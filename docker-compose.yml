@@ -1,0 +1,34 @@
+version: "3.7"
+
+services:
+  k8-spark-kafka:
+    init: true
+    image: k8-spark-kafka:latest
+    #container_name: fireworks_devcontainer # allegedly marks the exact container name
+    build:
+      context: .
+      dockerfile: Dockerfile
+    volumes:
+      # Update this IF the project is located somewhere other than relative to this file's location
+      - .:/workspace
+      # Enable Docker-from-Docker
+      - /var/run/docker.sock:/var/run/docker.sock
+
+    # entrypoint: /workspace/devcontainer/entrypoint.sh
+
+    # Use to DNS of the internal KinD cluster externally
+    cap_add:
+      - NET_ADMIN
+    dns:
+      - 10.96.0.10
+    dns_search:
+      - svc.cluster.local
+      - cluster.local
+
+    # Use the Kind network which will be created
+    networks:
+      - kind
+networks:
+  kind:
+    external: false
+    name: kind

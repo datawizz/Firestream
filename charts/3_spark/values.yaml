@@ -1,0 +1,27 @@
+service:
+  ## @param service.type Kubernetes Service type
+  ##
+  type: ClusterIP
+  ## @param service.ports.http Spark client port for HTTP
+  ## @param service.ports.https Spark client port for HTTPS
+  ## @param service.ports.cluster Spark cluster port
+  ##
+  ports:
+    http: 80
+    https: 443
+    cluster: 7077
+  ## Specify the nodePort(s) value(s) for the LoadBalancer and NodePort service types.
+  ## ref: https://kubernetes.io/docs/concepts/services-networking/service/#type-nodeport
+  ## @param service.nodePorts.http Kubernetes web node port for HTTP
+  ## @param service.nodePorts.https Kubernetes web node port for HTTPS
+  ## @param service.nodePorts.cluster Kubernetes cluster node port
+  ##
+  nodePorts:
+    http: ""
+    https: ""
+    cluster: ""
+  ## @param service.clusterIP Spark service Cluster IP
+  ## e.g.:
+  ## clusterIP: None
+  ##
+  clusterIP: "10.96.1.1"
