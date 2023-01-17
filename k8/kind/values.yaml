@@ -18,6 +18,11 @@ nodes:
       - containerPort: 80
         hostPort: 80
         protocol: TCP
+  # TODO allow the creation of workers for further cluster testing
+  # this currently breaks networking for the Kafka service
+  # - role: worker
+  # - role: worker
+  # - role: worker
 networking:
   apiServerPort: 8080
   # Use the "Docker Host" IP to listen for incoming commands
@@ -25,5 +30,5 @@ networking:
   apiServerAddress: 172.17.0.1 # the docker host network
   # These are the default values, defined here for clarity
   podSubnet: "10.244.0.0/16"
-  serviceSubnet: "10.96.0.0/12"
+  serviceSubnet: "10.96.0.0/16"
 

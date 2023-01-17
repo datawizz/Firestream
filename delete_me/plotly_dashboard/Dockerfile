@@ -1,5 +1,9 @@
 FROM python:3.8-slim-bullseye
 
+
+COPY --from=localhost:5000/dependencies:latest /tmp /tmp
+
+
 ENV DASH_DEBUG_MODE False
 
 RUN set -ex && pip install \

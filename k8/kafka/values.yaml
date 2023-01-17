@@ -42,3 +42,8 @@ service:
   ## clusterIP: None
   ##
   clusterIP: "10.96.1.2"
+
+# zookeeper:
+#   service:
+#     type: ClusterIP
+#     clusterIP: 10.96.1.10
