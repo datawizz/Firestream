@@ -1,3 +1,5 @@
+# Install Scala Build Tools (sbt) in a Debian host
+
 apt-get update
 apt-get install -y curl gnupg
 
