@@ -1,0 +1,1 @@
+spark-submit --class KafkaStatefulStream --master local --packages org.apache.spark:spark-sql-kafka-0-10_2.12:3.3.1,org.apache.kafka:kafka-clients:3.3.1 /workspace/scala/spark_stateful_streaming/target/scala-2.12/kafka-streams-stateful-assembly-1.0.jar
