@@ -1,7 +1,9 @@
 
-# Kubernetes + Spark + Kafka
 
-Kubernetes Spark Kafka (k8-spark-kafka) is a minimal development environment for denomstration of streaming ETL, Feature Generation, and Real Time Dashboarding. It uses the following stack:
+![Screenshot](images/fireworks_banner.png)
+
+
+Fireworks is a minimal development environment for denomstration of streaming ETL, Feature Generation, and Real Time Dashboarding. It uses the following stack:
 
 * Development Container (a bastion container with modified DNS)
 * Docker-From-Docker access to underlying Docker Engine
