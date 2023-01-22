@@ -15,8 +15,8 @@ const kafka = new Kafka({
 const consumer = kafka.consumer({ groupId: 'my-group3' })
 
 // const topics = ['metronome', 'spark_structured_streaming_stateful']
-const topics = ['pyspark_wiener_process_stateless']
-
+// const topics = ['pyspark_wiener_process_stateless']
+const topics = ['metronome']
 
 // store the last 100 records for each topic in an array
 const topicArrays = {};
