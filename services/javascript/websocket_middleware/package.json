@@ -1,7 +1,6 @@
 {
   "dependencies": {
     "kafkajs": "^2.2.3",
-    "plotly.js-dist": "^2.17.1",
     "ws": "^8.12.0"
   }
 }
