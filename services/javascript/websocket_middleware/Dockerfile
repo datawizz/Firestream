@@ -1,23 +1,26 @@
-FROM python:3.8-slim-bullseye
+FROM debian:bullseye-slim
+ENV DEBIAN_FRONTEND=noninteractive
 
+# Copy install scripts
+COPY --from=localhost:5000/dependencies:latest /tmp/library-scripts /tmp/library-scripts
 
-COPY --from=localhost:5000/dependencies:latest /tmp /tmp
+# Install Node.JS
+ENV NVM_DIR="/usr/local/share/nvm"
+ENV NVM_SYMLINK_CURRENT=true \
+    PATH=${NVM_DIR}/current/bin:${PATH}
+RUN apt-get update && bash /tmp/library-scripts/node-debian.sh "${NVM_DIR}"
 
+# Cleanup
+RUN rm -rf /tmp
 
-ENV DASH_DEBUG_MODE False
-
-RUN set -ex && pip install \
-    confluent-kafka==1.7.0 \
-    pandas==1.3.4 \
-    dash==2.7.0 \
-    gunicorn
-
-COPY charts/7_dashboard/app/ /app/
+# Copy App files
+COPY ./services/javascript/websocket_middleware /app
 
 WORKDIR /app
 
-EXPOSE 8050
+# Install dependencies
+RUN npm install
 
-# CMD ["gunicorn", "-b", "0.0.0.0:8050", "--reload", "main:server"]
+EXPOSE 8080
 
-CMD ["python", "main.py"]
+CMD ["node", "src/server.js"]
