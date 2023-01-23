@@ -82,35 +82,30 @@ sudo ip route add 10.244.0.0/16 via $KIND_IP
 ### 3. Local Docker Registry                                                ###
 ###############################################################################
 
-# export DOCKER_PORT=5000
-# export ARTIFACT_REPO=localhost:5000
-
-# TODO make this idempotent and clear the registry from previous runs?
-
 # Setup Docker Registry
 printf "\nInstalling Local Docker Registry...\n"
 docker pull registry
 
 printf "\nStarting Local Docker Registry...\n\n"
 
+# create registry container unless it already exists
 reg_name='fireworks-registry'
 reg_port='5000'
-running="$(docker inspect -f '{{.State.Running}}' "${reg_name}" 2>/dev/null || true)"
-if [ "${running}" != 'true' ]; then
+if [ "$(docker inspect -f '{{.State.Running}}' "${reg_name}" 2>/dev/null || true)" != 'true' ]; then
   docker run \
-    -d --restart=always -p "${reg_port}:5000" --name "${reg_name}" \
+    -d --restart=always -p "127.0.0.1:${reg_port}:5000" --name "${reg_name}" \
     registry:2
 fi
 
-# Connect registry running in Docker to the Kind network used in the cluster
-docker network connect "kind" "${reg_name}"
+# connect the registry to the cluster network if not already connected
+if [ "$(docker inspect -f='{{json .NetworkSettings.Networks.kind}}' "${reg_name}")" = 'null' ]; then
+  docker network connect "kind" "${reg_name}"
+fi
 
 
 ###############################################################################
 ### Build Docker Images                                                     ###
 ###############################################################################
-
-# export DOCKER_HOST=tcp://127.0.0.1:2375
 
 # Build the dependencies and make it available on the local Docker registry
 docker build --target dependencies -f /workspace/Dockerfile -t localhost:5000/dependencies:latest .
@@ -119,25 +114,27 @@ docker push localhost:5000/dependencies:latest
 # Build the Spark SQL Structured Streaming Stateful container
 docker build -f /workspace/services/scala/spark_structured_streaming_stateful/Dockerfile -t localhost:5000/spark_structured_streaming_stateful:latest .
 
-
+# Build the Websocket Middleware
+docker build -f /workspace/services/javascript/websocket_middleware/Dockerfile -t localhost:5000/websocket_middleware:latest .
+docker push localhost:5000/websocket_middleware:latest
 
 ###############################################################################
 ### Build Artifacts                                                         ###
 ###############################################################################
 
-# # # cd 
+# cd 
 
-# # # /workspace/scala/transform/target/scala-2.13/kafka-streams-stateful-processing-assembly-1.0.jar
-
-
+# /workspace/scala/transform/target/scala-2.13/kafka-streams-stateful-processing-assembly-1.0.jar
 
 
 
 
 
-# # ###############################################################################
-# # ### K8 Services                                                             ###
-# # ###############################################################################
+
+
+###############################################################################
+### K8 Services                                                             ###
+###############################################################################
 
 # Install Bitnami repo
 helm repo add bitnami https://charts.bitnami.com/bitnami
@@ -149,12 +146,15 @@ helm install kafka bitnami/kafka -f /workspace/k8/kafka/values.yaml
 helm install spark bitnami/spark -f /workspace/k8/spark/values.yaml
 
 
+# Install WebSocket Middleware
+cd /workspace/services/javascript/websocket_middleware/chart && helm install websocket-middleware -f values.yaml .
 
-
-# # ###############################################################################
-# # ### Sleep                                                                   ###
-# # ###############################################################################
+###############################################################################
+### Sleep                                                                   ###
+###############################################################################
 
 # # Keep the container alive indefinitely
 # Only needed if this is the entrypoint script of the project
 # sleep infinity
+
+kubectl get pods -o wide --watch
