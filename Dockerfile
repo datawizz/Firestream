@@ -82,6 +82,7 @@ ARG SPARK_VERSION=3.3.1
 ARG HADOOP_VERSION=3.3.4
 ARG JAVA_VERSION=11
 ARG PYTHON_VERSION=3.8
+ARG NODE_VERSION=14
 
 # Python
 RUN apt-get update && apt-get -y install python3 python3-pip
@@ -234,12 +235,10 @@ RUN apt-get update && export DEBIAN_FRONTEND=noninteractive \
 
 
 # Install Node.js
-
 ENV NVM_DIR="/usr/local/share/nvm"
 ENV NVM_SYMLINK_CURRENT=true \
     PATH=${NVM_DIR}/current/bin:${PATH}
-RUN apt-get update && bash /tmp/library-scripts/node-debian.sh "${NVM_DIR}"
-
+RUN apt-get update && /bin/bash /tmp/library-scripts/node-debian.sh "${NVM_DIR}" "$NODE_VERSION"
 
 
 # Cleanup
