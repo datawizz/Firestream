@@ -15,6 +15,8 @@ services:
       # Enable Docker-from-Docker
       # This uses the host's Docker Engine through socket mapping and is preferred over Docker-in-Docker for security and latency
       - /var/run/docker.sock:/var/run/docker.sock
+      # Persist images built in devcontainer
+      - /var/lib/docker:/var/lib/docker
 
     # Configure DNS resolution to use the internal IP address assigned to the KinD Control Plane
     # This allows internal Kubernetes services (which have arbitrary IP address assignments) to be addressed using DNS (i.e. name.svc.cluster.local)
