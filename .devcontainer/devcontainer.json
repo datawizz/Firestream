@@ -59,9 +59,9 @@
 		"scalameta.metals"
 	],
 	// Use 'forwardPorts' to make a list of ports inside the container available locally.
-	// "forwardPorts": [
-	// 	9021
-	// ],
+	"forwardPorts": [
+		3000
+	],
 	"remoteUser": "vscode",
 	// Update the 'dockerComposeFile' list if you have more compose files or use different names.
 	"dockerComposeFile": "../docker-compose.yml",
@@ -87,5 +87,7 @@
 	"remoteEnv": {
 		// the original host directory which is needed for volume mount commands from inside the container (Docker in Docker)
 		"LOCAL_WORKSPACE_FOLDER": "${localWorkspaceFolder}"
-	}
+	},
+	// Use 'postStartCommand' to run commands after the container is started.
+	"postStartCommand": "/workspace/bootstrap.sh"
 }
