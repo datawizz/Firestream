@@ -5,10 +5,11 @@ ENV DEBIAN_FRONTEND=noninteractive
 COPY --from=localhost:5000/dependencies:latest /tmp/library-scripts /tmp/library-scripts
 
 # Install Node.JS
+ARG NODE_VERSION=14
 ENV NVM_DIR="/usr/local/share/nvm"
 ENV NVM_SYMLINK_CURRENT=true \
     PATH=${NVM_DIR}/current/bin:${PATH}
-RUN apt-get update && bash /tmp/library-scripts/node-debian.sh "${NVM_DIR}"
+RUN apt-get update && bash /tmp/library-scripts/node-debian.sh "${NVM_DIR}" "$NODE_VERSION"
 
 # Cleanup
 RUN rm -rf /tmp
