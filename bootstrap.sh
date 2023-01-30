@@ -127,8 +127,11 @@ docker push localhost:5000/websocket_middleware:latest
 # /workspace/scala/transform/target/scala-2.13/kafka-streams-stateful-processing-assembly-1.0.jar
 
 
+###############################################################################
+### NPM Packages                                                            ###
+###############################################################################
 
-
+cd /workspace/services/javascript/dashboard && npm install
 
 
 
