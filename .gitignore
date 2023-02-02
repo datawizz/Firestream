@@ -4,3 +4,9 @@
 ## target folder at any level of the project structue
 **/target
 /target 
+
+## Note JS packages
+**/node_modules
+
+## Built java files
+*.jar

@@ -1,22 +1,26 @@
 version: "3.7"
 
 services:
-  k8-spark-kafka:
+  devcontainer:
     init: true
-    image: k8-spark-kafka:latest
-    #container_name: fireworks_devcontainer # allegedly marks the exact container name
+    image: fireworks:latest
     build:
       context: .
       dockerfile: Dockerfile
+    env_file:
+      - .env
     volumes:
-      # Update this IF the project is located somewhere other than relative to this file's location
+      # Mount the project directory on the local file system
       - .:/workspace
       # Enable Docker-from-Docker
+      # This uses the host's Docker Engine through socket mapping and is preferred over Docker-in-Docker for security and latency
       - /var/run/docker.sock:/var/run/docker.sock
+      # Persist images built in devcontainer
+      - /var/lib/docker:/var/lib/docker
 
-    # entrypoint: /workspace/devcontainer/entrypoint.sh
-
-    # Use to DNS of the internal KinD cluster externally
+    # Configure DNS resolution to use the internal IP address assigned to the KinD Control Plane
+    # This allows internal Kubernetes services (which have arbitrary IP address assignments) to be addressed using DNS (i.e. name.svc.cluster.local)
+    # NOTE: This will make the internet inaccessible until the KinD Control Plane has created and connected via the "bootstrap.sh" command 
     cap_add:
       - NET_ADMIN
     dns:
@@ -24,8 +28,6 @@ services:
     dns_search:
       - svc.cluster.local
       - cluster.local
-
-    # Use the Kind network which will be created
     networks:
       - kind
 networks:
