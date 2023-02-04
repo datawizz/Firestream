@@ -3,7 +3,7 @@
 ![Screenshot](images/fireworks_banner.png)
 
 
-Fireworks is a production ready development environment for streaming stateful/stateless ETL and streaming Dashboarding. The purpose of Fireworks is to provide a minimal implementation of a modern streaming Data Warehouse using popular technologies that can be deployed to production without additional configuration.
+Fireworks aims to be a production ready development environment for streaming stateful/stateless ETL and streaming Dashboarding. The purpose of Fireworks is to provide a minimal implementation of a modern streaming Data Warehouse using popular technologies that can be deployed to a production kubernetes cluster (such as Amazon EKS or Google GKE) with minimal additional configuration.
 
 # Table of Contents  
 [Tech Stack](#tech-stack)  
@@ -40,11 +40,9 @@ git clone https://github.com/datawizz/fireworks.git && cd fireworks && sh bootst
 
 This will use the Docker Engine of the host and bind to the var/run/docker.sock to create the Devcontainer, open it via a terminal, and bootstrap the project. Once everything is built it will then expose the dashboard on localhost:3000.
 
-
+Alternatively you can run this project using the VS Code Devcontainer extension. Simply clone the repo, open it in VS Code, and click "open in container" on the bottom left.
 
 # Development Container
-
-Alternatively you can run this project using the VS Code Devcontainer extension. Simply clone the repo, open it in VS Code, and click "open in container" on the bottom left.
 
 The Devcontainer is configured to use IP Tables to resolve Kubernetes internal services using CoreDNS hosted in the Kind Control Plane using the Docker Engine as a bridge on the host's network. This allows anything run within the Devcontainer to reach local Kubernetes services using the same URL as it would inside the Kubernetes cluster!
 
@@ -75,12 +73,14 @@ For a comparison of performance a Python application is configured to read data 
 
 ### Node Middleware
 
-Kafka is great for internal communication between microservices but it is not ideal for clients to connect to directly due to the need to secure it and scale it 1-1 with the clients that are connected. Instead a middleware service is implemented which reads the events from Kafka and publishes the events one by one to all connected websocket clients. Events from Kakfa are read and added to a queue. Asynchronously the queue is read and sent to all connected websocket clients.
+Kafka is great for internal communication between microservices but it is not ideal for clients to connect to directly due to the need to secure it and scale it with the number of clients that are connected. Instead a middleware service is implemented in Node.js which reads the events from Kafka and publishes the most recent events to all connected websocket clients. Events from Kakfa are read and added to a queue for the life of the pod. Asynchronously the queue is read and sent to all connected websocket clients.
+
+The Middleware is also responsible for sending a ping-pong request every 5 seconds to each connected client ensuring they are still there and listening. This service also handles client disconnection and reconnection ensuring a smooth experience.
 
 ### Plotly Dashboard
 
 Plotly is a powerful library for data visualization and provides bindings in Python to make a Data Scientist's life easier. But in the realm of quickly updating dashboards the Python layer is simply too slow.
 
-Implemented here is the Plotly JS library rendered client side using NextJS and React. The single page application subscribes to the Websocket connection provided by the middleware and updates events every 100 milliseconds.
+Implemented here is the Plotly JS library rendered client side using NextJS and React. The somewhat heavy single page application subscribes to the Websocket connection provided by the middleware and updates events every 100 milliseconds.
 
 The dashboard is available at localhost:3000
