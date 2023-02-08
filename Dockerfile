@@ -108,16 +108,6 @@ ARG BRANCH_ENV
 RUN apt-get update && apt-get -y install python3 python3-pip
 
 
-### Java ###
-# Default to UTF-8 file.encoding
-ENV LANG en_US.UTF-8
-# TODO use the openJDK image instead of Microsoft
-ENV JAVA_HOME /usr/lib/jvm/msopenjdk-${JAVA_VERSION}-amd64
-ENV PATH "${JAVA_HOME}/bin:${PATH}"
-#COPY --from=openjdk:11-jre-slim-bullseye $JAVA_HOME $JAVA_HOME
-COPY --from=mcr.microsoft.com/openjdk/jdk:11-ubuntu $JAVA_HOME $JAVA_HOME
-
-
 # Hadoop: Copy previously fetched runtime components
 COPY --from=dependencies /tmp/hadoop-${HADOOP_VERSION}/bin /opt/hadoop/bin
 COPY --from=dependencies /tmp/hadoop-${HADOOP_VERSION}/etc /opt/hadoop/etc
@@ -161,6 +151,17 @@ ENV SPARK_HOME /opt/spark
 ENV PATH $PATH:$SPARK_HOME/bin:$HADOOP_HOME/bin
 ENV SPARK_DIST_CLASSPATH /opt/hadoop/etc/hadoop:/opt/hadoop/share/hadoop/common/lib/*:/opt/hadoop/share/hadoop/common/*:/opt/hadoop/share/hadoop/hdfs:/opt/hadoop/share/hadoop/hdfs/lib/*:/opt/hadoop/share/hadoop/hdfs/*:/opt/hadoop/share/hadoop/mapreduce/lib/*:/opt/hadoop/share/hadoop/mapreduce/*:/opt/hadoop/share/hadoop/yarn:/opt/hadoop/share/hadoop/yarn/lib/*:/opt/hadoop/share/hadoop/yarn/*
 ENV SPARK_CLASSPATH /opt/spark/jars/*:$SPARK_DIST_CLASSPATH
+
+
+### Java ###
+# Default to UTF-8 file.encoding
+ENV LANG en_US.UTF-8
+# TODO use the openJDK image instead of Microsoft
+ENV JAVA_HOME /usr/lib/jvm/msopenjdk-${JAVA_VERSION}-amd64
+ENV PATH "${JAVA_HOME}/bin:${PATH}"
+#COPY --from=openjdk:11-jre-slim-bullseye $JAVA_HOME $JAVA_HOME
+COPY --from=mcr.microsoft.com/openjdk/jdk:11-ubuntu $JAVA_HOME $JAVA_HOME
+
 
 # # ### Apache Spark ###
 # # Install the binaries for Spark so that "Spark Submit" works locally
