@@ -71,23 +71,12 @@
 	// The optional 'workspaceFolder' property is the path VS Code should open by default when
 	// connected. This is typically a volume mount in .devcontainer/docker-compose.yml
 	"workspaceFolder": "/workspace",
-	"runArgs": [
-		"--init",
-		"--rm",
-		"--network=host" // Allow internal ingress controller to be reached from the host
-	],
-	"mounts": [
-		// Mounts the host's Docker socket to the Devcontainer's Docker Socket
-		"source=/var/run/docker.sock,target=/var/run/docker-host.sock,type=bind",
-		// Makes images built internal to this container persist when the Devcontainer is deleted
-		"source=docker-var-lib-docker,target=/var/lib/docker,type=volume"
-	],
 	// Disables VS Code attempting to keep the container running by relying on the entrypoint.sh called in the Dockerfile
 	"overrideCommand": false,
 	"remoteEnv": {
 		// the original host directory which is needed for volume mount commands from inside the container (Docker in Docker)
 		"LOCAL_WORKSPACE_FOLDER": "${localWorkspaceFolder}"
 	},
-	// Use 'postStartCommand' to run commands after the container is started.
+	// // Use 'postStartCommand' to run commands after the container is started.
 	"postStartCommand": "/workspace/bootstrap.sh"
 }
