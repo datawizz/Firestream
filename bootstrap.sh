@@ -14,16 +14,23 @@ set -e
 # 5. Print to console information to connect
 
 ###############################################################################
+### 0. Establish Environment                                                ###
+###############################################################################
+
+if [ -f /.dockerenv ]; then
+  echo "This script is running inside a Docker container. Setting up Environment"
+else
+  echo "This script is NOT running inside a Docker container, better build it!"
+  docker-compose build && docker-compose run -e BRANCH_ENV=develop devcontainer bash -c "/workspace/bootstrap.sh"
+fi
+
+
+###############################################################################
 ### 1. Ensure Docker is available                                           ###
 ###############################################################################
 
-# Assert that each command finishes without error
-# set -e
-
 # Start Docker
-echo "Starting Docker"
-# bash /usr/local/share/docker-init.sh
-#Ensure it is started
+echo "Ensuring Docker is available"
 docker --version
 
 ###############################################################################
@@ -176,13 +183,12 @@ kubectl wait --timeout=120s --for=condition=ready pods --all -n default
 
 if [ "$BRANCH_ENV" == "test" ]; then
   pytest
-  # cd / scala test
-  # cd javascript test
-  echo "I'm a test! I FAILED"
-  exit 0
-# if [ "$BRANCH_ENV" == "develop" ]; then
-#   echo "Running as Development Environment"
-#   sleep infinity
+  #TODO Scala Tests!
+  #TODO Node.js Tests!
+
+elif [ "$BRANCH_ENV" == "develop" ]; then
+  echo "Running as Development Environment"
+  sleep infinity
 else
   echo "No Environment Specified, exiting"
   exit 0
