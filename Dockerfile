@@ -19,6 +19,7 @@ ARG NODE_SHA=""
 
 FROM debian:bullseye-slim as dependencies
 
+ENV DOCKER_BUILDKIT=1
 ENV DEBIAN_FRONTEND=noninteractive
 
 ARG SPARK_VERSION
