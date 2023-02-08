@@ -1,4 +1,5 @@
 #!/bin/bash
+set -e
 
 ### BOOTSTRAP ###
 
@@ -65,10 +66,12 @@ echo $KIND_IP
 
 # Set the route for Services inside the cluster
 # This is also used for the CoreDNS service
-sudo ip route add 10.96.0.0/16 via $KIND_IP
+
+sudo ip route add 10.96.0.0/16 via $KIND_IP || (echo "Route already exists")
+
 
 # Set the route for services in
-sudo ip route add 10.244.0.0/16 via $KIND_IP
+sudo ip route add 10.244.0.0/16 via $KIND_IP  || (echo "Route already exists")
 
 # # Route ALL THE THINGS
 # sudo ip route add 10.0.0.0/8 via $KIND_IP
@@ -152,12 +155,35 @@ helm install spark bitnami/spark -f /workspace/k8/spark/values.yaml
 # Install WebSocket Middleware
 cd /workspace/services/javascript/websocket_middleware/chart && helm install websocket-middleware -f values.yaml .
 
+
+# Wait for services to come up
+echo "Waiting for pods to be ready"
+kubectl wait --timeout=120s --for=condition=ready pods --all -n default
+#--all-namespaces=true
+
+
 ###############################################################################
-### Sleep                                                                   ###
+### Testing                                                                 ###
 ###############################################################################
 
 # # Keep the container alive indefinitely
 # Only needed if this is the entrypoint script of the project
 # sleep infinity
 
-kubectl get pods -o wide --watch
+# kubectl get pods -o wide --watch
+
+
+
+if [ "$BRANCH_ENV" == "test" ]; then
+  pytest
+  # cd / scala test
+  # cd javascript test
+  echo "I'm a test! I FAILED"
+  exit 0
+# if [ "$BRANCH_ENV" == "develop" ]; then
+#   echo "Running as Development Environment"
+#   sleep infinity
+else
+  echo "No Environment Specified, exiting"
+  exit 0
+fi

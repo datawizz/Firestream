@@ -1,0 +1,37 @@
+name: Continuous Testing
+
+on:
+  push:
+    branches:
+    - main
+    - staging
+    - dependabot/**
+    - dev
+  pull_request:
+    branches:
+    - main
+
+env:
+  DOCKER_HOST: tcp://localhost:2375
+  # BRANCH_ENV: ${{ env.BRANCH }}
+
+jobs:
+  docker:
+    timeout-minutes: 10
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v3
+
+    - name: Build Platform
+      run: |
+        docker-compose build --no-cache
+
+    - name: Run Tests
+      run: |
+        docker-compose run -e BRANCH_ENV=test devcontainer /workspace/bootstrap.sh
+
+    - name: Stop containers
+      if: always()
+      run: docker kill $(docker ps -q)

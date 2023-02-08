@@ -1,21 +1,33 @@
 
 
+ARG BRANCH_ENV
+
+# Version and Hashes
+ARG SPARK_VERSION=3.3.1
+ARG SPARK_SHA512="4996c576a536210bfe799d217bce7033bceb4eafdc629e6d30e6aaee48fa74cfea7ce52a9afa073de9587aa46dfc39f76c84a34835b51197e5c2daed3b267b32  spark-3.3.1-bin-without-hadoop.tgz"
+ARG HADOOP_VERSION=3.3.4
+ARG HADOOP_SHA512="ca5e12625679ca95b8fd7bb7babc2a8dcb2605979b901df9ad137178718821097b67555115fafc6dbf6bb32b61864ccb6786dbc555e589694a22bf69147780b4  hadoop-3.3.4.tar.gz"
+ARG JAVA_VERSION=11
+ARG PYTHON_VERSION=3.8
+ARG NODE_VERSION=14
+ARG NODE_SHA=""
+
 ## Dependency Container ##
 # Combines downloading of external resources in one place
 # Allows for efficient multistage build with minimum network activity
-# and assertation of remote resources
+# and assertation of remote resources by good 'ol hard coded hash matching
 
 FROM debian:bullseye-slim as dependencies
 
 ENV DEBIAN_FRONTEND=noninteractive
 
-# Version and Hashes
-ENV SPARK_VERSION=3.3.1
-ARG SPARK_SHA512="4996c576a536210bfe799d217bce7033bceb4eafdc629e6d30e6aaee48fa74cfea7ce52a9afa073de9587aa46dfc39f76c84a34835b51197e5c2daed3b267b32  spark-3.3.1-bin-without-hadoop.tgz"
-ENV HADOOP_VERSION=3.3.4
-ARG HADOOP_SHA512="ca5e12625679ca95b8fd7bb7babc2a8dcb2605979b901df9ad137178718821097b67555115fafc6dbf6bb32b61864ccb6786dbc555e589694a22bf69147780b4  hadoop-3.3.4.tar.gz"
-ENV JAVA_VERSION=11
-ENV PYTHON_VERSION=3.8
+ARG SPARK_VERSION
+ARG SPARK_SHA512
+ARG HADOOP_VERSION
+ARG HADOOP_SHA512
+ARG JAVA_VERSION
+ARG PYTHON_VERSION
+ARG NODE_VERSION
 
 RUN apt-get update && apt-get -y install wget
 
@@ -41,6 +53,12 @@ RUN pip3 download --no-cache-dir -r /tmp/python_packages/requirements.txt -d /tm
 # Copy install scripts
 COPY ./bin /tmp/library-scripts/
 COPY requirements.txt /tmp/library-scripts/requirements.txt
+
+# TODO
+# Download NPM Packages
+
+
+
 
 
 # TODO configure Nvidia packages in a seperate build step?
@@ -78,11 +96,13 @@ FROM debian:bullseye-slim as devcontainer
 
 ENV DEBIAN_FRONTEND=noninteractive
 
-ARG SPARK_VERSION=3.3.1
-ARG HADOOP_VERSION=3.3.4
-ARG JAVA_VERSION=11
-ARG PYTHON_VERSION=3.8
-ARG NODE_VERSION=14
+ARG SPARK_VERSION
+ARG HADOOP_VERSION
+ARG JAVA_VERSION
+ARG PYTHON_VERSION
+ARG NODE_VERSION
+ARG BRANCH_ENV
+
 
 # Python
 RUN apt-get update && apt-get -y install python3 python3-pip
@@ -252,8 +272,7 @@ VOLUME [ "/var/lib/docker" ]
 # Persist K8s StatefulSets
 VOLUME ["/var/lib/docker/k8s"]
 
-# COPY docker-entrypoint.sh /
-# RUN chmod +x /docker-entrypoint.sh
-# ENTRYPOINT [ "/docker-entrypoint.sh" ]
+WORKDIR /workspace
+COPY . /workspace
 
 CMD ["sleep", "infinity"]
