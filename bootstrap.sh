@@ -36,7 +36,7 @@ docker --version
 cluster_name="fireworks"
 
 # Check if the project's kind cluster is running
-existing_cluster=$(kind get clusters | grep "$cluster_name")
+existing_cluster=$(kind get clusters | grep "$cluster_name") || existing_cluster=""
 
 if [ -z "$existing_cluster" ]; then
   echo "the cluster is not running, create it"
