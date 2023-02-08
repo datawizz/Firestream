@@ -11,7 +11,8 @@ on:
     branches:
     - main
 
-# env:
+env:
+  DOCKER_BUILDKIT=1
   # DOCKER_HOST: tcp://localhost:2375
   # BRANCH_ENV: ${{ env.BRANCH }}
 
