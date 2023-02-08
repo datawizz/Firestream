@@ -11,8 +11,8 @@ on:
     branches:
     - main
 
-env:
-  DOCKER_HOST: tcp://localhost:2375
+# env:
+  # DOCKER_HOST: tcp://localhost:2375
   # BRANCH_ENV: ${{ env.BRANCH }}
 
 jobs:
