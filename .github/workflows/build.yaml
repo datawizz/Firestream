@@ -16,22 +16,22 @@ env:
   # BRANCH_ENV: ${{ env.BRANCH }}
 
 jobs:
-  docker:
+  test:
     timeout-minutes: 10
     runs-on: ubuntu-latest
 
     steps:
-    - name: Checkout
-      uses: actions/checkout@v3
+      - name: Checkout
+        uses: actions/checkout@v2
 
-    - name: Build Platform
-      run: |
-        docker-compose build --no-cache
+      - name: Build Platform
+        run: |
+          docker-compose build --no-cache
 
-    - name: Run Tests
-      run: |
-        docker-compose run -e BRANCH_ENV=test devcontainer /workspace/bootstrap.sh
+      - name: Run Tests
+        run: |
+          docker-compose run -e BRANCH_ENV=test devcontainer /workspace/bootstrap.sh
 
-    - name: Stop containers
-      if: always()
-      run: docker kill $(docker ps -q)
+      - name: Stop containers
+        if: always()
+        run: docker kill $(docker ps -q)
