@@ -83,4 +83,6 @@ Plotly is a powerful library for data visualization and provides bindings in Pyt
 
 Implemented here is the Plotly JS library rendered client side using NextJS and React. The single page application subscribes to the Websocket connection provided by the middleware and updates events every 100 milliseconds.
 
-The dashboard is available at localhost:3000
+The dashboard is available at localhost:8000
+
+![Screenshot](images/dashboard.gif)
