@@ -1,0 +1,32 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: shared-environment
+  namespace: your-namespace
+data:
+  # Kafka environment variables
+  KAFKA_BOOTSTRAP_SERVERS: "kafka-service:9092"
+  
+  # Spark environment variables
+  SPARK_MASTER_URL: "spark://spark-master:7077"
+  SPARK_DRIVER_HOST: "your-spark-driver-host"
+  SPARK_DRIVER_PORT: "your-spark-driver-port"
+  SPARK_BLOCKMANAGER_PORT: "your-spark-blockmanager-port"
+
+  # PostgreSQL environment variables
+  POSTGRESQL_HOST: "postgresql-service"
+  POSTGRESQL_PORT: "5432"
+  POSTGRESQL_USER: "your-postgresql-user"
+  POSTGRESQL_PASSWORD: "your-postgresql-password"
+  POSTGRESQL_DATABASE: "your-postgresql-database"
+
+  # MinIO environment variables
+  MINIO_ENDPOINT: "minio-service:9000"
+  MINIO_ACCESS_KEY: "your-minio-access-key"
+  MINIO_SECRET_KEY: "your-minio-secret-key"
+  MINIO_REGION: "us-east-1"
+
+  # LakeFS environment variables
+  LAKEFS_ENDPOINT: "lakefs-service:8000"
+  LAKEFS_ACCESS_KEY: "your-lakefs-access-key"
+  LAKEFS_SECRET_KEY: "your-lakefs-secret-key"

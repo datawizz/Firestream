@@ -1,0 +1,37 @@
+apiVersion: kind.x-k8s.io/v1alpha4
+kind: Cluster
+# Enable local Docker registry
+containerdConfigPatches:
+  - |-
+    [plugins."io.containerd.grpc.v1.cri".registry.mirrors."localhost:5000"]
+      endpoint = ["http://fireworks-registry:5000"]
+nodes:
+  - role: control-plane
+  # Set Ingress to accept connections on port 8000
+    kubeadmConfigPatches:
+      - |
+        kind: InitConfiguration
+        nodeRegistration:
+          kubeletExtraArgs:
+            node-labels: "ingress-ready=true"
+    extraPortMappings:
+      - containerPort: 8080
+        hostPort: 8000
+        protocol: TCP
+      # - containerPort: 443
+      #   hostPort: 443
+      #   protocol: TCP
+  # TODO allow the creation of workers for further cluster testing
+  # this currently breaks networking for the Kafka service
+  # - role: worker
+  # - role: worker
+  # - role: worker
+networking:
+  apiServerPort: 8080
+  # Use the "Docker Host" IP to listen for incoming commands
+  # This configuration is specific to the Docker From Docker pattern
+  apiServerAddress: 172.17.0.1 # the docker host network
+  # These are the default values, defined here for clarity
+  podSubnet: "10.244.0.0/16"
+  serviceSubnet: "10.96.0.0/16"
+
