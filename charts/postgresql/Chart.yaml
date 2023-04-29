@@ -1,0 +1,11 @@
+apiVersion: v2
+name: my-postgres
+description: A simple example of using the Bitnami PostgreSQL Helm chart
+type: application
+version: 0.1.0
+appVersion: "1.0"
+
+dependencies:
+  - name: postgresql
+    version: 10.x.x
+    repository: https://charts.bitnami.com/bitnami
