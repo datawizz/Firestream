@@ -1,0 +1,13 @@
+**/__pycache__/
+
+# Ignore unnecessary files inside allowed directories
+# This should go after the allowed directories
+**/.env
+**/*~
+**/*.log
+**/.DS_Store
+**/Thumbs.db
+**/logs*
+.data/*
+.logs/*
+.k8/*
