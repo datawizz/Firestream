@@ -1,26 +1,37 @@
+### Arguments ###
+
+ARG DEPLOYMENT_MODE
+ARG HOST_USER_UID
+ARG HOST_USER_GID
+ARG DOCKER_GID
 
 
-ARG BRANCH_ENV
+ARG USERNAME="vscode"
+ARG DOCKER_BUILDKIT=1
+ARG DOCKER_GID
 
-# Version and Hashes
-ARG SPARK_VERSION=3.3.1
-ARG SPARK_SHA512="4996c576a536210bfe799d217bce7033bceb4eafdc629e6d30e6aaee48fa74cfea7ce52a9afa073de9587aa46dfc39f76c84a34835b51197e5c2daed3b267b32  spark-3.3.1-bin-without-hadoop.tgz"
+ARG SPARK_VERSION=3.3.2
+ARG SPARK_SHA512="347fd9029128b12e7b05e9cd7948a5b571a57f16bbbbffc8ad4023b4edc0e127cffd27d66fcdbf5f926fa33362a2ae4fc0a8d59ab3abdaa1d4c4ef1e23126932  spark-3.3.2-bin-without-hadoop.tgz"
 ARG HADOOP_VERSION=3.3.4
 ARG HADOOP_SHA512="ca5e12625679ca95b8fd7bb7babc2a8dcb2605979b901df9ad137178718821097b67555115fafc6dbf6bb32b61864ccb6786dbc555e589694a22bf69147780b4  hadoop-3.3.4.tar.gz"
 ARG JAVA_VERSION=11
-ARG PYTHON_VERSION=3.8
+ARG PYTHON_VERSION=3.8 
+##TODO the python version is being installed from debian, instead of manually which puts the bells and whistles in
 ARG NODE_VERSION=14
 ARG NODE_SHA=""
 
+
+
 ## Dependency Container ##
-# Combines downloading of external resources in one place
+
+# Combines downloading of external resources in one place.
 # Allows for efficient multistage build with minimum network activity
 # and assertation of remote resources by good 'ol hard coded hash matching
 
 FROM debian:bullseye-slim as dependencies
 
-ENV DOCKER_BUILDKIT=1
 ENV DEBIAN_FRONTEND=noninteractive
+ARG DOCKER_BUILDKIT
 
 ARG SPARK_VERSION
 ARG SPARK_SHA512
@@ -29,10 +40,15 @@ ARG HADOOP_SHA512
 ARG JAVA_VERSION
 ARG PYTHON_VERSION
 ARG NODE_VERSION
+ARG USER_UID
+ARG USER_GID
+ARG DOCKER_GID
 
-RUN apt-get update && apt-get -y install wget
+RUN apt-get update && apt-get -y install wget unzip zip curl gnupg2 ca-certificates
 
+#TODO change to build
 WORKDIR /tmp
+
 
 ## Spark ##
 # The "without hadoop" binary is used so that *any* hadoop version can be supplied and linked to Spark
@@ -47,27 +63,39 @@ RUN echo $HADOOP_SHA512 | sha512sum -c - && echo "Hash matched" || (echo "Hash d
 
 ## Python ##
 RUN apt-get update && apt-get -y install python3 python3-pip
+# There is only Python3!
+RUN ln -s /usr/bin/python3 /usr/bin/python
+RUN python -m pip install --upgrade pip
 ### Download Python packages required by the project
-COPY /requirements.txt /tmp/python_packages/
-RUN pip3 download --no-cache-dir -r /tmp/python_packages/requirements.txt -d /tmp/python_packages
+COPY requirements.txt /tmp/workspace/requirements.txt
+RUN python -m pip download --no-cache-dir -r /tmp/workspace/requirements.txt -d /tmp/python_packages
+# TODO use the python install script from bin to gaurantee consistency with python version
 
-# Copy install scripts
-COPY ./bin /tmp/library-scripts/
-COPY requirements.txt /tmp/library-scripts/requirements.txt
-
-# TODO
+## NodeJS ##
 # Download NPM Packages
+# TODO
+
+#TODO The javascript deps should be downloaded in the builder stage.
+# Install Node.js dependencies
+# RUN cd /workspace/services/javascript/dashboard && npm install
+# RUN cd /workspace/services/javascript/websocket_middleware && npm install
 
 
+## Nvidia ##
+# Configure Nvidia Container Toolkit
+# TODO
 
-
-
-# TODO configure Nvidia packages in a seperate build step?
-
-
-
-# Set commit hash
+## Git ##
+# Set commit hash to environment variable
 # RUN git rev-parse HEAD > commit_hash
+
+## Java ##
+
+#TODO download java SDK and JRE using SDKman
+#TODO download sbt and maven using SDKman
+#TODO get the JAR files downloaded that will be used later from maven et al
+# RUN bash /tmp/workspace/bin/install_scripts/sdkman.sh
+# TODO should the Java versions be downloaded here?
 
 # # Install Spark Dependencies and Prepare Spark Runtime Environment
 # RUN set -ex && \
@@ -89,25 +117,65 @@ COPY requirements.txt /tmp/library-scripts/requirements.txt
 #     rm -rf /var/cache/apt/*
 
 
-# FROM python:3.8-slim-bullseye
 
-## Devcontainer ##
+### Source Code ###
+# Download the source code for the project's dependencies
+# This is used in downstream stages to build the project's artifacts
+# COPY . /tmp/workspace
+
+
+
+
+
+### Devcontainer ###
+
 # Contains everything (and the kitchen sink) required to build project artifacts and run tests
+
 FROM debian:bullseye-slim as devcontainer
 
 ENV DEBIAN_FRONTEND=noninteractive
 
+## Environement Variables ##
+ARG DEPLOYMENT_MODE
 ARG SPARK_VERSION
 ARG HADOOP_VERSION
 ARG JAVA_VERSION
 ARG PYTHON_VERSION
 ARG NODE_VERSION
-ARG BRANCH_ENV
+ARG HOST_USER_UID
+ARG HOST_USER_GID
+ARG USERNAME
+ARG DOCKER_GID
+
+# Install additional OS packages.
+RUN apt-get update && export DEBIAN_FRONTEND=noninteractive \
+    && apt-get -y install --no-install-recommends \
+    librdkafka-dev \
+    librdkafka++1 \
+    librdkafka1 \
+    build-essential \
+    iputils-ping \
+    dnsutils \
+    apt-transport-https \
+    ca-certificates \
+    gnupg \
+    stress \
+    netcat \
+    postgresql-client \
+    chromium \
+    libglib2.0-0 \
+    libnss3 \
+    libx11-6 \
+    wget \
+    unzip \
+    zip \
+    curl \
+    gnupg2 \
+    ca-certificates
 
 
 # Python
-RUN apt-get update && apt-get -y install python3 python3-pip
-
+RUN apt-get -y install python3 python3-pip
 
 # Hadoop: Copy previously fetched runtime components
 COPY --from=dependencies /tmp/hadoop-${HADOOP_VERSION}/bin /opt/hadoop/bin
@@ -130,8 +198,9 @@ COPY --from=dependencies /tmp/spark-${SPARK_VERSION}-bin-without-hadoop/R /opt/s
 COPY --from=dependencies /tmp/spark-${SPARK_VERSION}-bin-without-hadoop/sbin /opt/spark/sbin
 COPY --from=dependencies /tmp/spark-${SPARK_VERSION}-bin-without-hadoop/yarn /opt/spark/yarn
 
-# Copy install scripts
-COPY --from=dependencies /tmp/library-scripts/ /tmp/library-scripts/
+# Copy project
+#COPY --from=dependencies /tmp/workspace /tmp/workspace
+COPY ./bin /tmp/workspace/bin
 
 
 # Spark: Copy examples, data, and tests
@@ -154,14 +223,6 @@ ENV SPARK_DIST_CLASSPATH /opt/hadoop/etc/hadoop:/opt/hadoop/share/hadoop/common/
 ENV SPARK_CLASSPATH /opt/spark/jars/*:$SPARK_DIST_CLASSPATH
 
 
-### Java ###
-# Default to UTF-8 file.encoding
-ENV LANG en_US.UTF-8
-# TODO use the openJDK image instead of Microsoft
-ENV JAVA_HOME /usr/lib/jvm/msopenjdk-${JAVA_VERSION}-amd64
-ENV PATH "${JAVA_HOME}/bin:${PATH}"
-#COPY --from=openjdk:11-jre-slim-bullseye $JAVA_HOME $JAVA_HOME
-COPY --from=mcr.microsoft.com/openjdk/jdk:11-ubuntu $JAVA_HOME $JAVA_HOME
 
 
 # # ### Apache Spark ###
@@ -178,20 +239,15 @@ ARG INSTALL_ZSH="true"
 ARG UPGRADE_PACKAGES="false"
 
 
-# Install needed packages and setup non-root user. Use a separate RUN statement to add your
-# own dependencies. A user of "automatic" attempts to reuse an user ID if one already exists.
-# Press the easy button and make this the user ID that is used by default in debian for the first user (1000:1000)
-ENV USERNAME=vscode
-ENV USER_UID=1000
-ENV USER_GID=$USER_UID
+
 
 
 
 # ### Scala Build Tools ###
-RUN /bin/bash /tmp/library-scripts/sbt-debian.sh
+# RUN /bin/bash /tmp/workspace/bin/install_scripts/sbt-debian.sh
 
 # Install VS Code remote development container features
-RUN /bin/bash /tmp/library-scripts/common-debian.sh "${INSTALL_ZSH}" "${USERNAME}" "${USER_UID}" "${USER_GID}" "${UPGRADE_PACKAGES}" "true" "true"
+RUN /bin/bash /tmp/workspace/bin/install_scripts/common-debian.sh "${INSTALL_ZSH}" "${USERNAME}" "${HOST_USER_UID}" "${HOST_USER_GID}" "${UPGRADE_PACKAGES}" "true" "true"
 
 ### Docker ###
 # [Option] Enable non-root Docker access in container
@@ -204,18 +260,57 @@ ARG DOCKER_VERSION="latest"
 ENV DOCKER_BUILDKIT=1
 
 # ### Docker from Docker
-RUN /bin/bash /tmp/library-scripts/docker-from-docker-debian.sh "${ENABLE_NONROOT_DOCKER}" "/var/run/docker-host.sock" "/var/run/docker.sock" "${USERNAME}"
+RUN /bin/bash /tmp/workspace/bin/install_scripts/docker-from-docker-debian.sh "${ENABLE_NONROOT_DOCKER}" "/var/run/docker-host.sock" "/var/run/docker.sock" "${USERNAME}" "true" "latest" "v1" 
 
+### K3D ###
+RUN /bin/bash /tmp/workspace/bin/install_scripts/k3d-debian.sh
 
 ### Kubectl and Helm ###
-RUN /bin/bash /tmp/library-scripts/kubectl-helm-debian.sh
+RUN /bin/bash /tmp/workspace/bin/install_scripts/kubectl-helm-debian.sh
 
-### KIND (Kubernetes in Docker) ###
-RUN /bin/bash /tmp/library-scripts/kind-debian.sh
+# ### KIND (Kubernetes in Docker) ###
+# RUN /bin/bash /tmp/workspace/bin/install_scripts/kind-debian.sh
+
+### Rust ###
+RUN /bin/bash /tmp/workspace/bin/install_scripts/rust-debian.sh
+USER ${USERNAME}
+RUN echo 'export PATH=$PATH:/usr/local/cargo/bin' >> ~/.bashrc
+USER root
+
+
+### Java ###
+ENV LANG="en_US.UTF-8"
+
+### SDK Man ###
+
+# Switch from `sh -c` to `bash -c` as the shell behind a `RUN` command.
+SHELL ["/bin/bash", "-c"]
+
+#Install sdkman
+USER ${USERNAME}
+ENV HOME /home/${USERNAME}
+RUN curl -s "https://get.sdkman.io" | bash
+
+# Install Java, sbt, scala, and maven
+RUN source "$HOME/.sdkman/bin/sdkman-init.sh" \
+    && sdk install java 11.0.12-open \
+    && sdk install sbt 1.4.2 \
+    && sdk install scala 2.12.12 \
+    && sdk install maven 3.8.2
+
+# Update environment variables with the new user's paths
+ENV PATH=${HOME}/.sdkman/candidates/java/current/bin:$PATH
+ENV PATH=${HOME}/.sdkman/candidates/scala/current/bin:$PATH
+ENV PATH=${HOME}/.sdkman/candidates/sbt/current/bin:$PATH
+ENV PATH=${HOME}/.sdkman/candidates/maven/current/bin:$PATH
+
+# Switch back to root user
+USER root
+
 
 
 # # ## Python ###
-
+#TODO install python from source instead of apt-get
 # ARG TARGET_PYTHON_INSTALL_PATH=/usr/local/python
 # # Setup default python tools in a venv via pipx to avoid conflicts
 # ENV PIPX_HOME=/usr/local/py-utils
@@ -224,13 +319,7 @@ RUN /bin/bash /tmp/library-scripts/kind-debian.sh
 
 
 
-# # Install python dependencies
 
-COPY --from=dependencies /tmp/python_packages /tmp/python_packages
-RUN pip3 install --no-index --find-links file:///tmp/python_packages -r /tmp/library-scripts/requirements.txt
-
-# There is only Python3!
-RUN ln -s /usr/bin/python3 /usr/bin/python
 
 ## Install PySpark
 # TODO install pyspark from spark build from source
@@ -239,42 +328,41 @@ RUN ln -s /usr/bin/python3 /usr/bin/python
 #cd $SPARK_HOME && sudo sbt clean assembly
 
 
-# Install additional OS packages.
-RUN apt-get update && export DEBIAN_FRONTEND=noninteractive \
-    && apt-get -y install --no-install-recommends \
-    librdkafka-dev \
-    librdkafka++1 \
-    librdkafka1 \
-    build-essential \
-    iputils-ping \
-    dnsutils \
-    apt-transport-https \
-    ca-certificates \
-    gnupg \
-    stress \
-    netcat \
-    postgresql-client
 
 
 # Install Node.js
 ENV NVM_DIR="/usr/local/share/nvm"
 ENV NVM_SYMLINK_CURRENT=true \
     PATH=${NVM_DIR}/current/bin:${PATH}
-RUN apt-get update && /bin/bash /tmp/library-scripts/node-debian.sh "${NVM_DIR}" "$NODE_VERSION"
+RUN apt-get update && /bin/bash /tmp/workspace/bin/install_scripts/node-debian.sh "${NVM_DIR}" "$NODE_VERSION"
 
 
-# Cleanup
-RUN rm -rf /tmp/library-scripts/
-# TODO can I also remove the entire /tmp directory?
+
+
+
+
+
+
+
+
+### Python ###
+
+# There is only Python3!
+RUN ln -s /usr/bin/python3 /usr/bin/python
+RUN python -m pip install --upgrade pip
+
+# Install python dependencies
+COPY ./requirements.txt /tmp/workspace/requirements.txt
+COPY --from=dependencies /tmp/python_packages /tmp/python_packages
+RUN chown $HOST_USER_UID:$HOST_USER_GID -R /tmp
+USER ${USERNAME}
+RUN python -m pip install --no-warn-script-location --no-index --find-links file:///tmp/python_packages -r /tmp/workspace/requirements.txt --user
+USER root
+
+### Cleanup ###
+RUN rm -rf /tmp/workspace
 RUN apt-get autoremove -y && apt-get clean -y && rm -rf /var/lib/apt/lists/*
-
-# Use the host's storage for persisting containers built inside this container
-VOLUME [ "/var/lib/docker" ]
-
-# Persist K8s StatefulSets
-VOLUME ["/var/lib/docker/k8s"]
-
+USER ${USERNAME}
 WORKDIR /workspace
-COPY . /workspace
 
 CMD ["sleep", "infinity"]

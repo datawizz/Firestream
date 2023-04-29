@@ -10,3 +10,16 @@
 
 ## Built java files
 *.jar
+
+## Development Logs
+logs/*
+
+## Local Secrets ##
+# Used to provide API keys etc. to the application locally. Contains sensitive data.
+.env.secrets
+
+## Downloaded Software ##
+/opt/apache/*
+/opt/maven/*
+/workspace/submodules/3rd_party_data/*.zip
+submodules/apache/solr/*
