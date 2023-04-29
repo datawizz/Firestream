@@ -1,0 +1,20 @@
+confluent-kafka==1.7.0
+# pyspark>=3.3.0
+# google-cloud-secret-manager==2.7.2
+pandas==1.3.4
+dataclasses-avroschema==0.26.1
+avro==1.11.0
+yfinance==0.1.84
+dataclass-wizard
+tinsel
+awscli
+jupyterlab
+pyro-ppl
+matplotlib
+ipywidgets
+torchvision
+mlflow
+scikit-learn
+pytest
+redis
+redis-om
