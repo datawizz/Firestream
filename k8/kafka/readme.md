@@ -1,1 +1,0 @@
-# The Bitnami packaged Kafka instance
