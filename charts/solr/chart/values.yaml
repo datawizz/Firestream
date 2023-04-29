@@ -1,0 +1,5 @@
+auth:
+  adminUsername: "admin"
+  adminPassword: "admin_admin"
+coreNames:
+  - fireworks
