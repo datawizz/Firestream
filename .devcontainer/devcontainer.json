@@ -2,62 +2,6 @@
 // https://github.com/microsoft/vscode-dev-containers/tree/v0.209.6/containers/docker-in-docker
 {
 	"name": "Fireworks",
-	// Set *default* container specific settings.json values on container create.
-	"settings": {
-		"python.defaultInterpreterPath": "usr/local/python/bin/python",
-		"python.linting.enabled": true,
-		"python.linting.pylintEnabled": true,
-		"python.linting.mypyEnabled": true,
-		"python.linting.banditEnabled": true,
-		"python.formatting.provider": "black",
-		"python.analysis.typeCheckingMode": "basic",
-		"python.linting.lintOnSave": true,
-		"python.formatting.autopep8Path": "/usr/local/py-utils/bin/autopep8",
-		"python.formatting.blackPath": "/usr/local/py-utils/bin/black",
-		"python.formatting.yapfPath": "/usr/local/py-utils/bin/yapf",
-		"python.linting.banditPath": "/usr/local/py-utils/bin/bandit",
-		"python.linting.flake8Path": "/usr/local/py-utils/bin/flake8",
-		"python.linting.mypyPath": "/usr/local/py-utils/bin/mypy",
-		"python.linting.pycodestylePath": "/usr/local/py-utils/bin/pycodestyle",
-		"python.linting.pydocstylePath": "/usr/local/py-utils/bin/pydocstyle",
-		"python.linting.pylintPath": "/usr/local/py-utils/bin/pylint",
-		"python.linting.pylintArgs": [
-			"--errors-only"
-		],
-		"python.tensorboard.logDirectory": "/workspace/logs/",
-		"workbench.colorCustomizations": {
-			"activityBar.background": "#a00909",
-			"titleBar.activeBackground": "#a00909"
-		},
-		"editor.formatOnSave": true,
-		"editor.insertSpaces": true,
-		"editor.detectIndentation": true,
-		"python.testing.pytestArgs": [
-			"."
-		],
-		"python.testing.unittestEnabled": false,
-		"python.testing.pytestEnabled": true,
-		// Controls if quick suggestions should show up while typing
-		"editor.quickSuggestions": {
-			"other": true,
-			"comments": false,
-			"strings": false
-		}
-	},
-	// Add the IDs of extensions you want installed when the container is created.
-	"extensions": [
-		"ms-azuretools.vscode-docker",
-		"ms-kubernetes-tools.vscode-kubernetes-tools",
-		"ms-python.python",
-		"ms-python.vscode-pylance",
-		"ms-vscode.live-server",
-		"randomfractalsinc.vscode-data-preview",
-		"ms-vscode-remote.remote-containers",
-		"github.codespaces",
-		"ms-toolsai.jupyter",
-		"ms-toolsai.jupyter-renderers",
-		"scalameta.metals"
-	],
 	// Use 'forwardPorts' to make a list of ports inside the container available locally.
 	"forwardPorts": [
 		3000
@@ -65,6 +9,8 @@
 	"remoteUser": "vscode",
 	// Update the 'dockerComposeFile' list if you have more compose files or use different names.
 	"dockerComposeFile": "../docker-compose.yml",
+	// Use 'postStartCommand' to run commands after the container is started.
+	// "postStartCommand": "/workspace/bootstrap.sh",
 	// The 'service' property is the name of the service for the container that VS Code should
 	// use. Update this value and .devcontainer/docker-compose.yml to the real service name.
 	"service": "devcontainer",
@@ -77,6 +23,63 @@
 		// the original host directory which is needed for volume mount commands from inside the container (Docker in Docker)
 		"LOCAL_WORKSPACE_FOLDER": "${localWorkspaceFolder}"
 	},
-	// // Use 'postStartCommand' to run commands after the container is started.
-	"postStartCommand": "/workspace/bootstrap.sh"
+	// Add the IDs of extensions you want installed when the container is created.
+	"customizations": {
+		"vscode": {
+			"extensions": [
+				"ms-python.python",
+				"ms-python.vscode-pylance",
+				"ms-toolsai.jupyter",
+				"ms-toolsai.jupyter-renderers",
+				"ms-azuretools.vscode-docker",
+				"ms-kubernetes-tools.vscode-kubernetes-tools",
+				"ms-vscode.live-server",
+				"randomfractalsinc.vscode-data-preview",
+				"GitHub.copilot",
+				"scala-lang.scala"
+			],
+			// Set *default* container specific settings.json values on container create.
+			"settings": {
+				"python.defaultInterpreterPath": "usr/local/python/bin/python",
+				"python.linting.enabled": true,
+				"python.linting.pylintEnabled": true,
+				"python.linting.mypyEnabled": true,
+				"python.linting.banditEnabled": true,
+				"python.formatting.provider": "black",
+				"python.analysis.typeCheckingMode": "basic",
+				"python.linting.lintOnSave": true,
+				"python.formatting.autopep8Path": "/usr/local/py-utils/bin/autopep8",
+				"python.formatting.blackPath": "/usr/local/py-utils/bin/black",
+				"python.formatting.yapfPath": "/usr/local/py-utils/bin/yapf",
+				"python.linting.banditPath": "/usr/local/py-utils/bin/bandit",
+				"python.linting.flake8Path": "/usr/local/py-utils/bin/flake8",
+				"python.linting.mypyPath": "/usr/local/py-utils/bin/mypy",
+				"python.linting.pycodestylePath": "/usr/local/py-utils/bin/pycodestyle",
+				"python.linting.pydocstylePath": "/usr/local/py-utils/bin/pydocstyle",
+				"python.linting.pylintPath": "/usr/local/py-utils/bin/pylint",
+				"python.linting.pylintArgs": [
+					"--errors-only"
+				],
+				"python.tensorboard.logDirectory": "/workspace/logs/",
+				"workbench.colorCustomizations": {
+					"activityBar.background": "#a00909",
+					"titleBar.activeBackground": "#a00909"
+				},
+				"editor.formatOnSave": true,
+				"editor.insertSpaces": true,
+				"editor.detectIndentation": true,
+				"python.testing.pytestArgs": [
+					"."
+				],
+				"python.testing.unittestEnabled": false,
+				"python.testing.pytestEnabled": true,
+				// Controls if quick suggestions should show up while typing
+				"editor.quickSuggestions": {
+					"other": true,
+					"comments": false,
+					"strings": false
+				}
+			}
+		}
+	}
 }

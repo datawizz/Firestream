@@ -1,195 +1,118 @@
 #!/bin/bash
+echo ""
+echo ""
+echo "       _____.__                                   __                 "
+echo "     _/ ____\__|______   ______  _  _____________|  | __  ______     "
+echo "     \   __\|  \_  __ \_/ __ \ \/ \/ /  _ \_  __ \  |/ / /  ___/     "
+echo "      |  |  |  ||  | \/\  ___/\     (  <_> )  | \/    <  \___ \      "
+echo "      |__|  |__||__|    \___  >\/\_/ \____/|__|  |__|_ \/____  >     "
+echo "                            \/                        \/     \/      "
+echo ""
+echo ""
+
 set -e
 
-### BOOTSTRAP ###
 
-# This script bootstraps the project
 
-# 1. Setup a Kind cluster
-# 2. Setup networking proxy into Kind DNS (exposes internal services to the devcotainer, used in testing and development)
-# 3. Create a local Docker Registry to store images built in the project
-# 4. Setup Bitnami as a source in Helm, then install Kafka
-# 5. Use Scala Build Tools to build a custom Spark function as a fat Jar
-# 6. Build a Spark Image with the Jar included
-# 5. Print to console information to connect
 
 ###############################################################################
-### 0. Establish Environment                                                ###
+### 0. Git Clone                                                            ###
 ###############################################################################
 
-if [ -f /.dockerenv ]; then
-  echo "This script is running inside a Docker container. Setting up Environment"
-else
-  echo "This script is NOT running inside a Docker container, better build it!"
-  docker-compose build && docker-compose run -e BRANCH_ENV=develop devcontainer bash -c "/workspace/bootstrap.sh"
+## Ensure that submodules are cloned
+# TODO
+# git clone --recurse-submodules https://github.com/datawizz/fireworks
+
+####
+# Scope the resources avaialble to the project.
+#TODO 
+
+# Assert that there is sufficent CPU power for the project's services
+
+# echo /proc/cpuinfo | grep -m 1 "cpu cores"
+# cat /proc/meminfo | grep -m 1 "MemTotal"
+
+###############################################################################
+### 1. Environment                                                          ###
+###############################################################################
+
+# Set the commit hash for tagging the container images
+export GIT_COMMIT_HASH=$(git rev-parse --short HEAD)
+
+#TODO check if docker is available
+
+
+
+# Check CPU architecture and save it to a variable
+cpu_arch=$(uname -m)
+echo "CPU Architecture: $cpu_arch"
+
+# Check for Nvidia GPU presence and save it to a variable
+nvidia_gpu="Not Found"
+if lspci | grep -q "NVIDIA"; then
+    nvidia_gpu="Found"
+fi
+echo "NVIDIA GPU: $nvidia_gpu"
+
+# The deployment mode must be provided either in a argument at runtime or as a environment variable of the same name
+deployment_mode="${1:-$DEPLOYMENT_MODE}"
+
+# Check if the argument is valid
+if [ "$deployment_mode" != "development" ] && [ "$deployment_mode" != "test" ]; then
+  echo "Invalid deployment_mode. It must be either 'development' or 'test'"
+  exit 1
+fi
+
+echo "Bootstraping Fireworks in < $deployment_mode > mode"
+
+
+###############################################################################
+### 2. Deployment                                                           ###
+###############################################################################
+
+# 1. If in test mode
+if [ "$deployment_mode" = "test" ]; then
+  # 1.1   Run test suite via Docker Compose for each service
+  # 1.2   Run the integration suite via Helm and Docker Compose
+  echo "TODO"
+fi
+
+# 2. If in development mode
+if [ "$deployment_mode" = "development" ]; then
+
+  # Setup a K3D cluster on the host's Docker Engine and
+  # route the devcontainer's DNS to the K8 Control Plane for internal DNS resolution
+  sh /workspace/docker/k3d/bootstrap.sh
+
+  # Build the project's container images and artifacts
+  #TODO make idempotent 
+  # sh /workspace/bin/cicd_scripts/build.sh
+
+  # Install source python packages in editable mode
+  sh /workspace/bin/cicd_scripts/bootstrap_devcontainer.sh
+fi
+
+# 3. If in production mode
+if [ "$deployment_mode" = "production" ]; then
+  
+  #TODO
+
+  # 3.1   Build the project's container images and artifacts
+  # 3.2   Push the images to the container registry
+  # 3.3   Deploy the project's services using Helm
+  # 3.4   ???
+  # 3.5   Profit
+  echo "TODO"
 fi
 
 
-###############################################################################
-### 1. Ensure Docker is available                                           ###
-###############################################################################
-
-# Start Docker
-echo "Ensuring Docker is available"
-docker --version
 
 ###############################################################################
-### 2. KinD (Kubernetes in Docker) Cluster                                  ###
+### 3. Deployment                                                           ###
 ###############################################################################
 
-# The project's KinD cluster is used for DNS resolution and needs to be available
+# Build Artifacts
+#sh /workspace/opt/cicd_scripts/build.sh
 
-# Define the cluster's name
-cluster_name="fireworks"
-
-# Check if the project's kind cluster is running
-existing_cluster=$(kind get clusters | grep "$cluster_name") || existing_cluster=""
-
-if [ -z "$existing_cluster" ]; then
-  echo "the cluster is not running, create it"
-  # # Create a KinD cluster on the host's Docker Engine
-  kind create cluster --config=/workspace/k8/kind/values.yaml --name $cluster_name
-else
-  echo "the cluster is running, attach to it"
-  # TODO don't delete the cluster and recreate it, attach to it by exporting kubeconfig and importing to kubectl
-  kind delete cluster --name $cluster_name
-  kind create cluster --config=/workspace/k8/kind/values.yaml --name $cluster_name
-fi
-
-# Wait a moment for the cluster to come up
-echo "Sleeping for 20 seconds to let KinD initialize"
-sleep 20
-
-###############################################################################
-### 3. Resolve DNS through Kubernetes Control Plane                         ###
-###############################################################################
-
-# Find the IP of the Kind Control Plane Node (dynamically assigned with each cluster restart)
-export KIND_IP=$(docker container inspect fireworks-control-plane --format '{{ .NetworkSettings.Networks.kind.IPAddress }}')
-echo $KIND_IP
-
-
-# TODO this needs to be idempotent as the second run after a devcontainer rebuild has conflicts with the existing config
-
-# Set the route for Services inside the cluster
-# This is also used for the CoreDNS service
-
-sudo ip route add 10.96.0.0/16 via $KIND_IP || (echo "Route already exists")
-
-
-# Set the route for services in
-sudo ip route add 10.244.0.0/16 via $KIND_IP  || (echo "Route already exists")
-
-# # Route ALL THE THINGS
-# sudo ip route add 10.0.0.0/8 via $KIND_IP
-
-# sudo ip route add 10.100.0.0/24 via $KIND_IP
-
-# TODO try to ping outside resources
-# ping Google.com
-
-###############################################################################
-### 3. Local Docker Registry                                                ###
-###############################################################################
-
-# Setup Docker Registry
-printf "\nInstalling Local Docker Registry...\n"
-docker pull registry
-
-printf "\nStarting Local Docker Registry...\n\n"
-
-# create registry container unless it already exists
-reg_name='fireworks-registry'
-reg_port='5000'
-if [ "$(docker inspect -f '{{.State.Running}}' "${reg_name}" 2>/dev/null || true)" != 'true' ]; then
-  docker run \
-    -d --restart=always -p "127.0.0.1:${reg_port}:5000" --name "${reg_name}" \
-    registry:2
-fi
-
-# connect the registry to the cluster network if not already connected
-if [ "$(docker inspect -f='{{json .NetworkSettings.Networks.kind}}' "${reg_name}")" = 'null' ]; then
-  docker network connect "kind" "${reg_name}"
-fi
-
-
-###############################################################################
-### Build Docker Images                                                     ###
-###############################################################################
-
-# Build the dependencies and make it available on the local Docker registry
-docker build --target dependencies -f /workspace/Dockerfile -t localhost:5000/dependencies:latest .
-docker push localhost:5000/dependencies:latest
-
-# Build the Spark SQL Structured Streaming Stateful container
-docker build -f /workspace/services/scala/spark_structured_streaming_stateful/Dockerfile -t localhost:5000/spark_structured_streaming_stateful:latest .
-
-# Build the Websocket Middleware
-docker build -f /workspace/services/javascript/websocket_middleware/Dockerfile -t localhost:5000/websocket_middleware:latest .
-docker push localhost:5000/websocket_middleware:latest
-
-###############################################################################
-### Build Artifacts                                                         ###
-###############################################################################
-
-# cd 
-
-# /workspace/scala/transform/target/scala-2.13/kafka-streams-stateful-processing-assembly-1.0.jar
-
-
-###############################################################################
-### NPM Packages                                                            ###
-###############################################################################
-
-cd /workspace/services/javascript/dashboard && npm install
-
-
-
-###############################################################################
-### K8 Services                                                             ###
-###############################################################################
-
-# Install Bitnami repo
-helm repo add bitnami https://charts.bitnami.com/bitnami
-
-# Install Kafka using local Values.yaml overrides
-helm install kafka bitnami/kafka -f /workspace/k8/kafka/values.yaml
-
-# Install Spark using local Values.yaml overrides
-helm install spark bitnami/spark -f /workspace/k8/spark/values.yaml
-
-
-# Install WebSocket Middleware
-cd /workspace/services/javascript/websocket_middleware/chart && helm install websocket-middleware -f values.yaml .
-
-
-# Wait for services to come up
-echo "Waiting for pods to be ready"
-kubectl wait --timeout=120s --for=condition=ready pods --all -n default
-#--all-namespaces=true
-
-
-###############################################################################
-### Testing                                                                 ###
-###############################################################################
-
-# # Keep the container alive indefinitely
-# Only needed if this is the entrypoint script of the project
-# sleep infinity
-
-# kubectl get pods -o wide --watch
-
-
-
-if [ "$BRANCH_ENV" == "test" ]; then
-  pytest
-  #TODO Scala Tests!
-  #TODO Node.js Tests!
-
-elif [ "$BRANCH_ENV" == "develop" ]; then
-  echo "Running as Development Environment"
-  sleep infinity
-else
-  echo "No Environment Specified, exiting"
-  exit 0
-fi
+# Helm Install Charts
+sh /workspace/bin/cicd_scripts/helm_install.sh
