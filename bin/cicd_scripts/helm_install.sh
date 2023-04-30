@@ -88,11 +88,6 @@ helm install solr bitnami/solr -f /workspace/charts/solr/chart/values.yaml \
 helm install kafka bitnami/kafka -f /workspace/charts/kafka/chart/values.yaml
 
 
-### Jupyter Hub ###
-helm install jupyter bitnami/jupyterhub -f /workspace/charts/jupyterhub/values.yaml
-
-
-
 # ### Websocket Middleware ###
 # cd /workspace/services/javascript/websocket_middleware/chart && helm install websocket-middleware -f values.yaml .
 
