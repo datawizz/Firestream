@@ -17,7 +17,7 @@ env:
 
 jobs:
   test:
-    timeout-minutes: 20
+    timeout-minutes: 30
     runs-on: ubuntu-latest
 
     steps:
@@ -30,7 +30,7 @@ jobs:
 
       - name: Run Tests
         run: |
-          docker compose run devcontainer make test
+          sudo chown runner:docker /var/run/docker.sock && docker compose run devcontainer make test
 
       - name: Stop containers
         if: always()
