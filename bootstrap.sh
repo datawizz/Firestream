@@ -1,4 +1,6 @@
 #!/bin/bash
+set -e
+
 echo ""
 echo ""
 echo "       _____.__                                   __                 "
@@ -9,11 +11,6 @@ echo "      |__|  |__||__|    \___  >\/\_/ \____/|__|  |__|_ \/____  >     "
 echo "                            \/                        \/     \/      "
 echo ""
 echo ""
-
-set -e
-
-
-
 
 ###############################################################################
 ### 0. Git Clone                                                            ###
@@ -37,7 +34,7 @@ set -e
 ###############################################################################
 
 # Set the commit hash for tagging the container images
-export GIT_COMMIT_HASH=$(git rev-parse --short HEAD)
+# export GIT_COMMIT_HASH=$(git rev-parse --short HEAD)
 
 #TODO check if docker is available
 
@@ -48,11 +45,7 @@ cpu_arch=$(uname -m)
 echo "CPU Architecture: $cpu_arch"
 
 # Check for Nvidia GPU presence and save it to a variable
-nvidia_gpu="Not Found"
-if lspci | grep -q "NVIDIA"; then
-    nvidia_gpu="Found"
-fi
-echo "NVIDIA GPU: $nvidia_gpu"
+#TODO
 
 # The deployment mode must be provided either in a argument at runtime or as a environment variable of the same name
 deployment_mode="${1:-$DEPLOYMENT_MODE}"
@@ -80,16 +73,21 @@ fi
 # 2. If in development mode
 if [ "$deployment_mode" = "development" ]; then
 
+  # Install source python packages in editable mode
+  bash /workspace/bin/cicd_scripts/bootstrap_devcontainer.sh
+
   # Setup a K3D cluster on the host's Docker Engine and
   # route the devcontainer's DNS to the K8 Control Plane for internal DNS resolution
-  sh /workspace/docker/k3d/bootstrap.sh
+  bash /workspace/docker/k3d/bootstrap.sh
 
   # Build the project's container images and artifacts
-  #TODO make idempotent 
-  # sh /workspace/bin/cicd_scripts/build.sh
+  #bash /workspace/bin/cicd_scripts/build.sh
 
-  # Install source python packages in editable mode
-  sh /workspace/bin/cicd_scripts/bootstrap_devcontainer.sh
+  # Helm Install Charts
+  bash /workspace/bin/cicd_scripts/helm_install.sh
+
+  # Run port forwarding for the services to localhost
+  bash /workspace/bin/cicd_scripts/port_forward.sh
 fi
 
 # 3. If in production mode
@@ -105,14 +103,3 @@ if [ "$deployment_mode" = "production" ]; then
   echo "TODO"
 fi
 
-
-
-###############################################################################
-### 3. Deployment                                                           ###
-###############################################################################
-
-# Build Artifacts
-#sh /workspace/opt/cicd_scripts/build.sh
-
-# Helm Install Charts
-sh /workspace/bin/cicd_scripts/helm_install.sh
