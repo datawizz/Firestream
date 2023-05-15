@@ -361,6 +361,9 @@ USER ${USERNAME}
 RUN python -m pip install --no-warn-script-location --no-index --find-links file:///tmp/python_packages -r /tmp/workspace/requirements.txt --user
 USER root
 
+# Add PySpark to the Python Path
+RUN bash /tmp/workspace/bin/cicd_scripts/set_environment.sh
+
 ### Cleanup ###
 # RUN rm -rf /tmp/workspace
 # RUN apt-get autoremove -y && apt-get clean -y && rm -rf /var/lib/apt/lists/*
