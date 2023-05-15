@@ -2,6 +2,8 @@
 
 # Exposes ports for all services in the project. Used only in development mode!
 
+mkdir /workspace/logs
+
 if [ "$DEPLOYMENT_MODE" != "development" ]; then
   echo "Invalid deployment_mode $DEPLOYMENT_MODE."
   echo "only 'development' mode is supported for exposing ports using kubectl!"

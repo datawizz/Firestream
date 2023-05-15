@@ -1,5 +1,7 @@
+## Python
 /.metals
 /.pytest_cache
+*.pyc
 
 ## target folder at any level of the project structue
 **/target
@@ -19,7 +21,5 @@ logs/*
 .env.secrets
 
 ## Downloaded Software ##
-/opt/apache/*
-/opt/maven/*
-/workspace/submodules/3rd_party_data/*.zip
-submodules/apache/solr/*
+submodules/*
+.DS_Store
