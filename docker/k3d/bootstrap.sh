@@ -34,7 +34,7 @@ echo "Configuring kubectl to use k3d cluster named $CLUSTER_NAME..."
 kubectl config use-context "k3d-$CLUSTER_NAME"
 
 # Wait for COREDNS to be available
-kubectl wait --namespace=kube-system --for=condition=available --timeout=300s deployment/coredns
+kubectl wait --namespace=kube-system --for=condition=available --timeout=300s --all deployments
 
 echo $(kubectl cluster-info)
 
@@ -63,4 +63,5 @@ echo $KUBERNETES_DNS_IP
 sudo echo -e "search svc.cluster.local cluster.local\nnameserver $KUBERNETES_DNS_IP\noptions edns0 trust-ad" | sudo tee /etc/resolv.conf
 
 
-
+# Test DNS resolution
+bash /workspace/bin/commands/network_connection_test.sh
