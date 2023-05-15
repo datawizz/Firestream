@@ -1,4 +1,4 @@
-### Arguments ###
+### Build Arguments ###
 
 ARG DEPLOYMENT_MODE
 ARG HOST_USER_UID
@@ -12,8 +12,11 @@ ARG DOCKER_GID
 
 ARG SPARK_VERSION=3.3.2
 ARG SPARK_SHA512="347fd9029128b12e7b05e9cd7948a5b571a57f16bbbbffc8ad4023b4edc0e127cffd27d66fcdbf5f926fa33362a2ae4fc0a8d59ab3abdaa1d4c4ef1e23126932  spark-3.3.2-bin-without-hadoop.tgz"
+ARG SPARK_HOME="/opt/spark"
 ARG HADOOP_VERSION=3.3.4
 ARG HADOOP_SHA512="ca5e12625679ca95b8fd7bb7babc2a8dcb2605979b901df9ad137178718821097b67555115fafc6dbf6bb32b61864ccb6786dbc555e589694a22bf69147780b4  hadoop-3.3.4.tar.gz"
+ARG HADOOP_HOME="/opt/hadoop"
+
 ARG JAVA_VERSION=11
 ARG PYTHON_VERSION=3.8 
 ##TODO the python version is being installed from debian, instead of manually which puts the bells and whistles in
@@ -35,8 +38,10 @@ ARG DOCKER_BUILDKIT
 
 ARG SPARK_VERSION
 ARG SPARK_SHA512
+ARG SPARK_HOME
 ARG HADOOP_VERSION
 ARG HADOOP_SHA512
+ARG HADOOP_HOME
 ARG JAVA_VERSION
 ARG PYTHON_VERSION
 ARG NODE_VERSION
@@ -54,12 +59,30 @@ WORKDIR /tmp
 # The "without hadoop" binary is used so that *any* hadoop version can be supplied and linked to Spark
 RUN wget https://dlcdn.apache.org/spark/spark-${SPARK_VERSION}/spark-${SPARK_VERSION}-bin-without-hadoop.tgz
 RUN echo $SPARK_SHA512 | sha512sum -c - && echo "Hash matched" || (echo "Hash didn't match" && exit 1) \
-    && tar xvzf spark-${SPARK_VERSION}-bin-without-hadoop.tgz
+    && mkdir -p ${SPARK_HOME} \
+    && tar xvzf spark-${SPARK_VERSION}-bin-without-hadoop.tgz -C /tmp
+
+RUN mkdir -p ${SPARK_HOME} && mv spark-${SPARK_VERSION}-bin-without-hadoop/* ${SPARK_HOME}
 
 ## Hadoop ##
 RUN wget https://dlcdn.apache.org/hadoop/common/hadoop-${HADOOP_VERSION}/hadoop-${HADOOP_VERSION}.tar.gz
 RUN echo $HADOOP_SHA512 | sha512sum -c - && echo "Hash matched" || (echo "Hash didn't match" && exit 1) \
-    && tar xvzf hadoop-${HADOOP_VERSION}.tar.gz
+    && tar xvzf hadoop-${HADOOP_VERSION}.tar.gz -C /tmp
+
+RUN mkdir -p ${HADOOP_HOME} && mv /tmp/hadoop-${HADOOP_VERSION}/* ${HADOOP_HOME}
+
+# Set Hadoop default logging to WARN (instead of INFO which is very verbose)
+RUN sed -i 's/hadoop.root.logger=INFO,console/hadoop.root.logger=WARN,console/g' ${HADOOP_HOME}/etc/hadoop/log4j.properties
+
+
+
+# ## Hive Standalone Metastore ##
+# RUN wget https://dlcdn.apache.org/hive/hive-standalone-metastore-${HIVE_VERSION}/hive-standalone-metastore-${HIVE_VERSION}-bin.tar.gz
+# RUN echo $HIVE_SHA256 | sha256sum -c - && echo "Hash matched" || (echo "Hash didn't match" && exit 1) \
+#     && tar xvzf hive-standalone-metastore-${HIVE_VERSION}-bin.tar.gz
+
+# ### Iceberg ###
+# RUN wget https://search.maven.org/remotecontent?filepath=org/apache/iceberg/iceberg-spark-runtime-3.3_2.12/1.2.1/iceberg-spark-runtime-3.3_2.12-1.2.1.jar
 
 ## Python ##
 RUN apt-get update && apt-get -y install python3 python3-pip
@@ -121,8 +144,8 @@ RUN python -m pip download --no-cache-dir -r /tmp/workspace/requirements.txt -d 
 ### Source Code ###
 # Download the source code for the project's dependencies
 # This is used in downstream stages to build the project's artifacts
-# COPY . /tmp/workspace
 
+COPY ./bin /tmp/workspace/bin
 
 
 
@@ -138,7 +161,9 @@ ENV DEBIAN_FRONTEND=noninteractive
 ## Environement Variables ##
 ARG DEPLOYMENT_MODE
 ARG SPARK_VERSION
+ARG SPARK_HOME
 ARG HADOOP_VERSION
+ARG HADOOP_HOME
 ARG JAVA_VERSION
 ARG PYTHON_VERSION
 ARG NODE_VERSION
@@ -178,43 +203,19 @@ RUN apt-get update && export DEBIAN_FRONTEND=noninteractive \
 RUN apt-get -y install python3 python3-pip
 
 # Hadoop: Copy previously fetched runtime components
-COPY --from=dependencies /tmp/hadoop-${HADOOP_VERSION}/bin /opt/hadoop/bin
-COPY --from=dependencies /tmp/hadoop-${HADOOP_VERSION}/etc /opt/hadoop/etc
-COPY --from=dependencies /tmp/hadoop-${HADOOP_VERSION}/include /opt/hadoop/include
-COPY --from=dependencies /tmp/hadoop-${HADOOP_VERSION}/lib /opt/hadoop/lib
-COPY --from=dependencies /tmp/hadoop-${HADOOP_VERSION}/libexec /opt/hadoop/libexec
-COPY --from=dependencies /tmp/hadoop-${HADOOP_VERSION}/sbin /opt/hadoop/sbin
-COPY --from=dependencies /tmp/hadoop-${HADOOP_VERSION}/share /opt/hadoop/share
+COPY --from=dependencies ${HADOOP_HOME} ${HADOOP_HOME}
 
 # Spark: Copy previously fetched runtime components
-COPY --from=dependencies /tmp/spark-${SPARK_VERSION}-bin-without-hadoop/bin /opt/spark/bin
-COPY --from=dependencies /tmp/spark-${SPARK_VERSION}-bin-without-hadoop/conf /opt/spark/conf
-COPY --from=dependencies /tmp/spark-${SPARK_VERSION}-bin-without-hadoop/data /opt/spark/data
-COPY --from=dependencies /tmp/spark-${SPARK_VERSION}-bin-without-hadoop/examples /opt/spark/examples
-COPY --from=dependencies /tmp/spark-${SPARK_VERSION}-bin-without-hadoop/kubernetes /opt/spark/kubernetes
-COPY --from=dependencies /tmp/spark-${SPARK_VERSION}-bin-without-hadoop/jars /opt/spark/jars
-COPY --from=dependencies /tmp/spark-${SPARK_VERSION}-bin-without-hadoop/python /opt/spark/python
-COPY --from=dependencies /tmp/spark-${SPARK_VERSION}-bin-without-hadoop/R /opt/spark/R
-COPY --from=dependencies /tmp/spark-${SPARK_VERSION}-bin-without-hadoop/sbin /opt/spark/sbin
-COPY --from=dependencies /tmp/spark-${SPARK_VERSION}-bin-without-hadoop/yarn /opt/spark/yarn
+COPY --from=dependencies ${SPARK_HOME} ${SPARK_HOME}
 
 # Copy project
 #COPY --from=dependencies /tmp/workspace /tmp/workspace
 COPY ./bin /tmp/workspace/bin
 
 
-# Spark: Copy examples, data, and tests
-COPY --from=dependencies /tmp/spark-${SPARK_VERSION}-bin-without-hadoop/examples /opt/spark/examples
-COPY --from=dependencies /tmp/spark-${SPARK_VERSION}-bin-without-hadoop/data /opt/spark/data
-COPY --from=dependencies /tmp/spark-${SPARK_VERSION}-bin-without-hadoop/kubernetes/tests /opt/spark/tests
-
-
 # Set Hadoop environment
-ENV HADOOP_HOME /opt/hadoop
 ENV LD_LIBRARY_PATH $HADOOP_HOME/lib/native
 
-# Set Hadoop default logging to WARN
-RUN sed -i 's/hadoop.root.logger=INFO,console/hadoop.root.logger=WARN,console/g' $HADOOP_HOME/etc/hadoop/log4j.properties
 
 # Set Spark environment
 ENV SPARK_HOME /opt/spark
@@ -272,10 +273,10 @@ RUN /bin/bash /tmp/workspace/bin/install_scripts/kubectl-helm-debian.sh
 # RUN /bin/bash /tmp/workspace/bin/install_scripts/kind-debian.sh
 
 ### Rust ###
-RUN /bin/bash /tmp/workspace/bin/install_scripts/rust-debian.sh
-USER ${USERNAME}
-RUN echo 'export PATH=$PATH:/usr/local/cargo/bin' >> ~/.bashrc
-USER root
+ENV PATH="/usr/local/cargo/bin:$PATH"
+RUN /bin/bash /tmp/workspace/bin/install_scripts/rust-debian.sh && \
+    rustup default stable && \
+    cargo install wasm-pack
 
 
 ### Java ###
@@ -336,8 +337,9 @@ ENV NVM_SYMLINK_CURRENT=true \
     PATH=${NVM_DIR}/current/bin:${PATH}
 RUN apt-get update && /bin/bash /tmp/workspace/bin/install_scripts/node-debian.sh "${NVM_DIR}" "$NODE_VERSION"
 
-
-
+# Update NPM to latest
+#TODO use a higher version of node which should be updated.
+RUN npm install -g npm
 
 
 
@@ -360,8 +362,8 @@ RUN python -m pip install --no-warn-script-location --no-index --find-links file
 USER root
 
 ### Cleanup ###
-RUN rm -rf /tmp/workspace
-RUN apt-get autoremove -y && apt-get clean -y && rm -rf /var/lib/apt/lists/*
+# RUN rm -rf /tmp/workspace
+# RUN apt-get autoremove -y && apt-get clean -y && rm -rf /var/lib/apt/lists/*
 USER ${USERNAME}
 WORKDIR /workspace
 

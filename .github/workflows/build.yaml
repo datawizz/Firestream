@@ -3,13 +3,12 @@ name: Continuous Testing
 on:
   push:
     branches:
-    - main
-    - staging
-    - dependabot/**
-    - dev
+      - staging
+      - dependabot/**
+      - dev
   pull_request:
     branches:
-    - main
+      - main
 
 env:
   DOCKER_BUILDKIT: 1
@@ -27,11 +26,11 @@ jobs:
 
       - name: Build Platform
         run: |
-          docker-compose build --no-cache
+          docker compose build
 
       - name: Run Tests
         run: |
-          docker-compose run -e BRANCH_ENV=test devcontainer /workspace/bootstrap.sh
+          docker compose run devcontainer make test
 
       - name: Stop containers
         if: always()

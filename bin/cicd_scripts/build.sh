@@ -1,6 +1,6 @@
 
 
-
+set -e
 
 ###############################################################################
 ### Build Artifacts                                                         ###
@@ -18,11 +18,46 @@
 
 ## Build each of the Dockerfiles in the project
 
-# Build the dependencies and make it available on the local Docker registry
+
+# TODO remove the "k3d" portion of the image name for more compatibility. This will become relevant when we start using a cloud registry
+
+### Dependencies ###
+BASE_IMAGE=k3d-$COMPOSE_PROJECT_NAME.$CONTAINER_REGISTRY_URL:$CONTAINER_REGISTRY_PORT/dependencies:$GIT_COMMIT_HASH
+
 cd /workspace && docker build --target dependencies \
   -f /workspace/Dockerfile \
-  -t $CONTAINER_REGISTRY_URL:$CONTAINER_REGISTRY_PORT/dependencies:$GIT_COMMIT_HASH \
+  -t k3d-$COMPOSE_PROJECT_NAME.$CONTAINER_REGISTRY_URL:$CONTAINER_REGISTRY_PORT/dependencies:$GIT_COMMIT_HASH \
   .
-docker push $CONTAINER_REGISTRY_URL:$CONTAINER_REGISTRY_PORT/dependencies:$GIT_COMMIT_HASH
 
-# TODO build the rest of the images in the project?
+docker push $BASE_IMAGE
+
+### Spark Master ###
+# Builds the Spark image with support for Kubernetes Operator
+# Loads the custom Jars in the Project
+# Loads the custom Spark Configs in the Project
+
+SPARK_BASE=k3d-$COMPOSE_PROJECT_NAME.$CONTAINER_REGISTRY_URL:$CONTAINER_REGISTRY_PORT/spark:$GIT_COMMIT_HASH
+SPARK_PYTHON=k3d-$COMPOSE_PROJECT_NAME.$CONTAINER_REGISTRY_URL:$CONTAINER_REGISTRY_PORT/spark-py:$GIT_COMMIT_HASH
+bash $SPARK_HOME/bin/docker-image-tool.sh -r k3d-$COMPOSE_PROJECT_NAME.$CONTAINER_REGISTRY_URL:$CONTAINER_REGISTRY_PORT -t $GIT_COMMIT_HASH $SPARK_HOME/kubernetes/dockerfiles/spark/Dockerfile build
+bash $SPARK_HOME/bin/docker-image-tool.sh -r k3d-$COMPOSE_PROJECT_NAME.$CONTAINER_REGISTRY_URL:$CONTAINER_REGISTRY_PORT -t $GIT_COMMIT_HASH -p $SPARK_HOME/kubernetes/dockerfiles/spark/bindings/python/Dockerfile build
+
+#TODO set the user uid?
+
+docker push $SPARK_BASE
+docker push $SPARK_PYTHON
+
+
+### Spark Thrift Server ###
+# Exposes a Thrift JDBC entrypoint vai a HIVE2 API port
+# Enables execution of jobs on a Spark Cluster using spark://
+SPARK_THRIFT_SERVER=k3d-$COMPOSE_PROJECT_NAME.$CONTAINER_REGISTRY_URL:$CONTAINER_REGISTRY_PORT/spark_thrift_server:$GIT_COMMIT_HASH 
+cd /workspace/charts/spark_thrift_server && docker build \
+  --build-arg BASE_IMAGE=$BASE_IMAGE \
+  -t $SPARK_THRIFT_SERVER \
+  .
+
+docker push $SPARK_THRIFT_SERVER
+
+
+
+ALL_SPARK=k3d-$COMPOSE_PROJECT_NAME.$CONTAINER_REGISTRY_URL:$CONTAINER_REGISTRY_PORT/all_spark:$GIT_COMMIT_HASH
