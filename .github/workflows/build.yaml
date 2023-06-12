@@ -24,13 +24,16 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v2
 
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+
       - name: Build Platform
         run: |
-          docker compose build
+          docker compose -f docker/docker-compose.test.yml build cicdcontainer
 
       - name: Run Tests
         run: |
-          sudo chown runner:docker /var/run/docker.sock && docker compose run devcontainer make test
+          docker compose -f docker/docker-compose.test.yml run cicdcontainer make test
 
       - name: Stop containers
         if: always()

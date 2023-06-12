@@ -1,6 +1,0 @@
-# values.yaml
-databaseConnectionString: ""
-authEncryptSecretKey: ""
-minioEndpoint: ""
-minioAccessKey: ""
-minioSecretKey: ""

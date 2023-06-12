@@ -2,6 +2,7 @@
 /.metals
 /.pytest_cache
 *.pyc
+**__pycache__**
 
 ## target folder at any level of the project structue
 **/target
@@ -21,5 +22,8 @@ logs/*
 .env.secrets
 
 ## Downloaded Software ##
-submodules/*
+
 .DS_Store
+opt/data/**
+.WIP/**
+tmp/**
