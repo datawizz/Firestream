@@ -50,14 +50,58 @@ docker push $SPARK_PYTHON
 ### Spark Thrift Server ###
 # Exposes a Thrift JDBC entrypoint vai a HIVE2 API port
 # Enables execution of jobs on a Spark Cluster using spark://
-SPARK_THRIFT_SERVER=k3d-$COMPOSE_PROJECT_NAME.$CONTAINER_REGISTRY_URL:$CONTAINER_REGISTRY_PORT/spark_thrift_server:$GIT_COMMIT_HASH 
-cd /workspace/charts/spark_thrift_server && docker build \
+# SPARK_THRIFT_SERVER=k3d-$COMPOSE_PROJECT_NAME.$CONTAINER_REGISTRY_URL:$CONTAINER_REGISTRY_PORT/spark_thrift_server:$GIT_COMMIT_HASH 
+# cd /workspace/charts/spark_thrift_server && docker build \
+#   --build-arg BASE_IMAGE=$BASE_IMAGE \
+#   -t $SPARK_THRIFT_SERVER \
+#   .
+
+# docker push $SPARK_THRIFT_SERVER
+
+
+
+# ALL_SPARK=k3d-$COMPOSE_PROJECT_NAME.$CONTAINER_REGISTRY_URL:$CONTAINER_REGISTRY_PORT/all_spark:$GIT_COMMIT_HASH
+
+
+
+#/workspace/charts/spark_thrift_server/Dockerfile
+
+# cd $SPARK_HOME && docker build \
+#   --build-arg BASE_IMAGE=$BASE_IMAGE \
+#   -t $SPARK_HISTORY_SERVER \
+#   .
+
+
+### Spark History Server ###
+SPARK_HISTORY_SERVER=k3d-$COMPOSE_PROJECT_NAME.$CONTAINER_REGISTRY_URL:$CONTAINER_REGISTRY_PORT/spark_history_server:$GIT_COMMIT_HASH
+
+cd /workspace/charts/spark_history_server && docker build \
   --build-arg BASE_IMAGE=$BASE_IMAGE \
-  -t $SPARK_THRIFT_SERVER \
+  --build-arg SPARK_HOME=$SPARK_HOME \
+  -t $SPARK_HISTORY_SERVER \
   .
-
-docker push $SPARK_THRIFT_SERVER
-
+docker push $SPARK_HISTORY_SERVER
 
 
-ALL_SPARK=k3d-$COMPOSE_PROJECT_NAME.$CONTAINER_REGISTRY_URL:$CONTAINER_REGISTRY_PORT/all_spark:$GIT_COMMIT_HASH
+
+
+# ### Websocket Middleware ###
+# WEBSOCKET_MIDDLEWARE=k3d-$COMPOSE_PROJECT_NAME.$CONTAINER_REGISTRY_URL:$CONTAINER_REGISTRY_PORT/websocket_middleware:$GIT_COMMIT_HASH
+
+# cd /workspace/src/services/api/websocket_middleware && docker build \
+#   --build-arg BASE_IMAGE=$BASE_IMAGE \
+#   -t $WEBSOCKET_MIDDLEWARE \
+#   .
+
+# docker push $WEBSOCKET_MIDDLEWARE
+
+
+# ### Hive Metastore ###
+# HIVE_METASTORE=k3d-$COMPOSE_PROJECT_NAME.$CONTAINER_REGISTRY_URL:$CONTAINER_REGISTRY_PORT/hive_metastore:$GIT_COMMIT_HASH
+
+# cd /workspace/charts/hive_metastore/docker && docker build \
+#   --build-arg BASE_IMAGE=$BASE_IMAGE \
+#   -t  $HIVE_METASTORE \
+#   .
+
+# docker push $HIVE_METASTORE

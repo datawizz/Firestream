@@ -2,19 +2,37 @@
 
 # This makefile is used as a DevOps tool for the project to automate the following tasks:
 
-bootstrap:
-	cd /workspace && bash bootstrap.sh
+BASEDIR=$(shell pwd)
 
-development:
-	cd /workspace && make bootstrap
+all:
+	@echo "No argument suppllied. Making a standard build."
+	export DEPLOYMENT_MODE="clean" && cd $(BASEDIR) && bash bootstrap.sh
+
+
+config_host:
+	cd /workspace && bash bin/commands/config_host.sh
+
+
+bootstrap:
+
+	cd /workspace && bash bootstrap.sh
+	pip install -r /workspace/requirements.txt
+
+dev:
+	export DEPLOYMENT_MODE="clean" && cd /workspace && bash bootstrap.sh
 
 # Start services
 demo:
+	export DEPLOYMENT_MODE="development" && make bootstrap
 
-	make bootstrap
+	# Apply Demo Data
+	# POD_NAME=$(kubectl get pods --no-headers -o custom-columns=":metadata.name" | grep superset | head -n 1)
+	# kubectl exec -it ${POD_NAME} -- superset load_examples
+	# kubectl exec -it superset-69459c794f-r6j5k -- superset load_examples
+
 
 	# Start Streaming Data Generation
-	python src/lib/python/etl_lib/tests/services/spark/pyspark_metronome/charts/main.py
+	nohup python /workspace/src/services/back_end/spark_applications/_boilerplate/metronome/src/main.py > /workspace/logs/metronome.log 2>&1 &
 
 
 
@@ -28,7 +46,6 @@ demo:
 
 # Test services
 test:
-
 	make bootstrap
 
 	bash /workspace/bin/commands/run_tests.sh
@@ -38,5 +55,12 @@ build:
 	bash /workspace/bin/cicd_scripts/build.sh
 
 # Clean up
-purge_containers:
+boomboom:
 	bash /workspace/bin/commands/delete.sh
+
+
+# Run Stress Tests
+stress:
+	make bootstrap
+
+	bash /workspace/bin/commands/run_stress_tests.sh

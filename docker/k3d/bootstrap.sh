@@ -26,7 +26,7 @@ fi
 
 # Create the k3d cluster
 echo "Creating k3d cluster named $CLUSTER_NAME..."
-k3d cluster create $CLUSTER_NAME -p "8069:80@loadbalancer" --registry-use k3d-$CLUSTER_NAME.$CONTAINER_REGISTRY_URL:$CONTAINER_REGISTRY_PORT
+k3d cluster create $CLUSTER_NAME -p "80:80@loadbalancer" --registry-use k3d-$CLUSTER_NAME.$CONTAINER_REGISTRY_URL:$CONTAINER_REGISTRY_PORT
 
 
 # Configure kubectl to use the MYCLUSTER

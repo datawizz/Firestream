@@ -91,7 +91,7 @@ RUN ln -s /usr/bin/python3 /usr/bin/python
 RUN python -m pip install --upgrade pip
 ### Download Python packages required by the project
 COPY requirements.txt /tmp/workspace/requirements.txt
-RUN python -m pip download --no-cache-dir -r /tmp/workspace/requirements.txt -d /tmp/python_packages
+RUN python -m pip download --no-cache-dir --no-deps -r /tmp/workspace/requirements.txt -d /tmp/python_packages
 # TODO use the python install script from bin to gaurantee consistency with python version
 
 ## NodeJS ##
@@ -187,16 +187,23 @@ RUN apt-get update && export DEBIAN_FRONTEND=noninteractive \
     stress \
     netcat \
     postgresql-client \
-    chromium \
     libglib2.0-0 \
     libnss3 \
     libx11-6 \
+    # Headless chrom
+    chromium \
+    # Dev Tools
     wget \
     unzip \
     zip \
     curl \
     gnupg2 \
-    ca-certificates
+    ca-certificates \
+    # Used to enable GPU support in the container
+    pciutils \
+    # pyhive Thrift API dependencies
+    libsasl2-dev \
+    libsasl2-modules-gssapi-mit
 
 
 # Python
@@ -357,9 +364,9 @@ RUN python -m pip install --upgrade pip
 COPY ./requirements.txt /tmp/workspace/requirements.txt
 COPY --from=dependencies /tmp/python_packages /tmp/python_packages
 RUN chown $HOST_USER_UID:$HOST_USER_GID -R /tmp
-USER ${USERNAME}
-RUN python -m pip install --no-warn-script-location --no-index --find-links file:///tmp/python_packages -r /tmp/workspace/requirements.txt --user
-USER root
+# USER ${USERNAME}
+# RUN python -m pip install --no-warn-script-location --no-deps --no-index --find-links file:///tmp/python_packages -r /tmp/workspace/requirements.txt --user
+# USER root
 
 # Add PySpark to the Python Path
 RUN bash /tmp/workspace/bin/cicd_scripts/set_environment.sh
@@ -369,5 +376,15 @@ RUN bash /tmp/workspace/bin/cicd_scripts/set_environment.sh
 # RUN apt-get autoremove -y && apt-get clean -y && rm -rf /var/lib/apt/lists/*
 USER ${USERNAME}
 WORKDIR /workspace
+
+CMD ["sleep", "infinity"]
+
+
+### CICD Container ###
+# Contains everything required to build project artifacts and run tests
+
+FROM devcontainer as cicdcontainer
+
+
 
 CMD ["sleep", "infinity"]

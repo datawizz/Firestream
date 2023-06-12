@@ -1,6 +1,6 @@
 
 
-![Screenshot](images/fireworks_banner.png)
+![Screenshot](docs/static/images/fireworks_banner.png)
 
 
 Fireworks is a production ready development environment for streaming stateful/stateless ETL and streaming Dashboarding. The purpose of Fireworks is to provide a minimal implementation of a modern streaming Data Warehouse using popular technologies that can be deployed to production without additional configuration.

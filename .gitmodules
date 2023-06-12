@@ -1,3 +1,51 @@
 [submodule "submodules/quadratichq/quadratic"]
 	path = submodules/quadratichq/quadratic
 	url = https://github.com/datawizz/quadratic
+[submodule "submodules/projectnessie/nessie"]
+	path = submodules/projectnessie/nessie
+	url = https://github.com/projectnessie/nessie
+[submodule "submodules/apache/solr-operator"]
+	path = submodules/apache/solr-operator
+	url = https://github.com/apache/solr-operator
+[submodule "submodules/apache/superset"]
+	path = submodules/apache/superset
+	url = https://github.com/apache/superset
+[submodule "submodules/pravega/zookeeper-operator"]
+	path = submodules/pravega/zookeeper-operator
+	url = https://github.com/pravega/zookeeper-operator
+[submodule "submodules/apache/kyuubi"]
+	path = submodules/apache/kyuubi
+	url = https://github.com/apache/kyuubi
+[submodule "submodules/the-fireworks-company/milvus-operator"]
+	path = submodules/the-fireworks-company/milvus-operator
+	url = https://github.com/The-Fireworks-Company/milvus-operator
+[submodule "submodules/the-fireworks-company/milvus"]
+	path = submodules/the-fireworks-company/milvus
+	url = https://github.com/The-Fireworks-Company/milvus
+[submodule "submodules/the-fireworks-company/kyuubi"]
+	path = submodules/the-fireworks-company/kyuubi
+	url = https://github.com/The-Fireworks-Company/kyuubi
+[submodule "submodules/the-fireworks-company/bitnami_charts"]
+	path = submodules/the-fireworks-company/bitnami_charts
+	url = https://github.com/The-Fireworks-Company/bitnami_charts
+[submodule "submodules/the-fireworks-company/superset"]
+	path = submodules/the-fireworks-company/superset
+	url = https://github.com/The-Fireworks-Company/superset
+[submodule "submodules/the-fireworks-company/Flowise"]
+	path = submodules/the-fireworks-company/Flowise
+	url = https://github.com/The-Fireworks-Company/Flowise
+[submodule "submodules/the-fireworks-company/nessie"]
+	path = submodules/the-fireworks-company/nessie
+	url = https://github.com/The-Fireworks-Company/nessie
+[submodule "submodules/the-fireworks-company/spark"]
+	path = submodules/the-fireworks-company/spark
+	url = https://github.com/The-Fireworks-Company/spark
+[submodule "submodules/the-fireworks-company/spark-on-k8s-operator"]
+	path = submodules/the-fireworks-company/spark-on-k8s-operator
+	url = https://github.com/The-Fireworks-Company/spark-on-k8s-operator
+[submodule "submodules/the-fireworks-company/OpenSearch"]
+	path = submodules/the-fireworks-company/OpenSearch
+	url = https://github.com/The-Fireworks-Company/OpenSearch
+[submodule "submodules/the-fireworks-company/opensearch-project-helm-charts"]
+	path = submodules/the-fireworks-company/opensearch-project-helm-charts
+	url = https://github.com/The-Fireworks-Company/opensearch-project-helm-charts

@@ -4,7 +4,7 @@ import os
 
 
 def test_log():
-    path = ".data/logs"
+    path = "./logs"
     if not os.path.exists(path):
         os.mkdir(path)
     logging.basicConfig(

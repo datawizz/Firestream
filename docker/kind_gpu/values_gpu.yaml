@@ -1,0 +1,46 @@
+apiVersion: kind.x-k8s.io/v1alpha4
+kind: Cluster
+# Enable local Docker registry
+containerdConfigPatches:
+  - |-
+    [plugins."io.containerd.grpc.v1.cri".registry.mirrors."localhost:5000"]
+      endpoint = ["http://fireworks-registry:5000"]
+nodes:
+  - role: control-plane
+  # Set Ingress to accept connections on port 80
+    kubeadmConfigPatches:
+      - |
+        kind: InitConfiguration
+        nodeRegistration:
+          kubeletExtraArgs:
+            node-labels: "ingress-ready=true"
+    extraPortMappings:
+      - containerPort: 80
+        hostPort: 80
+        protocol: TCP
+  # TODO allow the creation of workers for further cluster testing
+  # this currently breaks networking for the Kafka service
+  # - role: worker
+  # - role: worker
+  # - role: worker
+  env:
+  - name: NVIDIA_VISIBLE_DEVICES
+    value: all
+  - name: NVIDIA_DRIVER_CAPABILITIES
+    value: "compute,utility"
+  - name: LD_LIBRARY_PATH
+    value: /usr/local/nvidia/lib64:/usr/local/cuda/extras/CUPTI/lib64
+  - name: PATH
+    value: /usr/local/nvidia/bin:/usr/local/cuda/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+  - name: NVIDIA_REQUIRE_CUDA
+    value: "cuda>=11.0 brand=tesla,driver>=450,runtime>=450"
+    
+networking:
+  apiServerPort: 8080
+  # Use the "Docker Host" IP to listen for incoming commands
+  # This configuration is specific to the Docker From Docker pattern
+  apiServerAddress: 172.17.0.1 # the docker host network
+  # These are the default values, defined here for clarity
+  podSubnet: "10.244.0.0/16"
+  serviceSubnet: "10.96.0.0/16"
+
