@@ -4,26 +4,27 @@
 *.pyc
 **__pycache__**
 
-## target folder at any level of the project structue
-**/target
-/target 
+
 
 ## Note JS packages
 **/node_modules
 
-## Built java files
+## Java
 *.jar
+**/target
+/target 
 
 ## Development Logs
-logs/*
+logs/**
 
 ## Local Secrets ##
 # Used to provide API keys etc. to the application locally. Contains sensitive data.
 .env.secrets
 
-## Downloaded Software ##
-
-.DS_Store
-opt/data/**
-.WIP/**
+## Downloaded Software / Plugins ##
+submodules/plugins/**
 tmp/**
+
+
+# Mac OS
+.DS_Store
