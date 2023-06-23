@@ -14,7 +14,7 @@ config_host:
 
 
 bootstrap:
-
+	cd /workspace && git submodule update --init --recursive
 	cd /workspace && bash bootstrap.sh
 	pip install -r /workspace/requirements.txt
 
