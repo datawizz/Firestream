@@ -1,17 +1,18 @@
 version: "3.7"
 
 services:
-  cicdcontainer:
+  devcontainer:
     init: true
-    image: fireworks_cicd:latest
+    image: fireworks:latest
     build:
       context: ..
       dockerfile: Dockerfile
+      target: gpu_devcontainer
     env_file:
       - ../etc/.env.local
     volumes:
-      # # Mount the project directory on the local file system
-      # - ./:/workspace
+      # Mount the project directory on the local file system
+      - ../:/workspace
 
       # Enable Docker-from-Docker
       # This uses the host's Docker Engine through socket mapping and is preferred over Docker-in-Docker for security and latency
@@ -20,6 +21,20 @@ services:
       # Persist images built in devcontainer
       - /var/lib/docker/image:/var/lib/docker/image
       - /var/lib/docker/buildkit:/var/lib/docker/buildkit
+      # The path might differ depending on your host OS
+      
+      # Uses the host's SSH agent to enable SSH authentication
+      - /run/host-services/ssh-auth.sock:/ssh-agent.sock
+    environment:
+      SSH_AUTH_SOCK: /ssh-agent.sock
+
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [ gpu ]
 
     command: sleep infinity # Prevents the container from stopping
 

@@ -215,9 +215,8 @@ COPY --from=dependencies ${HADOOP_HOME} ${HADOOP_HOME}
 # Spark: Copy previously fetched runtime components
 COPY --from=dependencies ${SPARK_HOME} ${SPARK_HOME}
 
-# Copy project
-#COPY --from=dependencies /tmp/workspace /tmp/workspace
-COPY ./bin /tmp/workspace/bin
+# Copy install scripts
+COPY --from=dependencies /tmp/workspace/bin /tmp/workspace/bin
 
 
 # Set Hadoop environment
@@ -372,10 +371,13 @@ RUN chown $HOST_USER_UID:$HOST_USER_GID -R /tmp
 RUN bash /tmp/workspace/bin/cicd_scripts/set_environment.sh
 
 ### Cleanup ###
-# RUN rm -rf /tmp/workspace
-# RUN apt-get autoremove -y && apt-get clean -y && rm -rf /var/lib/apt/lists/*
+RUN rm -rf /tmp/workspace
+RUN apt-get autoremove -y && apt-get clean -y && rm -rf /var/lib/apt/lists/*
 USER ${USERNAME}
 WORKDIR /workspace
+
+# Install Jax CPU
+RUN pip install --upgrade "jax[cpu]"
 
 CMD ["sleep", "infinity"]
 
@@ -385,6 +387,38 @@ CMD ["sleep", "infinity"]
 
 FROM devcontainer as cicdcontainer
 
+RUN "echo 'Look I'm a CICD Container!' "
 
 
 CMD ["sleep", "infinity"]
+
+
+
+
+# ARG CUDA_IMAGE="12.1.0-base-ubuntu22.04"
+# ARG CUDA_OS="ubuntu22.04"
+
+
+FROM devcontainer as gpu_devcontainer
+
+# Install PyTorch
+#NOTE As of 2023-06-03 the nightly build is the only way to get PyTorch to work with CUDA 12.1
+RUN pip3 install --pre torch torchvision torchaudio --index-url https://download.pytorch.org/whl/nightly/cu121
+
+# Install the CUDA version of Jax
+# RUN pip install --upgrade "jax[cuda]" -f https://storage.googleapis.com/jax-releases/jax_cuda_releases.html
+
+# CUDA 12 installation
+# Note: wheels only available on linux.
+#TODO there is a issue with the mismatch of the CUDA version of the host (whatever is latest) and the cuDNN version shipped with Jax via wheels on Pip.
+# Running pip install jax[cuda_local] will use the host's versions, but that is crashing as of 2021-06-03...
+RUN pip install --upgrade "jax[cuda12_pip]" -f https://storage.googleapis.com/jax-releases/jax_cuda_releases.html
+#https://storage.googleapis.com/jax-releases/cuda12/jaxlib-0.4.10+cuda12.cudnn88-cp39-cp39-manylinux2014_x86_64.whl
+#https://storage.googleapis.com/jax-releases/jax_cuda_releases.html
+
+
+
+CMD ["sleep", "infinity"]
+
+FROM devcontainer as a_testing_container
+RUN echo "I'm a testing container"
