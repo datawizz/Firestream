@@ -21,6 +21,9 @@ logs/**
 # Used to provide API keys etc. to the application locally. Contains sensitive data.
 .env.secrets
 
+# Created docker-compose file
+.devcontainer/docker-compose.yml
+
 ## Downloaded Software / Plugins ##
 submodules/plugins/**
 tmp/**
