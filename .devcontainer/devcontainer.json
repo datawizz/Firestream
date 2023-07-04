@@ -6,14 +6,22 @@
 	"forwardPorts": [
 		3000
 	],
+	"service": "devcontainer",
+	"hostRequirements": {
+		"cpus": 4,
+		"memory": "8gb",
+		"storage": "32gb"
+	},
 	"remoteUser": "vscode",
 	// Update the 'dockerComposeFile' list if you have more compose files or use different names.
-	"dockerComposeFile": "../docker-compose.yml",
+	"dockerComposeFile": "docker-compose.yml",
+	// initializeCommand runs on the host before building the container.
+	// This is used to detect if the devcontainer should be loaded with GPU resources
+	"initializeCommand": "command -v nvidia-smi &>/dev/null && { cp docker/devcontainer_gpu.docker-compose.yml .devcontainer/docker-compose.yml; } || { cp docker/devcontainer.docker-compose.yml .devcontainer/docker-compose.yml; }",
 	// Use 'postStartCommand' to run commands after the container is started.
 	// "postStartCommand": "/workspace/bootstrap.sh",
 	// The 'service' property is the name of the service for the container that VS Code should
 	// use. Update this value and .devcontainer/docker-compose.yml to the real service name.
-	"service": "devcontainer",
 	// The optional 'workspaceFolder' property is the path VS Code should open by default when
 	// connected. This is typically a volume mount in .devcontainer/docker-compose.yml
 	"workspaceFolder": "/workspace",
