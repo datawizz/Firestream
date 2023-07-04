@@ -216,8 +216,7 @@ COPY --from=dependencies ${HADOOP_HOME} ${HADOOP_HOME}
 COPY --from=dependencies ${SPARK_HOME} ${SPARK_HOME}
 
 # Copy project
-#COPY --from=dependencies /tmp/workspace /tmp/workspace
-COPY ./bin /tmp/workspace/bin
+COPY --from=dependencies /tmp/workspace/bin /tmp/workspace/bin
 
 
 # Set Hadoop environment
@@ -365,7 +364,7 @@ COPY ./requirements.txt /tmp/workspace/requirements.txt
 COPY --from=dependencies /tmp/python_packages /tmp/python_packages
 RUN chown $HOST_USER_UID:$HOST_USER_GID -R /tmp
 # USER ${USERNAME}
-# RUN python -m pip install --no-warn-script-location --no-deps --no-index --find-links file:///tmp/python_packages -r /tmp/workspace/requirements.txt --user
+RUN python -m pip install --no-warn-script-location --no-deps --no-index --find-links file:///tmp/python_packages -r /tmp/workspace/requirements.txt
 # USER root
 
 # Add PySpark to the Python Path
