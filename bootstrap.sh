@@ -111,12 +111,21 @@ echo "Total Memory resources (in MB): $TOTAL_MEMORY_RESOURCES"
 if lspci | grep -i nvidia > /dev/null; then
     echo "NVIDIA GPU detected"
     export HAS_NVIDIA_GPU=true
+    # Install the Nvidia container tools
+    sudo /bin/bash bin/host_scripts/nvidia-debian.sh
 else
     echo "No NVIDIA GPU detected"
     export HAS_NVIDIA_GPU=false
 fi
 
 echo "Environment successfully configured"
+
+###############################################################################
+### 1. Configure Host                                                       ###
+###############################################################################
+# If this script is being run on a Debian OS directly, ensure the host is configured with the required pakcages
+# If this scirpt is being run in a container, assume the host is configured correctly.
+
 
 ###############################################################################
 ### 2. Deployment                                                           ###

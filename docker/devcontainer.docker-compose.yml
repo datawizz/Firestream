@@ -5,13 +5,14 @@ services:
     init: true
     image: fireworks:latest
     build:
-      context: .
+      context: ..
       dockerfile: Dockerfile
+      target: devcontainer
     env_file:
-      - ./etc/.env.local
+      - ../etc/.env.local
     volumes:
       # Mount the project directory on the local file system
-      - ./:/workspace
+      - ../:/workspace
 
       # Enable Docker-from-Docker
       # This uses the host's Docker Engine through socket mapping and is preferred over Docker-in-Docker for security and latency
@@ -20,6 +21,11 @@ services:
       # Persist images built in devcontainer
       - /var/lib/docker/image:/var/lib/docker/image
       - /var/lib/docker/buildkit:/var/lib/docker/buildkit
+      # The path might differ depending on your host OS
+      # Uses the host's SSH agent to enable SSH authentication
+      - /run/host-services/ssh-auth.sock:/ssh-agent.sock
+    environment:
+      SSH_AUTH_SOCK: /ssh-agent.sock
 
     command: sleep infinity # Prevents the container from stopping
 
