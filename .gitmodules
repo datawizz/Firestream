@@ -66,3 +66,9 @@
 	path = submodules/the-fireworks-company/opensearch-project-helm-charts
 	url = https://github.com/The-Fireworks-Company/opensearch-project-helm-charts
 	shallow = true
+[submodule "submodules/the-fireworks-company/supabase-kubernetes"]
+	path = submodules/the-fireworks-company/supabase-kubernetes
+	url = git@github.com:The-Fireworks-Company/supabase-kubernetes.git
+[submodule "submodules/the-fireworks-company/supabase"]
+	path = submodules/the-fireworks-company/supabase
+	url = git@github.com:The-Fireworks-Company/supabase.git
