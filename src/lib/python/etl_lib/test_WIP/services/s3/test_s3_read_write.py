@@ -8,12 +8,12 @@ class TestS3Access(unittest.TestCase):
     def setUp(self):
         self.s3 = boto3.client(
             's3',
-            aws_access_key_id=os.environ['S3_ACCESS_KEY_ID'],
-            aws_secret_access_key=os.environ['S3_SECRET_ACCESS_KEY'],
-            # region_name=os.environ['S3_DEFAULT_REGION'],
-            endpoint_url=f"http://{os.environ['S3_ENDPOINT_URL']}"
+            aws_access_key_id=os.environ['S3_LOCAL_ACCESS_KEY_ID'],
+            aws_secret_access_key=os.environ['S3_LOCAL_SECRET_ACCESS_KEY'],
+            # region_name=os.environ['S3_LOCAL_DEFAULT_REGION'],
+            endpoint_url=f"http://{os.environ['S3_LOCAL_ENDPOINT_URL']}"
         )
-        self.bucket_name = os.environ['S3_BUCKET_NAME']
+        self.bucket_name = os.environ['S3_LOCAL_BUCKET_NAME']
 
     def test_list_buckets(self):
         try:

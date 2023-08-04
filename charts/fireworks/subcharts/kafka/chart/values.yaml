@@ -1,6 +1,6 @@
 replicaCount: 3
-# persistence:
-#   size: 5Gi
+persistence:
+  size: 20Gi
 
 #   ## Service parameters
 # ##
@@ -43,3 +43,9 @@ replicaCount: 3
 # #   service:
 # #     type: ClusterIP
 # #     clusterIP: 10.96.1.10
+
+kraft:
+  enabled: false
+
+zoopkeeper:
+  enabled: true

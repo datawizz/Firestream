@@ -253,7 +253,7 @@ class S3_DataSink(DataSink):
 
         super().__init__(**kwargs)
         # use DataHeader to form a fully qualified name of the sharded path
-        base_path = os.environ.get("S3_ENDPOINT_URL")
+        base_path = os.environ.get("S3_LOCAL_ENDPOINT_URL")
         _url = f"{base_path}/{self.local_path}"
 
 

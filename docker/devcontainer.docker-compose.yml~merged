@@ -7,11 +7,17 @@ services:
     build:
       context: ..
       dockerfile: Dockerfile
-      target: gpu_devcontainer
+      target: devcontainer
     env_file:
       - ../etc/.env.local
+<<<<<<< HEAD
+=======
+<<<<<<< HEAD:.devcontainer/docker-compose.yml
     environment:
       - COMPOSE_PROJECT_NAME=fireworks
+=======
+>>>>>>> d26c61a17f4dbd145d6aef405faa14ac0cd5f17a:docker/devcontainer.docker-compose.yml
+>>>>>>> d26c61a17f4dbd145d6aef405faa14ac0cd5f17a
     volumes:
       # Mount the project directory on the local file system
       - ../:/workspace
@@ -24,14 +30,20 @@ services:
       - /var/lib/docker/image:/var/lib/docker/image
       - /var/lib/docker/buildkit:/var/lib/docker/buildkit
       # The path might differ depending on your host OS
+<<<<<<< HEAD
+=======
+<<<<<<< HEAD:.devcontainer/docker-compose.yml
 
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - driver: nvidia
-              count: all
-              capabilities: [ gpu ]
+=======
+>>>>>>> d26c61a17f4dbd145d6aef405faa14ac0cd5f17a
+      # Uses the host's SSH agent to enable SSH authentication
+      - /run/host-services/ssh-auth.sock:/ssh-agent.sock
+    environment:
+      SSH_AUTH_SOCK: /ssh-agent.sock
+<<<<<<< HEAD
+=======
+>>>>>>> d26c61a17f4dbd145d6aef405faa14ac0cd5f17a:docker/devcontainer.docker-compose.yml
+>>>>>>> d26c61a17f4dbd145d6aef405faa14ac0cd5f17a
 
     command: sleep infinity # Prevents the container from stopping
 
