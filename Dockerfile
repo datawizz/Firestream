@@ -18,7 +18,7 @@ ARG HADOOP_SHA512="ca5e12625679ca95b8fd7bb7babc2a8dcb2605979b901df9ad13717871882
 ARG HADOOP_HOME="/opt/hadoop"
 
 ARG JAVA_VERSION=11
-ARG PYTHON_VERSION=3.8 
+ARG PYTHON_VERSION=3.11
 ##TODO the python version is being installed from debian, instead of manually which puts the bells and whistles in
 ARG NODE_VERSION=14
 ARG NODE_SHA=""
@@ -55,6 +55,14 @@ RUN apt-get update && apt-get -y install wget unzip zip curl gnupg2 ca-certifica
 WORKDIR /tmp
 
 
+### Source Code ###
+# Download the source code for the project's dependencies
+# This is used in downstream stages to build the project's artifacts
+
+COPY ./bin /tmp/workspace/bin
+
+
+
 ## Spark ##
 # The "without hadoop" binary is used so that *any* hadoop version can be supplied and linked to Spark
 RUN wget https://dlcdn.apache.org/spark/spark-${SPARK_VERSION}/spark-${SPARK_VERSION}-bin-without-hadoop.tgz
@@ -85,9 +93,16 @@ RUN sed -i 's/hadoop.root.logger=INFO,console/hadoop.root.logger=WARN,console/g'
 # RUN wget https://search.maven.org/remotecontent?filepath=org/apache/iceberg/iceberg-spark-runtime-3.3_2.12/1.2.1/iceberg-spark-runtime-3.3_2.12-1.2.1.jar
 
 ## Python ##
-RUN apt-get update && apt-get -y install python3 python3-pip
-# There is only Python3!
-RUN ln -s /usr/bin/python3 /usr/bin/python
+
+# Install Python
+RUN /bin/bash /tmp/workspace/bin/install_scripts/python-debian.sh "${PYTHON_VERSION}" "/usr/local/python" "/usr/local/py-utils" "${USERNAME}" "true" "false" "false" "false"
+# Make "python" and "pip" command available
+RUN ln -s /usr/local/python/bin/python /usr/bin/python
+RUN ln -s /usr/local/python/bin/pip /usr/bin/pip
+
+# RUN apt-get update && apt-get -y install python3 python3-pip
+# # There is only Python3!
+# RUN ln -s /usr/bin/python3 /usr/bin/python
 RUN python -m pip install --upgrade pip
 ### Download Python packages required by the project
 COPY requirements.txt /tmp/workspace/requirements.txt
@@ -141,12 +156,6 @@ RUN python -m pip download --no-cache-dir --no-deps -r /tmp/workspace/requiremen
 
 
 
-### Source Code ###
-# Download the source code for the project's dependencies
-# This is used in downstream stages to build the project's artifacts
-
-COPY ./bin /tmp/workspace/bin
-
 
 
 
@@ -190,7 +199,7 @@ RUN apt-get update && export DEBIAN_FRONTEND=noninteractive \
     libglib2.0-0 \
     libnss3 \
     libx11-6 \
-    # Headless chrom
+    # Headless chrome
     chromium \
     # Dev Tools
     wget \
@@ -203,11 +212,13 @@ RUN apt-get update && export DEBIAN_FRONTEND=noninteractive \
     pciutils \
     # pyhive Thrift API dependencies
     libsasl2-dev \
-    libsasl2-modules-gssapi-mit
+    libsasl2-modules-gssapi-mit \
+    # Required for TLS Websocket support in Rust compiler
+    pkg-config \
+    libssl-dev \
+    protobuf-compiler
 
 
-# Python
-RUN apt-get -y install python3 python3-pip
 
 # Hadoop: Copy previously fetched runtime components
 COPY --from=dependencies ${HADOOP_HOME} ${HADOOP_HOME}
@@ -245,7 +256,30 @@ ARG INSTALL_ZSH="true"
 # [Option] Upgrade OS packages to their latest versions
 ARG UPGRADE_PACKAGES="false"
 
+### Python ###
 
+
+
+# Python
+# RUN apt-get -y install python3 python3-pip
+COPY --from=dependencies /tmp/workspace/bin/install_scripts/python-debian.sh /tmp/workspace/bin/install_scripts/python-debian.sh
+# Install Python
+RUN /bin/bash /tmp/workspace/bin/install_scripts/python-debian.sh "${PYTHON_VERSION}" "/usr/local/python" "/usr/local/py-utils" "${USERNAME}" "true" "false" "false" "false"
+# Make "python" command available
+RUN ln -s /usr/local/python/bin/python /usr/bin/python
+RUN ln -s /usr/local/python/bin/pip /usr/bin/pip
+
+# There is only Python3!
+# RUN ln -s /usr/bin/python3 /usr/bin/python
+RUN python -m pip install --upgrade pip
+
+# Install python dependencies
+COPY ./requirements.txt /tmp/workspace/requirements.txt
+COPY --from=dependencies /tmp/python_packages /tmp/python_packages
+RUN chown $HOST_USER_UID:$HOST_USER_GID -R /tmp
+# USER ${USERNAME}
+RUN python -m pip install --no-warn-script-location --no-deps --no-index --find-links file:///tmp/python_packages -r /tmp/workspace/requirements.txt
+# USER root
 
 
 
@@ -315,13 +349,17 @@ ENV PATH=${HOME}/.sdkman/candidates/maven/current/bin:$PATH
 USER root
 
 
+### Node.js ###
+ENV NVM_DIR="/usr/local/share/nvm"
+ENV NVM_SYMLINK_CURRENT=true \
+    PATH=${NVM_DIR}/current/bin:${PATH}
+RUN apt-get update && /bin/bash /tmp/workspace/bin/install_scripts/node-debian.sh "${NVM_DIR}" "$NODE_VERSION"
 
-# # ## Python ###
-#TODO install python from source instead of apt-get
-# ARG TARGET_PYTHON_INSTALL_PATH=/usr/local/python
-# # Setup default python tools in a venv via pipx to avoid conflicts
-# ENV PIPX_HOME=/usr/local/py-utils
-# RUN apt-get update && /bin/bash /tmp/library-scripts/python-debian.sh "${PYTHON_VERSION}" "${TARGET_PYTHON_INSTALL_PATH}" "${PIPX_HOME}" "${USERNAME}" "true" "true" "false" "true"
+
+# Update NPM to latest
+#TODO use a higher version of node which should be updated.
+RUN npm install -g npm
+
 
 
 
@@ -335,40 +373,18 @@ USER root
 #cd $SPARK_HOME && sudo sbt clean assembly
 
 
-
-
-# Install Node.js
-ENV NVM_DIR="/usr/local/share/nvm"
-ENV NVM_SYMLINK_CURRENT=true \
-    PATH=${NVM_DIR}/current/bin:${PATH}
-RUN apt-get update && /bin/bash /tmp/workspace/bin/install_scripts/node-debian.sh "${NVM_DIR}" "$NODE_VERSION"
-
-# Update NPM to latest
-#TODO use a higher version of node which should be updated.
-RUN npm install -g npm
-
-
-
-
-
-
-
-### Python ###
-
-# There is only Python3!
-RUN ln -s /usr/bin/python3 /usr/bin/python
-RUN python -m pip install --upgrade pip
-
-# Install python dependencies
-COPY ./requirements.txt /tmp/workspace/requirements.txt
-COPY --from=dependencies /tmp/python_packages /tmp/python_packages
-RUN chown $HOST_USER_UID:$HOST_USER_GID -R /tmp
-# USER ${USERNAME}
-RUN python -m pip install --no-warn-script-location --no-deps --no-index --find-links file:///tmp/python_packages -r /tmp/workspace/requirements.txt
-# USER root
-
 # Add PySpark to the Python Path
 RUN bash /tmp/workspace/bin/cicd_scripts/set_environment.sh
+
+
+
+
+
+
+
+
+
+
 
 ### Cleanup ###
 RUN rm -rf /tmp/workspace
@@ -376,8 +392,9 @@ RUN apt-get autoremove -y && apt-get clean -y && rm -rf /var/lib/apt/lists/*
 USER ${USERNAME}
 WORKDIR /workspace
 
-# Install Jax CPU
+# Install CPU Deep Learning Frameworks
 RUN pip install --upgrade "jax[cpu]"
+RUN pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu
 
 CMD ["sleep", "infinity"]
 
@@ -385,12 +402,6 @@ CMD ["sleep", "infinity"]
 ### CICD Container ###
 # Contains everything required to build project artifacts and run tests
 
-FROM devcontainer as cicdcontainer
-
-RUN "echo 'Look I'm a CICD Container!' "
-
-
-CMD ["sleep", "infinity"]
 
 
 
@@ -403,7 +414,7 @@ FROM devcontainer as gpu_devcontainer
 
 # Install PyTorch
 #NOTE As of 2023-06-03 the nightly build is the only way to get PyTorch to work with CUDA 12.1
-RUN pip3 install --pre torch torchvision torchaudio --index-url https://download.pytorch.org/whl/nightly/cu121
+RUN pip install --pre torch torchvision torchaudio --index-url https://download.pytorch.org/whl/nightly/cu121
 
 # Install the CUDA version of Jax
 # RUN pip install --upgrade "jax[cuda]" -f https://storage.googleapis.com/jax-releases/jax_cuda_releases.html
@@ -416,9 +427,17 @@ RUN pip install --upgrade "jax[cuda12_pip]" -f https://storage.googleapis.com/ja
 #https://storage.googleapis.com/jax-releases/cuda12/jaxlib-0.4.10+cuda12.cudnn88-cp39-cp39-manylinux2014_x86_64.whl
 #https://storage.googleapis.com/jax-releases/jax_cuda_releases.html
 
-
-
 CMD ["sleep", "infinity"]
 
+
+
 FROM devcontainer as a_testing_container
-RUN echo "I'm a testing container"
+# A container for running tests
+RUN echo "Running tests!"
+CMD ["make", "build_and_test"]
+
+
+FROM devcontainer as cicdcontainer
+# A container for running the deployment pipeline
+RUN echo "Running cicd!"
+CMD ["make", "deploy_production"]

@@ -30,8 +30,14 @@ echo "                                                                     "
 ### 1. Environment                                                          ###
 ###############################################################################
 
+# Project Directory
+_SRC="/workspace"
+
+# Set the Machine ID on Debian host
+export MACHINE_ID=${MACHINE_ID:-$(cat /var/lib/dbus/machine-id)}
+
 # Define valid deployment modes
-valid_modes=("development" "test" "clean" "cicd" "production")
+valid_modes=("development" "test" "clean" "cicd" "production" "resume")
 
 # Check if the argument is valid
 valid=false
@@ -141,37 +147,50 @@ fi
 # 2. If in development mode
 if [ "$DEPLOYMENT_MODE" = "development" ]; then
 
-  # Install source python packages in editable mode
-  bash /workspace/bin/cicd_scripts/bootstrap_devcontainer.sh
-  if [ $? -ne 0 ]; then exit 1; fi
-
   # Setup a K3D cluster on the host's Docker Engine and
   # route the devcontainer's DNS to the K8 Control Plane for internal DNS resolution
-  bash /workspace/docker/k3d/bootstrap.sh
+  bash $_SRC/docker/k3d/bootstrap.sh
+  if [ $? -ne 0 ]; then exit 1; fi
+
+  # Ensure the networking is configured correctly
+  bash 	$_SRC/docker/k3d/iproute.sh
+  if [ $? -ne 0 ]; then exit 1; fi
+
+  # Install source python packages in editable mode
+  bash $_SRC/bin/cicd_scripts/bootstrap_devcontainer.sh
   if [ $? -ne 0 ]; then exit 1; fi
 
   # Build the project's container images and artifacts
   #bash /workspace/bin/cicd_scripts/build.sh
 
   # Helm Install Charts
-  bash /workspace/bin/cicd_scripts/helm_install.sh
+  bash $_SRC/bin/cicd_scripts/helm_install.sh
   if [ $? -ne 0 ]; then exit 1; fi
 
   # Run port forwarding for the services to localhost
-  bash /workspace/bin/cicd_scripts/port_forward.sh
+  bash $_SRC/bin/cicd_scripts/port_forward.sh
   if [ $? -ne 0 ]; then exit 1; fi
 fi
+
+
+# 2.1. If in resume mode
+if [ "$DEPLOYMENT_MODE" = "resume" ]; then
+  # Ensure the networking is configured correctly
+  bash 	$_SRC/docker/k3d/iproute.sh
+  if [ $? -ne 0 ]; then exit 1; fi
+fi
+
 
 # 3. If in "clean" mode then just create the cluster but don't install services
 if [ "$DEPLOYMENT_MODE" = "clean" ]; then
 
   # Install source python packages in editable mode
-  bash /workspace/bin/cicd_scripts/bootstrap_devcontainer.sh
+  bash $_SRC/bin/cicd_scripts/bootstrap_devcontainer.sh
   if [ $? -ne 0 ]; then exit 1; fi
 
   # Setup a K3D cluster on the host's Docker Engine and
   # route the devcontainer's DNS to the K8 Control Plane for internal DNS resolution
-  bash /workspace/docker/k3d/bootstrap.sh
+  bash $_SRC/docker/k3d/bootstrap.sh
   if [ $? -ne 0 ]; then exit 1; fi
 
 fi
@@ -191,3 +210,5 @@ if [ "$DEPLOYMENT_MODE" = "production" ]; then
   exit 1
 fi
 
+# Finally, run the Plugin Manager to load all other configured plugins
+bash $_SRC/src/api/plugin_manager/bootstrap.sh

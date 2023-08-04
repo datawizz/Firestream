@@ -3,15 +3,15 @@ import time
 import os
 
 # Specify your AWS credentials and the name of the S3 bucket you want to test
-bucket_name = os.environ['S3_BUCKET_NAME']
+bucket_name = os.environ['S3_LOCAL_BUCKET_NAME']
 
 # Create an S3 client
 s3 = boto3.client(
             's3',
-            aws_access_key_id=os.environ['S3_ACCESS_KEY_ID'],
-            aws_secret_access_key=os.environ['S3_SECRET_ACCESS_KEY'],
-            # region_name=os.environ['S3_DEFAULT_REGION'],
-            endpoint_url=f"http://{os.environ['S3_ENDPOINT_URL']}"
+            aws_access_key_id=os.environ['S3_LOCAL_ACCESS_KEY_ID'],
+            aws_secret_access_key=os.environ['S3_LOCAL_SECRET_ACCESS_KEY'],
+            # region_name=os.environ['S3_LOCAL_DEFAULT_REGION'],
+            endpoint_url=f"http://{os.environ['S3_LOCAL_ENDPOINT_URL']}"
         )
 
 # Create a test object and upload it to the bucket

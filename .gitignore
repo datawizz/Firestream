@@ -7,7 +7,7 @@
 
 
 ## Note JS packages
-**/node_modules
+**/node_modules/**
 
 ## Java
 *.jar
@@ -16,6 +16,9 @@
 
 ## Development Logs
 logs/**
+
+# Temporary files
+**/tmp/**
 
 ## Local Secrets ##
 # Used to provide API keys etc. to the application locally. Contains sensitive data.
@@ -26,8 +29,12 @@ logs/**
 
 ## Downloaded Software / Plugins ##
 submodules/plugins/**
-tmp/**
-
 
 # Mac OS
 .DS_Store
+
+# Build Artifacts
+**/.next/**
+
+# WIP Hacking
+submodules/examples/**

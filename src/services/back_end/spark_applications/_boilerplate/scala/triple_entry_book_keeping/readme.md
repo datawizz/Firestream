@@ -1,1 +1,0 @@
-Implements a hash over the trailing records.

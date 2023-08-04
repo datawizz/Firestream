@@ -12,16 +12,16 @@ from delta.tables import *
 
 
 
-PATH = F"s3a://{os.environ.get('S3_BUCKET_NAME')}/example/data/delta-table3"
+PATH = F"s3a://{os.environ.get('S3_LOCAL_BUCKET_NAME')}/example/data/delta-table3"
 
 
 def spark_config():
 
 
     config = {
-        "spark.hadoop.fs.s3a.endpoint": F"http://{os.environ.get('S3_ENDPOINT_URL')}",
-        "spark.hadoop.fs.s3a.access.key": os.environ.get("S3_ACCESS_KEY_ID"),
-        "spark.hadoop.fs.s3a.secret.key": os.environ.get("S3_SECRET_ACCESS_KEY"),
+        "spark.hadoop.fs.s3a.endpoint": F"http://{os.environ.get('S3_LOCAL_ENDPOINT_URL')}",
+        "spark.hadoop.fs.s3a.access.key": os.environ.get("S3_LOCAL_ACCESS_KEY_ID"),
+        "spark.hadoop.fs.s3a.secret.key": os.environ.get("S3_LOCAL_SECRET_ACCESS_KEY"),
         "spark.hadoop.fs.s3a.connection.ssl.enabled": "false",
         "spark.hadoop.fs.s3a.path.style.access": "true",
         "spark.hadoop.fs.s3a.impl": "org.apache.hadoop.fs.s3a.S3AFileSystem",

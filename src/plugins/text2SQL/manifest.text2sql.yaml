@@ -1,0 +1,7 @@
+name: Virtual Paritioner
+version: 1.0.0
+author: Datawizz
+description: A service which creates virtual partitions based on event time and defined relationships.
+feature_flags:
+  - FEATURE_FLAG_KAFKA
+  - FEATURE_FLAG_DATAFLOW
