@@ -7,11 +7,11 @@ import os
 from etl_lib.services.spark.client import SparkClient
 import timeit
 
-_BUCKET = os.environ.get("S3_BUCKET_NAME")
+_BUCKET = os.environ.get("S3_LOCAL_BUCKET_NAME")
 _SERVER = os.environ.get("NESSIE_SERVER_URI")
-_S3_ENDPOINT_URL = os.environ.get("S3_ENDPOINT_URL")
-_S3_ACCESS_KEY_ID = os.environ.get("S3_ACCESS_KEY_ID")
-_S3_SECRET_ACCESS_KEY = os.environ.get("S3_SECRET_ACCESS_KEY")
+_S3_LOCAL_ENDPOINT_URL = os.environ.get("S3_LOCAL_ENDPOINT_URL")
+_S3_LOCAL_ACCESS_KEY_ID = os.environ.get("S3_LOCAL_ACCESS_KEY_ID")
+_S3_LOCAL_SECRET_ACCESS_KEY = os.environ.get("S3_LOCAL_SECRET_ACCESS_KEY")
 _PATH = f"s3a://{_BUCKET}/spark_warehouse"
 _LOG_PATH = f"s3a://{_BUCKET}/spark_logs"
 _LOG_DIR = "spark_logs/"
@@ -32,17 +32,17 @@ def create_logging_dir():
 
     s3 = boto3.resource(
         's3',
-        endpoint_url=os.environ['S3_ENDPOINT_URL'],
-        aws_access_key_id=os.environ['S3_ACCESS_KEY_ID'],
-        aws_secret_access_key=os.environ['S3_SECRET_ACCESS_KEY'],
-        region_name=os.environ['S3_DEFAULT_REGION']
+        endpoint_url=os.environ['S3_LOCAL_ENDPOINT_URL'],
+        aws_access_key_id=os.environ['S3_LOCAL_ACCESS_KEY_ID'],
+        aws_secret_access_key=os.environ['S3_LOCAL_SECRET_ACCESS_KEY'],
+        region_name=os.environ['S3_LOCAL_DEFAULT_REGION']
     )
 
-    bucket = s3.Bucket(os.environ['S3_BUCKET_NAME'])
+    bucket = s3.Bucket(os.environ['S3_LOCAL_BUCKET_NAME'])
     dir_obj = None
 
     try:
-        s3.meta.client.head_object(Bucket=os.environ['S3_BUCKET_NAME'], Key=_LOG_DIR)
+        s3.meta.client.head_object(Bucket=os.environ['S3_LOCAL_BUCKET_NAME'], Key=_LOG_DIR)
         dir_obj = bucket.Object(key=_LOG_DIR)
     except Exception as e:
         print("Directory does not exist, creating it now.")
@@ -71,13 +71,13 @@ def create_spark_session():
     jars_packages = ",".join(jars_packages)
 
     config = {
-        "spark.hadoop.fs.s3a.endpoint": _S3_ENDPOINT_URL,
+        "spark.hadoop.fs.s3a.endpoint": _S3_LOCAL_ENDPOINT_URL,
         "spark.hadoop.fs.s3a.connection.ssl.enabled": "false",
         "spark.hadoop.fs.s3a.path.style.access": "true",
         "spark.hadoop.fs.s3a.committer.name": "directory",
         "spark.hadoop.fs.s3a.aws.credentials.provider": "org.apache.hadoop.fs.s3a.SimpleAWSCredentialsProvider",
-        "spark.hadoop.fs.s3a.access.key": _S3_ACCESS_KEY_ID,
-        "spark.hadoop.fs.s3a.secret.key": _S3_SECRET_ACCESS_KEY,
+        "spark.hadoop.fs.s3a.access.key": _S3_LOCAL_ACCESS_KEY_ID,
+        "spark.hadoop.fs.s3a.secret.key": _S3_LOCAL_SECRET_ACCESS_KEY,
         "spark.hadoop.fs.s3a.impl": "org.apache.hadoop.fs.s3a.S3AFileSystem",
         "spark.sql.execution.arrow.pyspark.enabled": "true",
         "spark.sql.execution.arrow.pyspark.enabled": "true",

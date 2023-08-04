@@ -26,7 +26,7 @@ fi
 
 # Create the k3d cluster
 echo "Creating k3d cluster named $CLUSTER_NAME..."
-k3d cluster create $CLUSTER_NAME -p "80:80@loadbalancer" --registry-use k3d-$CLUSTER_NAME.$CONTAINER_REGISTRY_URL:$CONTAINER_REGISTRY_PORT
+k3d cluster create $CLUSTER_NAME --api-port 6550 -p "80:80@loadbalancer" -p "443:443@loadbalancer" --registry-use k3d-$CLUSTER_NAME.$CONTAINER_REGISTRY_URL:$CONTAINER_REGISTRY_PORT
 
 
 # Configure kubectl to use the MYCLUSTER
@@ -39,29 +39,13 @@ kubectl wait --namespace=kube-system --for=condition=available --timeout=300s --
 echo $(kubectl cluster-info)
 
 
+# Configure Self Signed Certificates
+bash /workspace/bin/cicd_scripts/configure-tls-debian.sh
 
-### Resolve DNS through Kubernetes Control Plane ###
+# Load TLS Certificates into the cluster as a secret
+kubectl create secret tls $TLS_SECRET --cert=$HOME/certs/server.crt --key=$HOME/certs/server.key
 
-# Find the IP of the k3d server node (dynamically assigned with each cluster restart)
-export K3D_SERVER_IP=$(docker container inspect k3d-$COMPOSE_PROJECT_NAME-server-0 --format '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}')
-echo $K3D_SERVER_IP
+#TODO: This is a hack to get the ingress to work. It should be removed once the ingress is configured properly
+sleep 10
 
-# Check if the route already exists and set the route for Services inside the cluster
-# This is also used for the CoreDNS service
-sudo ip route | grep -q "10.43.0.0/16" || sudo ip route add 10.43.0.0/16 via $K3D_SERVER_IP
-
-# Check if the route already exists and set the route for Pod networks
-sudo ip route | grep -q "10.42.0.0/16" || sudo ip route add 10.42.0.0/16 via $K3D_SERVER_IP
-
-### Update resolv.conf with dynamic Kubernetes DNS IP
-
-# Find the IP of the CoreDNS service in your Kubernetes cluster
-KUBERNETES_DNS_IP=$(kubectl get svc -n kube-system kube-dns -o jsonpath='{.spec.clusterIP}')
-echo $KUBERNETES_DNS_IP
-
-# Update the resolv.conf file inside your development container with the new DNS settings
-sudo echo -e "search svc.cluster.local cluster.local\nnameserver $KUBERNETES_DNS_IP\noptions edns0 trust-ad" | sudo tee /etc/resolv.conf
-
-
-# Test DNS resolution
-bash /workspace/bin/commands/network_connection_test.sh
+# kubectl apply -f /workspace/docker/k3d/ingress.yaml

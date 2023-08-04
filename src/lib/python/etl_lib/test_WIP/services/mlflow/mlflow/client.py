@@ -18,7 +18,7 @@ ML Flow expects the trained model to be in S3 or a local directory.
 
 
 1. Create a Dockerfile + Helm Chart to deploy ML Flow server as a K8 container
-    Use the MinIO S3 implementation, setting the MLFLOW_S3_ENDPOINT_URL env var to http://minio.local.cluster:9000
+    Use the MinIO S3 implementation, setting the MLFLOW_S3_LOCAL_ENDPOINT_URL env var to http://minio.local.cluster:9000
 
 1.1 Port Forward into the container to allow access locally
 1.2 View the UI

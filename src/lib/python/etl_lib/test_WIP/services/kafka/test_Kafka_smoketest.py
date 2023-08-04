@@ -133,6 +133,6 @@ def test_create_topic(topic: str):
 
 if __name__ == "__main__":
 
-    # test_produce("a_test_topic")
+    #test_produce("a_test_topic")
     test_consume("a_test_topic")
     # test_create_topic("mytopic")
