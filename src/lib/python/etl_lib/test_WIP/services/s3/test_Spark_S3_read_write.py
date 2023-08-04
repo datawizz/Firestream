@@ -9,7 +9,7 @@ import os
 # os.environ['AWS_SECRET_ACCESS_KEY'] = 'dev_admin'
 # os.environ['AWS_DEFAULT_REGION'] = 'us-west-2'
 # os.environ['AWS_ENDPOINT_URL'] = 'minio.default.svc.cluster.local:9000'
-bucket = os.environ.get("S3_BUCKET_NAME")
+bucket = os.environ.get("S3_LOCAL_BUCKET_NAME")
 _PATH = f"s3a://{bucket}/example/data/cities_parquet"
 _DATA = "/workspace/src/lib/python/etl_lib/tests/example_data/cities.csv"
 
@@ -24,15 +24,15 @@ config = {
     # "spark.driver.host": "jupyter.spark.svc.cluster.local",
     # "spark.driver.bindAddress": "0.0.0.0",
     "spark.sql.execution.arrow.pyspark.enabled": "true",
-    "spark.hadoop.fs.s3a.endpoint": os.environ.get("S3_ENDPOINT_URL"),
+    "spark.hadoop.fs.s3a.endpoint": os.environ.get("S3_LOCAL_ENDPOINT_URL"),
     "spark.hadoop.fs.s3a.connection.ssl.enabled": "false",
     "spark.hadoop.fs.s3a.path.style.access": "true",
     # "spark.hadoop.fs.s3a.impl": "org.apache.hadoop.fs.s3a.S3AFileSystem",
     # "spark.hadoop.com.amazonaws.services.s3.enableV4": "true",
     # "spark.hadoop.fs.s3a.aws.credentials.provider": "org.apache.hadoop.fs.s3a.AnonymousAWSCredentialsProvider",
     "spark.hadoop.fs.s3a.aws.credentials.provider": "org.apache.hadoop.fs.s3a.SimpleAWSCredentialsProvider",
-    "spark.hadoop.fs.s3a.access.key": os.environ.get("S3_ACCESS_KEY_ID"),
-    "spark.hadoop.fs.s3a.secret.key": os.environ.get("S3_SECRET_ACCESS_KEY"),
+    "spark.hadoop.fs.s3a.access.key": os.environ.get("S3_LOCAL_ACCESS_KEY_ID"),
+    "spark.hadoop.fs.s3a.secret.key": os.environ.get("S3_LOCAL_SECRET_ACCESS_KEY"),
     "spark.jars.packages": "org.apache.hadoop:hadoop-aws:3.3.1,org.apache.hadoop:hadoop-common:3.3.1,org.apache.spark:spark-hadoop-cloud_2.12:3.3.1",
     # "spark.hadoop.parquet.enable.summary-metadata": "false",
     "spark.sql.parquet.mergeSchema": "false",

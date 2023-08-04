@@ -42,3 +42,10 @@ nohup kubectl port-forward --namespace default svc/solr 8983:8983 > /workspace/l
 nohup kubectl port-forward --namespace default service/superset 8088:8088 > /workspace/logs/port_forwards.log 2>&1 &
 
 
+# Jaeger UI #
+nohup kubectl port-forward --namespace default service/jaeger-query 8089:16686 > /workspace/logs/port_forwards.log 2>&1 &
+
+# Open Search #
+nohup kubectl port-forward --namespace default service/opensearch-cluster-master 9200:9200 > /workspace/logs/port_forwards.log 2>&1 &
+
+nohup kubectl port-forward --namespace default service/opensearch-dashboard-opensearch-dashboards 5601:5601 > /workspace/logs/port_forwards.log 2>&1 &

@@ -8,7 +8,7 @@ def test():
 
     # function to calculate number of seconds from number of days
     days = lambda i: i * 86400
-    spark = SparkClient(app_name="test_spark_client")
+    spark = SparkClient(app_name="test_spark_client").session
 
 
 

@@ -5,7 +5,7 @@ from confluent_kafka import Consumer, DeserializingConsumer
 from confluent_kafka.serialization import StringSerializer
 from confluent_kafka.schema_registry import SchemaRegistryClient
 from confluent_kafka.schema_registry.avro import AvroSerializer
-from confluent_kafka.avro.serializer import SerializerError
+# from confluent_kafka.avro.serializer import SerializerError
 from confluent_kafka.admin import AdminClient, NewTopic
 from confluent_kafka.schema_registry.schema_registry_client import SchemaRegistryClient
 from confluent_kafka.schema_registry import Schema

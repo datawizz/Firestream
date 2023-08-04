@@ -1,4 +1,4 @@
-
+#!/bin/bash
 
 ###############################################################################
 ### Services                                                                ###
@@ -107,7 +107,7 @@ helm install nessie helm/nessie \
 
 ### Spark Cluster ###
 # Enables: spark://spark-master:7077
-helm install spark bitnami/spark -f /workspace/charts/fireworks/subcharts/spark_cluster/values.yaml
+helm install spark bitnami/spark #-f /workspace/charts/fireworks/subcharts/spark_cluster/values.yaml
 
 # ### MongoDB ###
 # helm install mongodb bitnami/mongodb-sharded
@@ -127,8 +127,11 @@ helm install minio bitnami/minio -f /workspace/charts/fireworks/subcharts/minio/
 #   --set coreNames="$SOLR_DEFAULT_CORE"
 
 ### Kafka ###
-helm install kafka bitnami/kafka -f /workspace/charts/fireworks/subcharts/kafka/chart/values.yaml
+# helm install kafka bitnami/kafka -f /workspace/charts/fireworks/subcharts/kafka/chart/values.yaml
 
+cd /workspace/submodules/the-fireworks-company/bitnami_charts/bitnami/kafka && \
+  helm install kafka . \
+   -f /workspace/charts/fireworks/subcharts/kafka/chart/values.yaml
 
 
 ### Kyuubi ###
@@ -145,12 +148,26 @@ cd /workspace/submodules/the-fireworks-company/superset &&
 
 
 ### Open Search ###
-cd /workspace/submodules/the-fireworks-company/opensearch-project-helm-charts/charts && \
-helm install opensearch opensearch
+# cd /workspace/submodules/the-fireworks-company/opensearch-project-helm-charts/charts && \
+# helm install opensearch opensearch
 # TODO the configuration of OpenSearch is not trival. 
 # The default username and password are admin/admin, which are used here implicitly.
 # --set something.something="$OPENSEARCH_USERNAME" \
 # --set something.something="$OPENSEARCH_PASSWORD" \
+
+helm repo add opensearch https://opensearch-project.github.io/helm-charts/
+helm install opensearch-dashboard opensearch/opensearch-dashboard
+helm install opensearch opensearch/opensearch
+
+# export CONTAINER_PORT=$(kubectl get pod --namespace default $POD_NAME -o jsonpath="{.spec.containers[0].ports[0].containerPort}")
+#   echo "Visit http://127.0.0.1:8080 to use your application"
+#   kubectl --namespace default port-forward $POD_NAME 8085:$CONTAINER_PORT
+
+### Airflow ###
+# Enables: spark://spark-master:7077
+helm install airflow bitnami/airflow
+
+
 
 
 # ### Superset ###
@@ -180,8 +197,38 @@ helm install opensearch opensearch
 # helm install superset /workspace/submodules/apache/superset/helm/superset \
 #     --set configFromSecret=superset-secret-config-py
 
+export OPENSEARCH_HOST="opensearch-cluster-master.default.svc.cluster.local"
+export OPENSEARCH_PORT="9200"
+export OPENSEARCH_USERNAME='admin'
+export OPENSEARCH_PASSWORD='admin'
 
 
+### Jaeger All-in-One ###
+helm repo add jaegertracing https://jaegertracing.github.io/helm-charts
+helm upgrade --install jaeger jaegertracing/jaeger \
+  --set provisionDataStore.cassandra=false \
+  --set storage.type=elasticsearch \
+  --set storage.elasticsearch.host="$OPENSEARCH_HOST" \
+  --set storage.elasticsearch.port="$OPENSEARCH_PORT" \
+  --set storage.elasticsearch.user="$OPENSEARCH_USERNAME" \
+  --set storage.elasticsearch.password="$OPENSEARCH_PASSWORD" \
+  --set ingester.enabled=true \
+  --set storage.kafka.brokers[0]="$KAFKA_BOOTSTRAP_SERVERS" \
+  --set storage.kafka.topic="jaeger-spans" 
+  # --debug --dry-run
+
+
+  # --set provisionDataStore.cassandra=false \
+  # --set provisionDataStore.elasticsearch=true \
+  # --set storage.type=elasticsearch
+
+# helm install jaeger jaegertracing/jaeger \
+#   --set provisionDataStore.cassandra=false \
+#   --set storage.type=elasticsearch \
+#   --set storage.elasticsearch.host=<HOST> \
+#   --set storage.elasticsearch.port=<PORT> \
+#   --set storage.elasticsearch.user=<USER> \
+#   --set storage.elasticsearch.password=<password>
 
 
 # ### Metabase ###
@@ -208,18 +255,26 @@ helm install opensearch opensearch
 # cd /workspace/services/javascript/dashboard/chart && helm install dashboard -f values.yaml .
 
 
-
-# Wait for all pods to be ready
 echo "Waiting for pods to be ready"
 
-# Start watching pods
-(kubectl get pods --watch) &
+# Define the watch command
+watch_cmd="kubectl get pods --watch -n default"
 
-# Wait for pods to be ready
-# but not the init-db pod which fires once and forgets
+# Run the watch command in the background
+${watch_cmd} &
+
+# Save the PID of the watch command
+watch_pid=$!
+
+# Wait for pods to be ready excluding the 'init-db' pod
 kubectl get pods --no-headers -n default | awk '!/init-db/{print $1}' | while read pod; do
-  kubectl wait --timeout=600s --for=condition=ready pod/$pod -n default
+  # Wait for each pod to be ready and print status
+  if kubectl wait --timeout=600s --for=condition=ready pod/$pod -n default; then
+    echo "Pod $pod is ready"
+  else
+    echo "Timeout while waiting for pod $pod to be ready"
+  fi
 done
 
 # Kill the watch command
-kill %1
+kill ${watch_pid}

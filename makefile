@@ -1,8 +1,13 @@
 ### Makefile ###
 
-# This makefile is used as a DevOps tool for the project to automate the following tasks:
+# A Pluripotent Makefile for Fireworks.
+# Designed to deploy in development, testing, and production environments.
 
 BASEDIR=$(shell pwd)
+
+devcontainer:
+	export DEPLOYMENT_MODE="clean" && cd /workspace && bash bootstrap.sh
+
 
 all:
 	@echo "No argument suppllied. Making a standard build."
@@ -14,16 +19,22 @@ config_host:
 
 
 bootstrap:
-	cd /workspace && git submodule update --init --recursive
+	#cd /workspace && git submodule update --init --recursive
 	cd /workspace && bash bootstrap.sh
 	pip install -r /workspace/requirements.txt
 
-dev:
-	export DEPLOYMENT_MODE="clean" && cd /workspace && bash bootstrap.sh
+resume:
+	# Useful for resuming the container after a restart
+	export DEPLOYMENT_MODE="resume" && cd $(BASEDIR) && bash bootstrap.sh
+
 
 # Start services
 demo:
 	export DEPLOYMENT_MODE="development" && make bootstrap
+
+	# Create dispose of the tunnel and create a new one
+	pkill ngrok
+	bash /workspace/bin/commands/create_ngrok_reverse_proxy.sh
 
 	# Apply Demo Data
 	# POD_NAME=$(kubectl get pods --no-headers -o custom-columns=":metadata.name" | grep superset | head -n 1)
@@ -32,7 +43,7 @@ demo:
 
 
 	# Start Streaming Data Generation
-	nohup python /workspace/src/services/back_end/spark_applications/_boilerplate/metronome/src/main.py > /workspace/logs/metronome.log 2>&1 &
+	#nohup python /workspace/src/services/back_end/spark_applications/_boilerplate/metronome/src/main.py > /workspace/logs/metronome.log 2>&1 &
 
 
 
@@ -56,7 +67,7 @@ build:
 
 # Clean up
 boomboom:
-	bash /workspace/bin/commands/delete.sh
+	bash bin/commands/delete.sh
 
 
 # Run Stress Tests
@@ -64,3 +75,12 @@ stress:
 	make bootstrap
 
 	bash /workspace/bin/commands/run_stress_tests.sh
+
+load_plugins:
+	bash /workspace/src/api/plugin_manager/bootstrap.sh
+
+
+
+# setup:
+# 	npm install --global yarn
+# 	yarnpkg add react-native-web echarts echarts-for-react ws

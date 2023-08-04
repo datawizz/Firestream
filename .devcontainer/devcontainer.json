@@ -14,13 +14,10 @@
 	},
 	"remoteUser": "vscode",
 	// Update the 'dockerComposeFile' list if you have more compose files or use different names.
-
 	// initializeCommand runs on the host before building the container.
 	// This is used to detect if the devcontainer should be loaded with GPU resources
 	"initializeCommand": "lspci | grep -i nvidia &>/dev/null && { cp docker/devcontainer.docker-compose.yml .devcontainer/docker-compose.yml; } || { cp docker/devcontainer_gpu.docker-compose.yml .devcontainer/docker-compose.yml; }",
-
 	"dockerComposeFile": "docker-compose.yml",
-
 	// Use 'postStartCommand' to run commands after the container is started.
 	// "postStartCommand": "/workspace/bootstrap.sh",
 	// The 'service' property is the name of the service for the container that VS Code should
@@ -49,7 +46,9 @@
 				"mhutchie.git-graph",
 				"DavidAnson.vscode-markdownlint",
 				"dbaeumer.vscode-eslint",
-				"timonwong.shellcheck"
+				"timonwong.shellcheck",
+				"rust-lang.rust-analyzer",
+				"streetsidesoftware.code-spell-checker"
 			],
 			// Set *default* container specific settings.json values on container create.
 			"settings": {
@@ -80,6 +79,7 @@
 				},
 				"editor.formatOnSave": true,
 				"editor.insertSpaces": true,
+				"editor.tabSize": 4,
 				"editor.detectIndentation": true,
 				"python.testing.pytestArgs": [
 					"."
@@ -91,7 +91,29 @@
 					"other": true,
 					"comments": false,
 					"strings": false
-				}
+				},
+				"files.exclude": {
+					"**/.git": true,
+					"**/.svn": true,
+					"**/.hg": true,
+					"**/CVS": true,
+					"**/.DS_Store": true,
+					"**/target/**": true,
+					"**/target-ra/**": true
+				},
+				"search.exclude": {
+					"**/node_modules": true,
+					"**/bower_components": true
+				},
+				"files.watcherExclude": {
+					"**/.git/objects/**": true,
+					"**/.git/subtree-cache/**": true,
+					"**/node_modules/*/**": true,
+					"**/target": true
+				},
+				"rust-analyzer.checkOnSave.extraArgs": [
+					"--target-dir=target-ra"
+				]
 			}
 		}
 	}
