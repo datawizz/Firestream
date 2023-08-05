@@ -12,6 +12,7 @@ services:
       - ../etc/.env.local
     environment:
       - COMPOSE_PROJECT_NAME=fireworks
+      - SSH_AUTH_SOCK=/ssh-auth.sock
     volumes:
       # Mount the project directory on the local file system
       - ../:/workspace
@@ -25,7 +26,8 @@ services:
       - /var/lib/docker/buildkit:/var/lib/docker/buildkit
       # The path might differ depending on your host OS
 
-
+      # Enables SSH Agent forwarding from the host
+      - /run/host-services/ssh-auth.sock:/ssh-auth.sock
     command: sleep infinity # Prevents the container from stopping
 
     # Configure DNS resolution to use the internal IP address assigned to the KinD Control Plane
