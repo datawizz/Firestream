@@ -16,7 +16,7 @@
 	// Update the 'dockerComposeFile' list if you have more compose files or use different names.
 	// initializeCommand runs on the host before building the container.
 	// This is used to detect if the devcontainer should be loaded with GPU resources
-	"initializeCommand": "lspci | grep -i nvidia &>/dev/null && { cp docker/devcontainer.docker-compose.yml .devcontainer/docker-compose.yml; } || { cp docker/devcontainer_gpu.docker-compose.yml .devcontainer/docker-compose.yml; }",
+	// "initializeCommand": "lspci | grep -i nvidia &>/dev/null && { cp docker/devcontainer.docker-compose.yml .devcontainer/docker-compose.yml; } || { cp docker/devcontainer_gpu.docker-compose.yml .devcontainer/docker-compose.yml; }",
 	"dockerComposeFile": "docker-compose.yml",
 	// Use 'postStartCommand' to run commands after the container is started.
 	// "postStartCommand": "/workspace/bootstrap.sh",
@@ -33,6 +33,43 @@
 	},
 	// Add the IDs of extensions you want installed when the container is created.
 	"customizations": {
+		"codespaces": {
+			"repositories": {
+				"The-Fireworks-Company/superset": {
+					"permissions": "write-all"
+				},
+				"The-Fireworks-Company/supabase": {
+					"permissions": "write-all"
+				},
+				"The-Fireworks-Company/kyuubi": {
+					"permissions": "write-all"
+				},
+				"The-Fireworks-Company/supabase-kubernetes": {
+					"permissions": "write-all"
+				},
+				"The-Fireworks-Company/OpenSearch": {
+					"permissions": "write-all"
+				},
+				"The-Fireworks-Company/bitnami_charts": {
+					"permissions": "write-all"
+				},
+				"The-Fireworks-Company/Flowise": {
+					"permissions": "write-all"
+				},
+				"The-Fireworks-Company/nessie": {
+					"permissions": "write-all"
+				},
+				"The-Fireworks-Company/spark-on-k8s-operator": {
+					"permissions": "write-all"
+				},
+				"The-Fireworks-Company/spark": {
+					"permissions": "write-all"
+				},
+				"The-Fireworks-Company/oepnsearch-project-helm-charts": {
+					"permissions": "write-all"
+				}
+			}
+		},
 		"vscode": {
 			"extensions": [
 				"ms-python.python",
