@@ -15,9 +15,10 @@
 	"remoteUser": "vscode",
 	// Update the 'dockerComposeFile' list if you have more compose files or use different names.
 	// initializeCommand runs on the host before building the container.
-	// This is used to detect if the devcontainer should be loaded with GPU resources
-	// "initializeCommand": "lspci | grep -i nvidia &>/dev/null && { cp docker/devcontainer.docker-compose.yml .devcontainer/docker-compose.yml; } || { cp docker/devcontainer_gpu.docker-compose.yml .devcontainer/docker-compose.yml; }",
+	"initializeCommand": "bash .devcontainer/devcontainer_init.sh",
 	"dockerComposeFile": "docker-compose.yml",
+	// Disables VS Code attempting to keep the container running by relying on the entrypoint.sh called in the Dockerfile
+	"overrideCommand": false,
 	// Use 'postStartCommand' to run commands after the container is started.
 	// "postStartCommand": "/workspace/bootstrap.sh",
 	// The 'service' property is the name of the service for the container that VS Code should
@@ -25,8 +26,6 @@
 	// The optional 'workspaceFolder' property is the path VS Code should open by default when
 	// connected. This is typically a volume mount in .devcontainer/docker-compose.yml
 	"workspaceFolder": "/workspace",
-	// Disables VS Code attempting to keep the container running by relying on the entrypoint.sh called in the Dockerfile
-	"overrideCommand": false,
 	"remoteEnv": {
 		// the original host directory which is needed for volume mount commands from inside the container (Docker in Docker)
 		"LOCAL_WORKSPACE_FOLDER": "${localWorkspaceFolder}"

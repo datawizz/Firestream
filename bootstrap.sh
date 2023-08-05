@@ -21,10 +21,8 @@ echo "                                                                     "
 ### 0. Git Clone                                                            ###
 ###############################################################################
 
-## Clone the project and the submodules that it depends on
-# TODO
-# git clone --recurse-submodules https://github.com/datawizz/fireworks
-
+# Fetch submodules
+git submodule update --init --recursive
 
 ###############################################################################
 ### 1. Environment                                                          ###

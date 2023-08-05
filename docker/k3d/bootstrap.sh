@@ -47,5 +47,3 @@ kubectl create secret tls $TLS_SECRET --cert=$HOME/certs/server.crt --key=$HOME/
 
 #TODO: This is a hack to get the ingress to work. It should be removed once the ingress is configured properly
 sleep 10
-
-# kubectl apply -f /workspace/docker/k3d/ingress.yaml
