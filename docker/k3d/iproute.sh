@@ -1,6 +1,20 @@
 
 ### Resolve DNS through Kubernetes Control Plane ###
 
+# Patch the /etc/hosts with the host-uuid for codespacec compatibility
+HOSTNAME=$(hostname)
+
+# Check if the hostname already exists in /etc/hosts
+grep -q "$HOSTNAME" /etc/hosts
+
+if [ $? -eq 1 ]; then
+  # If hostname not found, append it to /etc/hosts
+  echo "127.0.0.1 $HOSTNAME" | sudo tee -a /etc/hosts > /dev/null
+  echo "Hostname $HOSTNAME added to /etc/hosts"
+else
+  echo "Hostname $HOSTNAME already exists in /etc/hosts"
+fi
+
 # Find the IP of the k3d server node (dynamically assigned with each cluster restart)
 export K3D_SERVER_IP=$(docker container inspect k3d-$COMPOSE_PROJECT_NAME-server-0 --format '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}')
 echo $K3D_SERVER_IP
