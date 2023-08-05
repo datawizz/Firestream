@@ -36,122 +36,123 @@
 		"codespaces": {
 			"repositories": {
 				"The-Fireworks-Company/superset": {
-					"permissions": "write-all"
-				},
-				"The-Fireworks-Company/supabase": {
-					"permissions": "write-all"
-				},
-				"The-Fireworks-Company/kyuubi": {
-					"permissions": "write-all"
-				},
-				"The-Fireworks-Company/supabase-kubernetes": {
-					"permissions": "write-all"
-				},
-				"The-Fireworks-Company/OpenSearch": {
-					"permissions": "write-all"
-				},
-				"The-Fireworks-Company/bitnami_charts": {
-					"permissions": "write-all"
-				},
-				"The-Fireworks-Company/Flowise": {
-					"permissions": "write-all"
-				},
-				"The-Fireworks-Company/nessie": {
-					"permissions": "write-all"
-				},
-				"The-Fireworks-Company/spark-on-k8s-operator": {
-					"permissions": "write-all"
-				},
-				"The-Fireworks-Company/spark": {
-					"permissions": "write-all"
-				},
-				"The-Fireworks-Company/oepnsearch-project-helm-charts": {
-					"permissions": "write-all"
+					"permissions": {
+						"content": "read"
+					},
+					"The-Fireworks-Company/supabase": {
+						"permissions": "write-all"
+					},
+					"The-Fireworks-Company/kyuubi": {
+						"permissions": "write-all"
+					},
+					"The-Fireworks-Company/supabase-kubernetes": {
+						"permissions": "write-all"
+					},
+					"The-Fireworks-Company/OpenSearch": {
+						"permissions": "write-all"
+					},
+					"The-Fireworks-Company/bitnami_charts": {
+						"permissions": "write-all"
+					},
+					"The-Fireworks-Company/Flowise": {
+						"permissions": "write-all"
+					},
+					"The-Fireworks-Company/nessie": {
+						"permissions": "write-all"
+					},
+					"The-Fireworks-Company/spark-on-k8s-operator": {
+						"permissions": "write-all"
+					},
+					"The-Fireworks-Company/spark": {
+						"permissions": "write-all"
+					},
+					"The-Fireworks-Company/opensearch-project-helm-charts": {
+						"permissions": "write-all"
+					}
 				}
-			}
-		},
-		"vscode": {
-			"extensions": [
-				"ms-python.python",
-				"ms-python.vscode-pylance",
-				"ms-toolsai.jupyter",
-				"ms-toolsai.jupyter-renderers",
-				"ms-azuretools.vscode-docker",
-				"randomfractalsinc.vscode-data-preview",
-				"GitHub.copilot",
-				"scala-lang.scala",
-				"mhutchie.git-graph",
-				"DavidAnson.vscode-markdownlint",
-				"dbaeumer.vscode-eslint",
-				"timonwong.shellcheck",
-				"rust-lang.rust-analyzer",
-				"streetsidesoftware.code-spell-checker"
-			],
-			// Set *default* container specific settings.json values on container create.
-			"settings": {
-				"python.defaultInterpreterPath": "usr/local/python/bin/python",
-				"python.linting.enabled": true,
-				"python.linting.pylintEnabled": true,
-				"python.linting.mypyEnabled": true,
-				"python.linting.banditEnabled": true,
-				"python.formatting.provider": "black",
-				"python.analysis.typeCheckingMode": "basic",
-				"python.linting.lintOnSave": true,
-				"python.formatting.autopep8Path": "/usr/local/py-utils/bin/autopep8",
-				"python.formatting.blackPath": "/usr/local/py-utils/bin/black",
-				"python.formatting.yapfPath": "/usr/local/py-utils/bin/yapf",
-				"python.linting.banditPath": "/usr/local/py-utils/bin/bandit",
-				"python.linting.flake8Path": "/usr/local/py-utils/bin/flake8",
-				"python.linting.mypyPath": "/usr/local/py-utils/bin/mypy",
-				"python.linting.pycodestylePath": "/usr/local/py-utils/bin/pycodestyle",
-				"python.linting.pydocstylePath": "/usr/local/py-utils/bin/pydocstyle",
-				"python.linting.pylintPath": "/usr/local/py-utils/bin/pylint",
-				"python.linting.pylintArgs": [
-					"--errors-only"
+			},
+			"vscode": {
+				"extensions": [
+					"ms-python.python",
+					"ms-python.vscode-pylance",
+					"ms-toolsai.jupyter",
+					"ms-toolsai.jupyter-renderers",
+					"ms-azuretools.vscode-docker",
+					"randomfractalsinc.vscode-data-preview",
+					"GitHub.copilot",
+					"scala-lang.scala",
+					"mhutchie.git-graph",
+					"DavidAnson.vscode-markdownlint",
+					"dbaeumer.vscode-eslint",
+					"timonwong.shellcheck",
+					"rust-lang.rust-analyzer",
+					"streetsidesoftware.code-spell-checker"
 				],
-				"python.tensorboard.logDirectory": "/workspace/logs/",
-				"workbench.colorCustomizations": {
-					"activityBar.background": "#a00909",
-					"titleBar.activeBackground": "#a00909"
-				},
-				"editor.formatOnSave": true,
-				"editor.insertSpaces": true,
-				"editor.tabSize": 4,
-				"editor.detectIndentation": true,
-				"python.testing.pytestArgs": [
-					"."
-				],
-				"python.testing.unittestEnabled": false,
-				"python.testing.pytestEnabled": true,
-				// Controls if quick suggestions should show up while typing
-				"editor.quickSuggestions": {
-					"other": true,
-					"comments": false,
-					"strings": false
-				},
-				"files.exclude": {
-					"**/.git": true,
-					"**/.svn": true,
-					"**/.hg": true,
-					"**/CVS": true,
-					"**/.DS_Store": true,
-					"**/target/**": true,
-					"**/target-ra/**": true
-				},
-				"search.exclude": {
-					"**/node_modules": true,
-					"**/bower_components": true
-				},
-				"files.watcherExclude": {
-					"**/.git/objects/**": true,
-					"**/.git/subtree-cache/**": true,
-					"**/node_modules/*/**": true,
-					"**/target": true
-				},
-				"rust-analyzer.checkOnSave.extraArgs": [
-					"--target-dir=target-ra"
-				]
+				// Set *default* container specific settings.json values on container create.
+				"settings": {
+					"python.defaultInterpreterPath": "usr/local/python/bin/python",
+					"python.linting.enabled": true,
+					"python.linting.pylintEnabled": true,
+					"python.linting.mypyEnabled": true,
+					"python.linting.banditEnabled": true,
+					"python.formatting.provider": "black",
+					"python.analysis.typeCheckingMode": "basic",
+					"python.linting.lintOnSave": true,
+					"python.formatting.autopep8Path": "/usr/local/py-utils/bin/autopep8",
+					"python.formatting.blackPath": "/usr/local/py-utils/bin/black",
+					"python.formatting.yapfPath": "/usr/local/py-utils/bin/yapf",
+					"python.linting.banditPath": "/usr/local/py-utils/bin/bandit",
+					"python.linting.flake8Path": "/usr/local/py-utils/bin/flake8",
+					"python.linting.mypyPath": "/usr/local/py-utils/bin/mypy",
+					"python.linting.pycodestylePath": "/usr/local/py-utils/bin/pycodestyle",
+					"python.linting.pydocstylePath": "/usr/local/py-utils/bin/pydocstyle",
+					"python.linting.pylintPath": "/usr/local/py-utils/bin/pylint",
+					"python.linting.pylintArgs": [
+						"--errors-only"
+					],
+					"python.tensorboard.logDirectory": "/workspace/logs/",
+					"workbench.colorCustomizations": {
+						"activityBar.background": "#a00909",
+						"titleBar.activeBackground": "#a00909"
+					},
+					"editor.formatOnSave": true,
+					"editor.insertSpaces": true,
+					"editor.tabSize": 4,
+					"editor.detectIndentation": true,
+					"python.testing.pytestArgs": [
+						"."
+					],
+					"python.testing.unittestEnabled": false,
+					"python.testing.pytestEnabled": true,
+					// Controls if quick suggestions should show up while typing
+					"editor.quickSuggestions": {
+						"other": true,
+						"comments": false,
+						"strings": false
+					},
+					"files.exclude": {
+						"**/.git": true,
+						"**/.svn": true,
+						"**/.hg": true,
+						"**/CVS": true,
+						"**/.DS_Store": true,
+						"**/target/**": true,
+						"**/target-ra/**": true
+					},
+					"search.exclude": {
+						"**/node_modules": true,
+						"**/bower_components": true
+					},
+					"files.watcherExclude": {
+						"**/.git/objects/**": true,
+						"**/.git/subtree-cache/**": true,
+						"**/node_modules/*/**": true,
+						"**/target": true
+					},
+					"rust-analyzer.checkOnSave.extraArgs": [
+						"--target-dir=target-ra"
+					]
+				}
 			}
 		}
 	}
-}
