@@ -31,7 +31,7 @@ ARG NODE_SHA=""
 # Allows for efficient multistage build with minimum network activity
 # and assertation of remote resources by good 'ol hard coded hash matching
 
-FROM debian:bullseye-slim as dependencies
+FROM debian:bookworm as dependencies
 
 ENV DEBIAN_FRONTEND=noninteractive
 ARG DOCKER_BUILDKIT
@@ -163,7 +163,7 @@ RUN python -m pip download --no-cache-dir --no-deps -r /tmp/workspace/requiremen
 
 # Contains everything (and the kitchen sink) required to build project artifacts and run tests
 
-FROM debian:bullseye-slim as devcontainer
+FROM debian:bookworm as devcontainer
 
 ENV DEBIAN_FRONTEND=noninteractive
 
@@ -194,7 +194,7 @@ RUN apt-get update && export DEBIAN_FRONTEND=noninteractive \
     ca-certificates \
     gnupg \
     stress \
-    netcat \
+    # netcat \
     postgresql-client \
     libglib2.0-0 \
     libnss3 \
@@ -301,7 +301,7 @@ ARG DOCKER_VERSION="latest"
 ENV DOCKER_BUILDKIT=1
 
 # ### Docker from Docker
-RUN /bin/bash /tmp/workspace/bin/install_scripts/docker-from-docker-debian.sh "${ENABLE_NONROOT_DOCKER}" "/var/run/docker-host.sock" "/var/run/docker.sock" "${USERNAME}" "true" "latest" "v1" 
+RUN /bin/bash /tmp/workspace/bin/install_scripts/docker-from-docker-debian.sh "${ENABLE_NONROOT_DOCKER}" "/var/run/docker-host.sock" "/var/run/docker.sock" "${USERNAME}" "true" "latest" "v2" 
 
 ### K3D ###
 RUN /bin/bash /tmp/workspace/bin/install_scripts/k3d-debian.sh
@@ -396,6 +396,8 @@ WORKDIR /workspace
 RUN pip install --upgrade "jax[cpu]"
 RUN pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu
 
+# Required for Docker-from-Docker
+ENTRYPOINT ["/usr/local/share/docker-init.sh"]
 CMD ["sleep", "infinity"]
 
 
@@ -426,6 +428,7 @@ RUN pip install --pre torch torchvision torchaudio --index-url https://download.
 RUN pip install --upgrade "jax[cuda12_pip]" -f https://storage.googleapis.com/jax-releases/jax_cuda_releases.html
 #https://storage.googleapis.com/jax-releases/cuda12/jaxlib-0.4.10+cuda12.cudnn88-cp39-cp39-manylinux2014_x86_64.whl
 #https://storage.googleapis.com/jax-releases/jax_cuda_releases.html
+
 
 CMD ["sleep", "infinity"]
 
