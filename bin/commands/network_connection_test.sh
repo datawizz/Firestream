@@ -7,16 +7,16 @@ attempt=0
 
 while [ $attempt -lt $max_attempts ]
 do
-  # Try to ping debian.org
-  ping -c 1 debian.org > /dev/null 2>&1
+  # Try to fetch debian.org using curl
+  curl -s -I debian.org > /dev/null 2>&1
   
-  # Check if ping command was successful or not
+  # Check if curl command was successful or not
   if [ $? -eq 0 ]
   then
-    echo "Ping was successful!"
+    echo "Connection was successful!"
     exit 0
   else
-    echo "Ping failed, trying again in $wait_time seconds..."
+    echo "Connection failed, trying again in $wait_time seconds..."
     sleep $wait_time
     # Increase the wait_time for next attempt
     wait_time=$((wait_time*2))
@@ -25,5 +25,5 @@ do
 done
 
 # If we're here, then all the attempts have failed
-echo "All attempts to ping have failed. Please check your network settings."
+echo "All attempts to connect have failed. Please check your network settings."
 exit 1
