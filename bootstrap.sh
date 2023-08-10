@@ -130,6 +130,8 @@ echo "Environment successfully configured"
 # If this script is being run on a Debian OS directly, ensure the host is configured with the required pakcages
 # If this scirpt is being run in a container, assume the host is configured correctly.
 
+#TODO this needs to be run once on new host configuration
+# /home/fireworks/Fireworks/bin/host_scripts/max_memory_map.sh
 
 ###############################################################################
 ### 2. Deployment                                                           ###

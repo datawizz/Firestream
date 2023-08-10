@@ -116,9 +116,9 @@ helm install spark bitnami/spark #-f /workspace/charts/fireworks/subcharts/spark
 
 ### Minio ###
 helm install minio bitnami/minio -f /workspace/charts/fireworks/subcharts/minio/chart/values.yaml \
-  --set auth.rootUser="$S3_ACCESS_KEY_ID" \
-  --set auth.rootPassword="$S3_SECRET_ACCESS_KEY" \
-  --set defaultBuckets="$S3_BUCKET_NAME"
+  --set auth.rootUser="$S3_LOCAL_ACCESS_KEY_ID" \
+  --set auth.rootPassword="$S3_LOCAL_SECRET_ACCESS_KEY" \
+  --set defaultBuckets="$S3_LOCAL_BUCKET_NAME"
 
 # ### Solr ###
 # helm install solr bitnami/solr -f /workspace/charts/solr/chart/values.yaml \
@@ -130,6 +130,7 @@ helm install minio bitnami/minio -f /workspace/charts/fireworks/subcharts/minio/
 # helm install kafka bitnami/kafka -f /workspace/charts/fireworks/subcharts/kafka/chart/values.yaml
 
 cd /workspace/submodules/the-fireworks-company/bitnami_charts/bitnami/kafka && \
+  helm dependency build && \
   helm install kafka . \
    -f /workspace/charts/fireworks/subcharts/kafka/chart/values.yaml
 
@@ -142,8 +143,10 @@ helm install kyuubi charts/kyuubi
 # cd /workspace/submodules/the-fireworks-company/superset/helm/superset && helm dependency build
 
 ### Superset ###
-cd /workspace/submodules/the-fireworks-company/superset &&
-  helm install superset helm/superset 
+cd /workspace/submodules/the-fireworks-company/superset/helm/superset &&
+  helm dependency build && \
+  cd /workspace/submodules/the-fireworks-company/superset/helm && \
+  helm install superset superset
 
 
 
@@ -156,7 +159,7 @@ cd /workspace/submodules/the-fireworks-company/superset &&
 # --set something.something="$OPENSEARCH_PASSWORD" \
 
 helm repo add opensearch https://opensearch-project.github.io/helm-charts/
-helm install opensearch-dashboard opensearch/opensearch-dashboard
+helm install opensearch-dashboard opensearch/opensearch-dashboards
 helm install opensearch opensearch/opensearch
 
 # export CONTAINER_PORT=$(kubectl get pod --namespace default $POD_NAME -o jsonpath="{.spec.containers[0].ports[0].containerPort}")
@@ -203,18 +206,18 @@ export OPENSEARCH_USERNAME='admin'
 export OPENSEARCH_PASSWORD='admin'
 
 
-### Jaeger All-in-One ###
-helm repo add jaegertracing https://jaegertracing.github.io/helm-charts
-helm upgrade --install jaeger jaegertracing/jaeger \
-  --set provisionDataStore.cassandra=false \
-  --set storage.type=elasticsearch \
-  --set storage.elasticsearch.host="$OPENSEARCH_HOST" \
-  --set storage.elasticsearch.port="$OPENSEARCH_PORT" \
-  --set storage.elasticsearch.user="$OPENSEARCH_USERNAME" \
-  --set storage.elasticsearch.password="$OPENSEARCH_PASSWORD" \
-  --set ingester.enabled=true \
-  --set storage.kafka.brokers[0]="$KAFKA_BOOTSTRAP_SERVERS" \
-  --set storage.kafka.topic="jaeger-spans" 
+# ### Jaeger All-in-One ###
+# helm repo add jaegertracing https://jaegertracing.github.io/helm-charts
+# helm upgrade --install jaeger jaegertracing/jaeger \
+#   --set provisionDataStore.cassandra=false \
+#   --set storage.type=elasticsearch \
+#   --set storage.elasticsearch.host="$OPENSEARCH_HOST" \
+#   --set storage.elasticsearch.port="$OPENSEARCH_PORT" \
+#   --set storage.elasticsearch.user="$OPENSEARCH_USERNAME" \
+#   --set storage.elasticsearch.password="$OPENSEARCH_PASSWORD" \
+#   --set ingester.enabled=true \
+#   --set storage.kafka.brokers[0]="$KAFKA_BOOTSTRAP_SERVERS" \
+#   --set storage.kafka.topic="jaeger-spans" 
   # --debug --dry-run
 
 
