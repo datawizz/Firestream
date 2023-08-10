@@ -20,7 +20,7 @@ ARG HADOOP_HOME="/opt/hadoop"
 ARG JAVA_VERSION=11
 ARG PYTHON_VERSION=3.11
 ##TODO the python version is being installed from debian, instead of manually which puts the bells and whistles in
-ARG NODE_VERSION=14
+ARG NODE_VERSION=16
 ARG NODE_SHA=""
 
 
@@ -356,9 +356,8 @@ ENV NVM_SYMLINK_CURRENT=true \
 RUN apt-get update && /bin/bash /tmp/workspace/bin/install_scripts/node-debian.sh "${NVM_DIR}" "$NODE_VERSION"
 
 
-# Update NPM to latest
-#TODO use a higher version of node which should be updated.
-RUN npm install -g npm
+# Update npm, install yarn
+RUN npm install -g npm yarn
 
 
 
