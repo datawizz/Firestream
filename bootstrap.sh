@@ -152,10 +152,6 @@ if [ "$DEPLOYMENT_MODE" = "development" ]; then
   bash $_SRC/docker/k3d/bootstrap.sh
   if [ $? -ne 0 ]; then exit 1; fi
 
-  # Ensure the networking is configured correctly
-  bash 	$_SRC/docker/k3d/iproute.sh
-  if [ $? -ne 0 ]; then exit 1; fi
-
   # Install source python packages in editable mode
   bash $_SRC/bin/cicd_scripts/bootstrap_devcontainer.sh
   if [ $? -ne 0 ]; then exit 1; fi
@@ -175,14 +171,23 @@ fi
 
 # 2.1. If in resume mode
 if [ "$DEPLOYMENT_MODE" = "resume" ]; then
-  # Ensure the networking is configured correctly
-  bash 	$_SRC/docker/k3d/iproute.sh
+  # Setup a K3D cluster on the host's Docker Engine and
+  # route the devcontainer's DNS to the K8 Control Plane for internal DNS resolution
+  bash $_SRC/docker/k3d/bootstrap.sh
+  if [ $? -ne 0 ]; then exit 1; fi
+
+  # Install source python packages in editable mode
+  bash $_SRC/bin/cicd_scripts/bootstrap_devcontainer.sh
   if [ $? -ne 0 ]; then exit 1; fi
 fi
 
 
 # 3. If in "clean" mode then just create the cluster but don't install services
 if [ "$DEPLOYMENT_MODE" = "clean" ]; then
+  # Setup a K3D cluster on the host's Docker Engine and
+  # route the devcontainer's DNS to the K8 Control Plane for internal DNS resolution
+  bash $_SRC/docker/k3d/bootstrap.sh
+  if [ $? -ne 0 ]; then exit 1; fi
 
   # Install source python packages in editable mode
   bash $_SRC/bin/cicd_scripts/bootstrap_devcontainer.sh
@@ -210,5 +215,3 @@ if [ "$DEPLOYMENT_MODE" = "production" ]; then
   exit 1
 fi
 
-# Finally, run the Plugin Manager to load all other configured plugins
-bash $_SRC/src/api/plugin_manager/bootstrap.sh

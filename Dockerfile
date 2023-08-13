@@ -1,14 +1,16 @@
 ### Build Arguments ###
 
 ARG DEPLOYMENT_MODE
-ARG HOST_USER_UID
-ARG HOST_USER_GID
-ARG DOCKER_GID
-
+ARG HOST_USER_ID
+ARG HOST_GROUP_ID
+ARG HOST_MACHINE_ID
+ARG HOST_IP
+ARG HOST_DOCKER_GID
+ARG HOST_GPU_STATUS
 
 ARG USERNAME="vscode"
 ARG DOCKER_BUILDKIT=1
-ARG DOCKER_GID
+
 
 ARG SPARK_VERSION=3.3.2
 ARG SPARK_SHA512="347fd9029128b12e7b05e9cd7948a5b571a57f16bbbbffc8ad4023b4edc0e127cffd27d66fcdbf5f926fa33362a2ae4fc0a8d59ab3abdaa1d4c4ef1e23126932  spark-3.3.2-bin-without-hadoop.tgz"
@@ -45,9 +47,12 @@ ARG HADOOP_HOME
 ARG JAVA_VERSION
 ARG PYTHON_VERSION
 ARG NODE_VERSION
-ARG USER_UID
-ARG USER_GID
-ARG DOCKER_GID
+ARG HOST_USER_ID
+ARG HOST_GROUP_ID
+ARG HOST_MACHINE_ID
+ARG HOST_IP
+ARG HOST_DOCKER_GID
+ARG HOST_GPU_STATUS
 
 RUN apt-get update && apt-get -y install wget unzip zip curl gnupg2 ca-certificates
 
@@ -176,10 +181,13 @@ ARG HADOOP_HOME
 ARG JAVA_VERSION
 ARG PYTHON_VERSION
 ARG NODE_VERSION
-ARG HOST_USER_UID
-ARG HOST_USER_GID
 ARG USERNAME
-ARG DOCKER_GID
+ARG HOST_USER_ID
+ARG HOST_GROUP_ID
+ARG HOST_MACHINE_ID
+ARG HOST_IP
+ARG HOST_DOCKER_GID
+ARG HOST_GPU_STATUS
 
 # Install additional OS packages.
 RUN apt-get update && export DEBIAN_FRONTEND=noninteractive \
@@ -276,7 +284,7 @@ RUN python -m pip install --upgrade pip
 # Install python dependencies
 COPY ./requirements.txt /tmp/workspace/requirements.txt
 COPY --from=dependencies /tmp/python_packages /tmp/python_packages
-RUN chown $HOST_USER_UID:$HOST_USER_GID -R /tmp
+RUN chown $HOST_USER_ID:$HOST_GROUP_ID -R /tmp
 # USER ${USERNAME}
 RUN python -m pip install --no-warn-script-location --no-deps --no-index --find-links file:///tmp/python_packages -r /tmp/workspace/requirements.txt
 # USER root
@@ -288,7 +296,7 @@ RUN python -m pip install --no-warn-script-location --no-deps --no-index --find-
 # RUN /bin/bash /tmp/workspace/bin/install_scripts/sbt-debian.sh
 
 # Install VS Code remote development container features
-RUN /bin/bash /tmp/workspace/bin/install_scripts/common-debian.sh "${INSTALL_ZSH}" "${USERNAME}" "${HOST_USER_UID}" "${HOST_USER_GID}" "${UPGRADE_PACKAGES}" "true" "true"
+RUN /bin/bash /tmp/workspace/bin/install_scripts/common-debian.sh "${INSTALL_ZSH}" "${USERNAME}" "${HOST_USER_ID}" "${HOST_GROUP_ID}" "${UPGRADE_PACKAGES}" "true" "true"
 
 ### Docker ###
 # [Option] Enable non-root Docker access in container
@@ -411,35 +419,35 @@ CMD ["sleep", "infinity"]
 # ARG CUDA_OS="ubuntu22.04"
 
 
-FROM devcontainer as gpu_devcontainer
+# FROM devcontainer as gpu_devcontainer
 
-# Install PyTorch
-#NOTE As of 2023-06-03 the nightly build is the only way to get PyTorch to work with CUDA 12.1
-RUN pip install --pre torch torchvision torchaudio --index-url https://download.pytorch.org/whl/nightly/cu121
+# # Install PyTorch
+# #NOTE As of 2023-06-03 the nightly build is the only way to get PyTorch to work with CUDA 12.1
+# RUN pip install --pre torch torchvision torchaudio --index-url https://download.pytorch.org/whl/nightly/cu121
 
-# Install the CUDA version of Jax
-# RUN pip install --upgrade "jax[cuda]" -f https://storage.googleapis.com/jax-releases/jax_cuda_releases.html
+# # Install the CUDA version of Jax
+# # RUN pip install --upgrade "jax[cuda]" -f https://storage.googleapis.com/jax-releases/jax_cuda_releases.html
 
-# CUDA 12 installation
-# Note: wheels only available on linux.
-#TODO there is a issue with the mismatch of the CUDA version of the host (whatever is latest) and the cuDNN version shipped with Jax via wheels on Pip.
-# Running pip install jax[cuda_local] will use the host's versions, but that is crashing as of 2021-06-03...
-RUN pip install --upgrade "jax[cuda12_pip]" -f https://storage.googleapis.com/jax-releases/jax_cuda_releases.html
-#https://storage.googleapis.com/jax-releases/cuda12/jaxlib-0.4.10+cuda12.cudnn88-cp39-cp39-manylinux2014_x86_64.whl
-#https://storage.googleapis.com/jax-releases/jax_cuda_releases.html
-
-
-CMD ["sleep", "infinity"]
+# # CUDA 12 installation
+# # Note: wheels only available on linux.
+# #TODO there is a issue with the mismatch of the CUDA version of the host (whatever is latest) and the cuDNN version shipped with Jax via wheels on Pip.
+# # Running pip install jax[cuda_local] will use the host's versions, but that is crashing as of 2021-06-03...
+# RUN pip install --upgrade "jax[cuda12_pip]" -f https://storage.googleapis.com/jax-releases/jax_cuda_releases.html
+# #https://storage.googleapis.com/jax-releases/cuda12/jaxlib-0.4.10+cuda12.cudnn88-cp39-cp39-manylinux2014_x86_64.whl
+# #https://storage.googleapis.com/jax-releases/jax_cuda_releases.html
 
 
-
-FROM devcontainer as a_testing_container
-# A container for running tests
-RUN echo "Running tests!"
-CMD ["make", "build_and_test"]
+# CMD ["sleep", "infinity"]
 
 
-FROM devcontainer as cicdcontainer
-# A container for running the deployment pipeline
-RUN echo "Running cicd!"
-CMD ["make", "deploy_production"]
+
+# FROM devcontainer as a_testing_container
+# # A container for running tests
+# RUN echo "Running tests!"
+# CMD ["make", "build_and_test"]
+
+
+# FROM devcontainer as cicdcontainer
+# # A container for running the deployment pipeline
+# RUN echo "Running cicd!"
+# CMD ["make", "deploy_production"]
