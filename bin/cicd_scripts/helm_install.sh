@@ -127,13 +127,8 @@ helm install minio bitnami/minio -f /workspace/charts/fireworks/subcharts/minio/
 #   --set coreNames="$SOLR_DEFAULT_CORE"
 
 ### Kafka ###
-# helm install kafka bitnami/kafka -f /workspace/charts/fireworks/subcharts/kafka/chart/values.yaml
-
-cd /workspace/submodules/the-fireworks-company/bitnami_charts/bitnami/kafka && \
-  helm dependency build && \
-  helm install kafka . \
+helm upgrade --install kafka bitnami/kafka --version 24.0.10  \
    -f /workspace/charts/fireworks/subcharts/kafka/chart/values.yaml
-
 
 ### Kyuubi ###
 cd /workspace/submodules/the-fireworks-company/kyuubi && \
