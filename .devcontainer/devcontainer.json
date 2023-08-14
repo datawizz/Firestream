@@ -12,7 +12,7 @@
 		"memory": "8gb",
 		"storage": "32gb"
 	},
-	"remoteUser": "vscode",
+	"remoteUser": "fireworks",
 	// initializeCommand runs on the host before building the container.
 	"initializeCommand": "bash docker/docker_preinit.sh",
 	// Update the 'dockerComposeFile' list if you have more compose files or use different names.
