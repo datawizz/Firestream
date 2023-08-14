@@ -11,7 +11,6 @@ services:
     env_file:
       - ../etc/.env.local
     environment:
-      - COMPOSE_PROJECT_NAME=fireworks
       - SSH_AUTH_SOCK=/ssh-auth.sock
     volumes:
       # Mount the project directory on the local file system

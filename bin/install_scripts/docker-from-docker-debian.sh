@@ -328,16 +328,17 @@ log "Ensuring ${USERNAME} has access to ${SOURCE_SOCKET} via ${TARGET_SOCKET}"
 # fall back on using socat to forward the docker socket to another unix socket so 
 # that we can set permissions on it without affecting the host.
 if [ "${ENABLE_NONROOT_DOCKER}" = "true" ] && [ "${SOURCE_SOCKET}" != "${TARGET_SOCKET}" ] && [ "${USERNAME}" != "root" ] && [ "${USERNAME}" != "0" ]; then
-    SOCKET_GID=\$(stat -c '%g' ${SOURCE_SOCKET})
-    if [ "\${SOCKET_GID}" != "0" ] && [ "\${SOCKET_GID}" != "${DOCKER_GID}" ] && ! grep -E ".+:x:\${SOCKET_GID}" /etc/group; then
-        sudoIf groupmod --gid "\${SOCKET_GID}" docker
+    SOCKET_GID=$(stat -c '%g' ${SOURCE_SOCKET})
+
+    # If SOCKET_GID is not 0, not DOCKER_GID, and not present in /etc/group, modify the "docker" group GID
+    if [ "${SOCKET_GID}" != "0" ] && [ "${SOCKET_GID}" != "${DOCKER_GID}" ] && ! grep -E "docker:x:${SOCKET_GID}" /etc/group; then
+        sudoIf groupmod --gid "${SOCKET_GID}" docker
     else
-        # Enable proxy if not already running
-        if [ ! -f "\${SOCAT_PID}" ] || ! ps -p \$(cat \${SOCAT_PID}) > /dev/null; then
+        if [ ! -f "${SOCAT_PID}" ] || ! ps -p $(cat ${SOCAT_PID}) > /dev/null; then
             log "Enabling socket proxy."
             log "Proxying ${SOURCE_SOCKET} to ${TARGET_SOCKET} for vscode"
             sudoIf rm -rf ${TARGET_SOCKET}
-            (sudoIf socat UNIX-LISTEN:${TARGET_SOCKET},fork,mode=660,user=${USERNAME} UNIX-CONNECT:${SOURCE_SOCKET} 2>&1 | sudoIf tee -a \${SOCAT_LOG} > /dev/null & echo "\$!" | sudoIf tee \${SOCAT_PID} > /dev/null)
+            (sudoIf socat UNIX-LISTEN:${TARGET_SOCKET},fork,mode=660,user=${USERNAME} UNIX-CONNECT:${SOURCE_SOCKET} 2>&1 | sudoIf tee -a ${SOCAT_LOG} > /dev/null & echo "$!" | sudoIf tee ${SOCAT_PID} > /dev/null)
         else
             log "Socket proxy already running."
         fi
