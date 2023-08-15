@@ -6,21 +6,25 @@
 #
 # Docs: https://github.com/microsoft/vscode-dev-containers/blob/main/script-library/docs/docker.md
 # Maintainer: The VS Code and Codespaces Teams
-#
-# Syntax: ./docker-debian.sh [enable non-root docker socket access flag] [source socket] [target socket] [non-root user] [use moby] [CLI version] [Major version for docker-compose]
 
-ENABLE_NONROOT_DOCKER=${1:-"true"}
-SOURCE_SOCKET=${2:-"/var/run/docker-host.sock"}
-TARGET_SOCKET=${3:-"/var/run/docker.sock"}
-USERNAME=${4:-"automatic"}
-USE_MOBY=${5:-"true"}
-DOCKER_VERSION=${6:-"latest"}
-DOCKER_DASH_COMPOSE_VERSION=${7:-"v1"} # v1 or v2
+DOCKER_VERSION="${VERSION:-"latest"}"
+USE_MOBY="${MOBY:-"true"}"
+DOCKER_DASH_COMPOSE_VERSION="${DOCKERDASHCOMPOSEVERSION:-"v1"}" # v1 or v2 or none
+
+ENABLE_NONROOT_DOCKER="${ENABLE_NONROOT_DOCKER:-"true"}"
+SOURCE_SOCKET="${SOURCE_SOCKET:-"/var/run/docker-host.sock"}"
+TARGET_SOCKET="${TARGET_SOCKET:-"/var/run/docker.sock"}"
+USERNAME="${USERNAME:-"${_REMOTE_USER:-"automatic"}"}"
+INSTALL_DOCKER_BUILDX="${INSTALLDOCKERBUILDX:-"true"}"
+
 MICROSOFT_GPG_KEYS_URI="https://packages.microsoft.com/keys/microsoft.asc"
 DOCKER_MOBY_ARCHIVE_VERSION_CODENAMES="buster bullseye bionic focal jammy"
 DOCKER_LICENSED_ARCHIVE_VERSION_CODENAMES="buster bullseye bionic focal hirsute impish jammy"
 
 set -e
+
+# Clean up
+rm -rf /var/lib/apt/lists/*
 
 if [ "$(id -u)" -ne 0 ]; then
     echo -e 'Script must be run as root. Use sudo, su, or add "USER root" to your Dockerfile before running this script.'
@@ -31,7 +35,7 @@ fi
 if [ "${USERNAME}" = "auto" ] || [ "${USERNAME}" = "automatic" ]; then
     USERNAME=""
     POSSIBLE_USERS=("vscode" "node" "codespace" "$(awk -v val=1000 -F ":" '$3==val{print $1}' /etc/passwd)")
-    for CURRENT_USER in ${POSSIBLE_USERS[@]}; do
+    for CURRENT_USER in "${POSSIBLE_USERS[@]}"; do
         if id -u ${CURRENT_USER} > /dev/null 2>&1; then
             USERNAME=${CURRENT_USER}
             break
@@ -59,21 +63,18 @@ get_common_setting() {
     echo "$1=${!1}"
 }
 
-# Function to run apt-get if needed
-apt_get_update_if_needed()
+apt_get_update()
 {
-    if [ ! -d "/var/lib/apt/lists" ] || [ "$(ls /var/lib/apt/lists/ | wc -l)" = "0" ]; then
+    if [ "$(find /var/lib/apt/lists/* | wc -l)" = "0" ]; then
         echo "Running apt-get update..."
-        apt-get update
-    else
-        echo "Skipping apt-get update."
+        apt-get update -y
     fi
 }
 
 # Checks if packages are installed and installs them if not
 check_packages() {
     if ! dpkg -s "$@" > /dev/null 2>&1; then
-        apt_get_update_if_needed
+        apt_get_update
         apt-get -y install --no-install-recommends "$@"
     fi
 }
@@ -86,7 +87,7 @@ find_version_from_git_tags() {
     local repository=$2
     local prefix=${3:-"tags/v"}
     local separator=${4:-"."}
-    local last_part_optional=${5:-"false"}    
+    local last_part_optional=${5:-"false"}
     if [ "$(echo "${requested_version}" | grep -o "." | wc -l)" != "2" ]; then
         local escaped_separator=${separator//./\\.}
         local last_part
@@ -116,10 +117,9 @@ find_version_from_git_tags() {
 export DEBIAN_FRONTEND=noninteractive
 
 # Install dependencies
-check_packages apt-transport-https curl ca-certificates gnupg2 dirmngr
+check_packages apt-transport-https curl ca-certificates gnupg2 dirmngr wget
 if ! type git > /dev/null 2>&1; then
-    apt_get_update_if_needed
-    apt-get -y install git
+    check_packages git
 fi
 
 # Source /etc/os-release to get OS info
@@ -127,7 +127,7 @@ fi
 # Fetch host/container arch.
 architecture="$(dpkg --print-architecture)"
 
-# Check if distro is suppported
+# Check if distro is supported
 if [ "${USE_MOBY}" = "true" ]; then
     # 'get_common_setting' allows attribute to be updated remotely
     get_common_setting DOCKER_MOBY_ARCHIVE_VERSION_CODENAMES
@@ -172,7 +172,7 @@ apt-get update
 if [ "${DOCKER_VERSION}" = "latest" ] || [ "${DOCKER_VERSION}" = "lts" ] || [ "${DOCKER_VERSION}" = "stable" ]; then
     # Empty, meaning grab whatever "latest" is in apt repo
     cli_version_suffix=""
-else    
+else
     # Fetch a valid version from the apt-cache (eg: the Microsoft repo appends +azure, breakfix, etc...)
     docker_version_dot_escaped="${DOCKER_VERSION//./\\.}"
     docker_version_dot_plus_escaped="${docker_version_dot_escaped//+/\\+}"
@@ -194,76 +194,93 @@ if type docker > /dev/null 2>&1; then
     echo "Docker / Moby CLI already installed."
 else
     if [ "${USE_MOBY}" = "true" ]; then
-        apt-get -y install --no-install-recommends moby-cli${cli_version_suffix} moby-buildx
+        buildx=()
+        if [ "${INSTALL_DOCKER_BUILDX}" = "true" ]; then
+            buildx=(moby-buildx)
+        fi
+        apt-get -y install --no-install-recommends ${cli_package_name}${cli_version_suffix} "${buildx[@]}"
         apt-get -y install --no-install-recommends moby-compose || echo "(*) Package moby-compose (Docker Compose v2) not available for OS ${ID} ${VERSION_CODENAME} (${architecture}). Skipping."
     else
-        apt-get -y install --no-install-recommends docker-ce-cli${cli_version_suffix}
-        apt-get -y install --no-install-recommends docker-compose-plugin || echo "(*) Package docker-compose-plugin (Docker Compose v2) not available for OS ${ID} ${VERSION_CODENAME} (${architecture}). Skipping."
+        buildx=()
+        if [ "${INSTALL_DOCKER_BUILDX}" = "true" ]; then
+            buildx=(docker-buildx-plugin)
+        fi
+        apt-get -y install --no-install-recommends ${cli_package_name}${cli_version_suffix} "${buildx[@]}" docker-compose-plugin
+        buildx_path="/usr/libexec/docker/cli-plugins/docker-buildx"
+        # Older versions of Docker CE installs buildx as part of the CLI package
+        if [ "${INSTALL_DOCKER_BUILDX}" = "false" ] && [ -f "${buildx_path}" ]; then
+            echo "(*) Removing docker-buildx installed from docker-ce-cli since installDockerBuildx is disabled..."
+            rm -f "${buildx_path}"
+        fi
     fi
+    unset buildx buildx_path
 fi
 
-# Install Docker Compose if not already installed  and is on a supported architecture
-if type docker-compose > /dev/null 2>&1; then
-    echo "Docker Compose already installed."
-else
-    TARGET_COMPOSE_ARCH="$(uname -m)"
-    if [ "${TARGET_COMPOSE_ARCH}" = "amd64" ]; then
-        TARGET_COMPOSE_ARCH="x86_64"
-    fi
-    if [ "${TARGET_COMPOSE_ARCH}" != "x86_64" ]; then
-        # Use pip to get a version that runns on this architecture
-        if ! dpkg -s python3-minimal python3-pip libffi-dev python3-venv > /dev/null 2>&1; then
-            apt_get_update_if_needed
-            apt-get -y install python3-minimal python3-pip libffi-dev python3-venv
+# If 'docker-compose' command is to be included
+if [ "${DOCKER_DASH_COMPOSE_VERSION}" != "none" ]; then
+    # Install Docker Compose if not already installed  and is on a supported architecture
+    if type docker-compose > /dev/null 2>&1; then
+        echo "Docker Compose already installed."
+    elif [ "${DOCKER_DASH_COMPOSE_VERSION}" = "v1" ]; then
+        TARGET_COMPOSE_ARCH="$(uname -m)"
+        if [ "${TARGET_COMPOSE_ARCH}" = "amd64" ]; then
+            TARGET_COMPOSE_ARCH="x86_64"
         fi
-        export PIPX_HOME=/usr/local/pipx
-        mkdir -p ${PIPX_HOME}
-        export PIPX_BIN_DIR=/usr/local/bin
-        export PYTHONUSERBASE=/tmp/pip-tmp
-        export PIP_CACHE_DIR=/tmp/pip-tmp/cache
-        pipx_bin=pipx
-        if ! type pipx > /dev/null 2>&1; then
-            pip3 install --disable-pip-version-check --no-cache-dir --user pipx
-            pipx_bin=/tmp/pip-tmp/bin/pipx
+        if [ "${TARGET_COMPOSE_ARCH}" != "x86_64" ]; then
+            # Use pip to get a version that runs on this architecture
+            check_packages python3-minimal python3-pip libffi-dev python3-venv
+            export PIPX_HOME=/usr/local/pipx
+            mkdir -p ${PIPX_HOME}
+            export PIPX_BIN_DIR=/usr/local/bin
+            export PYTHONUSERBASE=/tmp/pip-tmp
+            export PIP_CACHE_DIR=/tmp/pip-tmp/cache
+            pipx_bin=pipx
+            if ! type pipx > /dev/null 2>&1; then
+                pip3 install --disable-pip-version-check --no-cache-dir --user pipx
+                pipx_bin=/tmp/pip-tmp/bin/pipx
+            fi
+            ${pipx_bin} install --pip-args '--no-cache-dir --force-reinstall' docker-compose
+            rm -rf /tmp/pip-tmp
+        else
+            compose_v1_version="1"
+            find_version_from_git_tags compose_v1_version "https://github.com/docker/compose" "tags/"
+            echo "(*) Installing docker-compose ${compose_v1_version}..."
+            curl -fsSL "https://github.com/docker/compose/releases/download/${compose_v1_version}/docker-compose-Linux-x86_64" -o /usr/local/bin/docker-compose
+            chmod +x /usr/local/bin/docker-compose
         fi
-        ${pipx_bin} install --pip-args '--no-cache-dir --force-reinstall' docker-compose
-        rm -rf /tmp/pip-tmp
-    else 
-        compose_v1_version="1"
-        find_version_from_git_tags compose_v1_version "https://github.com/docker/compose" "tags/"
-        echo "(*) Installing docker-compose ${compose_v1_version}..."
-        curl -fsSL "https://github.com/docker/compose/releases/download/${compose_v1_version}/docker-compose-Linux-x86_64" -o /usr/local/bin/docker-compose
+    else
+        echo "(*) Installing compose-switch as docker-compose..."
+        compose_switch_version="latest"
+        find_version_from_git_tags compose_switch_version "https://github.com/docker/compose-switch"
+        curl -fsSL "https://github.com/docker/compose-switch/releases/download/v${compose_switch_version}/docker-compose-linux-${architecture}" -o /usr/local/bin/docker-compose
         chmod +x /usr/local/bin/docker-compose
+        # TODO: Verify checksum once available: https://github.com/docker/compose-switch/issues/11
     fi
 fi
 
-# Install docker-compose switch if not already installed - https://github.com/docker/compose-switch#manual-installation
-current_v1_compose_path="$(which docker-compose)"
-target_v1_compose_path="$(dirname "${current_v1_compose_path}")/docker-compose-v1"
-if ! type compose-switch > /dev/null 2>&1; then
-    echo "(*) Installing compose-switch..."
-    compose_switch_version="latest"
-    find_version_from_git_tags compose_switch_version "https://github.com/docker/compose-switch"
-    curl -fsSL "https://github.com/docker/compose-switch/releases/download/v${compose_switch_version}/docker-compose-linux-${architecture}" -o /usr/local/bin/compose-switch
-    chmod +x /usr/local/bin/compose-switch
-    # TODO: Verify checksum once available: https://github.com/docker/compose-switch/issues/11
+# Setup a docker group in the event the docker socket's group is not root
+if ! grep -qE '^docker:' /etc/group; then
+    echo "(*) Creating missing docker group..."
+    groupadd --system docker
+fi
 
-    # Setup v1 CLI as alternative in addition to compose-switch (which maps to v2)
-    mv "${current_v1_compose_path}" "${target_v1_compose_path}"
-    update-alternatives --install /usr/local/bin/docker-compose docker-compose /usr/local/bin/compose-switch 99
-    update-alternatives --install /usr/local/bin/docker-compose docker-compose "${target_v1_compose_path}" 1
-fi
-if [ "${DOCKER_DASH_COMPOSE_VERSION}" = "v1" ]; then
-    update-alternatives --set docker-compose "${target_v1_compose_path}"
-else
-    update-alternatives --set docker-compose /usr/local/bin/compose-switch
-fi
+# Remarking this out to restore functionality in Azure VMs.  ID 999 is a reserved group ID
+# Ensure docker group gid is 999
+# if [ "$(getent group docker | cut -d: -f3)" != "999" ]; then
+#     echo "(*) Updating docker group gid to 999..."
+#     groupmod -g 999 docker
+# fi
+
+
+usermod -aG docker "${USERNAME}"
 
 # If init file already exists, exit
 if [ -f "/usr/local/share/docker-init.sh" ]; then
+    # Clean up
+    rm -rf /var/lib/apt/lists/*
     exit 0
 fi
-echo "docker-init doesnt exist, adding..."
+echo "docker-init doesn't exist, adding..."
 
 # By default, make the source and target sockets the same
 if [ "${SOURCE_SOCKET}" != "${TARGET_SOCKET}" ]; then
@@ -275,24 +292,18 @@ fi
 if [ "${ENABLE_NONROOT_DOCKER}" = "false" ] || [ "${USERNAME}" = "root" ]; then
     echo -e '#!/usr/bin/env bash\nexec "$@"' > /usr/local/share/docker-init.sh
     chmod +x /usr/local/share/docker-init.sh
+    # Clean up
+    rm -rf /var/lib/apt/lists/*
     exit 0
 fi
 
-# Setup a docker group in the event the docker socket's group is not root
-if ! grep -qE '^docker:' /etc/group; then
-    groupadd --system docker
-fi
-usermod -aG docker "${USERNAME}"
 DOCKER_GID="$(grep -oP '^docker:x:\K[^:]+' /etc/group)"
 
 # If enabling non-root access and specified user is found, setup socat and add script
-chown -h "${USERNAME}":root "${TARGET_SOCKET}"        
-if ! dpkg -s socat > /dev/null 2>&1; then
-    apt_get_update_if_needed
-    apt-get -y install socat
-fi
+chown -h "${USERNAME}":root "${TARGET_SOCKET}"
+check_packages socat
 tee /usr/local/share/docker-init.sh > /dev/null \
-<< EOF 
+<< EOF
 #!/usr/bin/env bash
 #-------------------------------------------------------------------------------------------------------------
 # Copyright (c) Microsoft Corporation. All rights reserved.
@@ -324,8 +335,8 @@ log()
 echo -e "\n** \$(date) **" | sudoIf tee -a \${SOCAT_LOG} > /dev/null
 log "Ensuring ${USERNAME} has access to ${SOURCE_SOCKET} via ${TARGET_SOCKET}"
 
-# If enabled, try to update the docker group with the right GID. If the group is root, 
-# fall back on using socat to forward the docker socket to another unix socket so 
+# If enabled, try to update the docker group with the right GID. If the group is root,
+# fall back on using socat to forward the docker socket to another unix socket so
 # that we can set permissions on it without affecting the host.
 if [ "${ENABLE_NONROOT_DOCKER}" = "true" ] && [ "${SOURCE_SOCKET}" != "${TARGET_SOCKET}" ] && [ "${USERNAME}" != "root" ] && [ "${USERNAME}" != "0" ]; then
     SOCKET_GID=\$(stat -c '%g' ${SOURCE_SOCKET})
@@ -345,11 +356,15 @@ if [ "${ENABLE_NONROOT_DOCKER}" = "true" ] && [ "${SOURCE_SOCKET}" != "${TARGET_
     log "Success"
 fi
 
-# Execute whatever commands were passed in (if any). This allows us 
+# Execute whatever commands were passed in (if any). This allows us
 # to set this script to ENTRYPOINT while still executing the default CMD.
 set +e
 exec "\$@"
 EOF
 chmod +x /usr/local/share/docker-init.sh
 chown ${USERNAME}:root /usr/local/share/docker-init.sh
+
+# Clean up
+rm -rf /var/lib/apt/lists/*
+
 echo "Done!"
