@@ -43,6 +43,11 @@ create_cluster() {
   wait_for_coredns
 }
 
+delete_cluster() {
+  echo "Deleting k3d cluster named $PROJECT_NAME..."
+  k3d cluster delete $PROJECT_NAME
+}
+
 test_kubectl() {
   kubectl_version_output=$(kubectl version --output=json)
   client_git_version=$(echo "$kubectl_version_output" | jq -r '.clientVersion.GitVersion')
@@ -146,6 +151,13 @@ test_dns_resolution() {
 ensure_kube_directory
 check_registry
 check_cluster
+
+# If "Clean" mode then delete the cluster and recreate it
+if [ "$DEPLOYMENT_MODE" = "clean" ]; then
+  delete_cluster
+  create_cluster
+fi
+
 load_tls_certificates
 hack_for_ingress
 

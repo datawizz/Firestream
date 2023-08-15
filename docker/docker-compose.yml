@@ -6,7 +6,7 @@ services:
     image: fireworks:latest
     build:
       context: ..
-      dockerfile: Dockerfile
+      dockerfile: docker/Dockerfile
       target: devcontainer
     env_file:
       - ../etc/.env.local
