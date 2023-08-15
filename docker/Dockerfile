@@ -308,8 +308,8 @@ ARG DOCKER_VERSION="latest"
 # Enable new "BUILDKIT" mode for Docker CLI (set permanently)
 ENV DOCKER_BUILDKIT=1
 
-# ### Docker from Docker
-RUN /bin/bash /tmp/workspace/bin/install_scripts/docker-from-docker-debian.sh
+### Docker from Docker
+RUN /bin/bash /tmp/workspace/bin/install_scripts/docker-from-docker-debian.sh "${ENABLE_NONROOT_DOCKER}" "/var/run/docker-host.sock" "/var/run/docker.sock" "${USERNAME}" "true" "latest" "v2" 
 
 ### K3D ###
 RUN /bin/bash /tmp/workspace/bin/install_scripts/k3d-debian.sh
@@ -442,12 +442,13 @@ CMD ["sleep", "infinity"]
 
 
 FROM devcontainer as test_container
+
 # Required for Docker-from-Docker
 ENTRYPOINT ["/usr/local/share/docker-init.sh"]
 
 # A container for running tests
 RUN echo "Running tests!"
-CMD ["make", "build_and_test"]
+CMD ["make", "test"]
 
 
 FROM devcontainer as cicd_container
