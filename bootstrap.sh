@@ -193,11 +193,6 @@ if [ "$DEPLOYMENT_MODE" = "clean" ]; then
   bash $_SRC/bin/cicd_scripts/bootstrap_devcontainer.sh
   if [ $? -ne 0 ]; then exit 1; fi
 
-  # Setup a K3D cluster on the host's Docker Engine and
-  # route the devcontainer's DNS to the K8 Control Plane for internal DNS resolution
-  bash $_SRC/docker/k3d/bootstrap.sh
-  if [ $? -ne 0 ]; then exit 1; fi
-
 fi
 
 
