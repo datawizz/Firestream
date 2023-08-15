@@ -104,7 +104,7 @@ patch_etc_hosts() {
 }
 
 set_ip_routes() {
-  export K3D_SERVER_IP=$(docker container inspect k3d-$COMPOSE_PROJECT_NAME-server-0 --format '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}')
+  export K3D_SERVER_IP=$(docker container inspect k3d-$PROJECT_NAME-server-0 --format '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}')
   echo $K3D_SERVER_IP
   sudo ip route | grep -q "10.43.0.0/16" || sudo ip route add 10.43.0.0/16 via $K3D_SERVER_IP
   sudo ip route | grep -q "10.42.0.0/16" || sudo ip route add 10.42.0.0/16 via $K3D_SERVER_IP
@@ -143,10 +143,6 @@ test_dns_resolution() {
 
 
 # Run
-ensure_kube_directory
-check_registry
-check_cluster
-
 ensure_kube_directory
 check_registry
 check_cluster
