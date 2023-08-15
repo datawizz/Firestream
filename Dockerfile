@@ -8,7 +8,7 @@ ARG HOST_IP
 ARG HOST_DOCKER_GID
 ARG HOST_GPU_STATUS
 
-ARG USERNAME="vscode"
+ARG USERNAME="fireworks"
 ARG DOCKER_BUILDKIT=1
 
 
@@ -309,7 +309,7 @@ ARG DOCKER_VERSION="latest"
 ENV DOCKER_BUILDKIT=1
 
 # ### Docker from Docker
-RUN /bin/bash /tmp/workspace/bin/install_scripts/docker-from-docker-debian.sh "${ENABLE_NONROOT_DOCKER}" "/var/run/docker-host.sock" "/var/run/docker.sock" "${USERNAME}" "true" "latest" "v2" 
+RUN /bin/bash /tmp/workspace/bin/install_scripts/docker-from-docker-debian.sh
 
 ### K3D ###
 RUN /bin/bash /tmp/workspace/bin/install_scripts/k3d-debian.sh
@@ -441,13 +441,20 @@ CMD ["sleep", "infinity"]
 
 
 
-# FROM devcontainer as a_testing_container
-# # A container for running tests
-# RUN echo "Running tests!"
-# CMD ["make", "build_and_test"]
+FROM devcontainer as test_container
+# Required for Docker-from-Docker
+ENTRYPOINT ["/usr/local/share/docker-init.sh"]
+
+# A container for running tests
+RUN echo "Running tests!"
+CMD ["make", "build_and_test"]
 
 
-# FROM devcontainer as cicdcontainer
-# # A container for running the deployment pipeline
-# RUN echo "Running cicd!"
-# CMD ["make", "deploy_production"]
+FROM devcontainer as cicd_container
+
+# Required for Docker-from-Docker
+ENTRYPOINT ["/usr/local/share/docker-init.sh"]
+
+# A container for running the deployment pipeline
+RUN echo "Running cicd!"
+CMD ["make", "deploy_production"]
