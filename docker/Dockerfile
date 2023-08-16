@@ -316,13 +316,8 @@ ARG DOCKER_VERSION="latest"
 # Enable new "BUILDKIT" mode for Docker CLI (set permanently)
 ENV DOCKER_BUILDKIT=1
 
-<<<<<<< HEAD:Dockerfile
-# ### Docker from Docker
-RUN /bin/bash /tmp/workspace/bin/install_scripts/docker-from-docker-debian.sh
-=======
 ### Docker from Docker
 RUN /bin/bash /tmp/workspace/bin/install_scripts/docker-from-docker-debian.sh 
->>>>>>> a36b738ad6f659e600300c2af14c8c3f1eff597a:docker/Dockerfile
 
 ### K3D ###
 RUN /bin/bash /tmp/workspace/bin/install_scripts/k3d-debian.sh
@@ -455,20 +450,12 @@ CMD ["sleep", "infinity"]
 
 
 FROM devcontainer as test_container
-<<<<<<< HEAD:Dockerfile
-=======
-
->>>>>>> a36b738ad6f659e600300c2af14c8c3f1eff597a:docker/Dockerfile
 # Required for Docker-from-Docker
 ENTRYPOINT ["/usr/local/share/docker-init.sh"]
 
 # A container for running tests
 RUN echo "Running tests!"
-<<<<<<< HEAD:Dockerfile
-CMD ["make", "build_and_test"]
-=======
 CMD ["make", "test"]
->>>>>>> a36b738ad6f659e600300c2af14c8c3f1eff597a:docker/Dockerfile
 
 
 FROM devcontainer as cicd_container
