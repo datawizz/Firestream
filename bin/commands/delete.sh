@@ -10,7 +10,9 @@ then
     docker stop $(docker ps -a | grep "fireworks" | awk '{print $1}')
     docker rm $(docker ps -a | grep "fireworks" | awk '{print $1}')
     docker rmi $(docker images | grep "fireworks" | awk '{print $3}')
-    docker network prune -f
+    docker network prune
+    docker volume prune
+    docker system prune
 else
     exit 0
 fi
