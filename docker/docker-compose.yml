@@ -6,7 +6,7 @@ services:
     image: fireworks:latest
     build:
       context: ..
-      dockerfile: Dockerfile
+      dockerfile: docker/Dockerfile
       target: devcontainer
     env_file:
       - ../etc/.env.local
@@ -18,7 +18,7 @@ services:
 
       # Enable Docker-from-Docker
       # This uses the host's Docker Engine through socket mapping and is preferred over Docker-in-Docker for security and latency
-      - /var/run/docker.sock:/var/run/docker.sock
+      - /var/run/docker.sock:/var/run/docker-host.sock
 
       # Persist images built in devcontainer
       - /var/lib/docker/image:/var/lib/docker/image
