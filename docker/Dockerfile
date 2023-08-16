@@ -54,19 +54,19 @@ ARG HOST_IP
 ARG HOST_DOCKER_GID
 ARG HOST_GPU_STATUS
 
-RUN apt-get update && apt-get -y install wget unzip zip curl gnupg2 ca-certificates
+# Install the packages but delete the package lists to enable caching of the layer
+RUN apt-get update && export DEBIAN_FRONTEND=noninteractive \
+    && apt-get -y install --no-install-recommends \
+    wget \
+    unzip \
+    zip \
+    curl \
+    gnupg2 \
+    ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
 
 #TODO change to build
 WORKDIR /tmp
-
-
-### Source Code ###
-# Download the source code for the project's dependencies
-# This is used in downstream stages to build the project's artifacts
-
-COPY ./bin /tmp/workspace/bin
-
-
 
 ## Spark ##
 # The "without hadoop" binary is used so that *any* hadoop version can be supplied and linked to Spark
@@ -100,6 +100,7 @@ RUN sed -i 's/hadoop.root.logger=INFO,console/hadoop.root.logger=WARN,console/g'
 ## Python ##
 
 # Install Python
+COPY bin/install_scripts/python-debian.sh /tmp/workspace/bin/install_scripts/python-debian.sh
 RUN /bin/bash /tmp/workspace/bin/install_scripts/python-debian.sh "${PYTHON_VERSION}" "/usr/local/python" "/usr/local/py-utils" "${USERNAME}" "true" "false" "false" "false"
 # Make "python" and "pip" command available
 RUN ln -s /usr/local/python/bin/python /usr/bin/python
@@ -160,6 +161,12 @@ RUN python -m pip download --no-cache-dir --no-deps -r /tmp/workspace/requiremen
 #     rm -rf /var/cache/apt/*
 
 
+### Source Code ###
+# Download the source code for the project's dependencies
+# This is used in downstream stages to build the project's artifacts
+
+COPY ./bin /tmp/workspace/bin
+
 
 
 
@@ -172,7 +179,7 @@ FROM debian:bookworm as devcontainer
 
 ENV DEBIAN_FRONTEND=noninteractive
 
-## Environement Variables ##
+## Build Args ##
 ARG DEPLOYMENT_MODE
 ARG SPARK_VERSION
 ARG SPARK_HOME
@@ -224,7 +231,8 @@ RUN apt-get update && export DEBIAN_FRONTEND=noninteractive \
     # Required for TLS Websocket support in Rust compiler
     pkg-config \
     libssl-dev \
-    protobuf-compiler
+    protobuf-compiler \
+    && rm -rf /var/lib/apt/lists/*
 
 
 
@@ -309,7 +317,7 @@ ARG DOCKER_VERSION="latest"
 ENV DOCKER_BUILDKIT=1
 
 ### Docker from Docker
-RUN /bin/bash /tmp/workspace/bin/install_scripts/docker-from-docker-debian.sh "${ENABLE_NONROOT_DOCKER}" "/var/run/docker-host.sock" "/var/run/docker.sock" "${USERNAME}" "true" "latest" "v2" 
+RUN /bin/bash /tmp/workspace/bin/install_scripts/docker-from-docker-debian.sh 
 
 ### K3D ###
 RUN /bin/bash /tmp/workspace/bin/install_scripts/k3d-debian.sh
