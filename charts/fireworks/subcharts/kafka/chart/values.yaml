@@ -1,6 +1,22 @@
-replicaCount: 3
-persistence:
-  size: 20Gi
+
+controller:
+  replicaCount: 5
+  # Sets the size of the heap for the Kafka Controller / broker process
+  heapOpts: "-Xmx1024m -Xms1024m"
+  persistence:
+    size: 20Gi
+
+
+listeners:
+  client:
+    protocol: "PLAINTEXT"
+  controller:
+    protocol: "PLAINTEXT"
+  interbroker:
+    protocol: "PLAINTEXT"
+  external:
+    protocol: "PLAINTEXT"
+
 
 #   ## Service parameters
 # ##
@@ -45,7 +61,7 @@ persistence:
 # #     clusterIP: 10.96.1.10
 
 kraft:
-  enabled: false
+  enabled: true
 
 zoopkeeper:
-  enabled: true
+  enabled: false
