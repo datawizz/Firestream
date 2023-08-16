@@ -151,8 +151,6 @@ test_dns_resolution() {
 ensure_kube_directory
 check_registry
 check_cluster
-<<<<<<< HEAD
-=======
 
 # If "Clean" mode then delete the cluster and recreate it
 if [ "$DEPLOYMENT_MODE" = "clean" ]; then
@@ -160,7 +158,6 @@ if [ "$DEPLOYMENT_MODE" = "clean" ]; then
   create_cluster
 fi
 
->>>>>>> a36b738ad6f659e600300c2af14c8c3f1eff597a
 load_tls_certificates
 hack_for_ingress
 
