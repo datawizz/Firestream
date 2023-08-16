@@ -63,5 +63,5 @@ listeners:
 kraft:
   enabled: true
 
-zoopkeeper:
+zookeeper:
   enabled: false
