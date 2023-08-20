@@ -27,13 +27,9 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v2
 
-      - name: Build Platform
+      - name: Run Integration Test Suite
         run: |
-          docker compose -f docker/docker-compose.test.yml build cicdcontainer
-
-      - name: Run Tests
-        run: |
-          docker compose -f docker/docker-compose.test.yml run cicdcontainer make test
+          docker compose -f docker/docker-compose.test.yml build && docker compose -f docker/docker-compose.test.yml run cicd_container make test
 
       - name: Stop containers
         if: always()
