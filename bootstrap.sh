@@ -22,7 +22,7 @@ echo "                                                                     "
 ###############################################################################
 
 # Fetch submodules
-git submodule update --init --recursive
+# git submodule update --init --recursive
 
 ###############################################################################
 ### 1. Environment                                                          ###
@@ -139,8 +139,7 @@ echo "Environment successfully configured"
 
 # 1. If in test mode
 if [ "$DEPLOYMENT_MODE" = "test" ]; then
-  # 1.1   Run test suite via Docker Compose for each service
-  # 1.2   Run the integration suite via Helm and Docker Compose
+  # TODO make the cluster name random
   echo "TODO"
 fi
 

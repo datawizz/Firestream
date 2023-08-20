@@ -12,8 +12,8 @@ ARG USERNAME="fireworks"
 ARG DOCKER_BUILDKIT=1
 
 
-ARG SPARK_VERSION=3.3.2
-ARG SPARK_SHA512="347fd9029128b12e7b05e9cd7948a5b571a57f16bbbbffc8ad4023b4edc0e127cffd27d66fcdbf5f926fa33362a2ae4fc0a8d59ab3abdaa1d4c4ef1e23126932  spark-3.3.2-bin-without-hadoop.tgz"
+ARG SPARK_VERSION=3.4.1
+ARG SPARK_SHA512="eacd191b83e62c12c55115a4ec21b97ca2fb07ce3a373e3f423a8275c646831f0fa78702aedf2be96d621c28cd0edde7ab0c2ad11df3e95e1498b5edeefb1daf  spark-3.4.1-bin-without-hadoop.tgz"
 ARG SPARK_HOME="/opt/spark"
 ARG HADOOP_VERSION=3.3.4
 ARG HADOOP_SHA512="ca5e12625679ca95b8fd7bb7babc2a8dcb2605979b901df9ad137178718821097b67555115fafc6dbf6bb32b61864ccb6786dbc555e589694a22bf69147780b4  hadoop-3.3.4.tar.gz"
@@ -449,20 +449,14 @@ CMD ["sleep", "infinity"]
 
 
 
-FROM devcontainer as test_container
-# Required for Docker-from-Docker
-ENTRYPOINT ["/usr/local/share/docker-init.sh"]
-
-# A container for running tests
-RUN echo "Running tests!"
-CMD ["make", "test"]
-
-
 FROM devcontainer as cicd_container
 
+WORKDIR /workspace
+
+COPY . .
+RUN python -m pip install pyspark==3.4.1
+
 # Required for Docker-from-Docker
 ENTRYPOINT ["/usr/local/share/docker-init.sh"]
-
-# A container for running the deployment pipeline
-RUN echo "Running cicd!"
-CMD ["make", "deploy_production"]
+# Default command, overwritten for CI
+CMD ["sleep", "infinity"]

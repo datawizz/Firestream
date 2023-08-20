@@ -107,7 +107,7 @@ helm install nessie helm/nessie \
 
 ### Spark Cluster ###
 # Enables: spark://spark-master:7077
-helm install spark bitnami/spark #-f /workspace/charts/fireworks/subcharts/spark_cluster/values.yaml
+# helm install spark bitnami/spark #-f /workspace/charts/fireworks/subcharts/spark_cluster/values.yaml
 
 # ### MongoDB ###
 # helm install mongodb bitnami/mongodb-sharded
@@ -115,7 +115,7 @@ helm install spark bitnami/spark #-f /workspace/charts/fireworks/subcharts/spark
 
 
 ### Minio ###
-helm install minio bitnami/minio -f /workspace/charts/fireworks/subcharts/minio/chart/values.yaml \
+helm install minio bitnami/minio -f /workspace/k8s/charts/fireworks/subcharts/minio/chart/values.yaml \
   --set auth.rootUser="$S3_LOCAL_ACCESS_KEY_ID" \
   --set auth.rootPassword="$S3_LOCAL_SECRET_ACCESS_KEY" \
   --set defaultBuckets="$S3_LOCAL_BUCKET_NAME"
@@ -131,21 +131,28 @@ helm upgrade --install kafka bitnami/kafka --version 24.0.10  \
    -f /workspace/charts/fireworks/subcharts/kafka/chart/values.yaml
 
 ### Kyuubi ###
-cd /workspace/submodules/the-fireworks-company/kyuubi && \
-helm install kyuubi charts/kyuubi
+# cd /workspace/submodules/the-fireworks-company/kyuubi && \
+# helm install kyuubi charts/kyuubi
 
 
 # cd /workspace/submodules/the-fireworks-company/superset/helm/superset && helm dependency build
 
 ### Superset ###
-cd /workspace/submodules/the-fireworks-company/superset/helm/superset &&
-  helm dependency build && \
-  cd /workspace/submodules/the-fireworks-company/superset/helm && \
-  helm install superset superset
+# cd /workspace/submodules/the-fireworks-company/superset/helm/superset &&
+#   helm dependency build && \
+#   cd /workspace/submodules/the-fireworks-company/superset/helm && \
+#   helm install superset superset
 
 
 
 ### Open Search ###
+
+export OPENSEARCH_HOST="opensearch-cluster-master.default.svc.cluster.local"
+export OPENSEARCH_PORT="9200"
+export OPENSEARCH_USERNAME='admin'
+export OPENSEARCH_PASSWORD='admin'
+
+
 # cd /workspace/submodules/the-fireworks-company/opensearch-project-helm-charts/charts && \
 # helm install opensearch opensearch
 # TODO the configuration of OpenSearch is not trival. 
@@ -153,9 +160,9 @@ cd /workspace/submodules/the-fireworks-company/superset/helm/superset &&
 # --set something.something="$OPENSEARCH_USERNAME" \
 # --set something.something="$OPENSEARCH_PASSWORD" \
 
-helm repo add opensearch https://opensearch-project.github.io/helm-charts/
-helm install opensearch-dashboard opensearch/opensearch-dashboards
-helm install opensearch opensearch/opensearch
+# helm repo add opensearch https://opensearch-project.github.io/helm-charts/
+# helm install opensearch-dashboard opensearch/opensearch-dashboards
+# helm install opensearch opensearch/opensearch
 
 # export CONTAINER_PORT=$(kubectl get pod --namespace default $POD_NAME -o jsonpath="{.spec.containers[0].ports[0].containerPort}")
 #   echo "Visit http://127.0.0.1:8080 to use your application"
@@ -163,9 +170,54 @@ helm install opensearch opensearch/opensearch
 
 ### Airflow ###
 # Enables: spark://spark-master:7077
-helm install airflow bitnami/airflow
+# helm install airflow bitnami/airflow
 
 
+
+### Spark Operator ###
+cd /workspace/submodules/the-fireworks-company/spark-on-k8s-operator/charts/spark-operator-chart && \
+helm upgrade --install spark-operator . --namespace "default" \
+  --set sparkJobNamespace="default" \
+  --set webhook.enable=true 
+
+
+
+#GCP kubectl create clusterrolebinding <user>-cluster-admin-binding --clusterrole=cluster-admin --user=<user>@<domain>
+
+
+
+# $ helm install my-release spark-operator/spark-operator --namespace spark-operator --set sparkJobNamespace=test-ns
+
+
+
+# retrieve config
+# kubectl get sparkapplications spark-pi -o=yaml
+# kubectl describe sparkapplication spark-pi
+# apiVersion: sparkoperator.k8s.io/v1beta2
+# kind: SparkApplication
+# metadata:
+#   ...
+# spec:
+#  deps: {}
+#
+
+
+### Cillium ###
+
+# helm repo add cilium https://helm.cilium.io/
+
+# kubectl create namespace cilium
+
+# helm install cilium cilium/cilium --version 1.14 \
+#   --namespace cilium \
+#   --set kubeProxyReplacement=partial \
+#   --set hostServices.enabled=false \
+#   --set externalIPs.enabled=true \
+#   --set nodePort.enabled=true \
+#   --set hostPort.enabled=true \
+#   --set bpf.masquerade=false \
+#   --set image.pullPolicy=IfNotPresent \
+#   --set ipam.mode=kubernetes
 
 
 # ### Superset ###
@@ -195,10 +247,7 @@ helm install airflow bitnami/airflow
 # helm install superset /workspace/submodules/apache/superset/helm/superset \
 #     --set configFromSecret=superset-secret-config-py
 
-export OPENSEARCH_HOST="opensearch-cluster-master.default.svc.cluster.local"
-export OPENSEARCH_PORT="9200"
-export OPENSEARCH_USERNAME='admin'
-export OPENSEARCH_PASSWORD='admin'
+
 
 
 # ### Jaeger All-in-One ###
@@ -248,31 +297,36 @@ export OPENSEARCH_PASSWORD='admin'
 
 # ### Websocket Middleware ###
 # cd /workspace/services/javascript/websocket_middleware/chart && helm install websocket-middleware -f values.yaml .
+echo "Waiting for Helm deployments to be ready"
 
-# ### Dashboard ###
-# cd /workspace/services/javascript/dashboard/chart && helm install dashboard -f values.yaml .
+sleep 5
 
 
-echo "Waiting for pods to be ready"
+# Loop until all deployments are ready
+while true; do
+  all_ready=true
+  
+  # Iterate through all Helm releases
+  for release in $(helm list -q); do
+    # Get the deployment names for the release
+    for deployment in $(helm get manifest $release | kubectl get -f - --ignore-not-found -o=jsonpath='{.items[?(@.kind=="Deployment")].metadata.name}'); do
+      # Check the status of the deployment
+      status=$(kubectl rollout status deployment $deployment --timeout=5s --watch=false 2>/dev/null)
+      
+      # If the status is not complete, continue waiting
+      if [[ "$status" != *"successfully rolled out"* ]]; then
+        all_ready=false
+      fi
+    done
+  done
 
-# Define the watch command
-watch_cmd="kubectl get pods --watch -n default"
-
-# Run the watch command in the background
-${watch_cmd} &
-
-# Save the PID of the watch command
-watch_pid=$!
-
-# Wait for pods to be ready excluding the 'init-db' pod
-kubectl get pods --no-headers -n default | awk '!/init-db/{print $1}' | while read pod; do
-  # Wait for each pod to be ready and print status
-  if kubectl wait --timeout=600s --for=condition=ready pod/$pod -n default; then
-    echo "Pod $pod is ready"
-  else
-    echo "Timeout while waiting for pod $pod to be ready"
+  # Break the loop if all deployments are ready
+  if [ "$all_ready" == true ]; then
+    break
   fi
+
+  # Sleep for 5 seconds before the next check
+  sleep 5
 done
 
-# Kill the watch command
-kill ${watch_pid}
+echo "All Helm deployments are ready"
