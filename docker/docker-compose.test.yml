@@ -10,7 +10,7 @@ services:
       target: cicd_container
     env_file:
       - ../etc/.env.local
-      - ../etc/.env.secrets
+      - ../etc/.env.secrets.example
     # environment:
     #   - SSH_AUTH_SOCK=/ssh-auth.sock
     volumes:
