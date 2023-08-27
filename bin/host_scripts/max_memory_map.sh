@@ -33,3 +33,5 @@ then
 else
     echo "vm.max_map_count is already $current_value, which is not less than $desired_value. No changes made."
 fi
+
+sudo sysctl -p

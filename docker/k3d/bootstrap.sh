@@ -30,7 +30,7 @@ check_cluster() {
 reconnect_cluster() {
   echo "k3d cluster named $PROJECT_NAME already exists. Connecting..."
   k3d kubeconfig write $PROJECT_NAME --kubeconfig-switch-context
-  mv $HOME/.k3d/kubeconfig-$PROJECT_NAME.yaml $HOME/.kube/config
+  mv /home/fireworks/.config/k3d/kubeconfig-$PROJECT_NAME.yaml $HOME/.kube/config
   kubectl config --kubeconfig=$HOME/.kube/config use-context k3d-$PROJECT_NAME
   test_kubectl
 }

@@ -54,9 +54,6 @@ services:
       - ../etc/.env.local
     environment:
       - COMPOSE_PROJECT_NAME=fireworks
-    ports:
-      - "8000:8000"
-      - "80:80"
     volumes:
       # Mount the project directory on the local file system
       - ../:/workspace
