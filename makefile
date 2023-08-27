@@ -26,6 +26,15 @@ resume:
 	# Useful for resuming the container after a restart
 	export DEPLOYMENT_MODE="resume" && cd $(BASEDIR) && bash bootstrap.sh
 
+# Test services
+test:
+	export DEPLOYMENT_MODE="test" && cd $(BASEDIR) && bash bootstrap.sh
+	export DEPLOYMENT_MODE="test" && cd $(BASEDIR) && python -m pytest
+
+# Build services
+build:
+	bash /workspace/bin/cicd_scripts/build.sh
+
 
 # Start services
 demo:

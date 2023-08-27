@@ -14,7 +14,7 @@
 	},
 	"remoteUser": "fireworks",
 	// initializeCommand runs on the host before building the container.
-	"initializeCommand": "bash docker/docker_preinit.sh",
+	"initializeCommand": "export DEPLOYMENT_MODE='devcontainer' && bash docker/docker_preinit.sh",
 	// Update the 'dockerComposeFile' list if you have more compose files or use different names.
 	"dockerComposeFile": "../docker/docker-compose.devcontainer.yml",
 	// Disables VS Code attempting to keep the container running by relying on the entrypoint.sh called in the Dockerfile

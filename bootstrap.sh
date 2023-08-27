@@ -18,6 +18,35 @@ echo "                    Starting Fireworks in < $DEPLOYMENT_MODE > mode  "
 echo "                                                                     "
 
 ###############################################################################
+### -1. PreInit                                                              ###
+###############################################################################
+
+echo "Checking Docker Status..."
+if ! command -v docker &> /dev/null; then
+  echo "Docker not installed."
+  if grep -q 'ID_LIKE=debian' /etc/os-release; then
+    echo "Debian detected, installing Docker."
+    bash bin/host_scripts/host-docker.sh
+  else
+    echo "Fireworks assumes Debian is the host but is running on something else."
+  fi
+else
+  echo "Docker is installed."
+  if grep -q docker /proc/1/cgroup; then
+    echo "Running inside Docker container, continuing."
+  else
+    echo "Not running in Docker container. Starting Initialization."
+    # Create the Deployment Docker Compose file
+    bash docker/docker_preinit.sh
+    docker compose -f docker/docker-compose.$DEPLOYMENT_MODE.yml build
+    docker compose -f docker/docker-compose.$DEPLOYMENT_MODE.yml run devcontainer export DEPLOYMENT_MODE=$DEPLOYMENT_MODE && /bin/bash bootstrap.sh
+    # export DEPLOYMENT_MODE='test' && docker-compose -f docker/docker-compose.${DEPLOYMENT_MODE}.yml run --entrypoint "/bin/bash -c 'export DEPLOYMENT_MODE=${DEPLOYMENT_MODE} && ./bootstrap.sh'" devcontainer 
+    # export DEPLOYMENT_MODE='test' && docker-compose -f docker/docker-compose.${DEPLOYMENT_MODE}.yml run --entrypoint "/bin/bash -c 'export DEPLOYMENT_MODE=${DEPLOYMENT_MODE} && ./bootstrap.sh'" devcontainer
+  fi
+fi
+
+
+###############################################################################
 ### 0. Git Clone                                                            ###
 ###############################################################################
 
@@ -35,7 +64,7 @@ _SRC="/workspace"
 export MACHINE_ID=${MACHINE_ID:-$(cat /var/lib/dbus/machine-id)}
 
 # Define valid deployment modes
-valid_modes=("development" "test" "clean" "cicd" "production" "resume")
+valid_modes=("devcontainer" "test" "clean" "cicd" "production" "resume")
 
 # Check if the argument is valid
 valid=false
@@ -89,8 +118,8 @@ function check_socket {
     fi
 }
 
-# run the checks if DEPLOYMENT_MODE is "development" or "cicd"
-if [ "$DEPLOYMENT_MODE" == "development" ] || [ "$DEPLOYMENT_MODE" == "cicd" ]; then
+# run the checks if DEPLOYMENT_MODE is "devcontainer" or "cicd"
+if [ "$DEPLOYMENT_MODE" == "devcontainer" ] || [ "$DEPLOYMENT_MODE" == "cicd" ]; then
     check_docker
     check_socket
 fi
@@ -139,13 +168,12 @@ echo "Environment successfully configured"
 
 # 1. If in test mode
 if [ "$DEPLOYMENT_MODE" = "test" ]; then
-  # 1.1   Run test suite via Docker Compose for each service
-  # 1.2   Run the integration suite via Helm and Docker Compose
-  echo "TODO"
+  # TODO make the cluster name random
+  docker compose -f docker/docker-compose.test.yml run cicd_container make test
 fi
 
 # 2. If in development mode
-if [ "$DEPLOYMENT_MODE" = "development" ]; then
+if [ "$DEPLOYMENT_MODE" = "devcontainer" ]; then
 
   # Setup a K3D cluster on the host's Docker Engine and
   # route the devcontainer's DNS to the K8 Control Plane for internal DNS resolution

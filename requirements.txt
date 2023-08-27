@@ -16,8 +16,7 @@ confluent-kafka==2.1.1
 contourpy==1.1.0
 cycler==0.11.0
 dataclasses-json==0.5.8
-datafusion==26.0.0
-delta-spark==2.4.0
+#datafusion==26.0.0
 deltalake==0.10.0
 Deprecated==1.2.14
 elasticsearch==7.13.4
