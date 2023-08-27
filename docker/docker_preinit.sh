@@ -131,7 +131,12 @@ if [ "$GPU_STATUS" = "true" ]; then
     OVERRIDE_FILE="docker/docker-compose.gpu_override.yml"
     docker compose -f $BASE_FILE -f $OVERRIDE_FILE -f $TEMP_COMPOSE_FILE config > docker/docker-compose.devcontainer.yml
 else
-    docker compose -f $BASE_FILE -f $TEMP_COMPOSE_FILE config > docker/docker-compose.devcontainer.yml
+    if [ "$DEPLOYMENT_MODE" = "test" ] || [ "$DEPLOYMENT_MODE" = "codespaces" ]; then
+        OVERRIDE_FILE="docker/docker-compose.$DEPLOYMENT_MODE.yml"
+        docker compose -f $BASE_FILE -f $OVERRIDE_FILE -f $TEMP_COMPOSE_FILE config > docker/docker-compose.devcontainer.yml
+    else
+        docker compose -f $BASE_FILE -f $TEMP_COMPOSE_FILE config > docker/docker-compose.devcontainer.yml
+    fi
 fi
 
 # Remove the temporary docker-compose file

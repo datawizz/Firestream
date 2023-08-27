@@ -10,6 +10,7 @@ services:
       target: devcontainer
     env_file:
       - ../etc/.env.local
+      # - ../etc/.env.secrets
     environment:
       - SSH_AUTH_SOCK=/ssh-auth.sock
     volumes:
