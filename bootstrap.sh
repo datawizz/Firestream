@@ -166,6 +166,10 @@ if [ "$DEPLOYMENT_MODE" = "development" ]; then
   # Run port forwarding for the services to localhost
   bash $_SRC/bin/cicd_scripts/port_forward.sh
   if [ $? -ne 0 ]; then exit 1; fi
+
+  # Set S3 Credentials
+  bash $_SRC/bin/commands/set_s3_credentials.sh
+  if [ $? -ne 0 ]; then exit 1; fi
 fi
 
 
