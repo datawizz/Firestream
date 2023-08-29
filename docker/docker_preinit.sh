@@ -107,11 +107,12 @@ if [ -z "$HOST_GPU" ]; then
 fi
 
 
-
+export COMPOSE_PROJECT_NAME="fireworks_devcontainer"
 
 
 # Create a temporary docker-compose file
 TEMP_COMPOSE_FILE="docker/docker-compose.temp.yml"
+echo "version: '3.7'" > $TEMP_COMPOSE_FILE
 echo "services:" > $TEMP_COMPOSE_FILE
 echo "  fireworks_devcontainer:" >> $TEMP_COMPOSE_FILE
 echo "    environment:" >> $TEMP_COMPOSE_FILE
