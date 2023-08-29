@@ -34,7 +34,7 @@ echo "                                                                     "
 ###############################################################################
 
 # Project Directory
-_SRC="/workspace"
+_SRC="$(pwd)"
 
 # Set the Machine ID on Debian host
 export MACHINE_ID=${MACHINE_ID:-$(cat /var/lib/dbus/machine-id)}
@@ -182,6 +182,8 @@ fi
 
 # 2. If in development mode
 if [ "$DEPLOYMENT_MODE" = "development" ]; then
+
+  reboot_in_container bash bootstrap.sh development
 
   # Setup a K3D cluster on the host's Docker Engine and
   # route the devcontainer's DNS to the K8 Control Plane for internal DNS resolution
