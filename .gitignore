@@ -25,7 +25,7 @@ logs/**
 .env.secrets
 
 # Created docker-compose file (contains secrets!)
-docker/docker-compose.devcontainer.yml
+docker/docker-compose.deployment.yml
 
 ## Downloaded Software / Plugins ##
 submodules/plugins/**

@@ -14,7 +14,10 @@ helm repo add bitnami https://charts.bitnami.com/bitnami
 
 sleep 3
 
-
+### Open Telemetry + Signoz ###
+helm repo add signoz https://charts.signoz.io
+sleep 1
+helm --namespace default upgrade --install signoz signoz/signoz
 
 ### Ingress ###
 

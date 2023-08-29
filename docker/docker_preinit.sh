@@ -1,5 +1,5 @@
 #!/bin/bash
-
+set -e
 
 # Assert that Docker is available on the host
 if ! command -v docker &> /dev/null; then
@@ -113,7 +113,7 @@ fi
 # Create a temporary docker-compose file
 TEMP_COMPOSE_FILE="docker/docker-compose.temp.yml"
 echo "services:" > $TEMP_COMPOSE_FILE
-echo "  devcontainer:" >> $TEMP_COMPOSE_FILE
+echo "  fireworks_devcontainer:" >> $TEMP_COMPOSE_FILE
 echo "    environment:" >> $TEMP_COMPOSE_FILE
 echo "      HOST_USER_ID: $HOST_USER_ID" >> $TEMP_COMPOSE_FILE
 echo "      HOST_GROUP_ID: $HOST_GROUP_ID" >> $TEMP_COMPOSE_FILE
@@ -129,13 +129,13 @@ echo "      HOST_OS_RELEASE: $HOST_OS_RELEASE" >> $TEMP_COMPOSE_FILE
 BASE_FILE="docker/docker-compose.yml"
 if [ "$GPU_STATUS" = "true" ]; then
     OVERRIDE_FILE="docker/docker-compose.gpu_override.yml"
-    docker compose -f $BASE_FILE -f $OVERRIDE_FILE -f $TEMP_COMPOSE_FILE config > docker/docker-compose.devcontainer.yml
+    docker compose -f $BASE_FILE -f $OVERRIDE_FILE -f $TEMP_COMPOSE_FILE config > docker/docker-compose.deployment.yml
 else
     if [ "$DEPLOYMENT_MODE" = "test" ] || [ "$DEPLOYMENT_MODE" = "codespaces" ]; then
         OVERRIDE_FILE="docker/docker-compose.$DEPLOYMENT_MODE.yml"
-        docker compose -f $BASE_FILE -f $OVERRIDE_FILE -f $TEMP_COMPOSE_FILE config > docker/docker-compose.devcontainer.yml
+        docker compose -f $BASE_FILE -f $OVERRIDE_FILE -f $TEMP_COMPOSE_FILE config > docker/docker-compose.deployment.yml
     else
-        docker compose -f $BASE_FILE -f $TEMP_COMPOSE_FILE config > docker/docker-compose.devcontainer.yml
+        docker compose -f $BASE_FILE -f $TEMP_COMPOSE_FILE config > docker/docker-compose.deployment.yml
     fi
 fi
 

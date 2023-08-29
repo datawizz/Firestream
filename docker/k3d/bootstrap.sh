@@ -20,12 +20,18 @@ check_registry() {
 }
 
 check_cluster() {
-  if k3d cluster list | grep -q $PROJECT_NAME; then
-    reconnect_cluster
+  if k3d cluster list | grep -q "$PROJECT_NAME"; then
+    if [ "$DEPLOYMENT_MODE" = "test" ]; then
+      delete_cluster
+      create_cluster
+    else
+      reconnect_cluster
+    fi
   else
     create_cluster
   fi
 }
+
 
 reconnect_cluster() {
   echo "k3d cluster named $PROJECT_NAME already exists. Connecting..."
