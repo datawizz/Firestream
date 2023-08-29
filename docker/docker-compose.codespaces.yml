@@ -1,0 +1,49 @@
+version: "3.7"
+
+services:
+  fireworks_devcontainer:
+    init: true
+    image: fireworks:latest
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+      target: devcontainer
+    env_file:
+      - ../etc/.env.local
+      # - ../etc/.env.secrets
+    environment:
+      HOST_USER_ID: 1000
+      HOST_GROUP_ID: 1000
+      HOST_DOCKER_GID: 1000
+      HOST_MACHINE_ID: "unknown"
+      HOST_IP: "127.0.0.1"
+      HOST_GPU_STATUS: "false"
+      HOST_CPU_ARCH: "x86_64"
+      HOST_OS_RELEASE: "unknown"
+      DEPLOYMENT_MODE: "default"
+      GPU_STATUS: "false"
+    volumes:
+      # Mount the project directory on the local file system
+      - ../:/workspace
+
+      # Enable Docker-from-Docker
+      # This uses the host's Docker Engine through socket mapping and is preferred over Docker-in-Docker for security and latency
+      - /var/run/docker.sock:/var/run/docker-host.sock
+
+      # Persist images built in devcontainer
+      - /var/lib/docker/image:/var/lib/docker/image
+      - /var/lib/docker/buildkit:/var/lib/docker/buildkit
+      # The path might differ depending on your host OS
+
+      # Enables SSH Agent forwarding from the host
+      - /run/host-services/ssh-auth.sock:/ssh-auth.sock
+
+    command: sleep infinity # Prevents the container from stopping
+
+    # Configure DNS resolution to use the internal IP address assigned to the KinD Control Plane
+    # This allows internal Kubernetes services (which have arbitrary IP address assignments) to be addressed using DNS (i.e. name.svc.cluster.local)
+    # NOTE: This will make the internet inaccessible until the KinD Control Plane has created and connected via the "bootstrap.sh" command 
+    cap_add:
+      - NET_ADMIN
+
+    network_mode: "host" # Enables K3D access from within container

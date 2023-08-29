@@ -131,7 +131,8 @@ OUTPUT_FILE="docker/docker-compose.deployment.yml"
 
 if [ -n "$CODESPACE_NAME" ]; then
   echo "Running in Codespaces"
-  cp $BASE_FILE $OUTPUT_FILE
+  # Codespaces is picky it gets a dedicated docker-compose file
+  cp docker/docker-compose.codespaces.yml $OUTPUT_FILE
 else
   if [ "$GPU_STATUS" = "true" ]; then
     OVERRIDE_FILE="docker/docker-compose.gpu_override.yml"
