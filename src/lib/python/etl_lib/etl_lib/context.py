@@ -32,7 +32,7 @@ from enum import Enum
 from pyspark.sql.window import Window
 from typing import Type
 import pyspark.sql.types as t
-from etl_lib._utils.git_revision import get_git_revision_hash
+from etl_lib.utils.git_revision import get_git_revision_hash
 from dataclasses import dataclass
 
 

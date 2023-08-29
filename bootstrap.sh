@@ -1,6 +1,10 @@
 #!/bin/bash
 set -e
 
+if [ "$#" -eq 1 ]; then
+  export DEPLOYMENT_MODE="$1"
+fi
+
 echo "                                                                     "
 echo "  Welcome to...                                                      "
 echo "                                                                     "
@@ -17,41 +21,13 @@ echo "                                                                     "
 echo "                    Starting Fireworks in < $DEPLOYMENT_MODE > mode  "
 echo "                                                                     "
 
-###############################################################################
-### -1. PreInit                                                              ###
-###############################################################################
-
-echo "Checking Docker Status..."
-if ! command -v docker &> /dev/null; then
-  echo "Docker not installed."
-  if grep -q 'ID_LIKE=debian' /etc/os-release; then
-    echo "Debian detected, installing Docker."
-    bash bin/host_scripts/host-docker.sh
-  else
-    echo "Fireworks assumes Debian is the host but is running on something else."
-  fi
-else
-  echo "Docker is installed."
-  if grep -q docker /proc/1/cgroup; then
-    echo "Running inside Docker container, continuing."
-  else
-    echo "Not running in Docker container. Starting Initialization."
-    # Create the Deployment Docker Compose file
-    bash docker/docker_preinit.sh
-    docker compose -f docker/docker-compose.$DEPLOYMENT_MODE.yml build
-    docker compose -f docker/docker-compose.$DEPLOYMENT_MODE.yml run devcontainer export DEPLOYMENT_MODE=$DEPLOYMENT_MODE && /bin/bash bootstrap.sh
-    # export DEPLOYMENT_MODE='test' && docker-compose -f docker/docker-compose.${DEPLOYMENT_MODE}.yml run --entrypoint "/bin/bash -c 'export DEPLOYMENT_MODE=${DEPLOYMENT_MODE} && ./bootstrap.sh'" devcontainer 
-    # export DEPLOYMENT_MODE='test' && docker-compose -f docker/docker-compose.${DEPLOYMENT_MODE}.yml run --entrypoint "/bin/bash -c 'export DEPLOYMENT_MODE=${DEPLOYMENT_MODE} && ./bootstrap.sh'" devcontainer
-  fi
-fi
-
 
 ###############################################################################
 ### 0. Git Clone                                                            ###
 ###############################################################################
 
 # Fetch submodules
-git submodule update --init --recursive
+# git submodule update --init --recursive
 
 ###############################################################################
 ### 1. Environment                                                          ###
@@ -63,22 +39,40 @@ _SRC="/workspace"
 # Set the Machine ID on Debian host
 export MACHINE_ID=${MACHINE_ID:-$(cat /var/lib/dbus/machine-id)}
 
-# Define valid deployment modes
-valid_modes=("devcontainer" "test" "clean" "cicd" "production" "resume")
+# Ensure the deployment mode is one of the expected values
+check_valid_mode() {
+  local DEPLOYMENT_MODE=$1
+  local valid=false
+  local valid_modes=("development" "test" "clean" "cicd" "production" "resume" "interactive")
+  
+  for mode in "${valid_modes[@]}"; do
+    if [ "$DEPLOYMENT_MODE" = "$mode" ]; then
+      valid=true
+      break
+    fi
+  done
 
-# Check if the argument is valid
-valid=false
-for mode in "${valid_modes[@]}"; do
-  if [ "$DEPLOYMENT_MODE" = "$mode" ]; then
-    valid=true
-    break
+  if [ "$valid" = false ]; then
+    echo "Invalid DEPLOYMENT_MODE. It must be one of: ${valid_modes[*]}"
+    exit 1
   fi
-done
+}
 
-if [ "$valid" = false ]; then
-  echo "Invalid DEPLOYMENT_MODE. It must be one of: ${valid_modes[*]}"
-  exit 1
-fi
+check_valid_mode $DEPLOYMENT_MODE
+
+reboot_in_container() {
+  local cmd="${1:-/bin/bash}"
+  if [ -f /.dockerenv ]; then
+    echo "Running inside the devcontainer."
+  else
+    echo "Not running in Docker container. Starting Initialization."
+    bash docker/docker_preinit.sh
+    docker compose -f docker/docker-compose.deployment.yml down --remove-orphans
+    docker compose -f docker/docker-compose.deployment.yml build
+    docker compose -f docker/docker-compose.deployment.yml run fireworks_devcontainer "$cmd"
+  fi
+}
+
 
 ### Code Version ###
 
@@ -90,14 +84,21 @@ fi
 
 ### Docker ###
 
-# function to check if docker is available
+# function to check if docker is available, offer to install it
 function check_docker {
     if ! command -v docker &> /dev/null
     then
         echo "Docker is not available in the terminal"
-        exit 1
+        read -p "Do you want to install Docker? [y/N]: " user_input
+        if [[ $user_input == 'y' || $user_input == 'Y' ]]
+        then
+            bash bin/host_scripts/host-docker.sh
+        else
+            exit 1
+        fi
     else
-        echo "Docker version $(docker --version) is installed"
+        export DOCKER_VERSION=$(docker --version)
+        echo "Docker version $DOCKER_VERSION is installed"
     fi
 }
 
@@ -118,8 +119,8 @@ function check_socket {
     fi
 }
 
-# run the checks if DEPLOYMENT_MODE is "devcontainer" or "cicd"
-if [ "$DEPLOYMENT_MODE" == "devcontainer" ] || [ "$DEPLOYMENT_MODE" == "cicd" ]; then
+# run the checks if DEPLOYMENT_MODE is "development" or "test"
+if [ "$DEPLOYMENT_MODE" == "development" ] || [ "$DEPLOYMENT_MODE" == "test" ] || [ "$DEPLOYMENT_MODE" == "interactive" ]; then
     check_docker
     check_socket
 fi
@@ -166,14 +167,21 @@ echo "Environment successfully configured"
 ### 2. Deployment                                                           ###
 ###############################################################################
 
+# 0. If in interactive mode
+if [ "$DEPLOYMENT_MODE" = "interactive" ]; then
+  # TODO make the cluster name random
+  docker compose -f docker/docker-compose.deployment.yml run fireworks_devcontainer /bin/bash
+fi
+
 # 1. If in test mode
 if [ "$DEPLOYMENT_MODE" = "test" ]; then
   # TODO make the cluster name random
-  docker compose -f docker/docker-compose.test.yml run cicd_container make test
+  reboot_in_container make test
+  cd /workspace/src/lib/python/etl_lib && python -m pip install . && python -m pytest
 fi
 
 # 2. If in development mode
-if [ "$DEPLOYMENT_MODE" = "devcontainer" ]; then
+if [ "$DEPLOYMENT_MODE" = "development" ]; then
 
   # Setup a K3D cluster on the host's Docker Engine and
   # route the devcontainer's DNS to the K8 Control Plane for internal DNS resolution
