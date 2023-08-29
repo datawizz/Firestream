@@ -126,18 +126,24 @@ echo "      HOST_CPU_ARCH: $HOST_CPU_ARCH" >> $TEMP_COMPOSE_FILE
 echo "      HOST_OS_RELEASE: $HOST_OS_RELEASE" >> $TEMP_COMPOSE_FILE
 
 
-# Combine Compose Files
 BASE_FILE="docker/docker-compose.yml"
-if [ "$GPU_STATUS" = "true" ]; then
-    OVERRIDE_FILE="docker/docker-compose.gpu_override.yml"
-    docker compose -f $BASE_FILE -f $OVERRIDE_FILE -f $TEMP_COMPOSE_FILE config > docker/docker-compose.deployment.yml
+OUTPUT_FILE="docker/docker-compose.deployment.yml"
+
+if [ -n "$CODESPACE_NAME" ]; then
+  echo "Running in Codespaces"
+  cp $BASE_FILE $OUTPUT_FILE
 else
-    if [ "$DEPLOYMENT_MODE" = "test" ] || [ "$DEPLOYMENT_MODE" = "codespaces" ]; then
-        OVERRIDE_FILE="docker/docker-compose.$DEPLOYMENT_MODE.yml"
-        docker compose -f $BASE_FILE -f $OVERRIDE_FILE -f $TEMP_COMPOSE_FILE config > docker/docker-compose.deployment.yml
-    else
-        docker compose -f $BASE_FILE -f $TEMP_COMPOSE_FILE config > docker/docker-compose.deployment.yml
-    fi
+  if [ "$GPU_STATUS" = "true" ]; then
+    OVERRIDE_FILE="docker/docker-compose.gpu_override.yml"
+  elif [ "$DEPLOYMENT_MODE" = "test" ]; then
+    OVERRIDE_FILE="docker/docker-compose.$DEPLOYMENT_MODE.yml"
+  fi
+
+  if [ -n "$OVERRIDE_FILE" ]; then
+    docker compose -f $BASE_FILE -f $OVERRIDE_FILE -f $TEMP_COMPOSE_FILE config > $OUTPUT_FILE
+  else
+    docker compose -f $BASE_FILE -f $TEMP_COMPOSE_FILE config > $OUTPUT_FILE
+  fi
 fi
 
 # Remove the temporary docker-compose file
