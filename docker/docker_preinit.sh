@@ -143,7 +143,8 @@ else
   if [ -n "$OVERRIDE_FILE" ]; then
     docker compose -f $BASE_FILE -f $OVERRIDE_FILE -f $TEMP_COMPOSE_FILE config > $OUTPUT_FILE
   else
-    docker compose -f $BASE_FILE -f $TEMP_COMPOSE_FILE config > $OUTPUT_FILE
+    # docker compose -f $BASE_FILE -f $TEMP_COMPOSE_FILE config > $OUTPUT_FILE
+    echo "using base file"
   fi
 fi
 

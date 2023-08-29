@@ -19,6 +19,10 @@ helm repo add signoz https://charts.signoz.io
 sleep 1
 helm --namespace default upgrade --install signoz signoz/signoz
 
+
+### Nessie ###
+helm repo add nessie https://charts.projectnessie.org
+
 ### Ingress ###
 
 # Add Nginx
@@ -98,8 +102,7 @@ project_nessie_install() {
 
   # Check if helm release already exists
   if ! helm list -q | grep -q nessie; then
-    cd /workspace/submodules/the-fireworks-company/nessie && \
-    helm install nessie helm/nessie \
+    helm install nessie nessie/nessie \
       --set versionStoreType=TRANSACTIONAL \
       --set postgres.jdbcUrl="$JDBC_CONNECTION_STRING" \
       --set image.tag="$NESSIE_VERSION"
