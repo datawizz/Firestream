@@ -173,14 +173,9 @@ if [ "$DEPLOYMENT_MODE" = "interactive" ]; then
   docker compose -f docker/docker-compose.deployment.yml run fireworks_devcontainer /bin/bash
 fi
 
-# 1. If in test mode
-if [ "$DEPLOYMENT_MODE" = "test" ]; then
-  # TODO make the cluster name random
-  reboot_in_container make test
-  cd /workspace/src/lib/python/etl_lib && python -m pip install . && python -m pytest
-fi
 
-# 2. If in development mode
+
+# 1. If in development mode
 if [ "$DEPLOYMENT_MODE" = "development" ]; then
 
   reboot_in_container bash bootstrap.sh development
@@ -210,6 +205,20 @@ if [ "$DEPLOYMENT_MODE" = "development" ]; then
   if [ $? -ne 0 ]; then exit 1; fi
 fi
 
+
+# 2. If in test mode
+if [ "$DEPLOYMENT_MODE" = "test" ]; then
+  # TODO make the cluster name random
+
+  # Ensure the process is running in a container
+  reboot_in_container make test
+
+  # Ensure the development cluster is running
+  bash bootstrap.sh development
+
+  # Run the tests
+  pytest
+fi
 
 # 2.1. If in resume mode
 if [ "$DEPLOYMENT_MODE" = "resume" ]; then
