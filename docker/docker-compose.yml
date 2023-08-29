@@ -13,6 +13,16 @@ services:
       # - ../etc/.env.secrets
     environment:
       - SSH_AUTH_SOCK=/ssh-auth.sock
+      - HOST_USER_ID=1000
+      - HOST_GROUP_ID=1000
+      - HOST_DOCKER_GID=1000
+      - HOST_MACHINE_ID=unknown
+      - HOST_IP=127.0.0.1
+      - HOST_GPU_STATUS=false
+      - HOST_CPU_ARCH=x86_64
+      - HOST_OS_RELEASE=unknown
+      - DEPLOYMENT_MODE=development
+      - GPU_STATUS=false
     volumes:
       # Mount the project directory on the local file system
       - ../:/workspace

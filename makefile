@@ -1,7 +1,7 @@
 ### Makefile ###
 
 # A Pluripotent Makefile for Fireworks.
-# Designed to deploy in development, testing, and production environments.
+# Designed to deploy in development, testing, cicd, and production environments.
 
 BASEDIR=$(shell pwd)
 PROJECT_NAME=fireworks
@@ -13,23 +13,7 @@ development:
 development_clean:
 	cd $(BASEDIR) && bash bootstrap.sh clean
 
-
-# interactive:
-# 	export DEPLOYMENT_MODE="development" && cd $(BASEDIR) && bash bootstrap.sh
-
-# all:
-# 	@echo "No argument suppllied. Making a standard build."
-# 	export DEPLOYMENT_MODE="clean" && cd $(BASEDIR) && bash bootstrap.sh
-
-
-# config_host:
-# 	cd /workspace && bash bin/commands/config_host.sh
-
-
-# bootstrap:
-# 	cd /workspace && bash bootstrap.sh
-# 	pip install -r /workspace/requirements.txt
-
+# Reuse the existing cluster by re-establishing the network tunnel
 resume:
 	# Useful for resuming the container after a restart
 	export DEPLOYMENT_MODE="resume" && cd $(BASEDIR) && bash bootstrap.sh
@@ -40,24 +24,27 @@ test:
 
 # Run Stress Tests
 stress:
-	make test
-
+	cd $(BASEDIR) make test
 	cd $(BASEDIR) && bash bin/commands/run_stress_tests.sh
 
 
 # Build services
 build:
+	# Make the devcontainer
+	make development_clean
+
+	# Run the build scripts
 	bash /workspace/bin/cicd_scripts/build.sh
 
 deploy:
 	# TODO
 	echo "Deploying... TODO"
 
-
 demo:
+	echo "TODO: Demo Mode"
 	# Wipe the cluster and boot the system
-	export DEPLOYMENT_MODE="clean" && cd $(BASEDIR) && bash bootstrap.sh
-	export DEPLOYMENT_MODE="development" && cd $(BASEDIR) && bash bootstrap.sh
+	# export DEPLOYMENT_MODE="clean" && cd $(BASEDIR) && bash bootstrap.sh
+	# export DEPLOYMENT_MODE="development" && cd $(BASEDIR) && bash bootstrap.sh
 
 	# Create dispose of the tunnel and create a new one
 	# pkill ngrok
@@ -73,39 +60,8 @@ demo:
 	#nohup python /workspace/src/services/back_end/spark_applications/_boilerplate/metronome/src/main.py > /workspace/logs/metronome.log 2>&1 &
 
 
-
-# # Stop services
-# stop:
-# 	# The commands to stop your services go here
-# 	# They will depend on how your services are set up
-# 	pkill -f your_python_script.py
-# 	pkill -f your_bash_script.sh
-# 	pkill -f your_java_program.jar
-
-# Test services
-# test:
-# 	make bootstrap
-
-# 	bash /workspace/bin/commands/run_tests.sh
-
-# Build services
-# build:
-# 	bash /workspace/bin/cicd_scripts/build.sh
-
-# Clean up
+# Clean up by deleting all the things
 boomboom:
 	# Delete the cluster first, then delete the project
 	# k3d cluster delete fireworks
 	bash bin/commands/delete.sh
-
-
-
-
-load_plugins:
-	bash /workspace/src/api/plugin_manager/bootstrap.sh
-
-
-
-# setup:
-# 	npm install --global yarn
-# 	yarnpkg add react-native-web echarts echarts-for-react ws
