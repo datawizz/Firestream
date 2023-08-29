@@ -4,36 +4,64 @@
 # Designed to deploy in development, testing, and production environments.
 
 BASEDIR=$(shell pwd)
+PROJECT_NAME=fireworks
 
-devcontainer:
-	export DEPLOYMENT_MODE="clean" && cd /workspace && bash bootstrap.sh
-
-
-all:
-	@echo "No argument suppllied. Making a standard build."
-	export DEPLOYMENT_MODE="clean" && cd $(BASEDIR) && bash bootstrap.sh
+development:
+	cd $(BASEDIR) && bash bootstrap.sh development
 
 
-config_host:
-	cd /workspace && bash bin/commands/config_host.sh
+development_clean:
+	cd $(BASEDIR) && bash bootstrap.sh clean
 
 
-bootstrap:
-	cd /workspace && bash bootstrap.sh
-	pip install -r /workspace/requirements.txt
+# interactive:
+# 	export DEPLOYMENT_MODE="development" && cd $(BASEDIR) && bash bootstrap.sh
+
+# all:
+# 	@echo "No argument suppllied. Making a standard build."
+# 	export DEPLOYMENT_MODE="clean" && cd $(BASEDIR) && bash bootstrap.sh
+
+
+# config_host:
+# 	cd /workspace && bash bin/commands/config_host.sh
+
+
+# bootstrap:
+# 	cd /workspace && bash bootstrap.sh
+# 	pip install -r /workspace/requirements.txt
 
 resume:
 	# Useful for resuming the container after a restart
 	export DEPLOYMENT_MODE="resume" && cd $(BASEDIR) && bash bootstrap.sh
 
+# Test services
+test:
+	cd $(BASEDIR) && bash bootstrap.sh test
 
-# Start services
+# Run Stress Tests
+stress:
+	make test
+
+	cd $(BASEDIR) && bash bin/commands/run_stress_tests.sh
+
+
+# Build services
+build:
+	bash /workspace/bin/cicd_scripts/build.sh
+
+deploy:
+	# TODO
+	echo "Deploying... TODO"
+
+
 demo:
-	export DEPLOYMENT_MODE="development" && make bootstrap
+	# Wipe the cluster and boot the system
+	export DEPLOYMENT_MODE="clean" && cd $(BASEDIR) && bash bootstrap.sh
+	export DEPLOYMENT_MODE="development" && cd $(BASEDIR) && bash bootstrap.sh
 
 	# Create dispose of the tunnel and create a new one
-	pkill ngrok
-	bash /workspace/bin/commands/create_ngrok_reverse_proxy.sh
+	# pkill ngrok
+	# bash /workspace/bin/commands/create_ngrok_reverse_proxy.sh
 
 	# Apply Demo Data
 	# POD_NAME=$(kubectl get pods --no-headers -o custom-columns=":metadata.name" | grep superset | head -n 1)
@@ -55,25 +83,23 @@ demo:
 # 	pkill -f your_java_program.jar
 
 # Test services
-test:
-	make bootstrap
+# test:
+# 	make bootstrap
 
-	bash /workspace/bin/commands/run_tests.sh
+# 	bash /workspace/bin/commands/run_tests.sh
 
 # Build services
-build:
-	bash /workspace/bin/cicd_scripts/build.sh
+# build:
+# 	bash /workspace/bin/cicd_scripts/build.sh
 
 # Clean up
 boomboom:
+	# Delete the cluster first, then delete the project
+	# k3d cluster delete fireworks
 	bash bin/commands/delete.sh
 
 
-# Run Stress Tests
-stress:
-	make bootstrap
 
-	bash /workspace/bin/commands/run_stress_tests.sh
 
 load_plugins:
 	bash /workspace/src/api/plugin_manager/bootstrap.sh

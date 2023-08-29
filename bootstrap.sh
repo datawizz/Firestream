@@ -1,6 +1,10 @@
 #!/bin/bash
 set -e
 
+if [ "$#" -eq 1 ]; then
+  export DEPLOYMENT_MODE="$1"
+fi
+
 echo "                                                                     "
 echo "  Welcome to...                                                      "
 echo "                                                                     "
@@ -17,39 +21,58 @@ echo "                                                                     "
 echo "                    Starting Fireworks in < $DEPLOYMENT_MODE > mode  "
 echo "                                                                     "
 
+
 ###############################################################################
 ### 0. Git Clone                                                            ###
 ###############################################################################
 
 # Fetch submodules
-git submodule update --init --recursive
+# git submodule update --init --recursive
 
 ###############################################################################
 ### 1. Environment                                                          ###
 ###############################################################################
 
 # Project Directory
-_SRC="/workspace"
+_SRC="$(pwd)"
 
 # Set the Machine ID on Debian host
 export MACHINE_ID=${MACHINE_ID:-$(cat /var/lib/dbus/machine-id)}
 
-# Define valid deployment modes
-valid_modes=("development" "test" "clean" "cicd" "production" "resume")
+# Ensure the deployment mode is one of the expected values
+check_valid_mode() {
+  local DEPLOYMENT_MODE=$1
+  local valid=false
+  local valid_modes=("development" "test" "clean" "cicd" "production" "resume" "interactive")
+  
+  for mode in "${valid_modes[@]}"; do
+    if [ "$DEPLOYMENT_MODE" = "$mode" ]; then
+      valid=true
+      break
+    fi
+  done
 
-# Check if the argument is valid
-valid=false
-for mode in "${valid_modes[@]}"; do
-  if [ "$DEPLOYMENT_MODE" = "$mode" ]; then
-    valid=true
-    break
+  if [ "$valid" = false ]; then
+    echo "Invalid DEPLOYMENT_MODE. It must be one of: ${valid_modes[*]}"
+    exit 1
   fi
-done
+}
 
-if [ "$valid" = false ]; then
-  echo "Invalid DEPLOYMENT_MODE. It must be one of: ${valid_modes[*]}"
-  exit 1
-fi
+check_valid_mode $DEPLOYMENT_MODE
+
+reboot_in_container() {
+  local cmd="${1:-/bin/bash}"
+  if [ -f /.dockerenv ]; then
+    echo "Running inside the devcontainer."
+  else
+    echo "Not running in Docker container. Starting Initialization."
+    bash docker/docker_preinit.sh
+    docker compose -f docker/docker-compose.deployment.yml down --remove-orphans
+    docker compose -f docker/docker-compose.deployment.yml build
+    docker compose -f docker/docker-compose.deployment.yml run fireworks_devcontainer "$cmd"
+  fi
+}
+
 
 ### Code Version ###
 
@@ -61,14 +84,21 @@ fi
 
 ### Docker ###
 
-# function to check if docker is available
+# function to check if docker is available, offer to install it
 function check_docker {
     if ! command -v docker &> /dev/null
     then
         echo "Docker is not available in the terminal"
-        exit 1
+        read -p "Do you want to install Docker? [y/N]: " user_input
+        if [[ $user_input == 'y' || $user_input == 'Y' ]]
+        then
+            bash bin/host_scripts/host-docker.sh
+        else
+            exit 1
+        fi
     else
-        echo "Docker version $(docker --version) is installed"
+        export DOCKER_VERSION=$(docker --version)
+        echo "Docker version $DOCKER_VERSION is installed"
     fi
 }
 
@@ -89,8 +119,8 @@ function check_socket {
     fi
 }
 
-# run the checks if DEPLOYMENT_MODE is "development" or "cicd"
-if [ "$DEPLOYMENT_MODE" == "development" ] || [ "$DEPLOYMENT_MODE" == "cicd" ]; then
+# run the checks if DEPLOYMENT_MODE is "development" or "test"
+if [ "$DEPLOYMENT_MODE" == "development" ] || [ "$DEPLOYMENT_MODE" == "test" ] || [ "$DEPLOYMENT_MODE" == "interactive" ]; then
     check_docker
     check_socket
 fi
@@ -137,15 +167,23 @@ echo "Environment successfully configured"
 ### 2. Deployment                                                           ###
 ###############################################################################
 
+# 0. If in interactive mode
+if [ "$DEPLOYMENT_MODE" = "interactive" ]; then
+  # TODO make the cluster name random
+  docker compose -f docker/docker-compose.deployment.yml run fireworks_devcontainer /bin/bash
+fi
+
 # 1. If in test mode
 if [ "$DEPLOYMENT_MODE" = "test" ]; then
-  # 1.1   Run test suite via Docker Compose for each service
-  # 1.2   Run the integration suite via Helm and Docker Compose
-  echo "TODO"
+  # TODO make the cluster name random
+  reboot_in_container make test
+  cd /workspace/src/lib/python/etl_lib && python -m pip install . && python -m pytest
 fi
 
 # 2. If in development mode
 if [ "$DEPLOYMENT_MODE" = "development" ]; then
+
+  reboot_in_container bash bootstrap.sh development
 
   # Setup a K3D cluster on the host's Docker Engine and
   # route the devcontainer's DNS to the K8 Control Plane for internal DNS resolution
@@ -165,6 +203,10 @@ if [ "$DEPLOYMENT_MODE" = "development" ]; then
 
   # Run port forwarding for the services to localhost
   bash $_SRC/bin/cicd_scripts/port_forward.sh
+  if [ $? -ne 0 ]; then exit 1; fi
+
+  # Set S3 Credentials
+  bash $_SRC/bin/commands/set_s3_credentials.sh
   if [ $? -ne 0 ]; then exit 1; fi
 fi
 

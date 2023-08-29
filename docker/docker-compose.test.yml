@@ -1,0 +1,12 @@
+version: "3.7"
+
+services:
+  fireworks_devcontainer:
+    init: true
+    image: fireworks:latest
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+      target: cicd_container
+
+    command: make test

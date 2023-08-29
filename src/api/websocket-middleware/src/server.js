@@ -1,7 +1,7 @@
 const WebSocket = require('ws');
 const express = require('express');
 const http = require('http');
-const Kafka = require('node-rdkafka'); // import node-rdkafka
+const Kafka = require('node-rdkafka');
 
 // Health Checks Server
 const app = express();
@@ -16,84 +16,69 @@ const wss = new WebSocket.Server({ port: 8080 });
 const clients = [];
 
 let messageCounter = 0;
-// Print out message count every 5 seconds
 setInterval(() => {
     console.log(`Kafka messages received in the last 5 seconds: ${messageCounter}`);
     messageCounter = 0;
 }, 5000);
 
-
-// TODO get this from environment variables
 const debug = false
 const bootstrapServers = 'kafka.default.svc.cluster.local:9092'
 
-// Create Kafka consumer
+const connectToKafka = (consumer) => {
+    consumer.connect();
+
+    consumer
+        .on('ready', () => {
+            consumer.subscribe(topics);
+            consumer.consume();
+        })
+        .on('data', (data) => {
+            messageCounter++;
+            topicArrays[data.topic].push(JSON.parse(data.value));
+            if (debug) {
+                console.log(data.topic);
+                console.log(topicArrays[data.topic].length);
+                console.log(data.value);
+            }
+            if (topicArrays[data.topic].length > 100) {
+                topicArrays[data.topic].pop();
+            }
+        })
+        .on('event.error', (err) => {
+            console.error('Error in Kafka consumer:', err);
+            console.log('Reconnecting...');
+            setTimeout(() => connectToKafka(consumer), 5000);
+        });
+};
+
 const consumer = new Kafka.KafkaConsumer({
     'group.id': 'WebSocketMiddleware2',
     'metadata.broker.list': bootstrapServers,
     'socket.keepalive.enable': true,
     'enable.auto.commit': false,
+    'reconnect.backoff.jitter.ms': 200,
+    'reconnect.backoff.ms': 200,
+    'reconnect.backoff.max.ms': 2000,
 }, {});
 
-// const topics = ['metronome', 'spark_structured_streaming_stateful']
-// const topics = ['pyspark_wiener_process_stateless']
-const topics = ['A_RUSTY_TOPIC']
-
-// store the last 100 records for each topic in an array
+const topics = ['A_RUSTY_TOPIC'];
 const topicArrays = {};
 topics.forEach(topic => {
     topicArrays[topic] = [];
 });
 
-consumer.connect();
-
-consumer
-    .on('ready', () => {
-        consumer.subscribe(topics);
-        consumer.consume();
-    })
-    .on('data', (data) => {
-        messageCounter++;
-        let key = data.key;
-        let value = data.value;
-        if (key != null) {
-            key = key.toString();
-        }
-        if (value != null) {
-            value = JSON.parse(value);
-        }
-        const decoded_message = {
-            topic: data.topic,
-            partition: data.partition,
-            key,
-            value
-        }
-        topicArrays[data.topic].push(decoded_message);
-        if (debug) {
-            console.log(data.topic);
-            console.log(topicArrays[data.topic].length);
-            console.log(decoded_message)
-        }
-        if (topicArrays[data.topic].length > 100) {
-            topicArrays[data.topic].pop();
-        }
-    });
+connectToKafka(consumer);
 
 wss.on('connection', (ws) => {
-    // add the new client to the list of connected clients
     clients.push({ ws, connected: true, lastPong: new Date() });
 
-    // Send data to all connected clients from queue
     setInterval(() => {
         topics.forEach(topic => {
             while (topicArrays[topic].length > 0) {
-                // Remove the first element of the queue
                 const _message = topicArrays[topic].shift();
-                // Send the first element to all connected clients
                 clients.forEach(client => {
                     if (client.connected) client.ws.send(JSON.stringify(_message).toString());
                 });
-
             }
         });
     }, 100);
