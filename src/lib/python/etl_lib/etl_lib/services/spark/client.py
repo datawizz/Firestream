@@ -1,27 +1,25 @@
-import os
-import etl_lib
-from pyspark.sql import SparkSession, Column
-from pyspark.sql import DataFrame
-from pyspark.sql.functions import col, struct, to_json, from_json, decode
+# import os
+# import etl_lib
+# from pyspark.sql import SparkSession, Column
+# from pyspark.sql import DataFrame
+# from pyspark.sql.functions import col, struct, to_json, from_json, decode
 from pyspark import SparkContext, SparkConf
-from pyspark.sql.column import Column, _to_java_column
+from pyspark.sql import SparkSession, DataFrame
+# from pyspark.sql.column import Column, _to_java_column
 
 
-import boto3
-import os
-
-from pyspark.sql.functions import sha2, concat_ws, bin, hash
-
-import time
-from datetime import datetime, timedelta
-import json
 
 
-from etl_lib.services.kafka.client import KafkaClient
+# from pyspark.sql.functions import sha2, concat_ws, bin, hash
 
-# from tinsel import struct, transform
-import numpy as np
-import pandas as pd
+# import time
+# from datetime import datetime, timedelta
+# import json
+
+
+# from etl_lib.services.kafka.client import KafkaClient
+
+
 
 
 # TODO The key setting is wonky AF
@@ -35,12 +33,11 @@ import pandas as pd
 # TODO build the jars into the dockerfiles served to Kubernetes to minimize spin up and network traffic on executors
 
 
-from pyspark.sql import SQLContext
 
 
-from pyspark import SparkConf
-from pyspark.sql import SparkSession
 import os
+from pyspark.sql import SparkSession
+import boto3
 
 
 class SparkClient:
@@ -55,95 +52,125 @@ class SparkClient:
     def __init__(self, app_name: str, config: dict = {}, **kwargs) -> None:
 
         self.spark_master = kwargs.get("master") or "local[*]"
-        self._REF = "main"
-        self._CATALOG = "blahblahblah"
+        self.CATALOG = kwargs.get("catalog") or "delta"
+        self.BRANCH = kwargs.get("branch") or os.environ.get("DEPLOYMENT_MODE") or "main"
+        self.NESSIE_SERVER = os.environ.get("NESSIE_SERVER_URI")
 
         #TODO this should be set to the spark master in the K8 cluster
         #self.spark_master = "spark://spark-master-0.spark-headless.default.svc.cluster.local:7077"
         self.app_name = app_name
+
+        # Start with config passed as a parameter
         self.config = config
 
-        self._BUCKET = os.environ.get("S3_LOCAL_BUCKET_NAME")
-        self._SERVER = os.environ.get("NESSIE_SERVER_URI")
-        self._S3_LOCAL_ENDPOINT_URL = os.environ.get("S3_LOCAL_ENDPOINT_URL")
-        self._S3_LOCAL_ACCESS_KEY_ID = os.environ.get("S3_LOCAL_ACCESS_KEY_ID")
-        self._S3_LOCAL_SECRET_ACCESS_KEY = os.environ.get("S3_LOCAL_SECRET_ACCESS_KEY")
-        self._PATH = f"s3a://{self._BUCKET}/spark_warehouse"
-        self._LOG_PATH = f"s3a://{self._BUCKET}/spark_logs"
+        # Default to using local S3
+        self.storage_location = kwargs.get("storage_location") or "local"
 
-        self._NESSIE_VERSION = os.environ.get("NESSIE_VERSION")
+        self.S3_CLOUD_ENDPOINT_URL = os.environ.get("S3_CLOUD_ENDPOINT_URL")
+        self.S3_CLOUD_ACCESS_KEY_ID = os.environ.get("S3_CLOUD_ACCESS_KEY_ID")
+        self.S3_CLOUD_SECRET_ACCESS_KEY = os.environ.get("S3_CLOUD_SECRET_ACCESS_KEY")
+        self.S3_CLOUD_BUCKET_NAME = os.environ.get("S3_CLOUD_BUCKET_NAME")
+        self.S3_CLOUD_PATH = f"s3a://{self.S3_CLOUD_BUCKET_NAME}/warehouse"
+        self.S3_CLOUD_DEFAULT_REGION = os.environ.get("S3_CLOUD_DEFAULT_REGION")
+
+        # Default logging to local S3 (in cluster or vpc)
+        # TODO use opentelemetry to log to a remote logging service
+        self.set_bucket()
 
         self.create_logging_dir()
-        self.session = self.create_spark_session()
-        # https://iceberg.apache.org/docs/latest/spark-writes/#type-compatibility
 
+        self.spark_session = self.create_spark_session()
+        self.spark_context = self.spark_session.sparkContext
 
+    def set_bucket(self):
+        if self.storage_location == "local":
+            self.S3_ENDPOINT_URL = os.environ.get("S3_LOCAL_ENDPOINT_URL")
+            self.S3_ACCESS_KEY_ID = os.environ.get("S3_LOCAL_ACCESS_KEY_ID")
+            self.S3_SECRET_ACCESS_KEY = os.environ.get("S3_LOCAL_SECRET_ACCESS_KEY")
+            self.S3_BUCKET_NAME = os.environ.get("S3_LOCAL_BUCKET_NAME")
+            self.S3_PATH = f"{self.S3_BUCKET_NAME}/warehouse"
+            self.S3_DEFAULT_REGION = os.environ.get("S3_LOCAL_DEFAULT_REGION")
+        else:
+            self.S3_ENDPOINT_URL = os.environ.get("S3_CLOUD_ENDPOINT_URL")
+            self.S3_ACCESS_KEY_ID = os.environ.get("S3_CLOUD_ACCESS_KEY_ID")
+            self.S3_SECRET_ACCESS_KEY = os.environ.get("S3_CLOUD_SECRET_ACCESS_KEY")
+            self.S3_BUCKET_NAME = os.environ.get("S3_CLOUD_BUCKET_NAME")
+            self.S3_PATH = f"{self.S3_BUCKET_NAME}/warehouse"
+            self.S3_DEFAULT_REGION = os.environ.get("S3_CLOUD_DEFAULT_REGION")
+
+        self.LOG_PATH = f"s3a://{self.S3_BUCKET_NAME}/spark_logs/"
 
     def create_logging_dir(self):
-
         s3 = boto3.resource(
             's3',
-            endpoint_url=os.environ['S3_LOCAL_ENDPOINT_URL'],
-            aws_access_key_id=os.environ['S3_LOCAL_ACCESS_KEY_ID'],
-            aws_secret_access_key=os.environ['S3_LOCAL_SECRET_ACCESS_KEY'],
-            region_name=os.environ['S3_LOCAL_DEFAULT_REGION']
+            endpoint_url=self.S3_ENDPOINT_URL,
+            aws_access_key_id=self.S3_ACCESS_KEY_ID,
+            aws_secret_access_key=self.S3_SECRET_ACCESS_KEY,
+            region_name=self.S3_DEFAULT_REGION
         )
 
-        bucket = s3.Bucket(os.environ['S3_LOCAL_BUCKET_NAME'])
-        dir_obj = None
+        # Check if bucket exists
+        if s3.Bucket(self.S3_BUCKET_NAME) not in s3.buckets.all():
+            s3.create_bucket(Bucket=self.S3_BUCKET_NAME)
 
         try:
-            s3.meta.client.head_object(Bucket=os.environ['S3_LOCAL_BUCKET_NAME'], Key='spark_logs/')
-            dir_obj = bucket.Object(key='spark_logs/')
+            s3.meta.client.head_object(Bucket=self.S3_BUCKET_NAME, Key="spark_logs/")
+            print(f"Directory {self.LOG_PATH} exists.")
         except Exception as e:
-            print("Directory does not exist, creating it now.")
-            
-        if dir_obj is None:
-            bucket.put_object(Key='spark_logs/')
+            print(f"Directory {self.LOG_PATH} does not exist, creating it now.")
+            bucket = s3.Bucket(self.S3_BUCKET_NAME)
+            bucket.put_object(Key="spark_logs/")
 
+    def config_spark(self):
 
+        catalog = self.CATALOG
 
-    def create_spark_session(self):
-
-        self.create_logging_dir()
-
-        jars_packages = [
-            # For Kafka access
-            "org.apache.spark:spark-sql-kafka-0-10_2.12:3.3.1",
-            "org.apache.spark:spark-streaming-kafka-0-10_2.12:3.3.1",
-            "org.apache.kafka:kafka-clients:3.3.1",
-            "org.apache.iceberg:iceberg-spark-runtime-3.3_2.12:1.2.1",
-            "org.projectnessie.nessie-integrations:nessie-spark-extensions-3.3_2.12:0.58.1",
+        # jars_packages = [
+        #     # For Kafka access
+        #     "org.apache.spark:spark-sql-kafka-0-10_2.12:3.3.1",
+        #     "org.apache.spark:spark-streaming-kafka-0-10_2.12:3.3.1",
+        #     "org.apache.kafka:kafka-clients:3.3.1",
+        #     "org.apache.iceberg:iceberg-spark-runtime-3.3_2.12:1.2.1",
+        #     "org.projectnessie.nessie-integrations:nessie-spark-extensions-3.3_2.12:0.58.1",
+        #     "org.apache.hadoop:hadoop-aws:3.3.1",
+        #     "org.apache.hadoop:hadoop-common:3.3.1",
+        #     "org.apache.spark:spark-hadoop-cloud_2.12:3.3.1"
+        # ]
+        self.jars_packages = [
+            "org.apache.spark:spark-sql-kafka-0-10_2.12:3.4.1",
+            "org.apache.spark:spark-streaming-kafka-0-10_2.12:3.4.1",
+            "org.apache.kafka:kafka-clients:3.4.1",
             "org.apache.hadoop:hadoop-aws:3.3.1",
             "org.apache.hadoop:hadoop-common:3.3.1",
-            "org.apache.spark:spark-hadoop-cloud_2.12:3.3.1"
+            "org.apache.spark:spark-hadoop-cloud_2.12:3.4.1"
         ]
-        jars_packages = ",".join(jars_packages)
+
+        if catalog == "delta":
+            self.jars_packages.append("io.delta:delta-core_2.12:2.4.0")
+        elif catalog == "nessie":
+            self.jars_packages.append( "org.projectnessie.nessie-integrations:nessie-spark-extensions-3.4_1.12:0.58.1")
+
+        self.jars_packages = ",".join(self.jars_packages)
+        print(self.jars_packages)
 
         self.config.update({
-            "spark.hadoop.fs.s3a.endpoint": self._S3_LOCAL_ENDPOINT_URL,
-            "spark.hadoop.fs.s3a.connection.ssl.enabled": "false",
+            "spark.jars.packages": self.jars_packages,
+            "spark.hadoop.fs.s3a.endpoint": self.S3_ENDPOINT_URL,
+            "spark.hadoop.fs.s3a.connection.ssl.enabled": "false", # TODO ssl on everything! This is just for testing
             "spark.hadoop.fs.s3a.path.style.access": "true",
             "spark.hadoop.fs.s3a.committer.name": "directory",
             "spark.hadoop.fs.s3a.aws.credentials.provider": "org.apache.hadoop.fs.s3a.SimpleAWSCredentialsProvider",
-            "spark.hadoop.fs.s3a.access.key": self._S3_LOCAL_ACCESS_KEY_ID,
-            "spark.hadoop.fs.s3a.secret.key": self._S3_LOCAL_SECRET_ACCESS_KEY,
+            "spark.hadoop.fs.s3a.access.key": self.S3_ACCESS_KEY_ID,
+            "spark.hadoop.fs.s3a.secret.key": self.S3_SECRET_ACCESS_KEY,
             "spark.hadoop.fs.s3a.impl": "org.apache.hadoop.fs.s3a.S3AFileSystem",
             "spark.sql.execution.arrow.pyspark.enabled": "true",
             "spark.sql.execution.arrow.pyspark.enabled": "true",
             "spark.sql.session.timeZone": "UTC",
             "spark.sql.streaming.checkpointLocation": "/tmp/spark_checkpoint", # TODO when deployed to K8 does this persist?
-            F"spark.sql.catalog.{self._CATALOG}.warehouse": self._PATH,
-            F"spark.sql.catalog.{self._CATALOG}": "org.apache.iceberg.spark.SparkCatalog",
-            F"spark.sql.catalog.{self._CATALOG}.catalog-impl": "org.apache.iceberg.nessie.NessieCatalog",
-            F"spark.sql.catalog.{self._CATALOG}.uri": self._SERVER,
-            F"spark.sql.catalog.{self._CATALOG}.ref": self._REF,
-            F"spark.sql.catalog.{self._CATALOG}.auth_type": "NONE",
-            "spark.sql.extensions": "org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions,org.projectnessie.spark.extensions.NessieSparkSessionExtensions",
-            "spark.jars.packages": jars_packages,
+            F"spark.sql.catalog.{self.CATALOG}.warehouse": self.S3_PATH,
             # Set logging to use S3
-            "spark.eventLog.enabled": "true",
-            "spark.eventLog.dir": self._LOG_PATH,
+            # "spark.eventLog.enabled": "true",
+            # "spark.eventLog.dir": self.LOG_PATH,
             # "spark.history.fs.logDirectory": F"s3a://{_BUCKET}/",
             "spark.eventLog.rolling.enabled": "true",
             "spark.eventLog.rolling.maxFileSize": "128m",
@@ -154,29 +181,105 @@ class SparkClient:
         })
 
 
+        # if catalog == "delta":
+        #     self.config.update({
+        #         # Delta Lake
+        #         F"spark.sql.catalog.{self.CATALOG}.catalog-impl": "org.apache.iceberg.delta.DeltaCatalog",
+        #         F"spark.sql.extensions": "io.delta.sql.DeltaSparkSessionExtension",
+        #     })
+
+        # elif catalog == "nessie":
+        #     # Nessie / Iceberg
+        #     self.config.update({
+        #         F"spark.sql.catalog.{self.CATALOG}": "org.apache.iceberg.spark.SparkCatalog",
+        #         F"spark.sql.catalog.{self.CATALOG}.catalog-impl": "org.apache.iceberg.nessie.NessieCatalog",
+        #         F"spark.sql.catalog.{self.CATALOG}.uri": self.NESSIE_SERVER,
+        #         F"spark.sql.catalog.{self.CATALOG}.ref": self.BRANCH,
+        #         F"spark.sql.catalog.{self.CATALOG}.auth_type": "NONE",
+        #         "spark.sql.extensions": "org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions,org.projectnessie.spark.extensions.NessieSparkSessionExtensions",    
+        #     })
+
+            
+
+    def create_spark_session(self):
 
         spark = SparkSession.builder.master(self.spark_master).appName(self.app_name)
+
+        self.config_spark()
 
         for key, value in self.config.items():
             spark.config(key, value)
 
         spark  = spark.getOrCreate()
-        spark.sparkContext.setLogLevel("INFO")
+        spark.sparkContext.setLogLevel(self.config.get("spark.log.level", "INFO"))
         return spark
 
+    def stop(self):
+        self.spark_session.stop()
+
+    def create_df(self, data: list, schema: dict) -> DataFrame:
+        return self.spark_session.createDataFrame(data, schema=schema)
+
+    def read(self, format: str, **kwargs) -> DataFrame:
+        return self.spark_session.read.format(format).options(**kwargs).load()
+    
+    def write(self, df: DataFrame, format: str, **kwargs) -> None:
+        mode = "overwrite" if kwargs.pop('overwrite', False) else "append"
+        df.write.format(format).mode(mode).options(**kwargs).save()
+
+    
+    def read_stream(self, format: str, **kwargs) -> DataFrame:
+        return self.spark_session.readStream.format(format).options(**kwargs)
+    
+###########
+###TESTS####
+###########
+# from pyspark.sql.types import StructType, StructField, StringType
+# import pytest
+
+# # Test case for read method
+# def test_read():
+#     app_name = "TestApp"
+#     config = {"key": "value"}
+#     client = SparkClient(app_name=app_name, config=config, storage_location="local")
+
+#     data = [("Alice",), ("Bob",)]
+#     schema = StructType([StructField("name", StringType(), True)])
+#     df = client.session.createDataFrame(data, schema=schema)
+#     path = "/tmp/read_test.parquet"
+#     df.write.mode("overwrite").parquet(path)
+#     read_df = client.session.read.format("parquet").load(str(path))
+#     read_df.show()
+
+#     # assert read_df.count() == 2
+
+#     client.session.stop()
+
+# if __name__ == "__main__":
+#     # pytest.main([__file__])
 
 
+#     test_read()
 
 
+# from pyspark.sql import SparkSession
+# from pyspark.sql.types import StructType, StructField, StringType
 
-        # def get_spark_session(app_name: str, conf: dict):
-        #     spark = SparkSession.builder.master(self.spark_master).appName(app_name)
+# def create_dataframe_from_dict(spark, data_dict):
+#     schema = StructType([
+#         StructField("name", StringType(), True),
+#         StructField("address", StringType(), True),
+#         StructField("phone", StringType(), True),
+#         StructField("email", StringType(), True)
+#     ])
+    
+#     return spark.createDataFrame(data=[tuple(v for v in record.values()) for record in data_dict.values()], schema=schema)
 
-        #     for key, value in config.items():
-        #         spark.config(key, value)
-        #     return spark.getOrCreate()
-
-        # # TODO make calls to this function idempotent
-        # self.spark_session = get_spark_session(app_name=app_name, conf=config)
-        # self.spark_context = self.spark_session.sparkContext
-        # self.spark_context.setLogLevel("INFO")
+# # Example usage
+# spark = SparkSession.builder.appName("AddressBook").getOrCreate()
+# data_dict = {
+#     "1": {"name": "John", "address": "123 Main St", "phone": "123-456-7890", "email": "john@example.com"},
+#     "2": {"name": "Jane", "address": "456 High St", "phone": "987-654-3210", "email": "jane@example.com"}
+# }
+# df = create_dataframe_from_dict(spark, data_dict)
+# df.show()

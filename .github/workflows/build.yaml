@@ -29,11 +29,7 @@ jobs:
 
       - name: Build Platform
         run: |
-          docker compose -f docker/docker-compose.test.yml build cicdcontainer
-
-      - name: Run Tests
-        run: |
-          docker compose -f docker/docker-compose.test.yml run cicdcontainer make test
+          bash bootstrap.sh test
 
       - name: Stop containers
         if: always()
