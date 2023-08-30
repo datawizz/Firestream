@@ -167,13 +167,6 @@ echo "Environment successfully configured"
 ### 2. Deployment                                                           ###
 ###############################################################################
 
-# 0. If in interactive mode
-if [ "$DEPLOYMENT_MODE" = "interactive" ]; then
-  # TODO make the cluster name random
-  docker compose -f docker/docker-compose.deployment.yml run fireworks_devcontainer /bin/bash
-fi
-
-
 
 # 1. If in development mode
 if [ "$DEPLOYMENT_MODE" = "development" ]; then
@@ -191,6 +184,7 @@ if [ "$DEPLOYMENT_MODE" = "development" ]; then
 
   # Build the project's container images and artifacts
   #bash /workspace/bin/cicd_scripts/build.sh
+  #TODO include builds inline
 
   # Helm Install Charts
   bash $_SRC/bin/cicd_scripts/helm_install.sh
