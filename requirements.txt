@@ -48,7 +48,7 @@ marshmallow-enum==1.5.1
 matplotlib==3.7.2
 mdurl==0.1.2
 ml-dtypes==0.2.0
-mpmath==1.2.1
+mpmath==1.3.0
 multidict==6.0.4
 multipledispatch==1.0.0
 mypy-extensions==1.0.0
