@@ -19,19 +19,6 @@ check_registry() {
   fi
 }
 
-check_cluster() {
-  if k3d cluster list | grep -q "$PROJECT_NAME"; then
-    if [ "$DEPLOYMENT_MODE" = "test" ]; then
-      delete_cluster
-      create_cluster
-    else
-      reconnect_cluster
-    fi
-  else
-    create_cluster
-  fi
-}
-
 
 reconnect_cluster() {
   echo "k3d cluster named $PROJECT_NAME already exists. Connecting..."
@@ -52,6 +39,19 @@ create_cluster() {
 delete_cluster() {
   echo "Deleting k3d cluster named $PROJECT_NAME..."
   k3d cluster delete $PROJECT_NAME
+}
+
+check_cluster() {
+  if k3d cluster list | grep -q "$PROJECT_NAME"; then
+    if [ "$DEPLOYMENT_MODE" = "test" ] || [ "$DEPLOYMENT_MODE" = "clean" ]; then
+      delete_cluster
+      create_cluster
+    else
+      reconnect_cluster
+    fi
+  else
+    create_cluster
+  fi
 }
 
 test_kubectl() {
@@ -101,24 +101,31 @@ hack_for_ingress() {
 
 
 
-
-
 patch_etc_hosts() {
   HOSTNAME=$(hostname)
-  grep -q "$HOSTNAME" /etc/hosts
-  if [ $? -eq 1 ]; then
+  if grep -q "$HOSTNAME" /etc/hosts; then
+    echo "Hostname $HOSTNAME already exists in /etc/hosts"
+    return
+  fi
+
+  if [ -w /etc/hosts ]; then
+    echo "127.0.0.1 $HOSTNAME" >> /etc/hosts
+    echo "Hostname $HOSTNAME added to /etc/hosts"
+  elif [ -x "$(command -v sudo)" ]; then
     echo "127.0.0.1 $HOSTNAME" | sudo tee -a /etc/hosts > /dev/null
     echo "Hostname $HOSTNAME added to /etc/hosts"
   else
-    echo "Hostname $HOSTNAME already exists in /etc/hosts"
+    echo "Cannot write to /etc/hosts and sudo is not available"
   fi
 }
 
+
 set_ip_routes() {
-  export K3D_SERVER_IP=$(docker container inspect k3d-$PROJECT_NAME-server-0 --format '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}')
-  echo $K3D_SERVER_IP
-  sudo ip route | grep -q "10.43.0.0/16" || sudo ip route add 10.43.0.0/16 via $K3D_SERVER_IP
-  sudo ip route | grep -q "10.42.0.0/16" || sudo ip route add 10.42.0.0/16 via $K3D_SERVER_IP
+  K3D_SERVER_IP=$(docker container inspect k3d-$PROJECT_NAME-server-0 --format '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}') || return 1
+  echo "$K3D_SERVER_IP" || return 1
+
+  sudo ip route | grep -q "10.43.0.0/16" || sudo ip route add 10.43.0.0/16 via $K3D_SERVER_IP || return 1
+  sudo ip route | grep -q "10.42.0.0/16" || sudo ip route add 10.42.0.0/16 via $K3D_SERVER_IP || return 1
 }
 
 update_resolv_conf() {
@@ -158,16 +165,12 @@ ensure_kube_directory
 check_registry
 check_cluster
 
-# If "Clean" mode then delete the cluster and recreate it
-if [ "$DEPLOYMENT_MODE" = "clean" ]; then
-  delete_cluster
-  create_cluster
-fi
 
-load_tls_certificates
-hack_for_ingress
-
+# load_tls_certificates
+# hack_for_ingress
+sleep 10
 patch_etc_hosts
 set_ip_routes
 update_resolv_conf
 test_dns_resolution
+
