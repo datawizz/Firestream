@@ -89,27 +89,7 @@ postgresql_install
 #   --set serverDefinitions.servers.firstServer.SSLMode="prefer" \
 #   --set serverDefinitions.servers.firstServer.MaintenanceDB=$POSTGRES_DEFAULT_DB
 
-project_nessie_install() {
 
-  # Check if secret already exists
-  if ! kubectl get secret postgres-creds > /dev/null 2>&1; then
-    temp_file=$(mktemp)
-    echo "postgres_username=${POSTGRES_USER}" > ${temp_file}
-    echo "postgres_password=${POSTGRES_PASSWORD}" >> ${temp_file}
-    kubectl create secret generic postgres-creds --from-env-file="${temp_file}"
-    rm ${temp_file}
-  fi
-
-  # Check if helm release already exists
-  if ! helm list -q | grep -q nessie; then
-    helm install nessie nessie/nessie \
-      --set versionStoreType=TRANSACTIONAL \
-      --set postgres.jdbcUrl="$JDBC_CONNECTION_STRING" \
-      --set image.tag="$NESSIE_VERSION"
-  fi
-}
-
-project_nessie_install
 
 ### Spark Cluster ###
 # Enables: spark://spark-master:7077
