@@ -20,9 +20,6 @@ sleep 1
 helm --namespace default upgrade --install signoz signoz/signoz
 
 
-### Nessie ###
-helm repo add nessie https://charts.projectnessie.org
-
 ### Ingress ###
 
 # Add Nginx
@@ -113,7 +110,7 @@ helm upgrade --install minio bitnami/minio -f /workspace/k8s/charts/fireworks/su
 #   --set coreNames="$SOLR_DEFAULT_CORE"
 
 ### Kafka ###
-helm install kafka bitnami/kafka --version 25.1.5 \
+helm upgrade --install kafka bitnami/kafka --version 24.0.10  \
   --set controller.replicaCount=5 \
   --set controller.heapOpts="-Xmx1024m -Xms1024m" \
   --set controller.persistence.size=20Gi \
@@ -122,8 +119,7 @@ helm install kafka bitnami/kafka --version 25.1.5 \
   --set listeners.interbroker.protocol=PLAINTEXT \
   --set listeners.external.protocol=PLAINTEXT
 
-
-#  -f /workspace/k8s/charts/fireworks/subcharts/kafka/chart/values.yaml
+  #  -f /workspace/k8s/charts/fireworks/subcharts/kafka/chart/values.yaml
 
 ### Kyuubi ###
 # cd /workspace/submodules/the-fireworks-company/kyuubi && \
