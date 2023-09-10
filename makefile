@@ -12,6 +12,7 @@ development:
 
 development_clean:
 	cd $(BASEDIR) && bash bootstrap.sh clean
+	cd $(BASEDIR) && bash bootstrap.sh development
 
 # Reuse the existing cluster by re-establishing the network tunnel
 resume:

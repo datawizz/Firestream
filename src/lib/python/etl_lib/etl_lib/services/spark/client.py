@@ -88,14 +88,14 @@ class SparkClient:
             self.S3_ACCESS_KEY_ID = os.environ.get("S3_LOCAL_ACCESS_KEY_ID")
             self.S3_SECRET_ACCESS_KEY = os.environ.get("S3_LOCAL_SECRET_ACCESS_KEY")
             self.S3_BUCKET_NAME = os.environ.get("S3_LOCAL_BUCKET_NAME")
-            self.S3_PATH = f"{self.S3_BUCKET_NAME}/warehouse"
+            self.S3_PATH = f"s3a://{self.S3_BUCKET_NAME}/warehouse"
             self.S3_DEFAULT_REGION = os.environ.get("S3_LOCAL_DEFAULT_REGION")
         else:
             self.S3_ENDPOINT_URL = os.environ.get("S3_CLOUD_ENDPOINT_URL")
             self.S3_ACCESS_KEY_ID = os.environ.get("S3_CLOUD_ACCESS_KEY_ID")
             self.S3_SECRET_ACCESS_KEY = os.environ.get("S3_CLOUD_SECRET_ACCESS_KEY")
             self.S3_BUCKET_NAME = os.environ.get("S3_CLOUD_BUCKET_NAME")
-            self.S3_PATH = f"{self.S3_BUCKET_NAME}/warehouse"
+            self.S3_PATH = f"s3a://{self.S3_BUCKET_NAME}/warehouse"
             self.S3_DEFAULT_REGION = os.environ.get("S3_CLOUD_DEFAULT_REGION")
 
         self.LOG_PATH = f"s3a://{self.S3_BUCKET_NAME}/spark_logs/"
@@ -136,19 +136,20 @@ class SparkClient:
         #     "org.apache.hadoop:hadoop-common:3.3.1",
         #     "org.apache.spark:spark-hadoop-cloud_2.12:3.3.1"
         # ]
+
+
+
         self.jars_packages = [
             "org.apache.spark:spark-sql-kafka-0-10_2.12:3.4.1",
             "org.apache.spark:spark-streaming-kafka-0-10_2.12:3.4.1",
             "org.apache.kafka:kafka-clients:3.4.1",
             "org.apache.hadoop:hadoop-aws:3.3.1",
             "org.apache.hadoop:hadoop-common:3.3.1",
-            "org.apache.spark:spark-hadoop-cloud_2.12:3.4.1"
+            "org.apache.spark:spark-hadoop-cloud_2.12:3.4.1",
+            # "io.delta:delta-core_2.12:2.4.0",
+            "org.apache.iceberg:iceberg-spark-runtime-3.3_2.12:1.3.0",
+            "org.projectnessie.nessie-integrations:nessie-spark-extensions-3.3_2.12:0.70.0"
         ]
-
-        if catalog == "delta":
-            self.jars_packages.append("io.delta:delta-core_2.12:2.4.0")
-        elif catalog == "nessie":
-            self.jars_packages.append( "org.projectnessie.nessie-integrations:nessie-spark-extensions-3.4_1.12:0.58.1")
 
         self.jars_packages = ",".join(self.jars_packages)
         print(self.jars_packages)
@@ -166,8 +167,14 @@ class SparkClient:
             "spark.sql.execution.arrow.pyspark.enabled": "true",
             "spark.sql.execution.arrow.pyspark.enabled": "true",
             "spark.sql.session.timeZone": "UTC",
-            "spark.sql.streaming.checkpointLocation": "/tmp/spark_checkpoint", # TODO when deployed to K8 does this persist?
+            "spark.sql.streaming.checkpointLocation": "/tmp/spark_checkpoint", # TODO when deployed to K8 does this persist, should be be backed by S3?
             F"spark.sql.catalog.{self.CATALOG}.warehouse": self.S3_PATH,
+            F"spark.sql.catalog.{self.CATALOG}": "org.apache.iceberg.spark.SparkCatalog",
+            F"spark.sql.catalog.{self.CATALOG}.catalog-impl": "org.apache.iceberg.nessie.NessieCatalog",
+            F"spark.sql.catalog.{self.CATALOG}.uri": self.NESSIE_SERVER,
+            F"spark.sql.catalog.{self.CATALOG}.ref": self.BRANCH,
+            F"spark.sql.catalog.{self.CATALOG}.auth_type": "NONE",
+            "spark.sql.extensions": "org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions,org.projectnessie.spark.extensions.NessieSparkSessionExtensions",   
             # Set logging to use S3
             # "spark.eventLog.enabled": "true",
             # "spark.eventLog.dir": self.LOG_PATH,
@@ -181,25 +188,6 @@ class SparkClient:
         })
 
 
-        # if catalog == "delta":
-        #     self.config.update({
-        #         # Delta Lake
-        #         F"spark.sql.catalog.{self.CATALOG}.catalog-impl": "org.apache.iceberg.delta.DeltaCatalog",
-        #         F"spark.sql.extensions": "io.delta.sql.DeltaSparkSessionExtension",
-        #     })
-
-        # elif catalog == "nessie":
-        #     # Nessie / Iceberg
-        #     self.config.update({
-        #         F"spark.sql.catalog.{self.CATALOG}": "org.apache.iceberg.spark.SparkCatalog",
-        #         F"spark.sql.catalog.{self.CATALOG}.catalog-impl": "org.apache.iceberg.nessie.NessieCatalog",
-        #         F"spark.sql.catalog.{self.CATALOG}.uri": self.NESSIE_SERVER,
-        #         F"spark.sql.catalog.{self.CATALOG}.ref": self.BRANCH,
-        #         F"spark.sql.catalog.{self.CATALOG}.auth_type": "NONE",
-        #         "spark.sql.extensions": "org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions,org.projectnessie.spark.extensions.NessieSparkSessionExtensions",    
-        #     })
-
-            
 
     def create_spark_session(self):
 
@@ -231,55 +219,3 @@ class SparkClient:
     def read_stream(self, format: str, **kwargs) -> DataFrame:
         return self.spark_session.readStream.format(format).options(**kwargs)
     
-###########
-###TESTS####
-###########
-# from pyspark.sql.types import StructType, StructField, StringType
-# import pytest
-
-# # Test case for read method
-# def test_read():
-#     app_name = "TestApp"
-#     config = {"key": "value"}
-#     client = SparkClient(app_name=app_name, config=config, storage_location="local")
-
-#     data = [("Alice",), ("Bob",)]
-#     schema = StructType([StructField("name", StringType(), True)])
-#     df = client.session.createDataFrame(data, schema=schema)
-#     path = "/tmp/read_test.parquet"
-#     df.write.mode("overwrite").parquet(path)
-#     read_df = client.session.read.format("parquet").load(str(path))
-#     read_df.show()
-
-#     # assert read_df.count() == 2
-
-#     client.session.stop()
-
-# if __name__ == "__main__":
-#     # pytest.main([__file__])
-
-
-#     test_read()
-
-
-# from pyspark.sql import SparkSession
-# from pyspark.sql.types import StructType, StructField, StringType
-
-# def create_dataframe_from_dict(spark, data_dict):
-#     schema = StructType([
-#         StructField("name", StringType(), True),
-#         StructField("address", StringType(), True),
-#         StructField("phone", StringType(), True),
-#         StructField("email", StringType(), True)
-#     ])
-    
-#     return spark.createDataFrame(data=[tuple(v for v in record.values()) for record in data_dict.values()], schema=schema)
-
-# # Example usage
-# spark = SparkSession.builder.appName("AddressBook").getOrCreate()
-# data_dict = {
-#     "1": {"name": "John", "address": "123 Main St", "phone": "123-456-7890", "email": "john@example.com"},
-#     "2": {"name": "Jane", "address": "456 High St", "phone": "987-654-3210", "email": "jane@example.com"}
-# }
-# df = create_dataframe_from_dict(spark, data_dict)
-# df.show()

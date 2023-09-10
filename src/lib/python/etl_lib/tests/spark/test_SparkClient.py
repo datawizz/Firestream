@@ -94,9 +94,20 @@
 #     import pytest
 #     pytest.main([__file__])
 
+from etl_lib import SparkClient
 
 
-
+def test_write_read(spark_client):
+    df = spark_client.spark_session.createDataFrame([(1, 'foo'), (2, 'bar')], ['id', 'value'])
+    write_path = "/tmp/data/temp.parquet"
+    spark_client.write(df, "parquet", path=write_path)
+    read_df = spark_client.read("parquet", path=write_path, mode="overwrite")
+    df.show()
+    read_df.show()
+    # assert (
+    #     sorted(df.collect(), key=lambda row: tuple(row)) ==
+    #     sorted(read_df.collect(), key=lambda row: tuple(row))
+    # )
 
 
 
@@ -115,18 +126,10 @@ class TestSparkClient:
         
         self.test_df = self.spark_client.spark_session.createDataFrame(data=self.test_data, schema=["Name", "Age"])
 
-    def test_write_read(self):
-        df = self.spark_client.spark_session.createDataFrame([(1, 'foo'), (2, 'bar')], ['id', 'value'])
-        write_path = "/tmp/data/temp.parquet"
-        self.spark_client.write(df, "parquet", path=write_path)
-        read_df = self.spark_client.read("parquet", path=write_path, mode="overwrite")
-        df.show()
-        read_df.show()
-        # assert (
-        #     sorted(df.collect(), key=lambda row: tuple(row)) ==
-        #     sorted(read_df.collect(), key=lambda row: tuple(row))
-        # )
+
 
 if __name__ == "__main__":
-    import pytest
-    pytest.main([__file__])
+
+    client = SparkClient(app_name="TestApp")
+    test_write_read(client)
+    
