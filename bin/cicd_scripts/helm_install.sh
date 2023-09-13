@@ -134,7 +134,14 @@ helm upgrade --install minio bitnami/minio -f /workspace/k8s/charts/fireworks/su
 
 ### Kafka ###
 helm upgrade --install kafka bitnami/kafka --version 24.0.10  \
-   -f /workspace/k8s/charts/fireworks/subcharts/kafka/chart/values.yaml
+  --set controller.replicaCount=5 \
+  --set controller.heapOpts="-Xmx1024m -Xms1024m" \
+  --set controller.persistence.size=100Gi \
+  --set listeners.client.protocol=PLAINTEXT \
+  --set listeners.controller.protocol=PLAINTEXT \
+  --set listeners.interbroker.protocol=PLAINTEXT \
+  --set listeners.external.protocol=PLAINTEXT
+
 
 ### Kyuubi ###
 # cd /workspace/submodules/the-fireworks-company/kyuubi && \
