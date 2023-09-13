@@ -22,7 +22,7 @@ ARG HADOOP_HOME="/opt/hadoop"
 ARG JAVA_VERSION=11
 ARG PYTHON_VERSION=3.11
 ##TODO the python version is being installed from debian, instead of manually which puts the bells and whistles in
-ARG NODE_VERSION=16
+ARG NODE_VERSION=18
 ARG NODE_SHA=""
 
 
