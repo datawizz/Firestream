@@ -1,5 +1,5 @@
 
-![Screenshot](images/fireworks_banner.png)
+![Screenshot](static/images/fireworks_banner.png)
 
 Fireworks is a platform for cloud native development of distributed applications.
 
@@ -57,4 +57,4 @@ This is basically a blanket kubectl proxy command but since it is run within the
 
 The **Kubernetes** cluster is run using K3D (K3S in Docker by Rancher Labs).
 
-![Screenshot](images/stack.png)
+![Screenshot](static/images/stack.png)
