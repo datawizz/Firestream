@@ -1,0 +1,43 @@
+
+
+# Define the service name
+ARG SERVICE_NAME
+
+FROM rust:1.67 as builder
+ARG SERVICE_NAME
+ENV RUST_BACKTRACE=full
+
+
+# Create a new empty shell project
+RUN USER=root cargo new --bin $SERVICE_NAME
+WORKDIR /$SERVICE_NAME
+
+# Copy over your manifests
+COPY ./Cargo.toml ./Cargo.toml
+
+# Copy the source tree
+COPY ./src ./src
+
+# Build for release
+RUN cargo build --release
+
+FROM debian:bullseye-slim as runtime
+ENV RUST_BACKTRACE=full
+ARG SERVICE_NAME
+WORKDIR /$SERVICE_NAME
+
+RUN apt-get update && apt-get install -y ca-certificates && rm -rf /var/lib/apt/lists/*
+RUN apt-get update && apt-get install -y dbus && dbus-uuidgen > /var/lib/dbus/machine-id
+
+# copy the build artifact from the build stage
+COPY --from=builder /$SERVICE_NAME/target/release/$SERVICE_NAME .
+
+# Create entrypoint.sh
+RUN echo '#!/bin/sh\n'\
+    # Set the Machine ID on Debian host
+    'export MACHINE_ID=$(cat /var/lib/dbus/machine-id)\n'\
+    './'$SERVICE_NAME > /entrypoint.sh && chmod +x /entrypoint.sh \
+    && chmod +x /entrypoint.sh
+
+# Use the script as the entrypoint
+ENTRYPOINT ["/bin/sh", "/entrypoint.sh"]

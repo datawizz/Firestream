@@ -14,7 +14,14 @@ helm repo add bitnami https://charts.bitnami.com/bitnami
 
 sleep 3
 
+### Open Telemetry + Signoz ###
+helm repo add signoz https://charts.signoz.io
+sleep 1
+helm --namespace default upgrade --install signoz signoz/signoz
 
+
+### Nessie ###
+helm repo add nessie https://charts.projectnessie.org
 
 ### Ingress ###
 
@@ -57,14 +64,18 @@ sleep 3
 ### PostgreSQL ###
 #  -f /workspace/charts/postgresql/values.yaml \
 
+postgresql_install() {
+  #  TODO use the high availability one
+  helm upgrade --install postgresql bitnami/postgresql \
+    --set global.postgresql.auth.username="$POSTGRES_USER" \
+    --set global.postgresql.auth.password="$POSTGRES_PASSWORD" \
+    --set global.postgresql.auth.database="$POSTGRES_DEFAULT_DB" \
+    --set global.postgresql.service.ports.postgresql="$POSTGRES_PORT"
+}
 
-#  TODO use the high availability one
-helm install postgresql bitnami/postgresql \
-  --set global.postgresql.auth.username="$POSTGRES_USER" \
-  --set global.postgresql.auth.password="$POSTGRES_PASSWORD" \
-  --set global.postgresql.auth.database="$POSTGRES_DEFAULT_DB" \
-  --set global.postgresql.service.ports.postgresql="$POSTGRES_PORT"
-  
+postgresql_install
+
+ 
 ## PGAdmin ##
 
 # cd /workspace/submodules/rowanruseler/helm-charts && \
@@ -78,36 +89,31 @@ helm install postgresql bitnami/postgresql \
 #   --set serverDefinitions.servers.firstServer.SSLMode="prefer" \
 #   --set serverDefinitions.servers.firstServer.MaintenanceDB=$POSTGRES_DEFAULT_DB
 
+project_nessie_install() {
 
+  # Check if secret already exists
+  if ! kubectl get secret postgres-creds > /dev/null 2>&1; then
+    temp_file=$(mktemp)
+    echo "postgres_username=${POSTGRES_USER}" > ${temp_file}
+    echo "postgres_password=${POSTGRES_PASSWORD}" >> ${temp_file}
+    kubectl create secret generic postgres-creds --from-env-file="${temp_file}"
+    rm ${temp_file}
+  fi
 
-### Project Nessie ###
+  # Check if helm release already exists
+  if ! helm list -q | grep -q nessie; then
+    helm install nessie nessie/nessie \
+      --set versionStoreType=TRANSACTIONAL \
+      --set postgres.jdbcUrl="$JDBC_CONNECTION_STRING" \
+      --set image.tag="$NESSIE_VERSION"
+  fi
+}
 
-# Create a kubernetes secret for the postgres-creds credentials
-# required (and best practice) for this helm chart
-
-# Make a new temporary file
-temp_file=$(mktemp)
-
-# Write the values of the environment variables to the temp file
-echo "postgres_username=${POSTGRES_USER}" > ${temp_file}
-echo "postgres_password=${POSTGRES_PASSWORD}" >> ${temp_file}
-cat ${temp_file}
-
-# Create the secret from the temp file
-kubectl create secret generic postgres-creds --from-env-file="${temp_file}"
-
-# Delete the temp file
-rm ${temp_file}
-
-cd /workspace/submodules/the-fireworks-company/nessie && \
-helm install nessie helm/nessie \
-  --set versionStoreType=TRANSACTIONAL \
-  --set postgres.jdbcUrl="$JDBC_CONNECTION_STRING" \
-  --set image.tag="$NESSIE_VERSION"
+project_nessie_install
 
 ### Spark Cluster ###
 # Enables: spark://spark-master:7077
-helm install spark bitnami/spark #-f /workspace/charts/fireworks/subcharts/spark_cluster/values.yaml
+# helm install spark bitnami/spark #-f /workspace/charts/fireworks/subcharts/spark_cluster/values.yaml
 
 # ### MongoDB ###
 # helm install mongodb bitnami/mongodb-sharded
@@ -115,7 +121,7 @@ helm install spark bitnami/spark #-f /workspace/charts/fireworks/subcharts/spark
 
 
 ### Minio ###
-helm install minio bitnami/minio -f /workspace/charts/fireworks/subcharts/minio/chart/values.yaml \
+helm upgrade --install minio bitnami/minio -f /workspace/k8s/charts/fireworks/subcharts/minio/chart/values.yaml \
   --set auth.rootUser="$S3_LOCAL_ACCESS_KEY_ID" \
   --set auth.rootPassword="$S3_LOCAL_SECRET_ACCESS_KEY" \
   --set defaultBuckets="$S3_LOCAL_BUCKET_NAME"
@@ -138,17 +144,17 @@ helm upgrade --install kafka bitnami/kafka --version 24.0.10  \
 
 
 ### Kyuubi ###
-cd /workspace/submodules/the-fireworks-company/kyuubi && \
-helm install kyuubi charts/kyuubi
+# cd /workspace/submodules/the-fireworks-company/kyuubi && \
+# helm install kyuubi charts/kyuubi
 
 
 # cd /workspace/submodules/the-fireworks-company/superset/helm/superset && helm dependency build
 
 ### Superset ###
-cd /workspace/submodules/the-fireworks-company/superset/helm/superset &&
-  helm dependency build && \
-  cd /workspace/submodules/the-fireworks-company/superset/helm && \
-  helm install superset superset
+# cd /workspace/submodules/the-fireworks-company/superset/helm/superset &&
+#   helm dependency build && \
+#   cd /workspace/submodules/the-fireworks-company/superset/helm && \
+#   helm install superset superset
 
 
 
@@ -160,9 +166,9 @@ cd /workspace/submodules/the-fireworks-company/superset/helm/superset &&
 # --set something.something="$OPENSEARCH_USERNAME" \
 # --set something.something="$OPENSEARCH_PASSWORD" \
 
-helm repo add opensearch https://opensearch-project.github.io/helm-charts/
-helm install opensearch-dashboard opensearch/opensearch-dashboards
-helm install opensearch opensearch/opensearch
+# helm repo add opensearch https://opensearch-project.github.io/helm-charts/
+# helm install opensearch-dashboard opensearch/opensearch-dashboards
+# helm install opensearch opensearch/opensearch
 
 # export CONTAINER_PORT=$(kubectl get pod --namespace default $POD_NAME -o jsonpath="{.spec.containers[0].ports[0].containerPort}")
 #   echo "Visit http://127.0.0.1:8080 to use your application"
@@ -170,7 +176,7 @@ helm install opensearch opensearch/opensearch
 
 ### Airflow ###
 # Enables: spark://spark-master:7077
-helm install airflow bitnami/airflow
+# helm install airflow bitnami/airflow
 
 
 
@@ -202,10 +208,10 @@ helm install airflow bitnami/airflow
 # helm install superset /workspace/submodules/apache/superset/helm/superset \
 #     --set configFromSecret=superset-secret-config-py
 
-export OPENSEARCH_HOST="opensearch-cluster-master.default.svc.cluster.local"
-export OPENSEARCH_PORT="9200"
-export OPENSEARCH_USERNAME='admin'
-export OPENSEARCH_PASSWORD='admin'
+# export OPENSEARCH_HOST="opensearch-cluster-master.default.svc.cluster.local"
+# export OPENSEARCH_PORT="9200"
+# export OPENSEARCH_USERNAME='admin'
+# export OPENSEARCH_PASSWORD='admin'
 
 
 # ### Jaeger All-in-One ###

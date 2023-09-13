@@ -1,7 +1,7 @@
 version: "3.7"
 
 services:
-  devcontainer:
+  fireworks_devcontainer:
     deploy:
       resources:
         reservations:
