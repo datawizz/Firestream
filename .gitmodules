@@ -1,35 +1,3 @@
-[submodule "submodules/quadratichq/quadratic"]
-	path = submodules/quadratichq/quadratic
-	url = https://github.com/datawizz/quadratic
-	shallow = true
-[submodule "submodules/projectnessie/nessie"]
-	path = submodules/projectnessie/nessie
-	url = https://github.com/projectnessie/nessie
-	shallow = true
-[submodule "submodules/apache/solr-operator"]
-	path = submodules/apache/solr-operator
-	url = https://github.com/apache/solr-operator
-	shallow = true
-[submodule "submodules/apache/superset"]
-	path = submodules/apache/superset
-	url = https://github.com/apache/superset
-	shallow = true
-[submodule "submodules/pravega/zookeeper-operator"]
-	path = submodules/pravega/zookeeper-operator
-	url = https://github.com/pravega/zookeeper-operator
-	shallow = true
-[submodule "submodules/apache/kyuubi"]
-	path = submodules/apache/kyuubi
-	url = https://github.com/apache/kyuubi
-	shallow = true
-[submodule "submodules/the-fireworks-company/milvus-operator"]
-	path = submodules/the-fireworks-company/milvus-operator
-	url = https://github.com/The-Fireworks-Company/milvus-operator
-	shallow = true
-[submodule "submodules/the-fireworks-company/milvus"]
-	path = submodules/the-fireworks-company/milvus
-	url = https://github.com/The-Fireworks-Company/milvus
-	shallow = true
 [submodule "submodules/the-fireworks-company/kyuubi"]
 	path = submodules/the-fireworks-company/kyuubi
 	url = https://github.com/The-Fireworks-Company/kyuubi
@@ -41,10 +9,6 @@
 [submodule "submodules/the-fireworks-company/superset"]
 	path = submodules/the-fireworks-company/superset
 	url = https://github.com/The-Fireworks-Company/superset
-	shallow = true
-[submodule "submodules/the-fireworks-company/Flowise"]
-	path = submodules/the-fireworks-company/Flowise
-	url = https://github.com/The-Fireworks-Company/Flowise
 	shallow = true
 [submodule "submodules/the-fireworks-company/nessie"]
 	path = submodules/the-fireworks-company/nessie
@@ -69,6 +33,16 @@
 [submodule "submodules/the-fireworks-company/supabase-kubernetes"]
 	path = submodules/the-fireworks-company/supabase-kubernetes
 	url = git@github.com:The-Fireworks-Company/supabase-kubernetes.git
+    shallow = true
 [submodule "submodules/the-fireworks-company/supabase"]
 	path = submodules/the-fireworks-company/supabase
 	url = git@github.com:The-Fireworks-Company/supabase.git
+    shallow = true
+[submodule "submodules/the-fireworks-company/quadratic"]
+	path = submodules/the-fireworks-company/quadratic
+	url = git@github.com:The-Fireworks-Company/quadratic.git
+    shallow = true
+[submodule "submodules/the-fireworks-company/scryer-prolog"]
+	path = submodules/the-fireworks-company/scryer-prolog
+	url = git@github.com:The-Fireworks-Company/scryer-prolog.git
+    shallow = true
