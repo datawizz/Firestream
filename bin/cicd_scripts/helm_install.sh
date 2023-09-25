@@ -14,14 +14,12 @@ helm repo add bitnami https://charts.bitnami.com/bitnami
 
 sleep 3
 
-### Open Telemetry + Signoz ###
-helm repo add signoz https://charts.signoz.io
-sleep 1
-helm --namespace default upgrade --install signoz signoz/signoz
 
 
-### Nessie ###
-helm repo add nessie https://charts.projectnessie.org
+
+# Build all services
+#sh /workspace/opt/cicd_scripts/build.sh
+
 
 ### Ingress ###
 
@@ -37,36 +35,17 @@ helm repo add nessie https://charts.projectnessie.org
 
 
 
-### Kafka ###
-#helm install kafka bitnami/kafka -f /workspace/k8/kafka/values.yaml
+
+
+
 
 
 
 ### PostgreSQL ###
-
-# PostgreSQL
-# cd /workspace/charts/postgresql && helm dependency build && \
-# helm install postgresql -f /workspace/charts/postgresql/values.yaml /workspace/charts/postgresql/
-
-# sh /workspace/src/services/persistence/postgresql/helm_install.sh
-# -f /workspace/charts/postgresql/values.yaml
-
-
-# Build all services
-#sh /workspace/opt/cicd_scripts/build.sh
-
-
-
-# Commands to test the cluster via psql terminal
-# export POSTGRES_PASSWORD=$(kubectl get secret --namespace default postgresql -o jsonpath="{.data.postgres-password}" | base64 -d) &&
-    # PGPASSWORD="$POSTGRES_PASSWORD" psql --host postgresql.default.svc.cluster.local -U postgres -d postgres -p 5432
-
-### PostgreSQL ###
-#  -f /workspace/charts/postgresql/values.yaml \
 
 postgresql_install() {
   #  TODO use the high availability one
-  helm upgrade --install postgresql bitnami/postgresql \
+  helm upgrade --install postgresql bitnami/postgresql --version 12.10.1 \
     --set global.postgresql.auth.username="$POSTGRES_USER" \
     --set global.postgresql.auth.password="$POSTGRES_PASSWORD" \
     --set global.postgresql.auth.database="$POSTGRES_DEFAULT_DB" \
@@ -74,6 +53,10 @@ postgresql_install() {
 }
 
 postgresql_install
+
+# Commands to test the cluster via psql terminal
+# export POSTGRES_PASSWORD=$(kubectl get secret --namespace default postgresql -o jsonpath="{.data.postgres-password}" | base64 -d) &&
+    # PGPASSWORD="$POSTGRES_PASSWORD" psql --host postgresql.default.svc.cluster.local -U postgres -d postgres -p 5432
 
  
 ## PGAdmin ##
@@ -89,7 +72,11 @@ postgresql_install
 #   --set serverDefinitions.servers.firstServer.SSLMode="prefer" \
 #   --set serverDefinitions.servers.firstServer.MaintenanceDB=$POSTGRES_DEFAULT_DB
 
+### Nessie ###
+
 project_nessie_install() {
+
+  helm repo add nessie https://charts.projectnessie.org
 
   # Check if secret already exists
   if ! kubectl get secret postgres-creds > /dev/null 2>&1; then
@@ -126,12 +113,6 @@ helm upgrade --install minio bitnami/minio -f /workspace/k8s/charts/fireworks/su
   --set auth.rootPassword="$S3_LOCAL_SECRET_ACCESS_KEY" \
   --set defaultBuckets="$S3_LOCAL_BUCKET_NAME"
 
-# ### Solr ###
-# helm install solr bitnami/solr -f /workspace/charts/solr/chart/values.yaml \
-#   --set auth.adminUsername="$SOLR_USERNAME" \
-#   --set auth.adminPassword="$SOLR_PASSWORD" \
-#   --set coreNames="$SOLR_DEFAULT_CORE"
-
 ### Kafka ###
 helm upgrade --install kafka bitnami/kafka --version 24.0.10  \
   --set controller.replicaCount=5 \
@@ -159,20 +140,14 @@ helm upgrade --install kafka bitnami/kafka --version 24.0.10  \
 
 
 ### Open Search ###
-# cd /workspace/submodules/the-fireworks-company/opensearch-project-helm-charts/charts && \
-# helm install opensearch opensearch
-# TODO the configuration of OpenSearch is not trival. 
+
 # The default username and password are admin/admin, which are used here implicitly.
-# --set something.something="$OPENSEARCH_USERNAME" \
-# --set something.something="$OPENSEARCH_PASSWORD" \
 
-# helm repo add opensearch https://opensearch-project.github.io/helm-charts/
-# helm install opensearch-dashboard opensearch/opensearch-dashboards
-# helm install opensearch opensearch/opensearch
+helm repo add opensearch https://opensearch-project.github.io/helm-charts/
+helm upgrade --install opensearch-dashboard opensearch/opensearch-dashboards --version $OPENSEARCH_DASHBOARD_VERSION
+helm upgrade --install opensearch opensearch/opensearch --version $OPENSEARCH_VERSION
 
-# export CONTAINER_PORT=$(kubectl get pod --namespace default $POD_NAME -o jsonpath="{.spec.containers[0].ports[0].containerPort}")
-#   echo "Visit http://127.0.0.1:8080 to use your application"
-#   kubectl --namespace default port-forward $POD_NAME 8085:$CONTAINER_PORT
+
 
 ### Airflow ###
 # Enables: spark://spark-master:7077
@@ -208,10 +183,15 @@ helm upgrade --install kafka bitnami/kafka --version 24.0.10  \
 # helm install superset /workspace/submodules/apache/superset/helm/superset \
 #     --set configFromSecret=superset-secret-config-py
 
-# export OPENSEARCH_HOST="opensearch-cluster-master.default.svc.cluster.local"
-# export OPENSEARCH_PORT="9200"
-# export OPENSEARCH_USERNAME='admin'
-# export OPENSEARCH_PASSWORD='admin'
+
+
+
+
+### Open Telemetry + Signoz ###
+helm repo add signoz https://charts.signoz.io
+sleep 1
+helm --namespace default upgrade --install signoz signoz/signoz
+
 
 
 # ### Jaeger All-in-One ###
@@ -240,12 +220,6 @@ helm upgrade --install kafka bitnami/kafka --version 24.0.10  \
 #   --set storage.elasticsearch.port=<PORT> \
 #   --set storage.elasticsearch.user=<USER> \
 #   --set storage.elasticsearch.password=<password>
-
-
-# ### Metabase ###
-# cd /workspace/charts/metabase/submodules/metabase-helm-chart && \
-#   helm install metabase . -f /workspace/charts/metabase/values.yaml \
-#   --set database.connectionURI="$METABASE_CONNECTION_URI"
 
 
 # ### Hive Metastore ###

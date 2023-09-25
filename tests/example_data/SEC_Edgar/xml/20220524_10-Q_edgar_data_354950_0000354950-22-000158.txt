@@ -1,0 +1,1295 @@
+<Header>
+<FileStats>
+    <FileName>20220524_10-Q_edgar_data_354950_0000354950-22-000158.txt</FileName>
+    <GrossFileSize>6205926</GrossFileSize>
+    <NetFileSize>147865</NetFileSize>
+    <NonText_DocumentType_Chars>3021943</NonText_DocumentType_Chars>
+    <HTML_Chars>1135221</HTML_Chars>
+    <XBRL_Chars>961674</XBRL_Chars>
+    <XML_Chars>875939</XML_Chars>
+    <N_Exhibits>13</N_Exhibits>
+</FileStats>
+<SEC-Header>
+0000354950-22-000158.hdr.sgml : 20220524
+<ACCEPTANCE-DATETIME>20220523175220
+ACCESSION NUMBER:		0000354950-22-000158
+CONFORMED SUBMISSION TYPE:	10-Q
+PUBLIC DOCUMENT COUNT:		58
+CONFORMED PERIOD OF REPORT:	20220501
+FILED AS OF DATE:		20220524
+DATE AS OF CHANGE:		20220523
+
+FILER:
+
+	COMPANY DATA:	
+		COMPANY CONFORMED NAME:			HOME DEPOT, INC.
+		CENTRAL INDEX KEY:			0000354950
+		STANDARD INDUSTRIAL CLASSIFICATION:	RETAIL-LUMBER & OTHER BUILDING MATERIALS DEALERS [5211]
+		IRS NUMBER:				953261426
+		STATE OF INCORPORATION:			DE
+		FISCAL YEAR END:			0129
+
+	FILING VALUES:
+		FORM TYPE:		10-Q
+		SEC ACT:		1934 Act
+		SEC FILE NUMBER:	001-08207
+		FILM NUMBER:		22953087
+
+	BUSINESS ADDRESS:	
+		STREET 1:		2455 PACES FERRY ROAD
+		CITY:			ATLANTA
+		STATE:			GA
+		ZIP:			30339-4024
+		BUSINESS PHONE:		770-433-8211
+
+	MAIL ADDRESS:	
+		STREET 1:		2455 PACES FERRY ROAD
+		CITY:			ATLANTA
+		STATE:			GA
+		ZIP:			30339-4024
+
+	FORMER COMPANY:	
+		FORMER CONFORMED NAME:	HOME DEPOT INC
+		DATE OF NAME CHANGE:	19920703
+
+</SEC-Header>
+</Header>
+
+ 0000354950-22-000158.txt : 20220524
+
+10-Q
+ 1
+ hd-20220501.htm
+ 10-Q
+
+hd-20220501 
+ 
+ Table of Contents 
+
+UNITED STATES 
+ SECURITIES AND EXCHANGE COMMISSION 
+ Washington, D.C. 20549 
+ FORM 
+ (Mark One) 
+ QUARTERLY REPORT PURSUANT TO SECTION 13 OR 15(d) OF THE SECURITIES EXCHANGE ACT OF 1934 
+ For the quarterly period ended 
+ or 
+ TRANSITION REPORT PURSUANT TO SECTION 13 OR 15(d) OF THE SECURITIES EXCHANGE ACT OF 1934 
+ For the transition period from to 
+ Commission File Number: 
+ 
+ THE 
+ (Exact name of registrant as specified in its charter) 
+ 
+ (State or other jurisdiction of incorporation or organization) (I.R.S. Employer Identification No.) 
+ (Address of principal executive offices) (Zip Code) 
+ ) 
+ (Registrant s telephone number, including area code) 
+ 
+ Not Applicable 
+ (Former name, former address and former fiscal year, if changed since last report) 
+ Securities registered pursuant to Section 12(b) of the Act: Title of each class Trading Symbol Name of each exchange on which registered 
+ Indicate by check mark whether the registrant (1) has filed all reports required to be filed by Section 13 or 15(d) of the Securities Exchange Act of 1934 during the preceding 12 months (or for such shorter period that the registrant was required to file such reports), and (2) has been subject to such filing requirements for the past 90 days. No 
+ Indicate by check mark whether the registrant has submitted electronically every Interactive Data File required to be submitted pursuant to Rule 405 of Regulation S-T 232.405 of this chapter) during the preceding 12 months (or for such shorter period that the registrant was required to submit such files). No 
+ Indicate by check mark whether the registrant is a large accelerated filer, an accelerated filer, a non-accelerated filer, a smaller reporting company, or an emerging growth company. See the definitions of large accelerated filer, accelerated filer, smaller reporting company, and emerging growth company in Rule 12b-2 of the Exchange Act. 
+ Accelerated filer Non-accelerated filer Smaller reporting company Emerging growth company 
+ If an emerging growth company, indicate by check mark if the registrant has elected not to use the extended transition period for complying with any new or revised financial accounting standards provided pursuant to Section 13(a) of the Exchange Act. 
+ Indicate by check mark whether the registrant is a shell company (as defined in Rule 12b-2 of the Exchange Act). Yes No 
+ Indicate the number of shares outstanding of each of the issuer s classes of common stock, as of the latest practicable date. 
+ shares of common stock, 0.05 par value, outstanding as of May 17, 2022 
+
+TABLE OF CONTENTS 
+ Commonly Used or Defined Terms 
+ ii 
+ Forward-Looking Statements 
+ iii 
+ PART I FINANCIAL INFORMATION 
+ 1 
+ Item 1. Financial Statements. 
+ 1 
+ Consolidated Balance Sheets 
+ 1 
+ Consolidated Statements of Earnings 
+ 2 
+ Consolidated Statements of Comprehensive Income 
+ 3 
+ Consolidated Statements of Stockholders' Equity 
+ 4 
+ Consolidated Statements of Cash Flows 
+ 5 
+ Notes to Consolidated Financial Statements 
+ 6 
+ Note 1. Summary of Significant Accounting Policies 
+ 6 
+ Note 2. Net Sales 
+ 6 
+ Note 3. Property and Leases 
+ 7 
+ N ote 4. Debt and Derivative Instruments 
+ 8 
+ Note 5. Stockholders' Equity 
+ 9 
+ Note 6. Fair Value Measurements 
+ 10 
+ Note 7. Weighted Average Common Shares 
+ 11 
+ Note 8. Contingencies 
+ 11 
+ Report of Independent Registered Public Accounting Firm 
+ 12 
+ Item 2. Management's Discussion and Analysis of Financial Condition and Results of Operations. 
+ 13 
+ Item 3. Quantitative and Qualitative Disclosures About Market Risk. 
+ 18 
+ Item 4. Controls and Procedures. 
+ 18 
+ PART II OTHER INFORMATION 
+ 18 
+ Item 1A. Risk Factors. 
+ 18 
+ Item 2. Unregistered Sales of Equity Securities and Use of Proceeds. 
+ 18 
+ Item 6. Exhibits. 
+ 19 
+ SIGNATURES 
+ 20 
+
+i 
+
+Table of Contents 
+
+ COMMONLY USED OR DEFINED TERMS 
+ Term Definition Comparable sales As defined in the Results of Operations section of MD A 
+ Exchange Act Securities Exchange Act of 1934, as amended fiscal 2021 Fiscal year ended January 30, 2022 fiscal 2022 Fiscal year ending January 29, 2023 GAAP U.S. generally accepted accounting principles MD A Management's Discussion and Analysis of Financial Condition and Results of Operations NOPAT Net operating profit after tax Restoration Plan Home Depot FutureBuilder Restoration Plan ROIC Return on invested capital SEC Securities and Exchange Commission Securities Act Securities Act of 1933, as amended SG A Selling, general and administrative 2021 Form 10-K 
+ Annual Report on Form 10-K for fiscal 2021 as filed with the SEC on March 23, 2022 
+ 
+ ii 
+
+Table of Contents 
+
+ FORWARD-LOOKING STATEMENTS 
+ Certain statements contained herein, as well as in other filings we make with the SEC and other written and oral information we release, regarding our performance or other events or developments in the future constitute forward-looking statements as defined in the Private Securities Litigation Reform Act of 1995. Forward-looking statements may relate to, among other things, the impact of the COVID-19 pandemic and the related recovery on our business, results of operations, cash flows and financial condition (which, among other things, may affect many of the items listed below); the demand for our products and services; net sales growth; comparable sales; the effects of competition; our brand and reputation; implementation of store, interconnected retail, supply chain and technology initiatives; inventory and in-stock positions; the state of the economy; the state of the housing and home improvement markets; the state of the credit markets, including mortgages, home equity loans, and consumer credit; impact of tariffs; issues related to the payment methods we accept; demand for credit offerings; management of relationships with our associates, potential associates, suppliers and service providers; cost and availability of labor; costs of fuel and other energy sources; international trade disputes, natural disasters, climate change, public health issues (including pandemics and quarantines, related shut-downs and other governmental orders, and similar restrictions, as well as subsequent re-openings), cybersecurity events, military conflicts or acts of war, and other business interruptions that could disrupt operation of our stores, distribution centers and other facilities, our ability to operate or access communications, financial or banking systems, or supply or delivery of, or demand for, the Company s products or services; our ability to meet environmental, social and governance (ESG) goals; continuation or suspension of share repurchases; net earnings performance; earnings per share; dividend targets; capital allocation and expenditures; liquidity; return on invested capital; expense leverage; stock-based compensation expense; commodity or other price inflation and deflation; our ability to issue debt on terms and at rates acceptable to us; the impact and expected outcome of investigations, inquiries, claims, and litigation, including compliance with related settlements; the effect of accounting charges; the effect of adopting certain accounting standards; the impact of regulatory changes, including changes to tax laws and regulations; store openings and closures; financial outlook; and the impact of acquired companies on our organization and the ability to recognize the anticipated benefits of those acquisitions. 
+ Forward-looking statements are based on currently available information and our current assumptions, expectations and projections about future events. You should not rely on our forward-looking statements. These statements are not guarantees of future performance and are subject to future events, risks and uncertainties many of which are beyond our control, dependent on the actions of third parties, or currently unknown to us as well as potentially inaccurate assumptions that could cause actual results to differ materially from our historical experience and our expectations and projections. These risks and uncertainties include, but are not limited to, those described in Part II, Item 1A, Risk Factors and elsewhere in this report and also as may be described from time to time in future reports we file with the SEC. You should read such information in conjunction with our consolidated financial statements and related notes and Management s Discussion and Analysis of Financial Condition and Results of Operations in this report. There also may be other factors that we cannot anticipate or that are not described herein, generally because we do not currently perceive them to be material. Such factors could cause results to differ materially from our expectations. Forward-looking statements speak only as of the date they are made, and we do not undertake to update these statements other than as required by law. You are advised, however, to review any further disclosures we make on related subjects in our filings with the SEC and in our other public statements. 
+ 
+ iii 
+
+Table of Contents 
+
+ PART I FINANCIAL INFORMATION 
+ 
+ Item 1. Financial Statements. 
+ 
+ THE HOME DEPOT, INC. 
+ CONSOLIDATED BALANCE SHEETS 
+ (Unaudited) 
+ in millions, except per share data May 1, 2022 January 30, 2022 Assets Current assets: Cash and cash equivalents Receivables, net Merchandise inventories Other current assets Total current assets Net property and equipment 
+ Operating lease right-of-use assets Goodwill Other assets Total assets Liabilities and Stockholders' Equity Current liabilities: Short-term debt Accounts payable Accrued salaries and related expenses Sales taxes payable Deferred revenue Current installments of long-term debt Current operating lease liabilities Other accrued expenses Total current liabilities Long-term debt, excluding current installments Long-term operating lease liabilities Other long-term liabilities Total liabilities Common stock, par value ; authorized: shares; issued: shares at May 1, 2022 and shares at January 30, 2022; outstanding: shares at May 1, 2022 and shares at January 30, 2022 
+ Paid-in capital Retained earnings Accumulated other comprehensive loss ) ) Treasury stock, at cost, shares at May 1, 2022 and shares at January 30, 2022 
+ ) ) Total stockholders (deficit) equity ) ) Total liabilities and stockholders equity 
+ 
+ See accompanying notes to consolidated financial statements. 
+ 1 
+
+Table of Contents 
+
+ THE HOME DEPOT, INC. 
+ CONSOLIDATED STATEMENTS OF EARNINGS 
+ (Unaudited) 
+ Three Months Ended in millions, except per share data May 1, 2022 May 2, 2021 Net sales Cost of sales Gross profit Operating expenses: Selling, general and administrative Depreciation and amortization Total operating expenses Operating income Interest and other (income) expense: Interest income and other, net ) ) Interest expense Interest and other, net Earnings before provision for income taxes Provision for income taxes Net earnings Basic weighted average common shares Basic earnings per share Diluted weighted average common shares Diluted earnings per share 
+ See accompanying notes to consolidated financial statements. 
+ 
+ 2 
+
+Table of Contents 
+
+ THE HOME DEPOT, INC. 
+ CONSOLIDATED STATEMENTS OF COMPREHENSIVE INCOME 
+ (Unaudited) 
+ Three Months Ended in millions May 1, 2022 May 2, 2021 Net earnings Other comprehensive income (loss), net of tax: Foreign currency translation adjustments Cash flow hedges Other Total other comprehensive income (loss), net of tax Comprehensive income 
+ See accompanying notes to consolidated financial statements. 
+ 
+ 3 
+
+Table of Contents 
+
+ THE HOME DEPOT, INC. 
+ CONSOLIDATED STATEMENTS OF STOCKHOLDERS' EQUITY 
+ (Unaudited) 
+ Three Months Ended in millions May 1, 2022 May 2, 2021 Common Stock: Balance at beginning of period Shares issued under employee stock plans Balance at end of period Paid-in Capital: Balance at beginning of period Shares issued under employee stock plans ) ) Stock-based compensation expense Balance at end of period Retained Earnings: Balance at beginning of period Net earnings Cash dividends 
+ ) ) Balance at end of period Accumulated Other Comprehensive Income (Loss): Balance at beginning of period ) ) Foreign currency translation adjustments, net of tax Cash flow hedges, net of tax Other, net of tax Balance at end of period ) ) Treasury Stock: Balance at beginning of period ) ) Repurchases of common stock ) ) Balance at end of period ) ) Total stockholders' (deficit) equity ) 
+ See accompanying notes to consolidated financial statements. 
+
+4 
+
+Table of Contents 
+
+ THE HOME DEPOT, INC. 
+ CONSOLIDATED STATEMENTS OF CASH FLOWS 
+ (Unaudited) 
+ Three Months Ended in millions May 1, 2022 May 2, 2021 Cash Flows from Operating Activities: Net earnings Reconciliation of net earnings to net cash provided by operating activities: Depreciation and amortization Stock-based compensation expense Changes in receivables, net ) ) Changes in merchandise inventories ) ) Changes in other current assets ) ) Changes in accounts payable and accrued expenses Changes in deferred revenue Changes in income taxes payable Changes in deferred income taxes ) ) Other operating activities Net cash provided by operating activities Cash Flows from Investing Activities: Capital expenditures 
+ ) ) Other investing activities ) Net cash used in investing activities ) ) Cash Flows from Financing Activities: Repayments of short-term debt, net ) Proceeds from long-term debt, net of discounts Repayments of long-term debt ) ) Repurchases of common stock ) ) Proceeds from sales of common stock Cash dividends 
+ ) ) Other financing activities ) ) Net cash used in financing activities ) ) Change in cash and cash equivalents ) Effect of exchange rate changes on cash and cash equivalents ) Cash and cash equivalents at beginning of period Cash and cash equivalents at end of period Supplemental Disclosures: Cash paid for interest, net of interest capitalized Cash paid for income taxes 
+ See accompanying notes to consolidated financial statements. 
+ 5 
+
+Table of Contents 
+
+ THE HOME DEPOT, INC. 
+ NOTES TO CONSOLIDATED FINANCIAL STATEMENTS 
+ (Unaudited) 
+
+1. 
+ operating segments, which we aggregate into reportable segment due to their similar operating and financial characteristics. 
+ There were no significant changes to our significant accounting policies as disclosed in the 2021 Form 10-K. 
+ 
+ 2. 
+ Net sales outside the U.S. 
+ Net sales 
+ 
+ Net sales services Net sales 
+ 
+ 6 
+
+Table of Contents 
+
+ D cor Hardlines Net sales 
+ Deferred Revenue 
+ For products and services sold in stores or online, payment is typically due at the point of sale. When we receive payment from customers before the customer has taken possession of the merchandise or the service has been performed, the amount received is recorded as deferred revenue until the sale or service is complete. Such performance obligations are part of contracts with expected original durations of typically three months or less. As of May 1, 2022 and January 30, 2022, deferred revenue for products and services was billion and billion, respectively. 
+ We further record deferred revenue for the sale of gift cards and recognize the associated revenue upon the redemption of those gift cards, which generally occurs within of gift card issuance. As of May 1, 2022 and January 30, 2022, our performance obligations for unredeemed gift cards were million and billion, respectively. Gift card breakage income, which is our estimate of the portion of our gift card balance not expected to be redeemed, was immaterial during the three months ended May 1, 2022 and May 2, 2021. 
+ 
+ 3. 
+ billion as of May 1, 2022 and billion as of January 30, 2022. 
+ Leases 
+ Finance lease assets (1) 
+ Net property and equipment 
+ Total lease assets Liabilities: Current: Operating lease liabilities Current operating lease liabilities Finance lease liabilities Current installments of long-term debt Long-term: Operating lease liabilities Long-term operating lease liabilities Finance lease liabilities Long-term debt, excluding current installments Total lease liabilities 
+ 
+ billion as of May 1, 2022 and billion as of January 30, 2022. 
+ 7 
+
+Table of Contents 
+
+ Lease assets obtained in exchange for new finance lease liabilities 
+ 
+ 4. 
+ billion. All of our short-term borrowings in the first three months of fiscal 2022 were under these commercial paper programs, and the maximum amount outstanding at any time was billion. In connection with these programs, we have back-up credit facilities with a consortium of banks for borrowings of up to billion, which consist of a billion credit facility scheduled to expire in December 2023 and a -day billion credit facility scheduled to expire in December 2022. At May 1, 2022, there were outstanding borrowings under our commercial paper programs, and at January 30, 2022, we had billion of outstanding borrowings under our commercial paper programs. 
+ Long-Term Debt 
+ March 2022 Issuance. In March 2022, we issued tranches of senior notes. 
+ The first tranche consisted of million of senior notes due April 15, 2025 (the 2025 notes at a discount of million. Interest on the 2025 notes is due semi-annually on April 15 and October 15 of each year, beginning October 15, 2022. 
+ The second tranche consisted of million of senior notes due April 15, 2027 (the 2027 notes at a discount of million. Interest on the 2027 notes is due semi-annually on April 15 and October 15 of each year, beginning October 15, 2022. 
+ The third tranche consisted of billion of senior notes due April 15, 2032 (the 2032 notes at a discount of million. Interest on the 2032 notes is due semi-annually on April 15 and October 15 of each year, beginning October 15, 2022. 
+ The fourth tranche consisted of billion of senior notes due April 15, 2052 (the 2052 notes at a discount of million (together with the 2025 notes, the 2027 notes, and the 2032 notes, the March 2022 issuance ). Interest on the 2052 notes is due semi-annually on April 15 and October 15 of each year, beginning October 15, 2022. 
+ Issuance costs for the March 2022 issuance totaled million. 
+ The 2025 notes, 2027 notes, 2032 notes, and 2052 notes may be redeemed by us at any time, in whole or in part, at the redemption price plus accrued interest up to the redemption date. Prior to the Par Call Date, as defined in the notes, the redemption price is equal to the greater of (1) of the principal amount of the notes to be redeemed or (2) the sum of the present values of the remaining scheduled payments of principal and interest to the Par Call Date. On or after the Par Call Date, the redemption price is equal to of the principal amount of the notes. Additionally, if a Change in Control Triggering Event occurs, as defined in the notes, holders of all such notes have the right to require us to redeem those notes at of the aggregate principal amount of the notes plus accrued interest up to the redemption date. 
+ The indenture governing the notes does not generally limit our ability to incur additional indebtedness or require us to maintain financial ratios or specified levels of net worth or liquidity. The indenture governing the notes contains various customary covenants; however, none are expected to impact our liquidity or capital resources. 
+ Repayments . In March 2022, we repaid our million senior notes and million floating rate senior notes at maturity. In May 2022, subsequent to the end of our first fiscal quarter, we fully repaid our billion senior notes, which had a maturity date of June 2022, at the Par Call Date for the notes. 
+ 8 
+
+Table of Contents 
+
+ billion at both May 1, 2022 and January 30, 2022. These agreements are accounted for as fair value hedges that swap fixed for variable rate interest to hedge changes in the fair values of certain senior notes. At May 1, 2022, the fair values of these agreements totaled million, with million recognized in other long-term liabilities and million recognized in other assets on the consolidated balance sheet. At January 30, 2022, the fair values of these agreements totaled million, with million recognized in other long-term liabilities and million recognized in other assets on the consolidated balance sheet. 
+ All of our interest rate swap agreements designated as fair value hedges meet the shortcut method requirements under GAAP. Accordingly, the changes in the fair values of these agreements offset the changes in the fair value of the hedged long-term debt. 
+ There were no material changes to the other hedging arrangements disclosed in our 2021 Form 10-K, and all related activity was immaterial for the periods presented within this document. 
+ Collateral . We generally enter into master netting arrangements, which are designed to reduce credit risk by permitting net settlement of transactions with the same counterparty. To further limit our credit risk, we enter into collateral security arrangements that provide for collateral to be received or posted when the net fair value of certain derivative instruments exceeds or falls below contractually established thresholds. The cash collateral posted by the Company related to derivative instruments under our collateral security arrangements was million as of May 1, 2022, which was recorded in other current assets on the consolidated balance sheet. We did not hold any cash collateral as of May 1, 2022, and cash collateral both held and posted was immaterial as of January 30, 2022. 
+ 
+ 5. 
+ Shares issued under employee stock plans Balance at end of period Treasury stock: Balance at beginning of period ) ) Repurchases of common stock ) ) Balance at end of period ) ) Shares outstanding at end of period Cash dividends per share 
+ 
+ 9 
+
+Table of Contents 
+
+ billion share repurchase authorization that replaced the previous authorization. This new authorization does not have a prescribed expiration date. As of May 1, 2022, approximately billion of the billion share repurchase authorization remained available. 
+ Total cost of shares repurchased 
+
+6. 
+ Derivative agreements liabilities ) ) Total ) ) 
+ The fair values of our derivative instruments are determined using an income approach and Level 2 inputs, which include the respective interest rate or foreign currency forward curves and discount rates. Our derivative instruments are discussed further in Note 4 . 
+ Assets and Liabilities Measured at Fair Value on a Nonrecurring Basis 
+ Long-lived assets, goodwill, and other intangible assets are subject to nonrecurring fair value measurement for the assessment of impairment. We did not have any material assets or liabilities that were measured at fair value on a nonrecurring basis during the three months ended May 1, 2022 or May 2, 2021. 
+ Other Fair Value Disclosures 
+ The carrying amounts of cash and cash equivalents, receivables, accounts payable, and short-term debt approximate fair value due to their short-term nature. 
+ 
+ 10 
+
+Table of Contents 
+
+ 7. 
+ Effect of potentially dilutive securities (1) 
+ Diluted weighted average common shares Anti-dilutive securities excluded from diluted weighted average common shares 
+ 
+ (1) Represents the dilutive impact of stock-based awards. 
+ 
+ 8. 
+ 
+ 11 
+
+Table of Contents 
+
+ REPORT OF INDEPENDENT REGISTERED PUBLIC ACCOUNTING FIRM 
+ To the Stockholders and Board of Directors 
+ The Home Depot, Inc.: 
+ Results of Review of Interim Financial Information 
+ We have reviewed the consolidated balance sheet of The Home Depot, Inc. and its subsidiaries (the Company as of May 1, 2022, the related consolidated statements of earnings, comprehensive income, stockholders equity, and cash flows for the three-month periods ended May 1, 2022 and May 2, 2021, and the related notes (collectively, the consolidated interim financial information ). Based on our reviews, we are not aware of any material modifications that should be made to the consolidated interim financial information for it to be in conformity with U.S. generally accepted accounting principles. 
+ We have previously audited, in accordance with the standards of the Public Company Accounting Oversight Board (United States) PCAOB ), the consolidated balance sheet of the Company as of January 30, 2022, and the related consolidated statements of earnings, comprehensive income, stockholders equity, and cash flows for the fiscal year then ended (not presented herein); and in our report dated March 23, 2022, we expressed an unqualified opinion on those consolidated financial statements. In our opinion, the information set forth in the accompanying consolidated balance sheet as of January 30, 2022, is fairly stated, in all material respects, in relation to the consolidated balance sheet from which it has been derived. 
+ Basis for Review Results 
+ This consolidated interim financial information is the responsibility of the Company s management. We are a public accounting firm registered with the PCAOB and are required to be independent with respect to the Company in accordance with the U.S. federal securities laws and the applicable rules and regulations of the Securities and Exchange Commission and the PCAOB. 
+ We conducted our reviews in accordance with the standards of the PCAOB. A review of consolidated interim financial information consists principally of applying analytical procedures and making inquiries of persons responsible for financial and accounting matters. It is substantially less in scope than an audit conducted in accordance with the standards of the PCAOB, the objective of which is the expression of an opinion regarding the financial statements taken as a whole. Accordingly, we do not express such an opinion. 
+ 
+ /s/ KPMG LLP 
+ Atlanta, Georgia 
+ May 23, 2022 
+ 12 
+
+Table of Contents 
+
+ Item 2. Management's Discussion and Analysis of Financial Condition and Results of Operations. 
+ The following discussion provides an analysis of the Company s financial condition and results of operations from management's perspective and should be read in conjunction with the consolidated financial statements and related notes included in this report and in the 2021 Form 10-K and with our MD A included in the 2021 Form 10-K. Our MD A includes the following sections: 
+ Executive Summary 
+ Results of Operations 
+ Liquidity and Capital Resources 
+ Critical Accounting Policies 
+ 
+ Executive Summary 
+ The following table presents quarter-to-date highlights of our financial performance: 
+ dollars in millions, except per share data Three Months Ended May 1, 2022 May 2, 2021 Net sales 38,908 37,500 Net earnings 4,231 4,145 Diluted earnings per share 4.09 3.86 Net cash provided by operating activities 3,789 6,310 Proceeds from long-term debt, net of discounts 
+ 3,957 Repayments of long-term debt 1,054 1,390 Repurchases of common stock 2,308 3,788 
+ We reported net sales of 38.9 billion in the first quarter of fiscal 2022. Net earnings were 4.2 billion, or 4.09 per diluted share. 
+ We lost one store in the U.S. during the first quarter of fiscal 2022 due to a fire, resulting in a total store count of 2,316 at May 1, 2022. A total of 311 stores, or 13.4 , were located in Canada and Mexico. For the first quarter of fiscal 2022, sales per retail square foot were 621.99. Our inventory turnover ratio was 4.4 times at the end of the first quarter of fiscal 2022, compared to 5.5 times at the end of the first quarter of fiscal 2021. The decrease in our inventory turnover ratio was primarily driven by an increase in average inventory levels during the first quarter of fiscal 2022, which primarily resulted from the strong demand environment, the impact of inflation, and the delayed start to spring. 
+ We generated 3.8 billion of cash flow from operations and issued 4.0 billion of long-term debt, net of discounts, during the first three months of fiscal 2022. This cash flow, together with cash on hand, was used to fund cash payments of 2.3 billion for share repurchases, repay an aggregate of 2.1 billion of long-term and short-term debt, pay 2.0 billion of dividends, and fund 704 million in capital expenditures. In February 2022, we announced a 15 increase in our quarterly cash dividend to 1.90 per share. 
+ Our ROIC for the trailing twelve-month period was 45.3 at the end of the first quarter of fiscal 2022 and 45.1 at the end of the first quarter of fiscal 2021. See the Non-GAAP Financial Measures section below for our definition and calculation of ROIC, as well as a reconciliation of NOPAT, a non-GAAP financial measure, to net earnings (the most comparable GAAP financial measure). 
+ 13 
+
+Table of Contents 
+
+ Results of Operations 
+ The following table presents the percentage relationship between net sales and major categories in our consolidated statements of earnings. 
+ Fiscal 2022 and Fiscal 2021 Three Month Comparisons 
+ Three Months Ended May 1, 2022 May 2, 2021 dollars in millions of Net Sales of Net Sales Net sales 38,908 37,500 Gross profit 13,145 33.8 12,742 34.0 Operating expenses: Selling, general and administrative 6,610 17.0 6,374 17.0 Depreciation and amortization 606 1.6 587 1.6 Total operating expenses 7,216 18.5 6,961 18.6 Operating income 5,929 15.2 5,781 15.4 Interest and other (income) expense: Interest income and other, net (3) (6) Interest expense 372 1.0 339 0.9 Interest and other, net 369 0.9 333 0.9 Earnings before provision for income taxes 5,560 14.3 5,448 14.5 Provision for income taxes 1,329 3.4 1,303 3.5 Net earnings 4,231 10.9 4,145 11.1 
+ 
+ Note: Certain percentages may not sum to totals due to rounding. 
+ Three Months Ended Selected financial and sales data: May 1, 2022 May 2, 2021 Change Comparable sales change) 
+ 2.2 31.0 N/A Comparable customer transactions change) (1) 
+ (8.4) 19.1 N/A Comparable average ticket change) (1) 
+ 11.2 10.3 N/A Customer transactions (in millions) (1) 
+ 410.7 447.2 (8.2) Average ticket (1) (2) 
+ 91.72 82.37 11.4 Sales per retail square foot (1) (3) 
+ 621.99 605.60 2.7 Diluted earnings per share 
+ 4.09 3.86 6.0 
+ 
+ (1) Does not include results for HD Supply. 
+ (2) Average ticket represents the average price paid per transaction and is used by management to monitor the performance of the Company, as it represents a primary driver in measuring sales performance. 
+ (3) Sales per retail square foot represents annualized sales divided by retail store square footage. Sales per retail square foot is a measure of the efficiency of sales based on the total square footage of our stores and is used by management to monitor the performance of the Company s retail operations as an indicator of the productivity of owned and leased square footage for these retail operations. 
+ 
+ 14 
+
+Table of Contents 
+
+ Sales. We assess our sales performance by evaluating both net sales and comparable sales. 
+ Net Sales . Net sales for the first quarter of fiscal 2022 increased 1.4 billion, or 3.8 , to 38.9 billion from 37.5 billion for the first quarter of fiscal 2021. The increase in net sales for the first quarter of fiscal 2022 primarily reflected the impact of positive comparable sales driven by an increase in comparable average ticket, offset by a decrease in comparable customer transactions. A stronger U.S. dollar negatively impacted net sales by 23 million in the first quarter of fiscal 2022. 
+ Online sales, which consist of sales generated online through our websites for products picked up at our stores or delivered to customer locations, represented 14.3 of net sales and grew by 3.7 during the first quarter of fiscal 2022 compared to the first quarter of fiscal 2021. The increase in online sales for the first quarter of fiscal 2022 was driven by customers continuing to leverage our digital platforms for their shopping needs. 
+ Comparable Sales . Comparable sales is a measure that highlights the performance of our existing locations and websites by measuring the change in net sales for a period over the comparable prior-period of equivalent length. Comparable sales includes sales at all locations, physical and online, open greater than 52 weeks (including remodels and relocations) and excludes closed stores. Retail stores become comparable on the Monday following their 52 nd week of operation. Acquisitions are typically included in comparable sales after they have been owned for more than 52 weeks. Comparable sales is intended only as supplemental information and is not a substitute for net sales presented in accordance with GAAP. 
+ Total comparable sales increased 2.2 for the first quarter of fiscal 2022, reflecting an 11.2 increase in comparable average ticket, partially offset by an 8.4 decrease in comparable customer transactions compared to the first quarter of fiscal 2021. The increase in comparable average ticket was primarily driven by inflation, as well as demand for new and innovative products. The decrease in comparable customer transactions was primarily due to lapping comparable transactions of 19.1 that we experienced in the first quarter of fiscal 2021 and the impact of the delayed start to spring in fiscal 2022. 
+ During the first quarter of fiscal 2022, 11 of our 14 merchandising departments posted positive comparable sales, led by Plumbing, Building Materials, Millwork, and Paint. Our Outdoor and Indoor Garden departments had double-digit negative comparable sales due to the late arrival of spring this year, and our Appliances department had slightly negative comparable sales, which were impacted by a shift in event timing into the second quarter of fiscal 2022. 
+ Gross Profit. Gross profit for the first quarter of fiscal 2022 increased 3.2 to 13.1 billion from 12.7 billion for the first quarter of fiscal 2021. Gross profit as a percentage of net sales, or gross profit margin, was 33.8 for the first quarter of fiscal 2022 compared to 34.0 for the first quarter of fiscal 2021. The decrease in gross profit margin during the first quarter of fiscal 2022 was primarily driven by investments in our supply chain network, rate and mix pressure from lumber, and higher product and transportation costs offset by the benefit from higher retail prices. 
+ Operating Expenses. Our operating expenses are composed of SG A and depreciation and amortization. 
+ Selling, General Administrative . SG A for the first quarter of fiscal 2022 increased 236 million, or 3.7 , to 6.6 billion from 6.4 billion for the first quarter of fiscal 2021. As a percentage of net sales, SG A was 17.0 for the first quarter of both fiscal 2022 and fiscal 2021, primarily reflecting leverage from a positive comparable sales environment, offset by wage investments for hourly associates as well as increased operational costs, including investments designed to drive efficiencies in our stores. 
+ Depreciation and Amortization . Depreciation and amortization for the first quarter of fiscal 2022 increased 19 million, or 3.2 , to 606 million from 587 million for the first quarter of fiscal 2021. As a percentage of net sales, depreciation and amortization was 1.6 for the first quarter of both fiscal 2022 and fiscal 2021, primarily reflecting leverage from a positive comparable sales environment, offset by increased depreciation expense from strategic investments in the business. 
+ Interest and Other, net. Interest and other, net, was 369 million for the first quarter of fiscal 2022 compared to 333 million for the first quarter of fiscal 2021. Interest and other, net, as a percentage of net sales was 0.9 for the first quarter of both fiscal 2022 and fiscal 2021, primarily reflecting higher interest expense due to higher debt balances during the first quarter of fiscal 2022, offset by leverage from a positive comparable sales environment. 
+ Provision for Income Taxes. Our combined effective income tax rate was 23.9 for the first quarter of both fiscal 2022 and fiscal 2021. 
+ Diluted Earnings per Share. Diluted earnings per share were 4.09 for the first quarter of fiscal 2022 compared to 3.86 for the first quarter of fiscal 2021. The increase in diluted earnings per share was driven by lower diluted shares due to share repurchases, as well as higher net earnings during the first quarter of fiscal 2022. 
+ 15 
+
+Table of Contents 
+
+ Non-GAAP Financial Measures 
+ To provide clarity about our operating performance, we supplement our reporting with certain non-GAAP financial measures. However, this supplemental information should not be considered in isolation or as a substitute for the related GAAP measures. Non-GAAP financial measures presented herein may differ from similar measures used by other companies. 
+ Return on Invested Capital. We believe ROIC is meaningful for investors and management because it measures how effectively we deploy our capital base. We define ROIC as NOPAT, a non-GAAP financial measure, for the most recent twelve-month period, divided by average debt and equity. We define average debt and equity as the average of beginning and ending long-term debt (including current installments) and equity for the most recent twelve-month period. 
+ The following table presents the calculation of ROIC, together with a reconciliation of NOPAT to net earnings (the most comparable GAAP measure): 
+ Twelve Months Ended dollars in millions May 1, 2022 May 2, 2021 Net earnings 16,519 14,766 Interest and other, net 1,339 1,326 Provision for income taxes 5,330 4,691 Operating income 23,188 20,783 Income tax adjustment (1) 
+ (5,628) (5,012) NOPAT 17,560 15,771 Average debt and equity 38,761 34,970 ROIC 45.3 45.1 
+ 
+ (1) Income tax adjustment is defined as operating income multiplied by our effective tax rate for the trailing twelve months. 
+ 
+ Liquidity and Capital Resources 
+ At May 1, 2022, we had 2.8 billion in cash and cash equivalents, of which 604 million was held by our foreign subsidiaries. We believe that our current cash position, cash flow generated from operations, funds available from our commercial paper programs, and access to the long-term debt capital markets should be sufficient not only for our operating requirements but also to enable us to invest in the business through capital expenditures, fund dividend payments, fund any share repurchases, make any required debt payments, and satisfy other contractual obligations through the next several fiscal years. In addition, we believe that we have the ability to obtain alternative sources of financing, if necessary. 
+ Our material cash requirements include contractual and other obligations arising in the normal course of business. These obligations primarily include long-term debt and related interest payments, operating and finance lease obligations, and purchase obligations. 
+ In addition to our cash requirements, we follow a disciplined approach to capital allocation. This approach first prioritizes investing in the business followed by paying dividends, with the intent of then returning excess cash to shareholders in the form of share repurchases. For fiscal 2022, we plan to invest approximately 3 billion back into the business in the form of capital expenditures, in line with our expectation of approximately two percent of net sales on an annual basis. However, we may adjust our capital expenditures to support the operations of the business, to enhance long-term strategic positioning, or in response to the economic environment, as necessary or appropriate. 
+ During the first three months of fiscal 2022, we paid cash dividends of 2.0 billion to shareholders. In February 2022, we also announced a 15 increase in our quarterly cash dividend from 1.65 to 1.90 per share. We intend to pay a dividend in the future; however, any future dividend is subject to declaration by our Board of Directors based on our earnings, capital requirements, financial condition, and other factors considered relevant by our Board of Directors. 
+ 16 
+
+Table of Contents 
+
+ In May 2021, our Board of Directors approved a 20.0 billion share repurchase authorization, of which 7.4 billion remained available as of May 1, 2022. This new authorization replaced the previous authorization and does not have a prescribed expiration date. During the first three months of fiscal 2022, we had cash payments of 2.3 billion for repurchases of our common stock through open market purchases. The amount and continuation of our share repurchases will be influenced by the evolving economic environment and business conditions. 
+ Debt 
+ We have commercial paper programs that allow for borrowings up to 3.0 billion. In connection with these programs, we have back-up credit facilities with a consortium of banks for borrowings up to 3.0 billion, which consist of a five-year 2.0 billion credit facility scheduled to expire in December 2023 and a 364-day 1.0 billion credit facility scheduled to expire in December 2022. At May 1, 2022, there were no outstanding borrowings under our commercial paper programs, and we were in compliance with all of the covenants contained in our credit facilities, none of which are expected to impact our liquidity or capital resources. 
+ We also issue senior notes from time to time as part of our capital management strategy. In March 2022, we issued 4.0 billion of senior notes. The net proceeds from this issuance are being used for general corporate purposes, including repayment of outstanding indebtedness and repurchases of shares of our common stock, subject to market conditions and other business considerations. In March 2022, we also repaid 1.0 billion of senior notes at maturity. In May 2022, subsequent to the end of our first fiscal quarter, we fully repaid 1.25 billion of senior notes, which had a maturity date in June 2022, at the Par Call Date for the notes. 
+ The indentures governing our senior notes do not generally limit our ability to incur additional indebtedness or require us to maintain financial ratios or specified levels of net worth or liquidity. The indentures governing our notes contain various customary covenants; however, none are expected to impact our liquidity or capital resources. See Note 4 to our consolidated financial statements for further discussion of our debt arrangements. 
+ Cash Flows Summary 
+ Operating Activities. Cash flow generated from operations provides us with a significant source of liquidity. Our operating cash flows result primarily from cash received from our customers, offset by cash payments we make for products and services, associate compensation, operations, occupancy costs, and income taxes. 
+ Cash provided by or used in operating activities is also subject to changes in working capital. Working capital at any point in time is subject to many variables, including seasonality, inventory management and category expansion, the timing of cash receipts and payments, vendor payment terms, and fluctuations in foreign exchange rates. 
+ Net cash provided by operating activities decreased by 2.5 billion in the first three months of fiscal 2022 compared to the first three months of fiscal 2021, primarily driven by changes in working capital, slightly offset by an increase in net earnings. Working capital was primarily impacted by timing of vendor payments, along with higher merchandise inventories at the end of the first quarter of fiscal 2022 resulting from several factors, including product and transportation cost inflation, a high demand environment, actions taken to improve in-stocks, and a delayed start to spring. 
+ Investing Activities. Cash used in investing activities increased by 173 million in the first three months of fiscal 2022 compared to the first three months of fiscal 2021, primarily resulting from increased capital expenditures. 
+ Financing Activities. Cash used in financing activities in the first three months of fiscal 2022 primarily reflected 2.3 billion of share repurchases, 2.0 billion of cash dividends paid, 1.1 billion of repayments of long-term debt, and 1.0 billion of repayments for short-term debt, partially offset by 4.0 billion of net proceeds from long-term debt. Cash used in financing activities in the first three months of fiscal 2021 primarily reflected 3.8 billion of share repurchases, 1.8 billion of cash dividends paid, and 1.4 billion of repayments of long-term debt. 
+ 
+ Critical Accounting Policies 
+ During the first three months of fiscal 2022, there were no changes to our critical accounting policies as disclosed in the 2021 Form 10-K. Refer to Note 1 of our consolidated financial statements for further discussion regarding our significant accounting policies. 
+ Additional Information 
+ For information on accounting pronouncements that have impacted or are expected to materially impact our consolidated financial condition, results of operations or cash flows, see Note 1 to our consolidated financial statements. 
+ 17 
+
+Table of Contents 
+
+ Item 3. Quantitative and Qualitative Disclosures about Market Risk. 
+ Our exposure to market risk results primarily from fluctuations in interest rates in connection with our long-term debt portfolio. We are also exposed to risks from foreign currency exchange rate fluctuations on the translation of our foreign operations into U.S. dollars and on the purchase of goods by these foreign operations that are not denominated in their local currencies. Additionally, we may experience inflation and deflation related to our purchase of certain commodity products. There have been no material changes to our exposure to market risks, including the instruments we use to manage our exposure to such risks, from those disclosed in the 2021 Form 10-K. 
+ 
+ Item 4. Controls and Procedures. 
+ Under the direction and with the participation of our Chief Executive Officer and Chief Financial Officer, we evaluated our disclosure controls and procedures (as defined in Rule 13a-15(e) under the Exchange Act) and concluded that our disclosure controls and procedures were effective as of May 1, 2022. 
+ We are in the process of an ongoing business transformation initiative, which includes upgrading and migrating certain accounting and finance systems. We plan to continue to migrate additional business processes over the course of the next few years and have modified and will continue to modify the design and implementation of certain internal control processes as the integration continues. 
+ Except as described above, there were no other changes in our internal control over financial reporting during the fiscal quarter ended May 1, 2022 that have materially affected, or are reasonably likely to materially affect, our internal control over financial reporting. 
+ 
+ PART II OTHER INFORMATION 
+ 
+ Item 1A. Risk Factors. 
+ In addition to the other information set forth in this report, you should carefully consider the factors discussed under Item 1A, Risk Factors and elsewhere in the 2021 Form 10-K. These risks and uncertainties could materially and adversely affect our business, consolidated financial condition, results of operations, or cash flows. Our operations could also be affected by additional factors that are not presently known to us or by factors that we currently do not consider material to our business. There have been no material changes in the risk factors discussed in the 2021 Form 10-K. 
+ 
+ Item 2. Unregistered Sales of Equity Securities and Use of Proceeds. 
+ ISSUER PURCHASES OF EQUITY SECURITIES 
+ The following table presents the number and average price of shares purchased in each fiscal month of the first quarter of fiscal 2022: 
+ Period Total Number of Shares Purchased (1) 
+ Average Price Paid Per Share (1) 
+ Total Number of Shares Purchased as Part of Publicly Announced Program (2) 
+ Dollar Value of Shares that May Yet Be Purchased Under the Program (2) 
+ January 31, 2022 February 27, 2022 1,645,383 347.07 1,626,917 9,053,183,815 February 28, 2022 March 27, 2022 627,670 319.18 279,283 8,963,898,777 March 28, 2022 May 1, 2022 5,209,451 306.35 5,208,219 7,368,369,778 Total 7,482,504 316.38 7,114,419 
+ 
+ (1) These amounts include repurchases pursuant to our Amended and Restated 2005 Omnibus Stock Incentive Plan and our 1997 Omnibus Stock Incentive Plan (collectively, the Plans ). Under the Plans, participants may surrender shares as payment of applicable tax withholding on the vesting of restricted stock. Participants in the Plans may also exercise stock options by surrendering shares of common stock that the participants already own as payment of the exercise price. Shares so surrendered by participants in the Plans are repurchased pursuant to the terms of the Plans and applicable award agreement and not pursuant to publicly announced share repurchase programs. 
+ (2) In May 2021, our Board of Directors approved a 20.0 billion share repurchase authorization that replaced the previous authorization. This new authorization does not have a prescribed expiration date. 
+ 
+ 18 
+
+Table of Contents 
+
+ SALES OF UNREGISTERED SECURITIES 
+ During the first quarter of fiscal 2022, we issued 556 deferred stock units under The Home Depot, Inc. Nonemployee Directors Deferred Stock Compensation Plan pursuant to the exemption from registration provided by Section 4(a)(2) of the Securities Act and Rule 506 of the SEC s Regulation D thereunder. The deferred stock units were credited during the first quarter of fiscal 2022 to the accounts of those non-employee directors who elected to receive all or a portion of board retainers in the form of deferred stock units instead of cash. The deferred stock units convert to shares of common stock on a one-for-one basis following a termination of service as described in this plan. 
+ During the first quarter of fiscal 2022, we credited 12,814 deferred stock units to participant accounts under the Restoration Plan pursuant to an exemption from the registration requirements of the Securities Act for involuntary, non-contributory plans. The deferred stock units convert to shares of common stock on a one-for-one basis following a termination of service as described in this plan. 
+ 
+ Item 6. Exhibits. 
+ Exhibits marked with an asterisk ) are incorporated by reference to exhibits or appendices previously filed with the SEC, as indicated by the references in brackets. All other exhibits are filed or furnished herewith. 
+ Exhibit Description 3.1 
+ Amended and Restated Certificate of Incorporation of The Home Depot, Inc. 
+ [Form 10-Q filed on September 1, 2011, Exhibit 3.1] 3.2 
+ By-Laws of The Home Depot, Inc. (Amended and Restated Effective February 28, 2019) 
+ [Form 8-K filed on March 4, 2019, Exhibit 3.2] 4.1 
+ Form of 2.700 Note due April 15, 2025 [Form 8-K filed on March 28, 2022, Exhibit 4.2] 
+ 4.2 
+ Form of 2.875 Note due April 15, 2027 [Form 8-K filed on March 28, 2022, Exhibit 4.3] 
+ 4.3 
+ Form of 3.250 Note due April 15, 2032 [Form 8-K filed on March 28, 2022, Exhibit 4.4] 
+ 4.4 
+ Form of 3.625 Note due April 15, 2052 [Form 8-K filed on March 28, 2022, Exhibit 4.5] 
+ 10.1 
+ Employment Arrangement between Edward P. Decker and The Home Depot, Inc., dated February 24, 2022 
+ 10.2 
+ Employment Arrangement between Craig A. Menear and The Home Depot, Inc., dated February 24, 2022 
+ 10.3 
+ Employment Arrangement between Matthew A. Carey and The Home Depot, Inc., dated April 19, 2022 
+ 15.1 
+ Acknowledgement of Independent Registered Public Accounting Firm 
+ 31.1 
+ Certification of the Chief Executive Officer and Pres ident pursuant to Rule 13a-14(a) 
+ 31.2 
+ Certification of the Executive Vice President and Chief Financial Officer pursuant to Rule 13a-14(a) 
+ 32.1 
+ Certification of the Chief Executive Officer and Pres ident furnished pursuant to Section 906 of the Sarbanes-Oxley Act of 2002 
+ 32.2 
+ Certification of the Executive Vice President and Chief Financial Officer furnished pursuant to Section 906 of the Sarbanes-Oxley Act of 2002 
+ 101.INS XBRL Instance Document - the instance document does not appear in the Interactive Data file because its XBRL tags are embedded within the Inline XBRL document 101.SCH Inline XBRL Taxonomy Extension Schema Document 101.CAL Inline XBRL Taxonomy Extension Calculation Linkbase Document 101.DEF Inline XBRL Taxonomy Extension Definition Linkbase Document 101.LAB Inline XBRL Taxonomy Extension Label Linkbase Document 101.PRE Inline XBRL Taxonomy Extension Presentation Linkbase Document 104 Cover Page Interactive Data File (formatted as inline XBRL and contained in Exhibit 101) 
+ 
+ Management contract or compensatory plan or arrangement 
+ 
+ 19 
+
+Table of Contents 
+
+ SIGNATURES 
+ Pursuant to the requirements of the Securities Exchange Act of 1934, the registrant has duly caused this report to be signed on its behalf by the undersigned thereunto duly authorized. 
+ THE HOME DEPOT, INC. 
+ (Registrant) 
+ By: /s/ E DWARD P. D ECKER 
+ Edward P. Decker, Chief Executive Officer and President (Principal Executive Officer) /s/ R ICHARD V. M C P HAIL 
+ Richard V. McPhail, Executive Vice President and Chief Financial Officer (Principal Financial Officer) /s/ S TEPHEN L. G IBBS 
+ Stephen L. Gibbs, Vice President, Chief Accounting Officer and Corporate Controller (Principal Accounting Officer) Date: May 23, 2022 
+ 20 
+
+<EX-10.1>
+ 2
+ exhibit101-deckeremploymen.htm
+ EX-10.1
+
+Document 
+ Exhibit 10.1 
+ 
+ Home Depot Letterhead 
+
+February 24, 2022 
+
+Ted Decker 
+
+Dear Ted 
+ 
+ I am pleased to confirm The Home Depot, Inc. s (the Company or Home Depot offer to you of the position of Chief Executive Officer and President, on the terms and conditions described herein. Please sign below to indicate your acceptance of this offer. 
+ 
+ 1. Your Position, Reporting, Effective Date 
+ 
+ You are being offered the position of Chief Executive Officer and President, reporting directly to the Company s Board of Directors, with an effective date of March 1, 2022. 
+ 
+ 2. Your Compensation and Benefits 
+ 
+ a. Base Salary 
+ 
+ Your annual base salary will be 1,400,000 payable in equal bi-weekly installments. Your next salary review will be held in February 2023, with salary reviews held annually thereafter. 
+ 
+ b. Management Incentive Plan for Officers 
+ 
+ In addition to your base salary, you will be eligible to participate in the Management Incentive Plan MIP for officers which provides an annual incentive target of up to 200 of your base salary. MIP will be paid annually based on achievement of the established goals. The earned incentive, if any, will be prorated based on the number of full months since the effective date of your new position. To be eligible for payment of any incentive, you must be employed on the day on which the incentive is paid. 
+ 
+ c. Equity Grants 
+ 
+ Home Depot has typically awarded an annual equity grant to Officers in March of each year under the Amended and Restated 2005 Omnibus Stock Incentive Plan (the Omnibus Plan ). Currently, equity awards for Officers in March 2022 are expected to consist of restricted stock, stock options, and performance shares. Vesting and performance goals for these awards are established annually for each grant. In March 2022, you will continue to be eligible to receive the same types of equity awards as other Officers in the Company. Annual equity awards are not guaranteed as compensation, and there is no minimum or guaranteed award. 
+ 
+ d. The Home Depot Inc. Employee Stock Purchase Plan Eligibility 
+ 
+ You will continue to be eligible to participate in The Home Depot, Inc. s Employee Stock Purchase Plan. The plan affords you the opportunity to purchase The Home Depot, Inc. common stock at a 15 discount through payroll deductions. 
+
+February 24, 2022 
+ Page 2 
+
+e. The Home Depot Deferred Compensation Plan for Officers 
+ 
+ You will continue to be eligible to participate in The Home Depot Deferred Compensation Plan for Officers. This plan affords you the opportunity to defer up to 50 of your base salary and 100 of your MIP payment into the plan. 
+ 
+ f. Other Benefit Programs 
+ 
+ You will remain eligible for employee benefits and other programs on the same terms and conditions available to other senior officers of the Company. 
+ 
+ g. Travel 
+ 
+ The Company requests that, where practicable, you travel by use of Company aircraft or charter aircraft, for security purposes. However, you may elect to travel by commercial aircraft when you deem appropriate. Also, to accommodate your travel schedule, your family shall be allowed to travel aboard the Company s aircraft, provided however, such personal use of the Company s aircraft will require the inclusion in your taxable income of an amount equal to the related benefit of such accommodation. Such inclusion shall be made as required under the Internal Revenue Code and related regulations. 
+ 
+ The terms of your annual base salary, the MIP, other benefits, and travel set forth herein are subject to future modification or termination at the Company s discretion. All compensation and benefits are subject to any required tax withholding. 
+ 
+ 3. Your General Obligations to Home Depot While You are Employed with the Company 
+ 
+ a. Exclusive Employment with Home Depot 
+ 
+ You agree that you will devote your full business time and attention to your job with Home Depot and that your job with Home Depot will be your sole occupation during the time you are employed with the Company. Except for passive personal investments or charitable work for nonprofit organizations, as of the date you begin employment with Home Depot, you will not perform any work for any person or entity for which you receive any form of compensation, including cash, equity, or in-kind payments, without the express written consent of the Executive Vice President, Human Resources of The Home Depot, Inc. (hereinafter EVP, HR ). You also agree that without the prior express written consent of both the Company s General Counsel and EVP, HR you will not pursue, accept, or retain a position on (i) the board of directors of a company that is publicly traded or intends to become publicly traded or (ii) an advisory board or a private company board of directors for which you receive any form of compensation. 
+ 
+ b. Restrictions on Outside Activities or Investments 
+ 
+ You agree that you shall not, without the prior express written consent of the EVP, HR, engage in or have any financial or other interests in, or render any service in any capacity to any competitor or supplier of the Company, its parents, subsidiaries, affiliates, or related entities during the course of your employment with the Company. Hereinafter, the Company and its parents, subsidiaries, affiliates and related entities are referred to collectively as the Company-Related Parties. Notwithstanding the foregoing, you shall not be restricted from owning securities of corporations listed on a national securities exchange or regularly traded by national securities dealers, provided that such ownership was acquired in a manner not 
+
+February 24, 2022 
+ Page 3 
+
+ prohibited by the Company s Conflict of Interest policy. The provisions of this paragraph shall apply to you, your immediate family members, and any person living in your household. 
+ 
+ c. Compliance with Policies of Home Depot 
+ 
+ You recognize that, as the leader of the Company and its most-senior officer, your compliance with both the letter and spirit of Company policies, rules, and procedures is critical to reinforcing the Company s culture of compliance. Accordingly, you agree that you will fully comply with all applicable Company rules, policies, and procedures, including The Home Depot Business Code of Conduct and Ethics, Corporate Compliance Policies, and Standard Operating Procedures, and you will take all appropriate measures to ensure others comply as well. 
+ 
+ 4. Your Obligations to Home Depot Regarding the Handling of Confidential Information, Trade Secrets, and Work Product 
+ 
+ a. Protection of Trade Secrets and Confidential Information of Home Depot 
+ 
+ You acknowledge that through your employment with the Company, you will acquire and have access to Confidential Information of the Company-Related Parties. You agree to use any Confidential Information of the Company-Related Parties that you acquire or have access to only for the purpose of conducting and completing your duties for the Company. You agree not to use any Confidential Information of the Company-Related Parties in any other manner or for any other purpose. You agree that you will not disclose any Confidential Information to any third party, other than as required for the purpose of conducting or completing your duties for the Company, subject to obtaining the appropriate approvals and implementing appropriate safeguards, and you further agree to return all documents or any other item or source containing Confidential Information or any other property of the Company-Related Parties to the Company immediately upon termination for any reason of your employment with the Company. This obligation shall remain in effect, both during and after your employment, for as long as the information or materials you have acquired or to which you have access retain their status as Confidential Information. This letter is not intended to, and does not, alter either the Company-Related Parties rights or your obligations under any state or federal statutory or common law regarding trade secrets and unfair trade practices. You agree that the Company may prevent the use or disclosure of any Confidential Information of the Company-Related Parties through use of an injunction or other means and acknowledge that the Company-Related Parties have taken reasonable steps necessary to protect the secrecy of the Confidential Information. 
+ 
+ For purposes of this letter, Confidential Information means any data or information that belongs and is valuable to the Company-Related Parties and not generally known to competitors of the Company-Related Parties or other outsiders, regardless of whether the Confidential Information is in printed, written or electronic form, retained in your memory or has been compiled or created by you, including but not limited to information related to operations, services, information technology, computer systems, marketing, advertising, e-commerce, interconnected retail, technical, financial, human resources, personnel, staffing, payroll, information about employee compensation and performance, merchandising, pricing, strategic planning, product, vendor, supplier, customer or store planning data, construction, data security information, private brands, supply chain, and or other business processes, or other information similar to the foregoing. 
+ 
+ Pursuant to 18 U.S.C. 1833(b), nothing in this letter, nor any other agreement or Company policy, shall be interpreted to expose you to criminal or civil liability under federal or state trade secret law for disclosure, in confidence, of trade secrets (i) to federal, state, and local government officials, directly or 
+
+February 24, 2022 
+ Page 4 
+
+ indirectly, or to an attorney, solely for the purpose of reporting or investigating a suspected violation of law, or (ii) in a complaint or other document filed in a lawsuit or other proceeding, provided the filing is made under seal and otherwise protected from disclosure except pursuant to court order. If you file a lawsuit for retaliation for reporting a suspected violation of law, you may disclose trade secrets to your attorney and use the trade secret information in a court proceeding, provided that you file any document containing the trade secret under seal and you do not otherwise disclose the trade secret, except pursuant to court order. Nothing herein is intended to prohibit you from reporting possible violations of law or regulation to any governmental agency or entity having responsibility to investigate same or from making any truthful statement in connection with any legal proceeding or investigation by any governmental agency or entity. 
+ 
+ b. Ownership of Work Product 
+ 
+ You acknowledge and agree that any work product, including without limitation concepts, designs, notes, reports, documentation, drawings, computer programs (source code, object code, and listings), ideas, inventions (whether or not patentable), trade secrets, improvements, creations, scientific and mathematical models, writings, works, works of authorship (whether or not copyrightable), theses, books, lectures, illustrations, devices, masks, models, work-in-process, photographs, pictorial, graphical or audiovisual works or sound recordings or video recordings, prints, and deliverables, and any other subject matter which is or may become legally protectable or recognized as a form of property, and all materials contained therein and prepared in connection therewith and or therefrom, whether in draft or final form (collectively, Work Product ), which are designed, created, conceived, developed or reduced to practice, writing or publication by you, either solely or jointly with others, during your employment with Home Depot, which relate to or are useful in Home Depot s business, or which derive in any way from using Home Depot property, shall be considered works made for hire and shall be owned by, and deemed the exclusive property of, Home Depot. Without in any way limiting the foregoing, and without any further compensation, in the event that it is determined that any Work Product does not quality as a work made for hire or that it is not otherwise owned by Home Depot, you agree to assign and do hereby assign to Home Depot your right, title, and interest in and to any Work Product, whether now existing or created in the future, that arises from your employment with Home Depot, or that derives in any way from using Home Depot property. You further agree to execute any additional documents that Home Depot deems, in its sole discretion, necessary to vest ownership of Work Product with Home Depot or perfect such intellectual property rights in the United States and any other jurisdiction worldwide. 
+ 
+ c. Protection of Information that Belongs to Others 
+ 
+ You understand that it is not the intention of Home Depot to receive or obtain any trade secrets, proprietary information, or other confidential information of others. Accordingly, you agree that you will not disclose or use during or in connection with your employment with Home Depot any trade secrets, proprietary information, or confidential information to which you may have been exposed or that you may have acquired in connection with your prior employment or engagement as an independent contractor or consultant. Further, you agree that you will not bring Home Depot any documents or materials in any form containing trade secrets, proprietary information, or confidential information from a prior employer, client, or customer. 
+ 
+ 5. Post-Employment Restrictive Covenants 
+ 
+ a. Non-Competition 
+
+February 24, 2022 
+ Page 5 
+
+ By accepting this offer, you acknowledge and agree that, as the leader of the Company and it most-senior officer, you have and will receive training and Confidential Information, and that you have been and will be provided and entrusted with access to the Company-Related Parties customer and employee relationships and goodwill. You further acknowledge that such Confidential Information, including trade secrets and other business processes, are utilized by the Company-Related Parties throughout the entire United States and in other locations in which it conducts business. You further acknowledge and agree that the Company-Related Parties Confidential Information, customer, service provider, vendor and employee relationships, and goodwill are valuable assets of the Company-Related Parties and are legitimate business interests that are properly subject to protection through the covenants contained in this letter. Consequently, you agree that during the Restricted Period you shall not, directly or indirectly, enter into or maintain an employment, contractual or other business relationship, in the United States, Canada, or Mexico, in which (A) you own an equity interest in a Competitor greater than one percent (1 of its outstanding equity, or manage, operate, finance, or control a Competitor or (B) you provide services or perform duties for a Competitor that (i) are the same as or similar to the services or job duties you performed for the Company at any point during the two-year period prior to the termination of your employment, or (ii) involve executive, managerial, financial, or other significant leadership responsibilities. 
+ 
+ Competitor shall mean 
+ 
+ (X) the following companies or entities, including their subsidiaries, affiliates, franchisees, or business units Lowe s Companies, Inc. Amazon.com Menard, Inc. Floor & Decor Canadian Tire Wayfair and Walmart Inc. 
+ 
+ (Y) any company or entity that sells or offers Competitive Products or Services that, in combination with its subsidiaries, affiliates, franchisees, or business units (a) operates more than 100 retail outlets across the United States, Canada, and Mexico or (b) generates more than 500 million in annual revenue or 
+ 
+ (Z) any company or entity that is formed through, or as a result of, a sale, merger, combination, renaming, restructuring, spin-off, or other corporate transaction involving a business or entity defined in clause (X) or (Y) of this sentence, and which sells Competitive Products or Services. 
+ 
+ Competitive Products or Services means anything of commercial value of the type offered, provided or sold by the Company-Related Parties, in the United States, Canada, or Mexico, within two (2) years prior to termination of your employment and during the Restricted Period, including, without limitation goods personal, real, or intangible property services financial products business opportunities or assistance or any other object or aspect of business conducted or provided by Company-Related Parties. 
+ 
+ Restricted Period shall mean the period during which you are employed with the Company and for a period of twenty-four (24) months following the termination of your employment, regardless of the reason for such termination. 
+ 
+ b. Non-Solicitation of Company Employees 
+ 
+ You agree that during the course of your employment and for a period of thirty-six (36) months following the termination of your employment with the Company Non-Solicitation Period ), you will not directly or indirectly, on your own behalf or on behalf of any other entity or person, Solicit any person who is, or during the last twelve (12) months of your employment with the Company was, an employee of any of the Company-Related Parties, with whom you had material contact during your employment, or with respect 
+
+February 24, 2022 
+ Page 6 
+
+ to whom you obtained or had authorized access to Confidential Information while employed with the Company, to terminate his or her employment or other relationship with any of the Company-Related Parties, or to refer any such employee to anyone, without the prior written approval from the EVP, HR. For purposes of this paragraph, Solicit shall include any solicitation, enticement, or encouragement whatsoever, regardless of which party initiated the initial contact, as well as any direct or indirect involvement in the recruitment, referral, interviewing, hiring, or setting of the initial terms and conditions of employment. 
+ 
+ c. Remedies for Breach 
+ 
+ i. Injunctive Relief 
+ 
+ You acknowledge and agree that quantifying the damages suffered by the Company for your breach of Section 4(a), 4(b), 5(a) or 5(b) might not be possible or feasible, or provide adequate compensation to the Company at law and that the balance of the hardships tips in favor of enforcing such section(s). You agree that the Company shall be entitled, if any such breach shall occur or be either threatened or attempted, if it so elects, to seek from a court a temporary, preliminary, and permanent injunction, without being required to post a bond, enjoining and restraining such breach or threatened or attempted breach. 
+ 
+ ii. Liquidated Damages 
+ 
+ Because of the potential difficulty in quantifying damages that the Company may suffer in the event of a breach by you of Section 4(a), 4(b), 5(a) or 5(b), you and the Company agree that it is appropriate to reasonably estimate such damages in advance and set an amount of liquidated damages that you will owe the Company in the event of a breach. Accordingly, after due consideration, you and the Company agree that, if you breach Section 4(a), 4(b), 5(a) or 5(b), you shall pay the Company, upon demand, an amount specified by the Company, up to the sum of the then-current market value of the shares of Common Stock that you hold that were granted by any equity awards and the aggregate after-tax proceeds you received upon the sale or other disposition of any shares of Common Stock granted by any equity award(s). 
+ 
+ iii. Other Remedies 
+ 
+ In addition to any and all other remedies at law or equity, including monetary damages, the Company shall be entitled to recover its reasonable attorney fees if it succeeds in obtaining an injunction against you for breach or threatened breach of Section 4(a), 4(b), 5(a) or 5(b), or otherwise proving in court that you violated any provision of Section 4(a), 4(b), 5(a) or 5(b). 
+ 
+ You acknowledge that the purpose and effect of Section 5(a) or 5(b) would be frustrated by measuring the duration of the Restricted Period or the Non-Solicitation Period from the termination of your employment if you were to fail to honor your obligation(s) until directed to do so by court order. Should legal proceedings be initiated by the Company to enforce Section 5(a) or 5(b), the commencement of the Restricted Period or the Non-Solicitation Period shall be tolled and extended and will instead begin on the date of the entry of an order granting the Company injunctive, monetary or other relief from your actual or threatened breach of this Agreement. 
+ 
+ You further agree to waive and not assert any claim for advancement of legal fees, costs, or expenses pursuant to the Company s by-laws or based on other authority in the event the Company initiates a legal action against you for violation of Section 4(a), 4(b), 5(a) or 5(b). 
+
+February 24, 2022 
+ Page 7 
+
+ d. Reasonableness of Restrictions 
+ 
+ You acknowledge and agree that each of the covenants in this letter is reasonable, appropriate, and narrowly tailored to protect the Company s legitimate interests, including but not limited to protecting Company-Related Parties Confidential Information, and that your full compliance with such restrictions will not unduly or unreasonably interfere with your ability to obtain and undertake other gainful future employment. You and the Company acknowledge and agree that there are number of unique circumstances that provide the Company with protectable interests that justify and necessitate the 24-month Restricted Period in Section 5(a) and the 36-month Non-Solicitation Period in Section 5(b). As the leader of the Company and its senior-most officer, you have been and will be involved in developing, and have unique access to, the Company-Related Parties Confidential Information, including its plans and strategies for the business, personnel leadership, talent management, and succession. This involvement and access enables you to learn information about the skills, capabilities, strengths, and weaknesses of Company-Related Parties personnel, as well as information about their compensation, bonuses, and performance, and Company-Related Parties plans and strategies for same. In addition, your senior position at the Company provides you with a unique and special access to the Company-Related Parties non-public business plans, strategies, and methods. Furthermore, your role with the Company enables you to utilize the Company-Related Parties goodwill to develop relationships with subordinate employees throughout the Company-Related Parties. 
+ 
+ Accordingly, you agree that these and other facts and circumstances associated with your position justify the scope and duration of the restrictions in Section 5(a) and 5(b). 
+ 
+ With respect to Section 5(a), in the event you wish to enter into any relationship or employment on or before the end of the Restricted Period that would potentially violate the restrictions in Section 5(a), you agree to request written permission from the EVP, HR before entering any such relationship or employment. The Company may approve or not approve of the relationship or employment at its absolute discretion. 
+ 
+ You and the Company agree that the amounts set forth in Section 5(c)(ii) for a breach of Section 4(a), 4(b), 5(a) or 5(b) shall represent a fair and reasonable measure of the Company's estimated damages for your breach, shall be deemed to have been fully negotiated and established bilaterally by you and the Company through such negotiations, and shall not constitute a penalty. 
+ 
+ e. Reformation, Severability, and Blue-Penciling 
+ 
+ If any of the provisions of Section 4(a), 4(b), 5(a) or 5(b) should ever be held by a court of competent jurisdiction to exceed the scope permitted by applicable law, you agree such provision or provisions shall first be modified to such lesser scope as the court may deem just and proper for the reasonable protection of the Company s legitimate business interests. In the alternative, if modification is not available, you and the Company agree that the court may sever such provision from this Offer Letter and enforce the remaining provisions. If the amounts set forth in Section 5(c)(ii) should be deemed for any reason by a court of competent jurisdiction not to constitute a permissible liquidated damage, you and the Company agree that the court may establish a liquidated damage in such lesser amount that is in accordance with applicable law. 
+ 
+ 6. At-Will Employment 
+ 
+ This letter should not be construed, nor is it intended, to be a contract of employment for a specified period of time or in any way limiting the Company s right to terminate the employment relationship. 
+
+February 24, 2022 
+ Page 8 
+
+ Your employment relationship is at will. The Company reserves the right to terminate your employment with or without cause at any time. 
+ 
+ 7. Interpretation and Enforcement of this Offer Letter and the Terms Contained Herein 
+ 
+ This letter supersedes any prior employment agreement, offer letters, or understandings, written or oral between you and the Company-Related Parties and contains the entire understanding of the Company and you with respect to the subject matter hereof, except that this letter does not supersede or limit any post-employment restrictions or obligations to the Company-Related Parties that may be contained in any agreement, plan, or document arising out of or relating to equity awards, incentive or bonus awards, or similar arrangements. 
+ 
+ The terms of this letter shall be binding on, and in favor of, the Company s successors in interest and assigns. 
+ 
+ This letter shall be construed, interpreted and applied in accordance with the law of the State of Georgia, without giving effect to any choice of law provisions thereof that would require the application of any other jurisdiction s laws. You agree to irrevocably submit any dispute arising out of or relating to this letter to the exclusive jurisdiction of the Atlanta Division of the U.S. District Court for the Northern District of Georgia, or if federal jurisdiction is not available, the Superior Court of Cobb County, Georgia. You also irrevocably waive, to the fullest extent permitted by applicable law, any objection you may now or hereafter have to the laying of venue of any such dispute brought in such court or any defense of inconvenient forum for the maintenance of such dispute, and you agree to personal jurisdiction and to accept service of legal process from the courts of Georgia. Subject to the parties agreement set forth above regarding modification, in the event any provision in this letter is determined to be legally invalid or unenforceable by any court of competent jurisdiction, and cannot be modified to be enforceable, the affected provision shall be stricken from the letter, and the remaining terms of the letter and its enforceability shall remain unaffected. You agree to accept service of process by mail or by any other means sufficient to ensure that you receive a copy of the items served. 
+ 
+ Ted, we are pleased to extend this offer to you, and we are excited about the opportunities that your leadership will bring to this new role. We have enclosed a copy of this letter for your records. Please sign, date and return the original to us. 
+ 
+ Sincerely, 
+ 
+ s Craig Menear 
+ 
+ Craig Menear 
+ Chairman and Chief Executive Officer 
+
+I accept this offer as Chief Executive Officer and President pursuant to the foregoing terms and conditions 
+
+s Ted Decker 2 24 22 
+ Ted Decker Date Signed 
+
+</EX-10.1>
+
+<EX-10.2>
+ 3
+ exhibit102-menearemploymen.htm
+ EX-10.2
+
+Document 
+ Exhibit 10.2 
+ 
+ Home Depot Letterhead 
+
+February 24, 2022 
+
+Craig Menear 
+
+Dear Craig 
+ 
+ I am pleased to confirm The Home Depot, Inc. s (the Company or Home Depot offer to you of the position of Chair of the Board of Directors Chair ), on the terms and conditions described herein. Please sign below to indicate your acceptance of this offer. 
+ 
+ 1. Your Position, Reporting, Effective Date 
+ 
+ You are being offered the position of Chair, with an effective date of March 1, 2022, and you will remain an executive officer of the Company. 
+ 
+ 2. Your Compensation and Benefits 
+ 
+ a. Base Salary 
+ 
+ Your annual base salary will be 750,000 payable in equal bi-weekly installments. 
+ 
+ b. Management Incentive Plan for Officers 
+ 
+ In addition to your base salary, you will be eligible to participate in the Management Incentive Plan MIP for officers which provides an annual incentive target of up to 150 of your base salary. MIP will be paid annually based on achievement of the established financial goals. The earned incentive, if any, will be prorated based on the number of full months since the effective date of your new position. Your MIP payment will be made in accordance with the MIP terms and conditions, as approved by the Leadership Development and Compensation Committee. 
+ 
+ c. Equity Grants 
+ 
+ Home Depot has typically awarded an annual equity grant to Officers in March of each year under the Amended and Restated 2005 Omnibus Stock Incentive Plan (the Omnibus Plan ). Equity awards for the Chair in March 2022 are expected to consist of stock options and performance shares. Vesting and performance goals for these awards are established annually for each grant. Annual equity awards are not guaranteed as compensation, and there is no minimum or guaranteed award. 
+ 
+ d. The Home Depot Inc. Employee Stock Purchase Plan Eligibility 
+ 
+ You will continue to be eligible to participate in The Home Depot, Inc. s Employee Stock Purchase Plan. The plan affords you the opportunity to purchase The Home Depot, Inc. common stock at a 15 discount through payroll deductions. 
+
+February 24, 2022 
+ Page 2 
+
+e. The Home Depot Deferred Compensation Plan for Officers 
+ 
+ You will continue to be eligible to participate in The Home Depot Deferred Compensation Plan for Officers. This plan affords you the opportunity to defer up to 50 of your base salary and 100 of your MIP payment into the plan. 
+ 
+ f. Other Benefit Programs 
+ 
+ You will remain eligible for employee benefits and other programs on the same terms and conditions available to other senior officers of the Company. 
+ 
+ g. Travel 
+ 
+ The Company requests that, where practicable, you travel by use of Company aircraft or charter aircraft, for security purposes. However, you may elect to travel by commercial aircraft when you deem appropriate. Also, to accommodate your travel schedule, your family shall be allowed to travel aboard the Company s aircraft, provided however, such personal use of the Company s aircraft will require the inclusion in your taxable income of an amount equal to the related benefit of such accommodation. Such inclusion shall be made as required under the Internal Revenue Code and related regulations. 
+ 
+ The terms of your annual base salary, the MIP, other benefits, and travel set forth herein are subject to future modification or termination at the Company s discretion. All compensation and benefits are subject to any required tax withholding. 
+ 
+ 3. Your General Obligations to Home Depot While You are Employed with the Company 
+ 
+ a. Exclusive Employment with Home Depot 
+ 
+ You agree that you will devote your full business time and attention to your job with Home Depot and that your job with Home Depot will be your sole occupation during the time you are employed with the Company. Except for passive personal investments or charitable work for nonprofit organizations, as of the date you begin employment with Home Depot, you will not perform any work for any person or entity for which you receive any form of compensation, including cash, equity, or in-kind payments, without the express written consent of the Executive Vice President, Human Resources of The Home Depot, Inc. (hereinafter EVP, HR ). You also agree that without the prior express written consent of both the Company s General Counsel and Chief Executive Officer CEO you will not pursue, accept, or retain a position on (i) the board of directors of a company that is publicly traded or intends to become publicly traded or (ii) an advisory board or a private company board of directors for which you receive any form of compensation. 
+ 
+ b. Restrictions on Outside Activities or Investments 
+ 
+ You agree that you shall not, without the prior express written consent of the EVP, HR, engage in or have any financial or other interests in, or render any service in any capacity to any competitor or supplier of the Company, its parents, subsidiaries, affiliates, or related entities during the course of your employment with the Company. Hereinafter, the Company and its parents, subsidiaries, affiliates and related entities are referred to collectively as the Company-Related Parties. Notwithstanding the foregoing, you shall not be restricted from owning securities of corporations listed on a national securities exchange or regularly traded by national securities dealers, provided that such ownership was acquired in a manner not 
+
+February 24, 2022 
+ Page 3 
+
+ prohibited by the Company s Conflict of Interest policy. The provisions of this paragraph shall apply to you, your immediate family members, and any person living in your household. 
+ 
+ c. Compliance with Policies of Home Depot 
+ 
+ You recognize that, as a Company leader, your compliance with both the letter and spirit of Company policies, rules, and procedures is critical to reinforcing the Company s culture of compliance. Accordingly, you agree that you will fully comply with all applicable Company rules, policies, and procedures, including The Home Depot Business Code of Conduct and Ethics, Corporate Compliance Policies, and Standard Operating Procedures, and you will take all appropriate measures to ensure others comply as well. 
+ 
+ 4. Your Obligations to Home Depot Regarding the Handling of Confidential Information, Trade Secrets, and Work Product 
+ 
+ a. Protection of Trade Secrets and Confidential Information of Home Depot 
+ 
+ You acknowledge that through your employment with the Company, you will acquire and have access to Confidential Information of the Company-Related Parties. You agree to use any Confidential Information of the Company-Related Parties that you acquire or have access to only for the purpose of conducting and completing your duties for the Company. You agree not to use any Confidential Information of the Company-Related Parties in any other manner or for any other purpose. You agree that you will not disclose any Confidential Information to any third party, other than as required for the purpose of conducting or completing your duties for the Company, subject to obtaining the appropriate approvals and implementing appropriate safeguards, and you further agree to return all documents or any other item or source containing Confidential Information or any other property of the Company-Related Parties to the Company immediately upon termination for any reason of your employment with the Company. This obligation shall remain in effect, both during and after your employment, for as long as the information or materials you have acquired or to which you have access retain their status as Confidential Information. This letter is not intended to, and does not, alter either the Company-Related Parties rights or your obligations under any state or federal statutory or common law regarding trade secrets and unfair trade practices. You agree that the Company may prevent the use or disclosure of any Confidential Information of the Company-Related Parties through use of an injunction or other means and acknowledge that the Company-Related Parties have taken reasonable steps necessary to protect the secrecy of the Confidential Information. 
+ 
+ For purposes of this letter, Confidential Information means any data or information that belongs and is valuable to the Company-Related Parties and not generally known to competitors of the Company-Related Parties or other outsiders, regardless of whether the Confidential Information is in printed, written or electronic form, retained in your memory or has been compiled or created by you, including but not limited to information related to operations, services, information technology, computer systems, marketing, advertising, e-commerce, interconnected retail, technical, financial, human resources, personnel, staffing, payroll, information about employee compensation and performance, merchandising, pricing, strategic planning, product, vendor, supplier, customer or store planning data, construction, data security information, private brands, supply chain, and or other business processes, or other information similar to the foregoing. 
+ 
+ Pursuant to 18 U.S.C. 1833(b), nothing in this letter, nor any other agreement or Company policy, shall be interpreted to expose you to criminal or civil liability under federal or state trade secret law for disclosure, in confidence, of trade secrets (i) to federal, state, and local government officials, directly or indirectly, or to an attorney, solely for the purpose of reporting or investigating a suspected violation of 
+
+February 24, 2022 
+ Page 4 
+
+ law, or (ii) in a complaint or other document filed in a lawsuit or other proceeding, provided the filing is made under seal and otherwise protected from disclosure except pursuant to court order. If you file a lawsuit for retaliation for reporting a suspected violation of law, you may disclose trade secrets to your attorney and use the trade secret information in a court proceeding, provided that you file any document containing the trade secret under seal and you do not otherwise disclose the trade secret, except pursuant to court order. Nothing herein is intended to prohibit you from reporting possible violations of law or regulation to any governmental agency or entity having responsibility to investigate same or from making any truthful statement in connection with any legal proceeding or investigation by any governmental agency or entity. 
+ 
+ b. Ownership of Work Product 
+ 
+ You acknowledge and agree that any work product, including without limitation concepts, designs, notes, reports, documentation, drawings, computer programs (source code, object code, and listings), ideas, inventions (whether or not patentable), trade secrets, improvements, creations, scientific and mathematical models, writings, works, works of authorship (whether or not copyrightable), theses, books, lectures, illustrations, devices, masks, models, work-in-process, photographs, pictorial, graphical or audiovisual works or sound recordings or video recordings, prints, and deliverables, and any other subject matter which is or may become legally protectable or recognized as a form of property, and all materials contained therein and prepared in connection therewith and or therefrom, whether in draft or final form (collectively, Work Product ), which are designed, created, conceived, developed or reduced to practice, writing or publication by you, either solely or jointly with others, during your employment with Home Depot, which relate to or are useful in Home Depot s business, or which derive in any way from using Home Depot property, shall be considered works made for hire and shall be owned by, and deemed the exclusive property of, Home Depot. Without in any way limiting the foregoing, and without any further compensation, in the event that it is determined that any Work Product does not quality as a work made for hire or that it is not otherwise owned by Home Depot, you agree to assign and do hereby assign to Home Depot your right, title, and interest in and to any Work Product, whether now existing or created in the future, that arises from your employment with Home Depot, or that derives in any way from using Home Depot property. You further agree to execute any additional documents that Home Depot deems, in its sole discretion, necessary to vest ownership of Work Product with Home Depot or perfect such intellectual property rights in the United States and any other jurisdiction worldwide. 
+ 
+ c. Protection of Information that Belongs to Others 
+ 
+ You understand that it is not the intention of Home Depot to receive or obtain any trade secrets, proprietary information, or other confidential information of others. Accordingly, you agree that you will not disclose or use during or in connection with your employment with Home Depot any trade secrets, proprietary information, or confidential information to which you may have been exposed or that you may have acquired in connection with your prior employment or engagement as an independent contractor or consultant. Further, you agree that you will not bring Home Depot any documents or materials in any form containing trade secrets, proprietary information, or confidential information from a prior employer, client, or customer. 
+ 
+ 5. Post-Employment Restrictive Covenants 
+ 
+ a. Non-Competition 
+
+February 24, 2022 
+ Page 5 
+
+ By accepting this offer, you acknowledge and agree that, as a key executive of the Company, you have and will receive training and Confidential Information, and that you have been and will be provided and entrusted with access to the Company-Related Parties customer and employee relationships and goodwill. You further acknowledge that such Confidential Information, including trade secrets and other business processes, are utilized by the Company-Related Parties throughout the entire United States and in other locations in which it conducts business. You further acknowledge and agree that the Company-Related Parties Confidential Information, customer, service provider, vendor and employee relationships, and goodwill are valuable assets of the Company-Related Parties and are legitimate business interests that are properly subject to protection through the covenants contained in this letter. Consequently, you agree that during the Restricted Period you shall not, directly or indirectly, enter into or maintain an employment, contractual or other business relationship, in the United States, Canada, or Mexico, in which (A) you own an equity interest in a Competitor greater than one percent (1 of its outstanding equity, or manage, operate, finance, or control a Competitor or (B) you provide services or perform duties for a Competitor that (i) are the same as or similar to the services or job duties you performed for the Company at any point during the two-year period prior to the termination of your employment, or (ii) involve executive, managerial, financial, or other significant leadership responsibilities. 
+ 
+ Competitor shall mean 
+ 
+ (X) the following companies or entities, including their subsidiaries, affiliates, franchisees, or business units Lowe s Companies, Inc. Amazon.com Menard, Inc. Floor & Decor Canadian Tire Wayfair and Walmart Inc. 
+ 
+ (Y) any company or entity that sells or offers Competitive Products or Services that, in combination with its subsidiaries, affiliates, franchisees, or business units (a) operates more than 100 retail outlets across the United States, Canada, and Mexico or (b) generates more than 500 million in annual revenue or 
+ 
+ (Z) any company or entity that is formed through, or as a result of, a sale, merger, combination, renaming, restructuring, spin-off, or other corporate transaction involving a business or entity defined in clause (X) or (Y) of this sentence, and which sells Competitive Products or Services. 
+ 
+ Competitive Products or Services means anything of commercial value of the type offered, provided or sold by the Company-Related Parties, in the United States, Canada, or Mexico, within two (2) years prior to termination of your employment and during the Restricted Period, including, without limitation goods personal, real, or intangible property services financial products business opportunities or assistance or any other object or aspect of business conducted or provided by Company-Related Parties. 
+ 
+ Restricted Period shall mean the period during which you are employed with the Company and for a period of twenty-four (24) months following the termination of your employment, regardless of the reason for such termination. 
+ 
+ b. Non-Solicitation of Company Employees 
+ 
+ You agree that during the course of your employment and for a period of thirty-six (36) months following the termination of your employment with the Company Non-Solicitation Period ), you will not directly or indirectly, on your own behalf or on behalf of any other entity or person, Solicit any person who is, or during the last twelve (12) months of your employment with the Company was, an employee of any of the Company-Related Parties, with whom you had material contact during your employment, or with respect to whom you obtained or had authorized access to Confidential Information while employed with the Company, to terminate his or her employment or other relationship with any of the Company- 
+
+February 24, 2022 
+ Page 6 
+
+ Related Parties, or to refer any such employee to anyone, without the prior written approval from the EVP, HR. For purposes of this paragraph, Solicit shall include any solicitation, enticement, or encouragement whatsoever, regardless of which party initiated the initial contact, as well as any direct or indirect involvement in the recruitment, referral, interviewing, hiring, or setting of the initial terms and conditions of employment. 
+ 
+ c. Remedies for Breach 
+ 
+ i. Injunctive Relief 
+ 
+ You acknowledge and agree that quantifying the damages suffered by the Company for your breach of Section 4(a), 4(b), 5(a) or 5(b) might not be possible or feasible, or provide adequate compensation to the Company at law and that the balance of the hardships tips in favor of enforcing such section(s). You agree that the Company shall be entitled, if any such breach shall occur or be either threatened or attempted, if it so elects, to seek from a court a temporary, preliminary, and permanent injunction, without being required to post a bond, enjoining and restraining such breach or threatened or attempted breach. 
+ 
+ ii. Liquidated Damages 
+ 
+ Because of the potential difficulty in quantifying damages that the Company may suffer in the event of a breach by you of Section 4(a), 4(b), 5(a) or 5(b), you and the Company agree that it is appropriate to reasonably estimate such damages in advance and set an amount of liquidated damages that you will owe the Company in the event of a breach. Accordingly, after due consideration, you and the Company agree that, if you breach Section 4(a), 4(b), 5(a) or 5(b), you shall pay the Company, upon demand, an amount specified by the Company, up to the sum of the then-current market value of the shares of Common Stock that you hold that were granted by any equity awards and the aggregate after-tax proceeds you received upon the sale or other disposition of any shares of Common Stock granted by any equity award(s). 
+ 
+ iii. Other Remedies 
+ 
+ In addition to any and all other remedies at law or equity, including monetary damages, the Company shall be entitled to recover its reasonable attorney fees if it succeeds in obtaining an injunction against you for breach or threatened breach of Section 4(a), 4(b), 5(a) or 5(b), or otherwise proving in court that you violated any provision of Section 4(a), 4(b), 5(a) or 5(b). 
+ 
+ You acknowledge that the purpose and effect of Section 5(a) or 5(b) would be frustrated by measuring the duration of the Restricted Period or the Non-Solicitation Period from the termination of your employment if you were to fail to honor your obligation(s) until directed to do so by court order. Should legal proceedings be initiated by the Company to enforce Section 5(a) or 5(b), the commencement of the Restricted Period or the Non-Solicitation Period shall be tolled and extended and will instead begin on the date of the entry of an order granting the Company injunctive, monetary or other relief from your actual or threatened breach of this Agreement. 
+ 
+ You further agree to waive and not assert any claim for advancement of legal fees, costs, or expenses pursuant to the Company s by-laws or based on other authority in the event the Company initiates a legal action against you for violation of Section 4(a), 4(b), 5(a) or 5(b). 
+
+February 24, 2022 
+ Page 7 
+
+d. Reasonableness of Restrictions 
+ 
+ You acknowledge and agree that each of the covenants in this letter is reasonable, appropriate, and narrowly tailored to protect the Company s legitimate interests, including but not limited to protecting Company-Related Parties Confidential Information, and that your full compliance with such restrictions will not unduly or unreasonably interfere with your ability to obtain and undertake other gainful future employment. You and the Company acknowledge and agree that there are number of unique circumstances that provide the Company with protectable interests that justify and necessitate the 24-month Restricted Period in Section 5(a) and the 36-month Non-Solicitation Period in Section 5(b). As one of the Company s senior-most officers, you have been and will be involved in developing, and have unique access to, the Company-Related Parties Confidential Information, including its plans and strategies for the business, personnel leadership, talent management, and succession. This involvement and access enables you to learn information about the skills, capabilities, strengths, and weaknesses of Company-Related Parties personnel, as well as information about their compensation, bonuses, and performance, and Company-Related Parties plans and strategies for same. In addition, your senior position at the Company provides you with a unique and special access to the Company-Related Parties non-public business plans, strategies, and methods. Furthermore, your role with the Company enables you to utilize the Company-Related Parties goodwill to develop relationships with subordinate employees throughout the Company-Related Parties. 
+ 
+ Accordingly, you agree that these and other facts and circumstances associated with your position justify the scope and duration of the restrictions in Section 5(a) and 5(b). 
+ 
+ With respect to Section 5(a), in the event you wish to enter into any relationship or employment on or before the end of the Restricted Period that would potentially violate the restrictions in Section 5(a), you agree to request written permission from the EVP, HR before entering any such relationship or employment. The Company may approve or not approve of the relationship or employment at its absolute discretion. 
+ 
+ You and the Company agree that the amounts set forth in Section 5(c)(ii) for a breach of Section 4(a), 4(b), 5(a) or 5(b) shall represent a fair and reasonable measure of the Company's estimated damages for your breach, shall be deemed to have been fully negotiated and established bilaterally by you and the Company through such negotiations, and shall not constitute a penalty. 
+ 
+ e. Reformation, Severability, and Blue-Penciling 
+ 
+ If any of the provisions of Section 4(a), 4(b), 5(a) or 5(b) should ever be held by a court of competent jurisdiction to exceed the scope permitted by applicable law, you agree such provision or provisions shall first be modified to such lesser scope as the court may deem just and proper for the reasonable protection of the Company s legitimate business interests. In the alternative, if modification is not available, you and the Company agree that the court may sever such provision from this Offer Letter and enforce the remaining provisions. If the amounts set forth in Section 5(c)(ii) should be deemed for any reason by a court of competent jurisdiction not to constitute a permissible liquidated damage, you and the Company agree that the court may establish a liquidated damage in such lesser amount that is in accordance with applicable law. 
+ 
+ 6. At-Will Employment 
+ 
+ This letter should not be construed, nor is it intended, to be a contract of employment for a specified period of time or in any way limiting the Company s right to terminate the employment relationship. 
+
+February 24, 2022 
+ Page 8 
+
+ Your employment relationship is at will. The Company reserves the right to terminate your employment with or without cause at any time. 
+ 
+ 7. Interpretation and Enforcement of this Offer Letter and the Terms Contained Herein 
+ 
+ This letter supersedes any prior employment agreement, offer letters, or understandings, written or oral between you and the Company-Related Parties and contains the entire understanding of the Company and you with respect to the subject matter hereof, except that this letter does not supersede or limit any post-employment restrictions or obligations to the Company-Related Parties that may be contained in any agreement, plan, or document arising out of or relating to equity awards, incentive or bonus awards, or similar arrangements. 
+ 
+ The terms of this letter shall be binding on, and in favor of, the Company s successors in interest and assigns. 
+ 
+ This letter shall be construed, interpreted and applied in accordance with the law of the State of Georgia, without giving effect to any choice of law provisions thereof that would require the application of any other jurisdiction s laws. You agree to irrevocably submit any dispute arising out of or relating to this letter to the exclusive jurisdiction of the Atlanta Division of the U.S. District Court for the Northern District of Georgia, or if federal jurisdiction is not available, the Superior Court of Cobb County, Georgia. You also irrevocably waive, to the fullest extent permitted by applicable law, any objection you may now or hereafter have to the laying of venue of any such dispute brought in such court or any defense of inconvenient forum for the maintenance of such dispute, and you agree to personal jurisdiction and to accept service of legal process from the courts of Georgia. Subject to the parties agreement set forth above regarding modification, in the event any provision in this letter is determined to be legally invalid or unenforceable by any court of competent jurisdiction, and cannot be modified to be enforceable, the affected provision shall be stricken from the letter, and the remaining terms of the letter and its enforceability shall remain unaffected. You agree to accept service of process by mail or by any other means sufficient to ensure that you receive a copy of the items served. 
+ 
+ Craig, we are pleased to extend this offer to you, and we are excited about the opportunities that your leadership will bring to this new role. We have enclosed a copy of this letter for your records. Please sign, date and return the original to us. 
+ 
+ Sincerely, 
+ 
+ s Greg Brenneman 
+ 
+ Gregory D. Brenneman 
+ Independent Lead Director 
+
+I accept this offer as Chair pursuant to the foregoing terms and conditions 
+
+s Craig Menear 2-24-22 
+ Craig Menear Date Signed 
+
+</EX-10.2>
+
+<EX-10.3>
+ 4
+ exhibit103-careyemployment.htm
+ EX-10.3
+
+Document 
+ Exhibit 10.3 
+ 
+ Home Depot Letterhead 
+
+April 19, 2022 
+
+Matt Carey 
+
+Dear Matt 
+ 
+ I am pleased to confirm The Home Depot, Inc. s (the Company or Home Depot offer to you of the position of Executive Vice President, Customer Experience, on the terms and conditions described herein. Please sign below to indicate your acceptance of this offer. 
+ 
+ 1. Your Position, Reporting, Effective Date 
+ 
+ You are being offered the position of Executive Vice President, Customer Experience, reporting directly to me, with an effective date of April 25, 2022. 
+ 
+ 2. Your Compensation and Benefits 
+ 
+ a. Base Salary 
+ 
+ Your annual base salary will be 870,000.00 payable in equal bi-weekly installments. Your next salary review will be held in April of 2023, with salary reviews held annually thereafter. 
+ 
+ b. Management Incentive Plan for Officers 
+ 
+ In addition to your base salary, you will be eligible to participate in the Management Incentive Plan MIP for officers which provides an annual incentive target of up to 100 of your base salary. MIP will be paid annually based on achievement of the established goals. The earned incentive, if any, will be prorated based on the number of full months since the effective date of your new position. To be eligible for payment of any incentive, you must be employed on the day on which the incentive is paid. 
+ 
+ c. Equity Grants 
+ 
+ Home Depot has typically awarded an annual equity grant to Officers in March of each year under the Amended and Restated 2005 Omnibus Stock Incentive Plan or a successor plan (the Omnibus Plan ). Currently, equity awards for officers in March 2023 are expected to consist of restricted stock, stock options, and performance shares. Vesting and performance goals for these awards are established annually for each grant. In March 2023, you will continue to be eligible to receive the same types of equity awards as other officers in the Company. Annual equity awards are not guaranteed as compensation, and there is no minimum or guaranteed award. 
+ 
+ At the next regularly scheduled quarterly meeting of The Home Depot, Inc. Board of Directors following the effective date of your new position, you will receive a grant under the Omnibus Plan of the greatest number of whole shares of restricted common stock of The Home Depot, Inc. Common Stock resulting from dividing 125,000 by the closing stock price on the grant date, vesting 50 after 30 months and 50 after 60 months. Once these provisions lapse, the shares will be yours, free and clear of restrictions, subject to the applicable provisions of the Omnibus Plan and award document. You will also 
+
+April 19, 2022 
+ Page 2 
+
+ receive a grant of nonqualified stock options under the Omnibus Plan equal to the greatest number of whole shares of Common Stock resulting from dividing 125,000 by the grant date accounting cost of the stock options, with an exercise price equal to the closing stock price on the grant date. Twenty-five percent of the stock options will become exercisable on the second, third, fourth and fifth anniversaries of the grant date. Expiration of all stock options will be the earlier of ten years from the grant date, employment termination, or any earlier time provided by the Omnibus Plan or your award document. As a condition to receiving any equity grant, you agree to comply with The Home Depot, Inc. s Securities Laws Policy. 
+ 
+ d. The Home Depot Inc. Employee Stock Purchase Plan Eligibility 
+ 
+ You will continue to be eligible to participate in The Home Depot, Inc. s Employee Stock Purchase Plan. The plan affords you the opportunity to purchase The Home Depot, Inc. common stock at a 15 discount through payroll deductions. 
+ 
+ e. The Home Depot Deferred Compensation Plan for Officers 
+ 
+ You will continue to be eligible to participate in The Home Depot Deferred Compensation Plan for Officers. This plan affords you the opportunity to defer up to 50 of your base salary and 100 of your MIP payment into the plan. 
+ 
+ f. Other Benefit Programs 
+ 
+ You will remain eligible for employee benefits and other programs on the same terms and conditions available to other senior officers of the Company. 
+ 
+ g. Other Terms 
+ 
+ The terms of your annual base salary, the MIP and other benefits set forth herein are subject to future modification or termination at the Company s discretion. All compensation and benefits are subject to any required tax withholding. 
+ 
+ 3. Your General Obligations to Home Depot While You are Employed with the Company 
+ 
+ a. Exclusive Employment with Home Depot 
+ 
+ You agree that you will devote your full business time and attention to your job with Home Depot and that your job with Home Depot will be your sole occupation during the time you are employed with the Company. Except for passive personal investments or charitable work for nonprofit organizations, as of the date you begin employment with Home Depot, you will not perform any work for any person or entity for which you receive any form of compensation, including cash, equity, or in-kind payments, without the express written consent of the Executive Vice President, Human Resources of The Home Depot, Inc. (hereinafter EVP, HR ). You also agree that without the prior express written consent of both the Company s General Counsel and CEO you will not pursue, accept, or retain a position on (i) the board of directors of a company that is publicly traded or intends to become publicly traded or (ii) an advisory board or a private company board of directors for which you receive any form of compensation. 
+
+April 19, 2022 
+ Page 3 
+
+b. Restrictions on Outside Activities or Investments 
+ 
+ You agree that you shall not, without the prior express written consent of the EVP, HR, engage in or have any financial or other interests in, or render any service in any capacity to any competitor or supplier of the Company, its subsidiaries, affiliates, or related entities during the course of your employment with the Company. Hereinafter, the Company and its subsidiaries, affiliates and related entities are referred to collectively as the Company-Related Parties. Notwithstanding the foregoing, you shall not be restricted from owning securities of corporations listed on a national securities exchange or regularly traded by national securities dealers, provided that such ownership was acquired in a manner not prohibited by the Company s Conflict of Interest policy. The provisions of this paragraph shall apply to you, your immediate family members, and any person living in your household. 
+ 
+ c. Compliance with Policies of Home Depot 
+ 
+ You recognize that, as a Company leader, your compliance with both the letter and spirit of Company policies, rules, and procedures is critical to reinforcing the Company s culture of compliance. Accordingly, you agree that you will fully comply with all applicable Company rules, policies, and procedures, including The Home Depot Business Code of Conduct and Ethics, Corporate Compliance Policies, and Standard Operating Procedures, and you will take all appropriate measures to ensure others comply as well. 
+ 
+ 4. Your Obligations to Home Depot Regarding the Handling of Confidential Information, Trade Secrets, and Work Product 
+ 
+ a. Protection of Trade Secrets and Confidential Information of Home Depot 
+ 
+ You acknowledge that through your employment with the Company, you will acquire and have access to Confidential Information of the Company-Related Parties. You agree to use any Confidential Information of the Company-Related Parties that you acquire or have access to only for the purpose of conducting and completing your duties for the Company. You agree not to use any Confidential Information of the Company-Related Parties in any other manner or for any other purpose. You agree that you will not disclose any Confidential Information to any third party, other than as required for the purpose of conducting or completing your duties for the Company, subject to obtaining the appropriate approvals and implementing appropriate safeguards, and you further agree to return all documents or any other item or source containing Confidential Information or any other property of the Company-Related Parties to the Company immediately upon termination for any reason of your employment with the Company. This obligation shall remain in effect, both during and after your employment, for as long as the information or materials you have acquired or to which you have access retain their status as Confidential Information. This letter is not intended to, and does not, alter either the Company-Related Parties rights or your obligations under any state or federal statutory or common law regarding trade secrets and unfair trade practices. You agree that the Company may prevent the use or disclosure of any Confidential Information of the Company-Related Parties through use of an injunction or other means and acknowledge that the Company-Related Parties have taken reasonable steps necessary to protect the secrecy of the Confidential Information. 
+
+April 19, 2022 
+ Page 4 
+
+ For purposes of this letter, Confidential Information means any data or information that belongs and is valuable to the Company-Related Parties and not generally known to competitors of the Company-Related Parties or other outsiders, regardless of whether the Confidential Information is in printed, written or electronic form, retained in your memory or has been compiled or created by you, including but not limited to information related to operations, services, information technology, computer systems, marketing, advertising, e-commerce, interconnected retail, technical, financial, human resources, personnel, staffing, payroll, information about employee compensation and performance, merchandising, pricing, strategic planning, product, vendor, supplier, customer or store planning data, construction, data security information, private brands, supply chain, and or other business processes, or other information similar to the foregoing. 
+ 
+ Pursuant to 18 U.S.C. 1833(b), nothing in this letter, nor any other agreement or Company policy, shall be interpreted to expose you to criminal or civil liability under federal or state trade secret law for disclosure, in confidence, of trade secrets (i) to federal, state, and local government officials, directly or indirectly, or to an attorney, solely for the purpose of reporting or investigating a suspected violation of law, or (ii) in a complaint or other document filed in a lawsuit or other proceeding, provided the filing is made under seal and otherwise protected from disclosure except pursuant to court order. If you file a lawsuit for retaliation for reporting a suspected violation of law, you may disclose trade secrets to your attorney and use the trade secret information in a court proceeding, provided that you file any document containing the trade secret under seal and you do not otherwise disclose the trade secret, except pursuant to court order. Nothing herein is intended to prohibit you from reporting possible violations of law or regulation to any governmental agency or entity having responsibility to investigate same or from making any truthful statement in connection with any legal proceeding or investigation by any governmental agency or entity. 
+ 
+ b. Ownership of Work Product 
+ 
+ You acknowledge and agree that any work product, including without limitation concepts, designs, notes, reports, documentation, drawings, computer programs (source code, object code, and listings), ideas, inventions (whether or not patentable), trade secrets, improvements, creations, scientific and mathematical models, writings, works, works of authorship (whether or not copyrightable), theses, books, lectures, illustrations, devices, masks, models, work-in-process, photographs, pictorial, graphical or audiovisual works or sound recordings or video recordings, prints, and deliverables, and any other subject matter which is or may become legally protectable or recognized as a form of property, and all materials contained therein and prepared in connection therewith and or therefrom, whether in draft or final form (collectively, Work Product ), which are designed, created, conceived, developed or reduced to practice, writing or publication by you, either solely or jointly with others, during your employment with Home Depot, which relate to or are useful in Home Depot s business, or which derive in any way from using Home Depot property, shall be considered works made for hire and shall be owned by, and deemed the exclusive property of, Home Depot. Without in any way limiting the foregoing, and without any further compensation, in the event that it is determined that any Work Product does not quality as a work made for hire or that it is not otherwise owned by Home Depot, you agree to assign and do hereby assign to Home Depot your right, title, and interest in and to any Work Product, whether now existing or created in the future, that arises from your employment with Home Depot, or that derives in any way from using Home Depot property. You further agree to execute any additional documents that Home Depot deems, in its sole discretion, necessary to vest ownership of Work Product with Home Depot or perfect such intellectual property rights in the United States and any other jurisdiction worldwide. 
+
+April 19, 2022 
+ Page 5 
+
+ c. Protection of Information that Belongs to Others 
+ 
+ You understand that it is not the intention of Home Depot to receive or obtain any trade secrets, proprietary information, or other confidential information of others. Accordingly, you agree that you will not disclose or use during or in connection with your employment with Home Depot any trade secrets, proprietary information, or confidential information to which you may have been exposed or that you may have acquired in connection with your prior employment or engagement as an independent contractor or consultant. Further, you agree that you will not bring Home Depot any documents or materials in any form containing trade secrets, proprietary information, or confidential information from a prior employer, client, or customer. 
+ 
+ 5. Post-Employment Restrictive Covenants 
+ 
+ a. Non-Competition 
+ 
+ By accepting this offer, you acknowledge and agree that, as a key executive of the Company, you have and will receive training and Confidential Information, and that you have been and will be provided and entrusted with access to the Company-Related Parties customer and employee relationships and goodwill. You further acknowledge that such Confidential Information, including trade secrets and other business processes, are utilized by the Company-Related Parties throughout the entire United States and in other locations in which it conducts business. You further acknowledge and agree that the Company-Related Parties Confidential Information, customer, service provider, vendor and employee relationships, and goodwill are valuable assets of the Company-Related Parties and are legitimate business interests that are properly subject to protection through the covenants contained in this letter. Consequently, you agree that during the Restricted Period you shall not, directly or indirectly, enter into or maintain an employment, contractual or other business relationship, in the United States, Canada, or Mexico, in which (A) you own an equity interest in a Competitor greater than one percent (1 of its outstanding equity, or manage, operate, finance, or control a Competitor or (B) you provide services or perform duties for a Competitor that (i) are the same as or similar to the services or job duties you performed for the Company at any point during the two-year period prior to the termination of your employment, or (ii) involve executive, managerial, financial, or other significant leadership responsibilities. 
+ 
+ Competitor shall mean 
+ 
+ (X) the following companies or entities, including their subsidiaries, affiliates, franchisees, or business units Lowe s Companies, Inc. Amazon.com Menard, Inc. Floor & Decor Canadian Tire Wayfair and Walmart Inc. 
+
+April 19, 2022 
+ Page 6 
+
+(Y) any company or entity that sells or offers Competitive Products or Services that, in combination with its subsidiaries, affiliates, franchisees, or business units (a) operates more than 100 retail outlets across the United States, Canada, and Mexico or (b) generates more than 500 million in annual revenue or 
+ 
+ (Z) any company or entity that is formed through, or as a result of, a sale, merger, combination, renaming, restructuring, spin-off, or other corporate transaction involving a business or entity defined in clause (X) or (Y) of this sentence, and which sells Competitive Products or Services. 
+ 
+ Competitive Products or Services means anything of commercial value of the type offered, provided or sold by the Company-Related Parties, in the United States, Canada, or Mexico, within two (2) years prior to termination of your employment and during the Restricted Period, including, without limitation goods personal, real, or intangible property services financial products business opportunities or assistance or any other object or aspect of business conducted or provided by Company-Related Parties. 
+ 
+ Restricted Period shall mean the period during which you are employed with the Company and for a period of twenty-four (24) months following the termination of your employment, regardless of the reason for such termination. 
+ 
+ b. Non-Solicitation of Company Employees 
+ 
+ You agree that during the course of your employment and for a period of thirty-six (36) months following the termination of your employment with the Company Non-Solicitation Period ), you will not directly or indirectly, on your own behalf or on behalf of any other entity or person, Solicit any person who is, or during the last twelve (12) months of your employment with the Company was, an employee of any of the Company-Related Parties, with whom you had material contact during your employment, or with respect to whom you obtained or had authorized access to Confidential Information while employed with the Company, to terminate his or her employment or other relationship with any of the Company-Related Parties, or to refer any such employee to anyone, without the prior written approval from the EVP, HR. For purposes of this paragraph, Solicit shall include any solicitation, enticement, or encouragement whatsoever, regardless of which party initiated the initial contact, as well as any direct or indirect involvement in the recruitment, referral, interviewing, hiring, or setting of the initial terms and conditions of employment. 
+ 
+ c. Remedies for Breach 
+ 
+ i. Injunctive Relief 
+ 
+ You acknowledge and agree that quantifying the damages suffered by the Company for your breach of Section 4(a), 4(b), 5(a) or 5(b) might not be possible or feasible, or provide adequate compensation to the Company at law and that the balance of the hardships tips in favor of enforcing such section(s). You agree that the Company shall be entitled, if any such breach shall occur or be either threatened or attempted, if it so elects, to seek from a court a temporary, preliminary, and permanent injunction, without being required to post a bond, enjoining and restraining such breach or threatened or attempted breach. 
+
+April 19, 2022 
+ Page 7 
+
+ii. Liquidated Damages 
+ 
+ Because of the potential difficulty in quantifying damages that the Company may suffer in the event of a breach by you of Section 4(a), 4(b), 5(a) or 5(b), you and the Company agree that it is appropriate to reasonably estimate such damages in advance and set an amount of liquidated damages that you will owe the Company in the event of a breach. Accordingly, after due consideration, you and the Company agree that, if you breach Section 4(a), 4(b), 5(a) or 5(b), you shall pay the Company, upon demand, an amount specified by the Company, up to the sum of the then-current market value of the shares of Common Stock that you hold that were granted by any equity awards and the aggregate after-tax proceeds you received upon the sale or other disposition of any shares of Common Stock granted by any equity award(s). 
+ 
+ iii. Other Remedies 
+ 
+ In addition to any and all other remedies at law or equity, including monetary damages, the Company shall be entitled to recover its reasonable attorney fees if it succeeds in obtaining an injunction against you for breach or threatened breach of Section 4(a), 4(b), 5(a) or 5(b), or otherwise proving in court that you violated any provision of Section 4(a), 4(b), 5(a) or 5(b). 
+ 
+ You acknowledge that the purpose and effect of Section 5(a) or 5(b) would be frustrated by measuring the duration of the Restricted Period or the Non-Solicitation Period from the termination of your employment if you were to fail to honor your obligation(s) until directed to do so by court order. Should legal proceedings be initiated by the Company to enforce Section 5(a) or 5(b), the commencement of the Restricted Period or the Non-Solicitation Period shall be tolled and extended and will instead begin on the date of the entry of an order granting the Company injunctive, monetary or other relief from your actual or threatened breach of this Agreement. 
+ 
+ You further agree to waive and not assert any claim for advancement of legal fees, costs, or expenses pursuant to the Company s by-laws or based on other authority in the event the Company initiates a legal action against you for violation of Section 4(a), 4(b), 5(a) or 5(b). 
+ 
+ d. Reasonableness of Restrictions 
+ 
+ You acknowledge and agree that each of the covenants in this letter is reasonable, appropriate, and narrowly tailored to protect the Company s legitimate interests, including but not limited to protecting Company-Related Parties Confidential Information, and that your full compliance with such restrictions will not unduly or unreasonably interfere with your ability to obtain and undertake other gainful future employment. You and the Company acknowledge and agree that there are number of unique circumstances that provide the Company with protectable interests that justify and necessitate the 24-month Restricted Period in Section 5(a) and the 36-month Non-Solicitation Period in Section 5(b). As one of the Company s senior-most officers, you have been and will be involved in developing, and have unique access to, the Company-Related Parties Confidential Information, including its plans and strategies for the business, personnel leadership, talent management, and succession. This involvement and access enables you to learn information about the skills, capabilities, strengths, and weaknesses of Company-Related Parties personnel, as well as information about their compensation, bonuses, and performance, and Company-Related Parties plans and strategies for same. In addition, your senior position at the Company provides you with a unique and special access to the Company-Related Parties non-public business plans, strategies, and methods. Furthermore, your role with the Company enables 
+
+April 19, 2022 
+ Page 8 
+
+ you to utilize the Company-Related Parties goodwill to develop relationships with subordinate employees throughout the Company-Related Parties. 
+ 
+ Accordingly, you agree that these and other facts and circumstances associated with your position justify the scope and duration of the restrictions in Section 5(a) and 5(b). 
+ 
+ With respect to Section 5(a), in the event you wish to enter into any relationship or employment on or before the end of the Restricted Period that would potentially violate the restrictions in Section 5(a), you agree to request written permission from the EVP, HR before entering any such relationship or employment. The Company may approve or not approve of the relationship or employment at its absolute discretion. 
+ 
+ You and the Company agree that the amounts set forth in Section 5(c)(ii) for a breach of Section 4(a), 4(b), 5(a) or 5(b) shall represent a fair and reasonable measure of the Company's estimated damages for your breach, shall be deemed to have been fully negotiated and established bilaterally by you and the Company through such negotiations, and shall not constitute a penalty. 
+ 
+ e. Reformation, Severability, and Blue-Penciling 
+ 
+ If any of the provisions of Section 4(a), 4(b), 5(a) or 5(b) should ever be held by a court of competent jurisdiction to exceed the scope permitted by applicable law, you agree such provision or provisions shall first be modified to such lesser scope as the court may deem just and proper for the reasonable protection of the Company s legitimate business interests. In the alternative, if modification is not available, you and the Company agree that the court may sever such provision from this Offer Letter and enforce the remaining provisions. If the amounts set forth in Section 5(c)(ii) should be deemed for any reason by a court of competent jurisdiction not to constitute a permissible liquidated damage, you and the Company agree that the court may establish a liquidated damage in such lesser amount that is in accordance with applicable law. 
+ 
+ 6. At-Will Employment 
+ 
+ This letter should not be construed, nor is it intended, to be a contract of employment for a specified period of time or in any way limiting the Company s right to terminate the employment relationship. Your employment relationship is at will. The Company reserves the right to terminate your employment with or without cause at any time. 
+ 
+ 7. Interpretation and Enforcement of this Offer Letter and the Terms Contained Herein 
+ 
+ This letter supersedes any prior employment agreement, offer letters, or understandings, written or oral between you and the Company-Related Parties and contains the entire understanding of the Company and you with respect to the subject matter hereof, except that this letter does not supersede or limit any post-employment restrictions or obligations to the Company-Related Parties that may be contained in any agreement, plan, or document arising out of or relating to equity awards, incentive or bonus awards, or similar arrangements. 
+
+April 19, 2022 
+ Page 9 
+
+ The terms of this letter shall be binding on, and in favor of, the Company s successors in interest and assigns. 
+ 
+ This letter shall be construed, interpreted and applied in accordance with the law of the State of Georgia, without giving effect to any choice of law provisions thereof that would require the application of any other jurisdiction s laws. You agree to irrevocably submit any dispute arising out of or relating to this letter to the exclusive jurisdiction of the Atlanta Division of the U.S. District Court for the Northern District of Georgia, or if federal jurisdiction is not available, the Superior Court of Cobb County, Georgia. You also irrevocably waive, to the fullest extent permitted by applicable law, any objection you may now or hereafter have to the laying of venue of any such dispute brought in such court or any defense of inconvenient forum for the maintenance of such dispute, and you agree to personal jurisdiction and to accept service of legal process from the courts of Georgia. Subject to the parties agreement set forth above regarding modification, in the event any provision in this letter is determined to be legally invalid or unenforceable by any court of competent jurisdiction, and cannot be modified to be enforceable, the affected provision shall be stricken from the letter, and the remaining terms of the letter and its enforceability shall remain unaffected. You agree to accept service of process by mail or by any other means sufficient to ensure that you receive a copy of the items served. 
+ 
+ Matt, we are pleased to extend this offer to you, and we are excited about the opportunities that your leadership will bring to this new role. We have enclosed a copy of this letter for your records. Please sign, date and return the original to us. 
+ 
+ Sincerely, 
+ 
+ s Ted Decker 
+ 
+ Ted Decker 
+ Chief Executive Officer & President 
+
+I accept this offer as Executive Vice President, Customer Experience, pursuant to the foregoing terms and conditions 
+
+s Matt Carey 4-19-2022 
+ Matt Carey Date Signed 
+
+</EX-10.3>
+
+<EX-15.1>
+ 5
+ hd_ex151-05012022xactive.htm
+ EX-15.1
+
+Document 
+
+Exhibit 15.1 
+ ACKNOWLEDGEMENT OF INDEPENDENT REGISTERED PUBLIC ACCOUNTING FIRM 
+ To the Stockholders and Board of Directors 
+ The Home Depot, Inc. 
+ 
+ We acknowledge our awareness of the use of our report dated May 23, 2022 related to our review of interim financial information included within the Quarterly Report on Form 10-Q of The Home Depot, Inc. for the three-month period ended May 1, 2022, and incorporated by reference in the following Registration Statements 
+ Description Registration Statement Number Form S-3 Depot Direct stock purchase program 333-249732 Debt securities 333-259121 Form S-8 The Home Depot, Inc. 1997 Omnibus Stock Incentive Plan 333-61733 The Home Depot Canada Registered Retirement Savings Plan 333-38946 The Home Depot, Inc. Restated and Amended Employee Stock Purchase Plan 333-151849 The Home Depot, Inc. Amended and Restated Employee Stock Purchase Plan 
+ 333-182374 The Home Depot, Inc. Non-Qualified Stock Option and Deferred Stock Units Plan and Agreement 333-56722 The Home Depot, Inc. 2005 Omnibus Stock Incentive Plan 
+ 333-125331 The Home Depot, Inc. 2005 Omnibus Stock Incentive Plan 333-153171 The Home Depot FutureBuilder and The Home Depot FutureBuilder for Puerto Rico 
+ 333-125332 
+ 
+ Pursuant to Rule 436 under the Securities Act of 1933 the Act ), such report is not considered part of a registration statement prepared or certified by an independent registered public accounting firm, or a report prepared or certified by an independent registered public accounting firm within the meaning of Sections 7 and 11 of the Act. 
+ s KPMG LLP 
+ Atlanta, Georgia 
+ May 23, 2022 
+
+</EX-15.1>
+
+<EX-31.1>
+ 6
+ hd_ex311-05012022xactive.htm
+ EX-31.1
+
+Document 
+
+Exhibit 31.1 
+ CERTIFICATION 
+ I, Edward P. Decker, certify that 
+ 
+ 1. I have reviewed this quarterly report on Form 10-Q of The Home Depot, Inc. 
+ 
+ 2. Based on my knowledge, this report does not contain any untrue statement of a material fact or omit to state a material fact necessary to make the statements made, in light of the circumstances under which such statements were made, not misleading with respect to the period covered by this report 
+ 
+ 3. Based on my knowledge, the financial statements, and other financial information included in this report, fairly present in all material respects the financial condition, results of operations and cash flows of the registrant as of, and for, the periods presented in this report 
+ 
+ 4. The registrant s other certifying officer(s) and I are responsible for establishing and maintaining disclosure controls and procedures (as defined in Exchange Act Rules 13a-15(e) and 15d-15(e)) and internal control over financial reporting (as defined in Exchange Act Rules 13a-15(f) and 15d-15(f)) for the registrant and have 
+ 
+ a) Designed such disclosure controls and procedures, or caused such disclosure controls and procedures to be designed under our supervision, to ensure that material information relating to the registrant, including its consolidated subsidiaries, is made known to us by others within those entities, particularly during the period in which this report is being prepared 
+ 
+ b) Designed such internal control over financial reporting, or caused such internal control over financial reporting to be designed under our supervision, to provide reasonable assurance regarding the reliability of financial reporting and the preparation of financial statements for external purposes in accordance with generally accepted accounting principles 
+ 
+ c) Evaluated the effectiveness of the registrant s disclosure controls and procedures and presented in this report our conclusions about the effectiveness of the disclosure controls and procedures, as of the end of the period covered by this report based on such evaluation and 
+ 
+ d) Disclosed in this report any change in the registrant s internal control over financial reporting that occurred during the registrant s most recent fiscal quarter (the registrant s fourth fiscal quarter in the case of an annual report) that has materially affected, or is reasonably likely to materially affect, the registrant s internal control over financial reporting and 
+ 
+ 5. The registrant s other certifying officer(s) and I have disclosed, based on our most recent evaluation of internal control over financial reporting, to the registrant s auditors and the audit committee of the registrant s board of directors (or persons performing the equivalent functions) 
+ 
+ a) All significant deficiencies and material weaknesses in the design or operation of internal control over financial reporting which are reasonably likely to adversely affect the registrant s ability to record, process, summarize and report financial information and 
+ 
+ b) Any fraud, whether or not material, that involves management or other employees who have a significant role in the registrant s internal control over financial reporting. 
+ 
+ Date May 23, 2022 
+ 
+ s Edward P. Decker Edward P. Decker Chief Executive Officer and President 
+
+</EX-31.1>
+
+<EX-31.2>
+ 7
+ hd_ex312-05012022xactive.htm
+ EX-31.2
+
+Document 
+
+Exhibit 31.2 
+ CERTIFICATION 
+ I, Richard V. McPhail, certify that 
+ 
+ 1. I have reviewed this quarterly report on Form 10-Q of The Home Depot, Inc. 
+ 
+ 2. Based on my knowledge, this report does not contain any untrue statement of a material fact or omit to state a material fact necessary to make the statements made, in light of the circumstances under which such statements were made, not misleading with respect to the period covered by this report 
+ 
+ 3. Based on my knowledge, the financial statements, and other financial information included in this report, fairly present in all material respects the financial condition, results of operations and cash flows of the registrant as of, and for, the periods presented in this report 
+ 
+ 4. The registrant s other certifying officer(s) and I are responsible for establishing and maintaining disclosure controls and procedures (as defined in Exchange Act Rules 13a-15(e) and 15d-15(e)) and internal control over financial reporting (as defined in Exchange Act Rules 13a-15(f) and 15d-15(f)) for the registrant and have 
+ 
+ a) Designed such disclosure controls and procedures, or caused such disclosure controls and procedures to be designed under our supervision, to ensure that material information relating to the registrant, including its consolidated subsidiaries, is made known to us by others within those entities, particularly during the period in which this report is being prepared 
+ 
+ b) Designed such internal control over financial reporting, or caused such internal control over financial reporting to be designed under our supervision, to provide reasonable assurance regarding the reliability of financial reporting and the preparation of financial statements for external purposes in accordance with generally accepted accounting principles 
+ 
+ c) Evaluated the effectiveness of the registrant s disclosure controls and procedures and presented in this report our conclusions about the effectiveness of the disclosure controls and procedures, as of the end of the period covered by this report based on such evaluation and 
+ 
+ d) Disclosed in this report any change in the registrant s internal control over financial reporting that occurred during the registrant s most recent fiscal quarter (the registrant s fourth fiscal quarter in the case of an annual report) that has materially affected, or is reasonably likely to materially affect, the registrant s internal control over financial reporting and 
+ 
+ 5. The registrant s other certifying officer(s) and I have disclosed, based on our most recent evaluation of internal control over financial reporting, to the registrant s auditors and the audit committee of the registrant s board of directors (or persons performing the equivalent functions) 
+ 
+ a) All significant deficiencies and material weaknesses in the design or operation of internal control over financial reporting which are reasonably likely to adversely affect the registrant s ability to record, process, summarize and report financial information and 
+ 
+ b) Any fraud, whether or not material, that involves management or other employees who have a significant role in the registrant s internal control over financial reporting. 
+ 
+ Date May 23, 2022 
+ 
+ s Richard V. McPhail Richard V. McPhail Executive Vice President and Chief Financial Officer 
+
+</EX-31.2>
+
+<EX-32.1>
+ 8
+ hd_ex321-05012022xactive.htm
+ EX-32.1
+
+Document 
+
+Exhibit 32.1 
+ CERTIFICATION PURSUANT TO 
+ 18 U.S.C. SECTION 1350 
+ AS ADOPTED PURSUANT TO 
+ SECTION 906 OF THE SARBANES-OXLEY ACT OF 2002 
+ In connection with the Quarterly Report of The Home Depot, Inc. (the Company on Form 10-Q Form 10-Q for the period ended May 1, 2022 as filed with the Securities and Exchange Commission, I, Edward P. Decker, Chief Executive Officer and President of the Company, certify, pursuant to 18 U.S.C. Section 1350, as adopted pursuant to Section 906 of the Sarbanes-Oxley Act of 2002, that, to my knowledge 
+ 
+ (1) The Form 10-Q fully complies with the requirements of section 13(a) or 15(d) of the Securities Exchange Act of 1934 and 
+ 
+ (2) The information contained in the Form 10-Q fairly presents, in all material respects, the financial condition and results of operations of the Company. 
+ 
+ s Edward P. Decker Edward P. Decker Chief Executive Officer and President May 23, 2022 
+
+</EX-32.1>
+
+<EX-32.2>
+ 9
+ hd_ex322-05012022xactive.htm
+ EX-32.2
+
+Document 
+
+Exhibit 32.2 
+ CERTIFICATION PURSUANT TO 
+ 18 U.S.C. SECTION 1350 
+ AS ADOPTED PURSUANT TO 
+ SECTION 906 OF THE SARBANES-OXLEY ACT OF 2002 
+ In connection with the Quarterly Report of The Home Depot, Inc. (the Company on Form 10-Q Form 10-Q for the period ended May 1, 2022 as filed with the Securities and Exchange Commission, I, Richard V. McPhail, Executive Vice President and Chief Financial Officer of the Company, certify, pursuant to 18 U.S.C. Section 1350, as adopted pursuant to Section 906 of the Sarbanes-Oxley Act of 2002, that, to my knowledge 
+ 
+ (1) The Form 10-Q fully complies with the requirements of section 13(a) or 15(d) of the Securities Exchange Act of 1934 and 
+ 
+ (2) The information contained in the Form 10-Q fairly presents, in all material respects, the financial condition and results of operations of the Company. 
+ 
+ s Richard V. McPhail Richard V. McPhail Executive Vice President and Chief Financial Officer May 23, 2022 
+
+</EX-32.2>
+
+<EX-101.SCH>
+ 10
+ hd-20220501.xsd
+ XBRL TAXONOMY EXTENSION SCHEMA DOCUMENT
+
+</EX-101.SCH>
+
+<EX-101.CAL>
+ 11
+ hd-20220501_cal.xml
+ XBRL TAXONOMY EXTENSION CALCULATION LINKBASE DOCUMENT
+
+</EX-101.CAL>
+
+<EX-101.DEF>
+ 12
+ hd-20220501_def.xml
+ XBRL TAXONOMY EXTENSION DEFINITION LINKBASE DOCUMENT
+
+</EX-101.DEF>
+
+<EX-101.LAB>
+ 13
+ hd-20220501_lab.xml
+ XBRL TAXONOMY EXTENSION LABEL LINKBASE DOCUMENT
+
+</EX-101.LAB>
+
+<EX-101.PRE>
+ 14
+ hd-20220501_pre.xml
+ XBRL TAXONOMY EXTENSION PRESENTATION LINKBASE DOCUMENT
+
+</EX-101.PRE>
+

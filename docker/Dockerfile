@@ -20,7 +20,7 @@ ARG HADOOP_SHA512="ca5e12625679ca95b8fd7bb7babc2a8dcb2605979b901df9ad13717871882
 ARG HADOOP_HOME="/opt/hadoop"
 
 ARG JAVA_VERSION=11
-ARG PYTHON_VERSION=3.11
+ARG PYTHON_VERSION=3.10
 ##TODO the python version is being installed from debian, instead of manually which puts the bells and whistles in
 ARG NODE_VERSION=18
 ARG NODE_SHA=""
@@ -33,7 +33,7 @@ ARG NODE_SHA=""
 # Allows for efficient multistage build with minimum network activity
 # and assertation of remote resources by good 'ol hard coded hash matching
 
-FROM debian:bookworm as dependencies
+FROM debian:bookworm-slim as dependencies
 
 ENV DEBIAN_FRONTEND=noninteractive
 ARG DOCKER_BUILDKIT
@@ -175,7 +175,7 @@ COPY ./bin /tmp/workspace/bin
 
 # Contains everything (and the kitchen sink) required to build project artifacts and run tests
 
-FROM debian:bookworm as devcontainer
+FROM debian:bookworm-slim as devcontainer
 
 ENV DEBIAN_FRONTEND=noninteractive
 
@@ -269,6 +269,12 @@ RUN ln -s /usr/local/python/bin/pip /usr/bin/pip
 # RUN ln -s /usr/bin/python3 /usr/bin/python
 RUN python -m pip install --upgrade pip
 
+
+# Install CPU Deep Learning Frameworks
+RUN pip install --upgrade "jax[cpu]"
+RUN pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu
+
+
 # Install python dependencies
 COPY ./requirements.txt /tmp/workspace/requirements.txt
 COPY --from=dependencies /tmp/python_packages /tmp/python_packages
@@ -300,11 +306,9 @@ ENV PATH $PATH:$SPARK_HOME/bin:$HADOOP_HOME/bin
 ENV SPARK_DIST_CLASSPATH /opt/hadoop/etc/hadoop:/opt/hadoop/share/hadoop/common/lib/*:/opt/hadoop/share/hadoop/common/*:/opt/hadoop/share/hadoop/hdfs:/opt/hadoop/share/hadoop/hdfs/lib/*:/opt/hadoop/share/hadoop/hdfs/*:/opt/hadoop/share/hadoop/mapreduce/lib/*:/opt/hadoop/share/hadoop/mapreduce/*:/opt/hadoop/share/hadoop/yarn:/opt/hadoop/share/hadoop/yarn/lib/*:/opt/hadoop/share/hadoop/yarn/*
 ENV SPARK_CLASSPATH /opt/spark/jars/*:$SPARK_DIST_CLASSPATH
 
-## Install PySpark
-# TODO install pyspark from spark build from source
-# use the local source version of spark for pyspark instead of downloading again
+### PySpark ###
+# Install PySpark globally pointing to the Spark installation
 RUN cd $SPARK_HOME/python && python -m pip install .
-# RUN $SPARK_HOME && sbt clean assembly
 
 
 # Add PySpark to the Python Path
@@ -324,13 +328,9 @@ RUN cd $SPARK_HOME/python && python -m pip install .
 
 
 
-# ### Scala Build Tools ###
-# RUN /bin/bash /tmp/workspace/bin/install_scripts/sbt-debian.sh
 
 # Install VS Code remote development container features
 RUN /bin/bash /tmp/workspace/bin/install_scripts/common-debian.sh "${INSTALL_ZSH}" "${USERNAME}" "${HOST_USER_ID}" "${HOST_GROUP_ID}" "${UPGRADE_PACKAGES}" "true" "true"
-
-
 
 ### Docker from Docker
 RUN /bin/bash /tmp/workspace/bin/install_scripts/docker-from-docker-debian.sh 
@@ -341,14 +341,15 @@ RUN /bin/bash /tmp/workspace/bin/install_scripts/k3d-debian.sh
 ### Kubectl and Helm ###
 RUN /bin/bash /tmp/workspace/bin/install_scripts/kubectl-helm-debian.sh
 
-# ### KIND (Kubernetes in Docker) ###
-# RUN /bin/bash /tmp/workspace/bin/install_scripts/kind-debian.sh
-
 ### Rust ###
 ENV PATH="/usr/local/cargo/bin:$PATH"
-RUN /bin/bash /tmp/workspace/bin/install_scripts/rust-debian.sh && \
-    rustup default stable && \
+RUN /bin/bash /tmp/workspace/bin/install_scripts/rust-debian.sh
+USER ${USERNAME}
+RUN rustup default stable && \
+    # Install wasm-pack for WebAssembly bundling
     cargo install wasm-pack
+USER root
+
 
 
 ### Java ###
@@ -392,30 +393,14 @@ RUN apt-get update && /bin/bash /tmp/workspace/bin/install_scripts/node-debian.s
 RUN npm install -g npm yarn
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 ### Cleanup ###
 RUN rm -rf /tmp/workspace
+RUN rm -rf /tmp/builder
 RUN apt-get autoremove -y && apt-get clean -y && rm -rf /var/lib/apt/lists/*
 USER ${USERNAME}
+
 WORKDIR /workspace
 
-# Install CPU Deep Learning Frameworks
-RUN pip install --upgrade "jax[cpu]"
-RUN pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu
 
 # Required for Docker-from-Docker
 ENTRYPOINT ["/usr/local/share/docker-init.sh"]
