@@ -62,3 +62,5 @@ services:
       - NET_ADMIN
 
     network_mode: "host" # Enables K3D access from within container
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
