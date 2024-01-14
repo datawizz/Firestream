@@ -1,0 +1,18 @@
+secrets:
+  databaseConnectionString: {{ POSTGRES_CONNECTION_STRING }}
+  authEncryptSecretKey: SOME_RANDOM_SECRET_KEY_THAT_IS_ALPHA_NUMERIC
+lakefsConfig: |
+  database:
+    type: postgres
+  blockstore:
+    type: s3
+    s3:
+      region: us-east-1
+  gateways:
+    s3:
+      domain_name: s3.lakefs.example.com
+
+s3Fallback:
+  enabled = true	If set to true, an S3Proxy container will be started. Requests to lakeFS S3 gateway with a non-existing repository will be forwarded to this container.	
+s3Fallback.aws_access_key	An AWS access key to be used by the S3Proxy for authentication	
+s3Fallback.aws_secret_key	An AWS secret key to be used by the S3Proxy for authentication

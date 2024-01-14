@@ -40,6 +40,15 @@ from pyspark.sql import SparkSession
 import boto3
 
 
+
+# TODO this hack is to set the LakeFS credentials, which should be set via the CLI (but cannot be used with MinIO :|  )
+os.environ["LAKEFS_ENDPOINT_URL"] = "https://lakefs.default.svc.cluster.local:80/api/v1"
+os.environ["LAKEFS_ACCESS_KEY"] = "TODO_CHANGE_ME2"
+os.environ["LAKEFS_SECRET_KEY"] = "THIS_IS_A_SECRET_TODO_CHANGE_ME2"
+
+
+
+
 class SparkClient:
 
     """
@@ -53,8 +62,7 @@ class SparkClient:
 
         self.spark_master = kwargs.get("master") or "local[*]"
         self.CATALOG = kwargs.get("catalog") or "delta"
-        self.BRANCH = kwargs.get("branch") or os.environ.get("DEPLOYMENT_MODE") or "main"
-        self.NESSIE_SERVER = os.environ.get("NESSIE_SERVER_URI")
+        self.BRANCH = kwargs.get("branch") or os.environ.get("DEPLOYMENT_MODE", "main")
 
         #TODO this should be set to the spark master in the K8 cluster
         #self.spark_master = "spark://spark-master-0.spark-headless.default.svc.cluster.local:7077"
@@ -66,39 +74,29 @@ class SparkClient:
         # Default to using local S3
         self.storage_location = kwargs.get("storage_location") or "local"
 
-        self.S3_CLOUD_ENDPOINT_URL = os.environ.get("S3_CLOUD_ENDPOINT_URL")
-        self.S3_CLOUD_ACCESS_KEY_ID = os.environ.get("S3_CLOUD_ACCESS_KEY_ID")
-        self.S3_CLOUD_SECRET_ACCESS_KEY = os.environ.get("S3_CLOUD_SECRET_ACCESS_KEY")
-        self.S3_CLOUD_BUCKET_NAME = os.environ.get("S3_CLOUD_BUCKET_NAME")
-        self.S3_CLOUD_PATH = f"s3a://{self.S3_CLOUD_BUCKET_NAME}/warehouse"
-        self.S3_CLOUD_DEFAULT_REGION = os.environ.get("S3_CLOUD_DEFAULT_REGION")
+        self.S3_ENDPOINT_URL = os.environ.get("S3_LOCAL_ENDPOINT_URL")
+        self.S3_ACCESS_KEY_ID = os.environ.get("S3_LOCAL_ACCESS_KEY_ID")
+        self.S3_SECRET_ACCESS_KEY = os.environ.get("S3_LOCAL_SECRET_ACCESS_KEY")
+        self.S3_BUCKET_NAME = os.environ.get("S3_LOCAL_BUCKET_NAME")
+        self.S3_DEFAULT_REGION = os.environ.get("S3_LOCAL_DEFAULT_REGION")
 
+        self.LAKEFS_ENDPOINT_URL = os.environ.get("LAKEFS_ENDPOINT_URL")
+        self.LAKEFS_ACCESS_KEY = os.environ.get("LAKEFS_ACCESS_KEY")
+        self.LAKEFS_SECRET_KEY = os.environ.get("LAKEFS_SECRET_KEY")
+
+        self.S3_PATH = f"s3a://{self.S3_BUCKET_NAME}/warehouse"
         # Default logging to local S3 (in cluster or vpc)
         # TODO use opentelemetry to log to a remote logging service
-        self.set_bucket()
+        self.LOG_PATH = f"s3a://{self.S3_BUCKET_NAME}/spark_logs/"
+
 
         self.create_logging_dir()
 
         self.spark_session = self.create_spark_session()
         self.spark_context = self.spark_session.sparkContext
 
-    def set_bucket(self):
-        if self.storage_location == "local":
-            self.S3_ENDPOINT_URL = os.environ.get("S3_LOCAL_ENDPOINT_URL")
-            self.S3_ACCESS_KEY_ID = os.environ.get("S3_LOCAL_ACCESS_KEY_ID")
-            self.S3_SECRET_ACCESS_KEY = os.environ.get("S3_LOCAL_SECRET_ACCESS_KEY")
-            self.S3_BUCKET_NAME = os.environ.get("S3_LOCAL_BUCKET_NAME")
-            self.S3_PATH = f"{self.S3_BUCKET_NAME}/warehouse"
-            self.S3_DEFAULT_REGION = os.environ.get("S3_LOCAL_DEFAULT_REGION")
-        else:
-            self.S3_ENDPOINT_URL = os.environ.get("S3_CLOUD_ENDPOINT_URL")
-            self.S3_ACCESS_KEY_ID = os.environ.get("S3_CLOUD_ACCESS_KEY_ID")
-            self.S3_SECRET_ACCESS_KEY = os.environ.get("S3_CLOUD_SECRET_ACCESS_KEY")
-            self.S3_BUCKET_NAME = os.environ.get("S3_CLOUD_BUCKET_NAME")
-            self.S3_PATH = f"{self.S3_BUCKET_NAME}/warehouse"
-            self.S3_DEFAULT_REGION = os.environ.get("S3_CLOUD_DEFAULT_REGION")
 
-        self.LOG_PATH = f"s3a://{self.S3_BUCKET_NAME}/spark_logs/"
+        
 
     def create_logging_dir(self):
         s3 = boto3.resource(
@@ -125,49 +123,46 @@ class SparkClient:
 
         catalog = self.CATALOG
 
-        # jars_packages = [
-        #     # For Kafka access
-        #     "org.apache.spark:spark-sql-kafka-0-10_2.12:3.3.1",
-        #     "org.apache.spark:spark-streaming-kafka-0-10_2.12:3.3.1",
-        #     "org.apache.kafka:kafka-clients:3.3.1",
-        #     "org.apache.iceberg:iceberg-spark-runtime-3.3_2.12:1.2.1",
-        #     "org.projectnessie.nessie-integrations:nessie-spark-extensions-3.3_2.12:0.58.1",
-        #     "org.apache.hadoop:hadoop-aws:3.3.1",
-        #     "org.apache.hadoop:hadoop-common:3.3.1",
-        #     "org.apache.spark:spark-hadoop-cloud_2.12:3.3.1"
-        # ]
         self.jars_packages = [
             "org.apache.spark:spark-sql-kafka-0-10_2.12:3.4.1",
             "org.apache.spark:spark-streaming-kafka-0-10_2.12:3.4.1",
             "org.apache.kafka:kafka-clients:3.4.1",
             "org.apache.hadoop:hadoop-aws:3.3.1",
             "org.apache.hadoop:hadoop-common:3.3.1",
-            "org.apache.spark:spark-hadoop-cloud_2.12:3.4.1"
+            "org.apache.spark:spark-hadoop-cloud_2.12:3.4.1",
+            "io.delta:delta-core_2.12:2.4.0",
+            "io.lakefs:hadoop-lakefs-assembly:0.1.15"
         ]
-
-        if catalog == "delta":
-            self.jars_packages.append("io.delta:delta-core_2.12:2.4.0")
-        elif catalog == "nessie":
-            self.jars_packages.append( "org.projectnessie.nessie-integrations:nessie-spark-extensions-3.4_1.12:0.58.1")
 
         self.jars_packages = ",".join(self.jars_packages)
         print(self.jars_packages)
 
+
+
+
         self.config.update({
             "spark.jars.packages": self.jars_packages,
+            "spark.hadoop.fs.lakefs.impl": "io.lakefs.LakeFSFileSystem",
+            # "spark.hadoop.fs.lakefs.api.url": self.LAKEFS_ENDPOINT_URL,
+            "spark.hadoop.fs.lakefs.endpoint": self.LAKEFS_ENDPOINT_URL,
+            "spark.hadoop.fs.lakefs.connection.ssl.enabled": "false", #TODO ssl on everything! This is just for testing
+            "spark.hadoop.fs.lakefs.access.key": self.LAKEFS_ACCESS_KEY,
+            "spark.hadoop.fs.lakefs.secret.key": self.LAKEFS_SECRET_KEY,
+            "spark.hadoop.fs.s3a.impl": "org.apache.hadoop.fs.s3a.S3AFileSystem",
+            "spark.hadoop.fs.s3a.access.key": self.S3_ACCESS_KEY_ID,
+            "spark.hadoop.fs.s3a.secret.key": self.S3_SECRET_ACCESS_KEY,
             "spark.hadoop.fs.s3a.endpoint": self.S3_ENDPOINT_URL,
             "spark.hadoop.fs.s3a.connection.ssl.enabled": "false", # TODO ssl on everything! This is just for testing
             "spark.hadoop.fs.s3a.path.style.access": "true",
-            "spark.hadoop.fs.s3a.committer.name": "directory",
+            # "spark.hadoop.fs.s3a.committer.name": "directory",
             "spark.hadoop.fs.s3a.aws.credentials.provider": "org.apache.hadoop.fs.s3a.SimpleAWSCredentialsProvider",
-            "spark.hadoop.fs.s3a.access.key": self.S3_ACCESS_KEY_ID,
-            "spark.hadoop.fs.s3a.secret.key": self.S3_SECRET_ACCESS_KEY,
-            "spark.hadoop.fs.s3a.impl": "org.apache.hadoop.fs.s3a.S3AFileSystem",
-            "spark.sql.execution.arrow.pyspark.enabled": "true",
+            "spark.sql.catalog.spark_catalog": "org.apache.spark.sql.delta.catalog.DeltaCatalog",
+            # F"spark.sql.catalog.{self.CATALOG}.catalog-impl": "org.apache.spark.sql.delta.catalog.DeltaCatalog",
+            "spark.sql.extensions": "io.delta.sql.DeltaSparkSessionExtension",
             "spark.sql.execution.arrow.pyspark.enabled": "true",
             "spark.sql.session.timeZone": "UTC",
-            "spark.sql.streaming.checkpointLocation": "/tmp/spark_checkpoint", # TODO when deployed to K8 does this persist?
-            F"spark.sql.catalog.{self.CATALOG}.warehouse": self.S3_PATH,
+            # "spark.sql.streaming.checkpointLocation": "/tmp/spark_checkpoint", # TODO when deployed to K8 does this persist?
+            F"spark.sql.catalog.spark_catalog.warehouse": self.S3_PATH,
             # Set logging to use S3
             # "spark.eventLog.enabled": "true",
             # "spark.eventLog.dir": self.LOG_PATH,
@@ -181,25 +176,6 @@ class SparkClient:
         })
 
 
-        # if catalog == "delta":
-        #     self.config.update({
-        #         # Delta Lake
-        #         F"spark.sql.catalog.{self.CATALOG}.catalog-impl": "org.apache.iceberg.delta.DeltaCatalog",
-        #         F"spark.sql.extensions": "io.delta.sql.DeltaSparkSessionExtension",
-        #     })
-
-        # elif catalog == "nessie":
-        #     # Nessie / Iceberg
-        #     self.config.update({
-        #         F"spark.sql.catalog.{self.CATALOG}": "org.apache.iceberg.spark.SparkCatalog",
-        #         F"spark.sql.catalog.{self.CATALOG}.catalog-impl": "org.apache.iceberg.nessie.NessieCatalog",
-        #         F"spark.sql.catalog.{self.CATALOG}.uri": self.NESSIE_SERVER,
-        #         F"spark.sql.catalog.{self.CATALOG}.ref": self.BRANCH,
-        #         F"spark.sql.catalog.{self.CATALOG}.auth_type": "NONE",
-        #         "spark.sql.extensions": "org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions,org.projectnessie.spark.extensions.NessieSparkSessionExtensions",    
-        #     })
-
-            
 
     def create_spark_session(self):
 
