@@ -249,17 +249,17 @@ helm upgrade --install kafka bitnami/kafka --version 24.0.10  \
 
 echo "Waiting for pods to be ready"
 
-# Define the watch command
-watch_cmd="kubectl get pods --watch -n default"
+# Define the watch command to watch pod status changes quietly
+watch_cmd="kubectl get pods --watch -n default > /dev/null 2>&1"
 
 # Run the watch command in the background
-${watch_cmd} &
+eval ${watch_cmd} &
 
 # Save the PID of the watch command
 watch_pid=$!
 
-# Wait for pods to be ready excluding the 'init-db' pod
-kubectl get pods --no-headers -n default | awk '!/init-db/{print $1}' | while read pod; do
+# Wait for pods to be ready, excluding pods with 'Completed' status
+kubectl get pods --no-headers -n default | awk '$3 != "Completed" && $3 != "Init:0/1" {print $1}' | while read pod; do
   # Wait for each pod to be ready and print status
   if kubectl wait --timeout=600s --for=condition=ready pod/$pod -n default; then
     echo "Pod $pod is ready"

@@ -1,5 +1,7 @@
 ### Build Arguments ###
 
+# Feature Flags control if a given resource should be installed.
+
 ARG DEPLOYMENT_MODE
 ARG HOST_USER_ID
 ARG HOST_GROUP_ID
@@ -12,26 +14,24 @@ ARG USERNAME="fireworks"
 ARG DOCKER_BUILDKIT=1
 
 
-ARG SPARK_VERSION=3.4.1
-ARG SPARK_SHA512="eacd191b83e62c12c55115a4ec21b97ca2fb07ce3a373e3f423a8275c646831f0fa78702aedf2be96d621c28cd0edde7ab0c2ad11df3e95e1498b5edeefb1daf  spark-3.4.1-bin-without-hadoop.tgz"
-ARG SPARK_HOME="/opt/spark"
-ARG HADOOP_VERSION=3.3.4
-ARG HADOOP_SHA512="ca5e12625679ca95b8fd7bb7babc2a8dcb2605979b901df9ad137178718821097b67555115fafc6dbf6bb32b61864ccb6786dbc555e589694a22bf69147780b4  hadoop-3.3.4.tar.gz"
-ARG HADOOP_HOME="/opt/hadoop"
+ARG SPARK_VERSION
+ARG SPARK_SHA512
+ARG SPARK_HOME
+ARG HADOOP_VERSION
+ARG HADOOP_SHA512
+ARG HADOOP_HOME
 
-ARG JAVA_VERSION=11
-ARG PYTHON_VERSION=3.11
-##TODO the python version is being installed from debian, instead of manually which puts the bells and whistles in
-ARG NODE_VERSION=18
-ARG NODE_SHA=""
+ARG JAVA_VERSION
+ARG PYTHON_VERSION
+ARG NODE_VERSION
+ARG NODE_SHA
 
 ARG LAKEFS_VERSION=0.108.0
 
-## Dependency Container ##
+### Dependency Container ###
 
-# Combines downloading of external resources in one place.
-# Allows for efficient multistage build with minimum network activity
-# and assertation of remote resources by good 'ol hard coded hash matching
+# The Dependency Container centralizes downloading of all external resources in one place.
+# Allows for efficient multistage build with minimum network activity when rebuilding downstream containers.
 
 FROM debian:bookworm as dependencies
 
@@ -78,7 +78,7 @@ RUN echo $SPARK_SHA512 | sha512sum -c - && echo "Hash matched" || (echo "Hash di
 
 RUN mkdir -p ${SPARK_HOME} && mv spark-${SPARK_VERSION}-bin-without-hadoop/* ${SPARK_HOME}
 
-## Hadoop ##
+### Hadoop ###
 RUN wget https://dlcdn.apache.org/hadoop/common/hadoop-${HADOOP_VERSION}/hadoop-${HADOOP_VERSION}.tar.gz
 RUN echo $HADOOP_SHA512 | sha512sum -c - && echo "Hash matched" || (echo "Hash didn't match" && exit 1) \
     && tar xvzf hadoop-${HADOOP_VERSION}.tar.gz -C /tmp
@@ -90,76 +90,22 @@ RUN sed -i 's/hadoop.root.logger=INFO,console/hadoop.root.logger=WARN,console/g'
 
 
 
-# ## Hive Standalone Metastore ##
-# RUN wget https://dlcdn.apache.org/hive/hive-standalone-metastore-${HIVE_VERSION}/hive-standalone-metastore-${HIVE_VERSION}-bin.tar.gz
-# RUN echo $HIVE_SHA256 | sha256sum -c - && echo "Hash matched" || (echo "Hash didn't match" && exit 1) \
-#     && tar xvzf hive-standalone-metastore-${HIVE_VERSION}-bin.tar.gz
-
-# ### Iceberg ###
-# RUN wget https://search.maven.org/remotecontent?filepath=org/apache/iceberg/iceberg-spark-runtime-3.3_2.12/1.2.1/iceberg-spark-runtime-3.3_2.12-1.2.1.jar
-
-## Python ##
+### Python ###
 
 # Install Python
 COPY bin/install_scripts/python-debian.sh /tmp/workspace/bin/install_scripts/python-debian.sh
 RUN /bin/bash /tmp/workspace/bin/install_scripts/python-debian.sh "${PYTHON_VERSION}" "/usr/local/python" "/usr/local/py-utils" "${USERNAME}" "true" "false" "false" "false"
+
 # Make "python" and "pip" command available
 RUN ln -s /usr/local/python/bin/python /usr/bin/python
 RUN ln -s /usr/local/python/bin/pip /usr/bin/pip
 
-# RUN apt-get update && apt-get -y install python3 python3-pip
-# # There is only Python3!
-# RUN ln -s /usr/bin/python3 /usr/bin/python
 RUN python -m pip install --upgrade pip
-### Download Python packages required by the project
+
+### Download globally required Python Packages
 COPY requirements.txt /tmp/workspace/requirements.txt
 RUN python -m pip download --no-cache-dir --no-deps -r /tmp/workspace/requirements.txt -d /tmp/python_packages
-# TODO use the python install script from bin to gaurantee consistency with python version
 
-## NodeJS ##
-# Download NPM Packages
-# TODO
-
-#TODO The javascript deps should be downloaded in the builder stage.
-# Install Node.js dependencies
-# RUN cd /workspace/services/javascript/dashboard && npm install
-# RUN cd /workspace/services/javascript/websocket_middleware && npm install
-
-
-## Nvidia ##
-# Configure Nvidia Container Toolkit
-# TODO
-
-## Git ##
-# Set commit hash to environment variable
-# RUN git rev-parse HEAD > commit_hash
-
-## Java ##
-
-#TODO download java SDK and JRE using SDKman
-#TODO download sbt and maven using SDKman
-#TODO get the JAR files downloaded that will be used later from maven et al
-# RUN bash /tmp/workspace/bin/install_scripts/sdkman.sh
-# TODO should the Java versions be downloaded here?
-
-# # Install Spark Dependencies and Prepare Spark Runtime Environment
-# RUN set -ex && \
-#     apt-get update && \
-#     ln -s /lib /lib64 && \
-#     apt install -y bash tini libc6 libpam-modules libnss3 wget python3 python3-pip && \
-#     mkdir -p /opt/hadoop && \
-#     mkdir -p /opt/spark && \
-#     mkdir -p /opt/spark/examples && \
-#     mkdir -p /opt/spark/work-dir && \
-#     touch /opt/spark/RELEASE && \
-#     rm /bin/sh && \
-#     ln -sv /bin/bash /bin/sh && \
-#     ln -sv /usr/bin/tini /sbin/tini && \
-#     echo "auth required pam_wheel.so use_uid" >> /etc/pam.d/su && \
-#     chgrp root /etc/passwd && chmod ug+rw /etc/passwd && \
-#     ln -sv /usr/bin/python3 /usr/bin/python && \
-#     ln -sv /usr/bin/pip3 /usr/bin/pip \
-#     rm -rf /var/cache/apt/*
 
 
 ### Source Code ###
@@ -167,8 +113,6 @@ RUN python -m pip download --no-cache-dir --no-deps -r /tmp/workspace/requiremen
 # This is used in downstream stages to build the project's artifacts
 
 COPY ./bin /tmp/workspace/bin
-
-
 
 
 
@@ -267,19 +211,13 @@ RUN /bin/bash /tmp/workspace/bin/install_scripts/python-debian.sh "${PYTHON_VERS
 RUN ln -s /usr/local/python/bin/python /usr/bin/python
 RUN ln -s /usr/local/python/bin/pip /usr/bin/pip
 
-# There is only Python3!
-# RUN ln -s /usr/bin/python3 /usr/bin/python
 RUN python -m pip install --upgrade pip
 
 # Install python dependencies
 COPY ./requirements.txt /tmp/workspace/requirements.txt
 COPY --from=dependencies /tmp/python_packages /tmp/python_packages
 RUN chown $HOST_USER_ID:$HOST_GROUP_ID -R /tmp
-# USER ${USERNAME}
 RUN python -m pip install --no-warn-script-location --no-deps --no-index --find-links file:///tmp/python_packages -r /tmp/workspace/requirements.txt
-# USER root
-
-
 
 
 # Hadoop: Copy previously fetched runtime components
@@ -302,7 +240,34 @@ ENV PATH $PATH:$SPARK_HOME/bin:$HADOOP_HOME/bin
 ENV SPARK_DIST_CLASSPATH /opt/hadoop/etc/hadoop:/opt/hadoop/share/hadoop/common/lib/*:/opt/hadoop/share/hadoop/common/*:/opt/hadoop/share/hadoop/hdfs:/opt/hadoop/share/hadoop/hdfs/lib/*:/opt/hadoop/share/hadoop/hdfs/*:/opt/hadoop/share/hadoop/mapreduce/lib/*:/opt/hadoop/share/hadoop/mapreduce/*:/opt/hadoop/share/hadoop/yarn:/opt/hadoop/share/hadoop/yarn/lib/*:/opt/hadoop/share/hadoop/yarn/*
 ENV SPARK_CLASSPATH /opt/spark/jars/*:$SPARK_DIST_CLASSPATH
 
-## Install PySpark
+### Install PySpark ###
+
+
+
+
+# # Install Spark Dependencies and Prepare Spark Runtime Environment
+# RUN set -ex && \
+#     apt-get update && \
+#     ln -s /lib /lib64 && \
+#     apt install -y bash tini libc6 libpam-modules libnss3 wget python3 python3-pip && \
+#     mkdir -p /opt/hadoop && \
+#     mkdir -p /opt/spark && \
+#     mkdir -p /opt/spark/examples && \
+#     mkdir -p /opt/spark/work-dir && \
+#     touch /opt/spark/RELEASE && \
+#     rm /bin/sh && \
+#     ln -sv /bin/bash /bin/sh && \
+#     ln -sv /usr/bin/tini /sbin/tini && \
+#     echo "auth required pam_wheel.so use_uid" >> /etc/pam.d/su && \
+#     chgrp root /etc/passwd && chmod ug+rw /etc/passwd && \
+#     ln -sv /usr/bin/python3 /usr/bin/python && \
+#     ln -sv /usr/bin/pip3 /usr/bin/pip \
+#     rm -rf /var/cache/apt/*
+
+
+
+
+
 # TODO install pyspark from spark build from source
 # use the local source version of spark for pyspark instead of downloading again
 RUN cd $SPARK_HOME/python && python -m pip install .
@@ -323,16 +288,8 @@ RUN cd $SPARK_HOME/python && python -m pip install .
 
 
 
-
-
-
-# ### Scala Build Tools ###
-# RUN /bin/bash /tmp/workspace/bin/install_scripts/sbt-debian.sh
-
 # Install VS Code remote development container features
 RUN /bin/bash /tmp/workspace/bin/install_scripts/common-debian.sh "${INSTALL_ZSH}" "${USERNAME}" "${HOST_USER_ID}" "${HOST_GROUP_ID}" "${UPGRADE_PACKAGES}" "true" "true"
-
-
 
 ### Docker from Docker
 RUN /bin/bash /tmp/workspace/bin/install_scripts/docker-from-docker-debian.sh 
@@ -343,9 +300,6 @@ RUN /bin/bash /tmp/workspace/bin/install_scripts/k3d-debian.sh
 ### Kubectl and Helm ###
 RUN /bin/bash /tmp/workspace/bin/install_scripts/kubectl-helm-debian.sh
 
-# ### KIND (Kubernetes in Docker) ###
-# RUN /bin/bash /tmp/workspace/bin/install_scripts/kind-debian.sh
-
 ### Rust ###
 ENV PATH="/usr/local/cargo/bin:$PATH"
 RUN /bin/bash /tmp/workspace/bin/install_scripts/rust-debian.sh && \
@@ -353,31 +307,33 @@ RUN /bin/bash /tmp/workspace/bin/install_scripts/rust-debian.sh && \
     cargo install wasm-pack
 
 
-### Java ###
-ENV LANG="en_US.UTF-8"
-
 ### SDK Man ###
 
 # Switch from `sh -c` to `bash -c` as the shell behind a `RUN` command.
 SHELL ["/bin/bash", "-c"]
 
-#Install sdkman
+### SDKman! ###
+# Enables installation of arbitrary
 USER ${USERNAME}
 ENV HOME /home/${USERNAME}
 RUN curl -s "https://get.sdkman.io" | bash
 
-# Install Java, sbt, scala, and maven
+### Java and Maven ###
 RUN source "$HOME/.sdkman/bin/sdkman-init.sh" \
     && sdk install java 11.0.12-open \
-    && sdk install sbt 1.4.2 \
-    && sdk install scala 2.12.12 \
     && sdk install maven 3.8.2
-
-# Update environment variables with the new user's paths
 ENV PATH=${HOME}/.sdkman/candidates/java/current/bin:$PATH
+ENV PATH=${HOME}/.sdkman/candidates/maven/current/bin:$PATH
+ENV LANG="en_US.UTF-8"
+
+### Scala and Scala Build Tools ###
+# RUN /bin/bash /tmp/workspace/bin/install_scripts/sbt-debian.sh
+RUN source "$HOME/.sdkman/bin/sdkman-init.sh" \
+    && sdk install scala 2.12.12 \
+    && sdk install sbt 1.4.2
 ENV PATH=${HOME}/.sdkman/candidates/scala/current/bin:$PATH
 ENV PATH=${HOME}/.sdkman/candidates/sbt/current/bin:$PATH
-ENV PATH=${HOME}/.sdkman/candidates/maven/current/bin:$PATH
+
 
 # Switch back to root user
 USER root
@@ -394,20 +350,8 @@ RUN apt-get update && /bin/bash /tmp/workspace/bin/install_scripts/node-debian.s
 RUN npm install -g npm yarn
 
 
-
-
-
-
 ### Lake FS CLI ###
 RUN /bin/bash /tmp/workspace/bin/install_scripts/lakefs-debian.sh "${LAKEFS_VERSION}"
-
-
-
-
-
-
-
-
 
 
 ### Cleanup ###
@@ -416,17 +360,10 @@ RUN apt-get autoremove -y && apt-get clean -y && rm -rf /var/lib/apt/lists/*
 USER ${USERNAME}
 WORKDIR /workspace
 
-# Install CPU Deep Learning Frameworks
-RUN pip install --upgrade "jax[cpu]"
-RUN pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu
 
 # Required for Docker-from-Docker
 ENTRYPOINT ["/usr/local/share/docker-init.sh"]
 CMD ["sleep", "infinity"]
-
-
-### CICD Container ###
-# Contains everything required to build project artifacts and run tests
 
 
 
@@ -475,3 +412,10 @@ ENTRYPOINT ["/usr/local/share/docker-init.sh"]
 # A container for running the deployment pipeline
 RUN echo "Running cicd!"
 CMD ["make", "deploy_production"]
+
+
+
+# Install CPU Deep Learning Frameworks
+# RUN pip install --upgrade "jax[cpu]"
+# RUN pip install --upgrade "jax[cuda]"
+# RUN pip install torch torchvision torchaudio
