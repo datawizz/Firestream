@@ -46,10 +46,6 @@
 	path = submodules/the-fireworks-company/Flowise
 	url = https://github.com/The-Fireworks-Company/Flowise
 	shallow = true
-[submodule "submodules/the-fireworks-company/nessie"]
-	path = submodules/the-fireworks-company/nessie
-	url = https://github.com/The-Fireworks-Company/nessie
-	shallow = true
 [submodule "submodules/the-fireworks-company/spark"]
 	path = submodules/the-fireworks-company/spark
 	url = https://github.com/The-Fireworks-Company/spark

@@ -26,7 +26,7 @@ ARG PYTHON_VERSION
 ARG NODE_VERSION
 ARG NODE_SHA
 
-
+ARG LAKEFS_VERSION=0.108.0
 
 ### Dependency Container ###
 
@@ -47,6 +47,7 @@ ARG HADOOP_HOME
 ARG JAVA_VERSION
 ARG PYTHON_VERSION
 ARG NODE_VERSION
+ARG LAKEFS_VERSION
 ARG HOST_USER_ID
 ARG HOST_GROUP_ID
 ARG HOST_MACHINE_ID
@@ -132,6 +133,7 @@ ARG HADOOP_HOME
 ARG JAVA_VERSION
 ARG PYTHON_VERSION
 ARG NODE_VERSION
+ARG LAKEFS_VERSION
 ARG USERNAME
 ARG HOST_USER_ID
 ARG HOST_GROUP_ID
@@ -348,8 +350,8 @@ RUN apt-get update && /bin/bash /tmp/workspace/bin/install_scripts/node-debian.s
 RUN npm install -g npm yarn
 
 
-
-
+### Lake FS CLI ###
+RUN /bin/bash /tmp/workspace/bin/install_scripts/lakefs-debian.sh "${LAKEFS_VERSION}"
 
 
 ### Cleanup ###
