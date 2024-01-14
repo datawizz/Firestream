@@ -8,6 +8,20 @@ services:
       context: ..
       dockerfile: docker/Dockerfile
       target: devcontainer
+      args:
+        - SPARK_VERSION=${SPARK_VERSION}
+        - SPARK_SHA512=${SPARK_SHA512}
+        - SPARK_HOME=${SPARK_HOME}
+        - HADOOP_VERSION=${HADOOP_VERSION}
+        - HADOOP_SHA512=${HADOOP_SHA512}
+        - HADOOP_HOME=${HADOOP_HOME}
+        - CUDA_VERSION=${CUDA_VERSION}
+        - NVIDIA_DRIVER_VERSION=${NVIDIA_DRIVER_VERSION}
+        - JAVA_VERSION=${JAVA_VERSION}
+        - PYTHON_VERSION=${PYTHON_VERSION}
+        - NODE_VERSION=${NODE_VERSION}
+        - NODE_SHA=${NODE_SHA}
+
     env_file:
       - ../etc/.env.local
       # - ../etc/.env.secrets
@@ -48,3 +62,5 @@ services:
       - NET_ADMIN
 
     network_mode: "host" # Enables K3D access from within container
+    extra_hosts:
+      - "host.docker.internal:host-gateway"

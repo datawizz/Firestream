@@ -36,6 +36,19 @@ echo "                                                                     "
 # Project Directory
 _SRC="$(pwd)"
 
+reboot_in_container() {
+  local cmd="${1:-/bin/bash}"
+  if [ -f /.dockerenv ]; then
+    echo "Running inside the devcontainer."
+  else
+    echo "Not running in Docker container. Starting Initialization."
+    bash docker/docker_preinit.sh
+    docker compose -f docker/docker-compose.deployment.yml down --remove-orphans
+    docker compose -f docker/docker-compose.deployment.yml build
+    docker compose -f docker/docker-compose.deployment.yml run fireworks_devcontainer "$cmd"
+  fi
+}
+
 # Set the Machine ID on Debian host
 export MACHINE_ID=${MACHINE_ID:-$(cat /var/lib/dbus/machine-id)}
 
@@ -59,19 +72,6 @@ check_valid_mode() {
 }
 
 check_valid_mode $DEPLOYMENT_MODE
-
-reboot_in_container() {
-  local cmd="${1:-/bin/bash}"
-  if [ -f /.dockerenv ]; then
-    echo "Running inside the devcontainer."
-  else
-    echo "Not running in Docker container. Starting Initialization."
-    bash docker/docker_preinit.sh
-    docker compose -f docker/docker-compose.deployment.yml down --remove-orphans
-    docker compose -f docker/docker-compose.deployment.yml build
-    docker compose -f docker/docker-compose.deployment.yml run fireworks_devcontainer "$cmd"
-  fi
-}
 
 
 ### Code Version ###
