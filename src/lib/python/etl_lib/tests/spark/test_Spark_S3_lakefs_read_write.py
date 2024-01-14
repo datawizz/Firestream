@@ -99,87 +99,43 @@
 #     pytest.main([__file__])
 
 
-import pytest
-from etl_lib.services.spark.client import SparkClient
-
-@pytest.fixture(scope='session')
-def spark_client():
-    """
-    Create a SparkClient for testing
-    """
-
-    client = SparkClient(app_name="Pytest", config={}, storage_location="local")
-    yield client
-
-    client.stop()
-
-@pytest.fixture(scope='session')
-def spark_context(spark_client):
-    """
-    Return a SparkContext for testing (aka "spark")
-    """
-
-    spark = spark_client.spark_context
-
-    yield spark
-
-    # spark.session.stop()
-
-
-@pytest.fixture(scope='session')
-def spark_session(spark_context):
-    """
-    Return a SparkSession
-    """
-
-    yield spark_context.session
-
-    # spark_context.stop(), hanlded in spark_context fixture
-
-
 import os
-import pytest
-# from etl_lib.services.spark.client import SparkClient
+os.environ["LAKEFS_ENDPOINT_URL"] = "http://lakefs.default.svc.cluster.local:80/api/v1"
+os.environ["LAKEFS_REPO"] = "fireworks"
+os.environ['LAKEFS_BRANCH'] = "main"
+os.environ['LAKEFS_BUCKET'] = "fireworks"
+os.environ["LAKEFS_ACCESS_KEY"] = "AKIAJV77CIW6QKTEQWSQ"
+os.environ["LAKEFS_SECRET_KEY"] = "ekmv6TrQOqoU1nWvqAQO9dhaSqnXosFN7DbVVuo8"
 
 
-bucket = os.environ["S3_LOCAL_BUCKET_NAME"]
-_PATH = f"s3a://{bucket}/example/data/cities_parquet"
-_DATA = "/workspace/src/lib/python/etl_lib/tests/example_data/cities.csv"
-_ACCESS_KEY = os.environ["S3_LOCAL_ACCESS_KEY_ID"]
-_SECRET_KEY = os.environ["S3_LOCAL_SECRET_ACCESS_KEY"]
-_ENDPOINT_URL = os.environ["S3_LOCAL_ENDPOINT_URL"]
+from etl_lib.services.spark.client import SparkClient
+import os
 
+def create_spark_client():
+    return SparkClient(app_name="Pytest", config={}, storage_location="local")
 
-@pytest.mark.usefixtures("spark_client")
-class TestSparkApp:
+def main():
+    spark_client = create_spark_client()
+    spark_client.spark_context.setLogLevel("WARN")
 
-    def test_write(self, spark_client):
+    bucket = os.environ["S3_LOCAL_BUCKET_NAME"]
+    _PATH = f"s3a://{bucket}/example/data/cities_parquet"
+    _DATA = "/workspace/src/lib/python/etl_lib/tests/example_data/cities.csv"
+    
+    # Test write
+    df = spark_client.spark_session.read.csv(_DATA, header=True, inferSchema=True)
+    df.show()
+    df.write.format("parquet").mode("overwrite").save(_PATH)
+    
+    # Test read
+    df = spark_client.spark_session.read.parquet(_PATH)
+    df.show()
+    df.printSchema()
 
-        spark_client.spark_context.setLogLevel("WARN")
+    df = df.select("State").where(df.State == "CA")
+    df.show()
 
-        df = spark_client.spark_session.read.csv(_DATA, header=True, inferSchema=True)
-
-        df.show()
-
-        df.write.format("parquet").mode("overwrite").save(_PATH)
-
-
-    def test_read(self, spark_client):
-
-        df = spark_client.spark_session.read.parquet(_PATH)
-
-        df.show()
-        df.printSchema()
-
-        df = df.select("State").where(df.State == "CA")
-
-        df.show()
-
-
-
-
-
+    spark_client.stop()
 
 if __name__ == '__main__':
-    import pytest
-    pytest.main([__file__])
+    main()

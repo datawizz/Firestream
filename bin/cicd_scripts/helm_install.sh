@@ -20,9 +20,6 @@ sleep 1
 helm --namespace default upgrade --install signoz signoz/signoz
 
 
-### Nessie ###
-helm repo add nessie https://charts.projectnessie.org
-
 ### Ingress ###
 
 # Add Nginx
@@ -89,27 +86,7 @@ postgresql_install
 #   --set serverDefinitions.servers.firstServer.SSLMode="prefer" \
 #   --set serverDefinitions.servers.firstServer.MaintenanceDB=$POSTGRES_DEFAULT_DB
 
-project_nessie_install() {
 
-  # Check if secret already exists
-  if ! kubectl get secret postgres-creds > /dev/null 2>&1; then
-    temp_file=$(mktemp)
-    echo "postgres_username=${POSTGRES_USER}" > ${temp_file}
-    echo "postgres_password=${POSTGRES_PASSWORD}" >> ${temp_file}
-    kubectl create secret generic postgres-creds --from-env-file="${temp_file}"
-    rm ${temp_file}
-  fi
-
-  # Check if helm release already exists
-  if ! helm list -q | grep -q nessie; then
-    helm install nessie nessie/nessie \
-      --set versionStoreType=TRANSACTIONAL \
-      --set postgres.jdbcUrl="$JDBC_CONNECTION_STRING" \
-      --set image.tag="$NESSIE_VERSION"
-  fi
-}
-
-project_nessie_install
 
 ### Spark Cluster ###
 # Enables: spark://spark-master:7077
@@ -136,11 +113,15 @@ helm upgrade --install minio bitnami/minio -f /workspace/k8s/charts/fireworks/su
 helm upgrade --install kafka bitnami/kafka --version 24.0.10  \
   --set controller.replicaCount=5 \
   --set controller.heapOpts="-Xmx1024m -Xms1024m" \
+  --set controller.persistence.size=20Gi \
   --set controller.persistence.size=100Gi \
   --set listeners.client.protocol=PLAINTEXT \
   --set listeners.controller.protocol=PLAINTEXT \
   --set listeners.interbroker.protocol=PLAINTEXT \
   --set listeners.external.protocol=PLAINTEXT
+
+
+  #  -f /workspace/k8s/charts/fireworks/subcharts/kafka/chart/values.yaml
 
 
 ### Kyuubi ###

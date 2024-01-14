@@ -7,11 +7,17 @@ BASEDIR=$(shell pwd)
 PROJECT_NAME=fireworks
 
 development:
+	# Reconnects to the existing cluster
 	cd $(BASEDIR) && bash bootstrap.sh development
 
 
-development_clean:
+clean:
+	# Wipe the cluster create a new one
 	cd $(BASEDIR) && bash bootstrap.sh clean
+	# Load services
+	cd $(BASEDIR) && bash bootstrap.sh development
+
+	bash /workspace/src/plugins/lakefs/deploy_lakefs.sh
 
 # Reuse the existing cluster by re-establishing the network tunnel
 resume:
@@ -30,11 +36,11 @@ stress:
 
 # Build services
 build:
-	# Make the devcontainer
+	# The development environment contains a Local Registry
 	make development_clean
 
 	# Run the build scripts
-	bash /workspace/bin/cicd_scripts/build.sh
+	bash /workspace/docker/build.sh
 
 deploy:
 	# TODO
