@@ -355,8 +355,6 @@ RUN npm install -g npm yarn
 ### Lake FS CLI ###
 RUN /bin/bash /tmp/workspace/bin/install_scripts/lakefs-debian.sh "${LAKEFS_VERSION}"
 
-
-
 ### Cleanup ###
 RUN rm -rf /tmp/workspace
 RUN apt-get autoremove -y && apt-get clean -y && rm -rf /var/lib/apt/lists/*
