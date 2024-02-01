@@ -4,14 +4,16 @@
 # Designed to deploy in development, testing, and production environments.
 
 BASEDIR=$(shell pwd)
+PROJECT_NAME=fireworks
 
-# Setup the environment
-bootstrap:
-	@echo "No argument suppllied. Making a standard build."
-	export DEPLOYMENT_MODE="clean" && cd $(BASEDIR) && bash bootstrap.sh
+development:
+	cd $(BASEDIR) && bash bootstrap.sh development
 
-	bash /workspace/bin/cicd_scripts/helm_install.sh
 
+development_clean:
+	cd $(BASEDIR) && bash bootstrap.sh clean
+
+# Reuse the existing cluster by re-establishing the network tunnel
 resume:
 	# Useful for resuming the container after a restart
 	export DEPLOYMENT_MODE="resume" && cd $(BASEDIR) && bash bootstrap.sh
@@ -23,7 +25,11 @@ test:
 
 # Build services
 build:
-	bash /workspace/bin/cicd_scripts/build.sh
+	# The development environment contains a Local Registry
+	make development_clean
+
+	# Run the build scripts
+	bash /workspace/docker/build.sh
 
 
 # Start services

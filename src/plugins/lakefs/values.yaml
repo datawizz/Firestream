@@ -1,0 +1,20 @@
+secrets:
+  databaseConnectionString: "postgres://pguser:THIS_IS_A_SECRET_TODO_CHANGE_ME@postgresql.default.svc.cluster.local:5432/postgres"
+  authEncryptSecretKey: "SOME_RANDOM_SECRET_KEY_THAT_IS_ALPHA_NUMERIC"
+lakefsConfig: |
+  database:
+    type: postgres
+  blockstore:
+    type: s3
+    s3:
+      region: "us-west-2"
+      endpoint: "http://minio.default.svc.cluster.local:9000"
+      skip_verify_certificate_test_only: true
+      credentials:
+        access_key_id: "TODO_CHANGE_ME"
+        secret_access_key: "THIS_IS_A_SECRET_TODO_CHANGE_ME"
+      force_path_style: true
+      discover_bucket_region: false
+  gateways:
+    s3:
+      domain_name: "*.s3.local.lakefs.io"

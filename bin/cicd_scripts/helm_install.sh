@@ -80,31 +80,6 @@ helm install postgresql bitnami/postgresql \
 
 
 
-# ### Project Nessie ###
-
-# # Create a kubernetes secret for the postgres-creds credentials
-# # required (and best practice) for this helm chart
-
-# # Make a new temporary file
-# temp_file=$(mktemp)
-
-# # Write the values of the environment variables to the temp file
-# echo "postgres_username=${POSTGRES_USER}" > ${temp_file}
-# echo "postgres_password=${POSTGRES_PASSWORD}" >> ${temp_file}
-# cat ${temp_file}
-
-# # Create the secret from the temp file
-# kubectl create secret generic postgres-creds --from-env-file="${temp_file}"
-
-# # Delete the temp file
-# rm ${temp_file}
-
-# cd /workspace/submodules/the-fireworks-company/nessie && \
-# helm install nessie helm/nessie \
-#   --set versionStoreType=TRANSACTIONAL \
-#   --set postgres.jdbcUrl="$JDBC_CONNECTION_STRING" \
-#   --set image.tag="$NESSIE_VERSION"
-
 ### Spark Cluster ###
 # Enables: spark://spark-master:7077
 # helm install spark bitnami/spark #-f /workspace/charts/fireworks/subcharts/spark_cluster/values.yaml
@@ -128,7 +103,15 @@ helm install minio bitnami/minio -f /workspace/charts/fireworks/subcharts/minio/
 
 ### Kafka ###
 helm upgrade --install kafka bitnami/kafka --version 24.0.10  \
-   -f /workspace/charts/fireworks/subcharts/kafka/chart/values.yaml
+  --set controller.replicaCount=5 \
+  --set controller.heapOpts="-Xmx1024m -Xms1024m" \
+  --set controller.persistence.size=20Gi \
+  --set listeners.client.protocol=PLAINTEXT \
+  --set listeners.controller.protocol=PLAINTEXT \
+  --set listeners.interbroker.protocol=PLAINTEXT \
+  --set listeners.external.protocol=PLAINTEXT
+
+  #  -f /workspace/k8s/charts/fireworks/subcharts/kafka/chart/values.yaml
 
 ### Kyuubi ###
 # cd /workspace/submodules/the-fireworks-company/kyuubi && \
