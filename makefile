@@ -1,23 +1,17 @@
 ### Makefile ###
 
 # A Pluripotent Makefile for Fireworks.
-# Designed to deploy in development, testing, cicd, and production environments.
+# Designed to deploy in development, testing, and production environments.
 
 BASEDIR=$(shell pwd)
 PROJECT_NAME=fireworks
 
 development:
-	# Reconnects to the existing cluster
 	cd $(BASEDIR) && bash bootstrap.sh development
 
 
-clean:
-	# Wipe the cluster create a new one
+development_clean:
 	cd $(BASEDIR) && bash bootstrap.sh clean
-	# Load services
-	cd $(BASEDIR) && bash bootstrap.sh development
-
-	bash /workspace/src/plugins/lakefs/deploy_lakefs.sh
 
 # Reuse the existing cluster by re-establishing the network tunnel
 resume:
@@ -26,13 +20,8 @@ resume:
 
 # Test services
 test:
-	cd $(BASEDIR) && bash bootstrap.sh test
-
-# Run Stress Tests
-stress:
-	cd $(BASEDIR) make test
-	cd $(BASEDIR) && bash bin/commands/run_stress_tests.sh
-
+	make bootstrap
+	export DEPLOYMENT_MODE="test" && cd $(BASEDIR) && python -m pytest
 
 # Build services
 build:
@@ -42,19 +31,14 @@ build:
 	# Run the build scripts
 	bash /workspace/docker/build.sh
 
-deploy:
-	# TODO
-	echo "Deploying... TODO"
 
+# Start services
 demo:
-	echo "TODO: Demo Mode"
-	# Wipe the cluster and boot the system
-	# export DEPLOYMENT_MODE="clean" && cd $(BASEDIR) && bash bootstrap.sh
-	# export DEPLOYMENT_MODE="development" && cd $(BASEDIR) && bash bootstrap.sh
+	export DEPLOYMENT_MODE="development" && make bootstrap
 
 	# Create dispose of the tunnel and create a new one
-	# pkill ngrok
-	# bash /workspace/bin/commands/create_ngrok_reverse_proxy.sh
+	pkill ngrok
+	bash /workspace/bin/commands/create_ngrok_reverse_proxy.sh
 
 	# Apply Demo Data
 	# POD_NAME=$(kubectl get pods --no-headers -o custom-columns=":metadata.name" | grep superset | head -n 1)
@@ -66,8 +50,23 @@ demo:
 	#nohup python /workspace/src/services/back_end/spark_applications/_boilerplate/metronome/src/main.py > /workspace/logs/metronome.log 2>&1 &
 
 
-# Clean up by deleting all the things
+
+# Clean up
 boomboom:
-	# Delete the cluster first, then delete the project
-	# k3d cluster delete fireworks
 	bash bin/commands/delete.sh
+
+
+# Run Stress Tests
+stress:
+	make bootstrap
+
+	bash /workspace/bin/commands/run_stress_tests.sh
+
+load_plugins:
+	bash /workspace/src/api/plugin_manager/bootstrap.sh
+
+
+
+# setup:
+# 	npm install --global yarn
+# 	yarnpkg add react-native-web echarts echarts-for-react ws

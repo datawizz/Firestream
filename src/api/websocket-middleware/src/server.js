@@ -38,6 +38,7 @@ app.get('/health', (req, res) => {
 server.listen(8000);
 
 let messageCounter = 0;
+// Print out message count every 5 seconds
 setInterval(() => {
     console.log(`Messages processed in the last 5 seconds: ${messageCounter}`);
     messageCounter = 0;
