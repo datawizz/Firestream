@@ -23,9 +23,10 @@ ARG JAVA_VERSION=11
 ARG PYTHON_VERSION=3.11
 ##TODO the python version is being installed from debian, instead of manually which puts the bells and whistles in
 ARG NODE_VERSION=18
+ARG NODE_VERSION=18
 ARG NODE_SHA=""
 
-
+ARG LAKEFS_VERSION=0.108.0
 
 ## Dependency Container ##
 
@@ -47,6 +48,7 @@ ARG HADOOP_HOME
 ARG JAVA_VERSION
 ARG PYTHON_VERSION
 ARG NODE_VERSION
+ARG LAKEFS_VERSION
 ARG HOST_USER_ID
 ARG HOST_GROUP_ID
 ARG HOST_MACHINE_ID
@@ -188,6 +190,7 @@ ARG HADOOP_HOME
 ARG JAVA_VERSION
 ARG PYTHON_VERSION
 ARG NODE_VERSION
+ARG LAKEFS_VERSION
 ARG USERNAME
 ARG HOST_USER_ID
 ARG HOST_GROUP_ID
@@ -380,17 +383,8 @@ RUN npm install -g npm yarn
 
 
 
-
-## Install PySpark
-# TODO install pyspark from spark build from source
-# use the local source version of spark for pyspark instead of downloading again
-#cd /opt/spark/python && pip install .
-#cd $SPARK_HOME && sudo sbt clean assembly
-
-
-# Add PySpark to the Python Path
-RUN bash /tmp/workspace/bin/cicd_scripts/set_environment.sh
-
+### Lake FS CLI ###
+RUN /bin/bash /tmp/workspace/bin/install_scripts/lakefs-debian.sh "${LAKEFS_VERSION}"
 
 
 
