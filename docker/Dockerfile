@@ -21,6 +21,7 @@ ARG HADOOP_VERSION
 ARG HADOOP_SHA512
 ARG HADOOP_HOME
 
+
 ARG JAVA_VERSION
 ARG PYTHON_VERSION
 ARG NODE_VERSION
@@ -350,8 +351,10 @@ RUN apt-get update && /bin/bash /tmp/workspace/bin/install_scripts/node-debian.s
 RUN npm install -g npm yarn
 
 
+
 ### Lake FS CLI ###
 RUN /bin/bash /tmp/workspace/bin/install_scripts/lakefs-debian.sh "${LAKEFS_VERSION}"
+
 
 
 ### Cleanup ###
