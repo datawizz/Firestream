@@ -12,16 +12,17 @@ ARG USERNAME="fireworks"
 ARG DOCKER_BUILDKIT=1
 
 
-ARG SPARK_VERSION=3.4.1
-ARG SPARK_SHA512="eacd191b83e62c12c55115a4ec21b97ca2fb07ce3a373e3f423a8275c646831f0fa78702aedf2be96d621c28cd0edde7ab0c2ad11df3e95e1498b5edeefb1daf  spark-3.4.1-bin-without-hadoop.tgz"
+ARG SPARK_VERSION=3.4.2
+ARG SPARK_SHA512="f3966fce33389706087b1b576ed6e101f7765425cba65c2d68df3e9ec9d5eb9206d13873c1ffcbf9090a5b5f1b239c8674244a5f3b9b6d45ee2dc86133dbaf60  spark-3.4.2-bin-without-hadoop.tgz"
 ARG SPARK_HOME="/opt/spark"
-ARG HADOOP_VERSION=3.3.4
-ARG HADOOP_SHA512="ca5e12625679ca95b8fd7bb7babc2a8dcb2605979b901df9ad137178718821097b67555115fafc6dbf6bb32b61864ccb6786dbc555e589694a22bf69147780b4  hadoop-3.3.4.tar.gz"
+ARG HADOOP_VERSION=3.3.6
+ARG HADOOP_SHA512="de3eaca2e0517e4b569a88b63c89fae19cb8ac6c01ff990f1ff8f0cc0f3128c8e8a23db01577ca562a0e0bb1b4a3889f8c74384e609cd55e537aada3dcaa9f8a  hadoop-3.3.6.tar.gz"
 ARG HADOOP_HOME="/opt/hadoop"
 
 ARG JAVA_VERSION=11
 ARG PYTHON_VERSION=3.11
 ##TODO the python version is being installed from debian, instead of manually which puts the bells and whistles in
+ARG NODE_VERSION=18
 ARG NODE_VERSION=18
 ARG NODE_SHA=""
 
@@ -198,24 +199,6 @@ ARG HOST_IP
 ARG HOST_DOCKER_GID
 ARG HOST_GPU_STATUS
 
-
-
-# [Option] Install zsh
-ARG INSTALL_ZSH="true"
-# [Option] Upgrade OS packages to their latest versions
-ARG UPGRADE_PACKAGES="false"
-
-### Docker ###
-# [Option] Enable non-root Docker access in container
-ARG ENABLE_NONROOT_DOCKER="true"
-# [Option] Use the OSS Moby Engine instead of the licensed Docker Engine
-ARG USE_MOBY="true"
-# [Option] Engine/CLI Version
-ARG DOCKER_VERSION="latest"
-# Enable new "BUILDKIT" mode for Docker CLI (set permanently)
-ENV DOCKER_BUILDKIT=1
-
-
 # Install additional OS packages.
 RUN apt-get update && export DEBIAN_FRONTEND=noninteractive \
     && apt-get -y install --no-install-recommends \
@@ -256,7 +239,45 @@ RUN apt-get update && export DEBIAN_FRONTEND=noninteractive \
 
 
 
+# Hadoop: Copy previously fetched runtime components
+COPY --from=dependencies ${HADOOP_HOME} ${HADOOP_HOME}
+
+# Spark: Copy previously fetched runtime components
+COPY --from=dependencies ${SPARK_HOME} ${SPARK_HOME}
+
+# Copy install scripts
+COPY --from=dependencies /tmp/workspace/bin /tmp/workspace/bin
+
+
+# Set Hadoop environment
+ENV LD_LIBRARY_PATH $HADOOP_HOME/lib/native
+
+
+# Set Spark environment
+ENV SPARK_HOME /opt/spark
+ENV PATH $PATH:$SPARK_HOME/bin:$HADOOP_HOME/bin
+ENV SPARK_DIST_CLASSPATH /opt/hadoop/etc/hadoop:/opt/hadoop/share/hadoop/common/lib/*:/opt/hadoop/share/hadoop/common/*:/opt/hadoop/share/hadoop/hdfs:/opt/hadoop/share/hadoop/hdfs/lib/*:/opt/hadoop/share/hadoop/hdfs/*:/opt/hadoop/share/hadoop/mapreduce/lib/*:/opt/hadoop/share/hadoop/mapreduce/*:/opt/hadoop/share/hadoop/yarn:/opt/hadoop/share/hadoop/yarn/lib/*:/opt/hadoop/share/hadoop/yarn/*
+ENV SPARK_CLASSPATH /opt/spark/jars/*:$SPARK_DIST_CLASSPATH
+
+
+
+
+# # ### Apache Spark ###
+# # Install the binaries for Spark so that "Spark Submit" works locally
+# ENV SPARK_HOME=/usr/local/spark
+# ENV PATH $PATH:$SPARK_HOME/bin
+# RUN /bin/bash /tmp/library-scripts/spark-debian.sh "${SPARK_HOME}"
+
+
+
+# [Option] Install zsh
+ARG INSTALL_ZSH="true"
+# [Option] Upgrade OS packages to their latest versions
+ARG UPGRADE_PACKAGES="false"
+
 ### Python ###
+
+
 
 # Python
 # RUN apt-get -y install python3 python3-pip
@@ -282,57 +303,21 @@ RUN python -m pip install --no-warn-script-location --no-deps --no-index --find-
 
 
 
-# Hadoop: Copy previously fetched runtime components
-COPY --from=dependencies ${HADOOP_HOME} ${HADOOP_HOME}
-
-# Spark: Copy previously fetched runtime components
-COPY --from=dependencies ${SPARK_HOME} ${SPARK_HOME}
-
-# Copy install scripts
-COPY --from=dependencies /tmp/workspace/bin /tmp/workspace/bin
-
-
-# Set Hadoop environment
-ENV LD_LIBRARY_PATH $HADOOP_HOME/lib/native
-
-
-# Set Spark environment
-ENV SPARK_HOME /opt/spark
-ENV PATH $PATH:$SPARK_HOME/bin:$HADOOP_HOME/bin
-ENV SPARK_DIST_CLASSPATH /opt/hadoop/etc/hadoop:/opt/hadoop/share/hadoop/common/lib/*:/opt/hadoop/share/hadoop/common/*:/opt/hadoop/share/hadoop/hdfs:/opt/hadoop/share/hadoop/hdfs/lib/*:/opt/hadoop/share/hadoop/hdfs/*:/opt/hadoop/share/hadoop/mapreduce/lib/*:/opt/hadoop/share/hadoop/mapreduce/*:/opt/hadoop/share/hadoop/yarn:/opt/hadoop/share/hadoop/yarn/lib/*:/opt/hadoop/share/hadoop/yarn/*
-ENV SPARK_CLASSPATH /opt/spark/jars/*:$SPARK_DIST_CLASSPATH
-
-## Install PySpark
-# TODO install pyspark from spark build from source
-# use the local source version of spark for pyspark instead of downloading again
-RUN cd $SPARK_HOME/python && python -m pip install .
-# RUN $SPARK_HOME && sbt clean assembly
-
-
-# Add PySpark to the Python Path
-# RUN echo 'ZIPS=("$SPARK_HOME/python/lib/*.zip"); IFS=:; PYTHONPATH=$(echo "${ZIPS[*]}"):$PYTHONPATH' >> ~/.bashrc
-
-
-
-
-# # ### Apache Spark ###
-# # Install the binaries for Spark so that "Spark Submit" works locally
-# ENV SPARK_HOME=/usr/local/spark
-# ENV PATH $PATH:$SPARK_HOME/bin
-# RUN /bin/bash /tmp/library-scripts/spark-debian.sh "${SPARK_HOME}"
-
-
-
-
-
-
 # ### Scala Build Tools ###
 # RUN /bin/bash /tmp/workspace/bin/install_scripts/sbt-debian.sh
 
 # Install VS Code remote development container features
 RUN /bin/bash /tmp/workspace/bin/install_scripts/common-debian.sh "${INSTALL_ZSH}" "${USERNAME}" "${HOST_USER_ID}" "${HOST_GROUP_ID}" "${UPGRADE_PACKAGES}" "true" "true"
 
-
+### Docker ###
+# [Option] Enable non-root Docker access in container
+ARG ENABLE_NONROOT_DOCKER="true"
+# [Option] Use the OSS Moby Engine instead of the licensed Docker Engine
+ARG USE_MOBY="true"
+# [Option] Engine/CLI Version
+ARG DOCKER_VERSION="latest"
+# Enable new "BUILDKIT" mode for Docker CLI (set permanently)
+ENV DOCKER_BUILDKIT=1
 
 ### Docker from Docker
 RUN /bin/bash /tmp/workspace/bin/install_scripts/docker-from-docker-debian.sh 
@@ -458,20 +443,14 @@ CMD ["sleep", "infinity"]
 
 
 
-FROM devcontainer as test_container
-# Required for Docker-from-Docker
-ENTRYPOINT ["/usr/local/share/docker-init.sh"]
-
-# A container for running tests
-RUN echo "Running tests!"
-CMD ["make", "test"]
-
-
 FROM devcontainer as cicd_container
 
+WORKDIR /workspace
+
+COPY . .
+RUN python -m pip install pyspark==3.4.1
+
 # Required for Docker-from-Docker
 ENTRYPOINT ["/usr/local/share/docker-init.sh"]
-
-# A container for running the deployment pipeline
-RUN echo "Running cicd!"
-CMD ["make", "deploy_production"]
+# Default command, overwritten for CI
+CMD ["sleep", "infinity"]

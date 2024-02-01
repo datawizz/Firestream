@@ -74,6 +74,8 @@ class SparkClient:
         # Default to using local S3
         self.storage_location = kwargs.get("storage_location") or "local"
 
+
+
         self.S3_ENDPOINT_URL = os.environ.get("S3_LOCAL_ENDPOINT_URL")
         self.S3_ACCESS_KEY_ID = os.environ.get("S3_LOCAL_ACCESS_KEY_ID")
         self.S3_SECRET_ACCESS_KEY = os.environ.get("S3_LOCAL_SECRET_ACCESS_KEY")
@@ -95,8 +97,23 @@ class SparkClient:
         self.spark_session = self.create_spark_session()
         self.spark_context = self.spark_session.sparkContext
 
+    def set_bucket(self):
+        if self.storage_location == "local":
+            self.S3_ENDPOINT_URL = os.environ.get("S3_LOCAL_ENDPOINT_URL")
+            self.S3_ACCESS_KEY_ID = os.environ.get("S3_LOCAL_ACCESS_KEY_ID")
+            self.S3_SECRET_ACCESS_KEY = os.environ.get("S3_LOCAL_SECRET_ACCESS_KEY")
+            self.S3_BUCKET_NAME = os.environ.get("S3_LOCAL_BUCKET_NAME")
+            self.S3_PATH = f"{self.S3_BUCKET_NAME}/warehouse"
+            self.S3_DEFAULT_REGION = os.environ.get("S3_LOCAL_DEFAULT_REGION")
+        else:
+            self.S3_ENDPOINT_URL = os.environ.get("S3_CLOUD_ENDPOINT_URL")
+            self.S3_ACCESS_KEY_ID = os.environ.get("S3_CLOUD_ACCESS_KEY_ID")
+            self.S3_SECRET_ACCESS_KEY = os.environ.get("S3_CLOUD_SECRET_ACCESS_KEY")
+            self.S3_BUCKET_NAME = os.environ.get("S3_CLOUD_BUCKET_NAME")
+            self.S3_PATH = f"{self.S3_BUCKET_NAME}/warehouse"
+            self.S3_DEFAULT_REGION = os.environ.get("S3_CLOUD_DEFAULT_REGION")
 
-        
+        self.LOG_PATH = f"s3a://{self.S3_BUCKET_NAME}/spark_logs/"
 
     def create_logging_dir(self):
         s3 = boto3.resource(
@@ -190,52 +207,47 @@ class SparkClient:
         spark.sparkContext.setLogLevel(self.config.get("spark.log.level", "INFO"))
         return spark
 
-    def stop(self):
-        self.spark_session.stop()
 
-    def create_df(self, data: list, schema: dict) -> DataFrame:
-        return self.spark_session.createDataFrame(data, schema=schema)
+
 
     def read(self, format: str, **kwargs) -> DataFrame:
-        return self.spark_session.read.format(format).options(**kwargs).load()
+        return self.session.read.format(format).options(**kwargs)
     
-    def write(self, df: DataFrame, format: str, **kwargs) -> None:
-        mode = "overwrite" if kwargs.pop('overwrite', False) else "append"
-        df.write.format(format).mode(mode).options(**kwargs).save()
-
+    def write(self, df: DataFrame, format: str, **kwargs) -> DataFrame:
+        return df.write.format(format).options(**kwargs)
     
     def read_stream(self, format: str, **kwargs) -> DataFrame:
-        return self.spark_session.readStream.format(format).options(**kwargs)
+        return self.session.readStream.format(format).options(**kwargs)
     
 ###########
 ###TESTS####
 ###########
-# from pyspark.sql.types import StructType, StructField, StringType
-# import pytest
+from pyspark.sql.types import StructType, StructField, StringType
+import pytest
 
-# # Test case for read method
-# def test_read():
-#     app_name = "TestApp"
-#     config = {"key": "value"}
-#     client = SparkClient(app_name=app_name, config=config, storage_location="local")
+# Test case for read method
+def test_read():
+    app_name = "TestApp"
+    config = {"key": "value"}
+    client = SparkClient(app_name=app_name, config=config, storage_location="local")
 
-#     data = [("Alice",), ("Bob",)]
-#     schema = StructType([StructField("name", StringType(), True)])
-#     df = client.session.createDataFrame(data, schema=schema)
-#     path = "/tmp/read_test.parquet"
-#     df.write.mode("overwrite").parquet(path)
-#     read_df = client.session.read.format("parquet").load(str(path))
-#     read_df.show()
+    data = [("Alice",), ("Bob",)]
+    schema = StructType([StructField("name", StringType(), True)])
+    df = client.session.createDataFrame(data, schema=schema)
+    path = "/tmp/read_test.parquet"
+    df.write.mode("overwrite").parquet(path)
+    read_df = client.session.read.format("parquet").load(str(path))
+    read_df.show()
 
-#     # assert read_df.count() == 2
+    # assert read_df.count() == 2
 
-#     client.session.stop()
+    client.session.stop()
 
-# if __name__ == "__main__":
-#     # pytest.main([__file__])
+if __name__ == "__main__":
+    # pytest.main([__file__])
 
 
-#     test_read()
+    test_read()
 
 
 # from pyspark.sql import SparkSession

@@ -14,10 +14,6 @@ helm repo add bitnami https://charts.bitnami.com/bitnami
 
 sleep 3
 
-### Open Telemetry + Signoz ###
-helm repo add signoz https://charts.signoz.io
-sleep 1
-helm --namespace default upgrade --install signoz signoz/signoz
 
 
 ### Ingress ###
@@ -61,18 +57,14 @@ helm --namespace default upgrade --install signoz signoz/signoz
 ### PostgreSQL ###
 #  -f /workspace/charts/postgresql/values.yaml \
 
-postgresql_install() {
-  #  TODO use the high availability one
-  helm upgrade --install postgresql bitnami/postgresql \
-    --set global.postgresql.auth.username="$POSTGRES_USER" \
-    --set global.postgresql.auth.password="$POSTGRES_PASSWORD" \
-    --set global.postgresql.auth.database="$POSTGRES_DEFAULT_DB" \
-    --set global.postgresql.service.ports.postgresql="$POSTGRES_PORT"
-}
 
-postgresql_install
-
- 
+#  TODO use the high availability one
+helm install postgresql bitnami/postgresql \
+  --set global.postgresql.auth.username="$POSTGRES_USER" \
+  --set global.postgresql.auth.password="$POSTGRES_PASSWORD" \
+  --set global.postgresql.auth.database="$POSTGRES_DEFAULT_DB" \
+  --set global.postgresql.service.ports.postgresql="$POSTGRES_PORT"
+  
 ## PGAdmin ##
 
 # cd /workspace/submodules/rowanruseler/helm-charts && \
@@ -98,7 +90,7 @@ postgresql_install
 
 
 ### Minio ###
-helm upgrade --install minio bitnami/minio -f /workspace/k8s/charts/fireworks/subcharts/minio/chart/values.yaml \
+helm install minio bitnami/minio -f /workspace/charts/fireworks/subcharts/minio/chart/values.yaml \
   --set auth.rootUser="$S3_LOCAL_ACCESS_KEY_ID" \
   --set auth.rootPassword="$S3_LOCAL_SECRET_ACCESS_KEY" \
   --set defaultBuckets="$S3_LOCAL_BUCKET_NAME"
@@ -137,6 +129,13 @@ helm upgrade --install kafka bitnami/kafka --version 24.0.10  \
 
 
 ### Open Search ###
+
+export OPENSEARCH_HOST="opensearch-cluster-master.default.svc.cluster.local"
+export OPENSEARCH_PORT="9200"
+export OPENSEARCH_USERNAME='admin'
+export OPENSEARCH_PASSWORD='admin'
+
+
 # cd /workspace/submodules/the-fireworks-company/opensearch-project-helm-charts/charts && \
 # helm install opensearch opensearch
 # TODO the configuration of OpenSearch is not trival. 
@@ -157,6 +156,51 @@ helm upgrade --install kafka bitnami/kafka --version 24.0.10  \
 # helm install airflow bitnami/airflow
 
 
+
+### Spark Operator ###
+cd /workspace/submodules/the-fireworks-company/spark-on-k8s-operator/charts/spark-operator-chart && \
+helm upgrade --install spark-operator . --namespace "default" \
+  --set sparkJobNamespace="default" \
+  --set webhook.enable=true 
+
+
+
+#GCP kubectl create clusterrolebinding <user>-cluster-admin-binding --clusterrole=cluster-admin --user=<user>@<domain>
+
+
+
+# $ helm install my-release spark-operator/spark-operator --namespace spark-operator --set sparkJobNamespace=test-ns
+
+
+
+# retrieve config
+# kubectl get sparkapplications spark-pi -o=yaml
+# kubectl describe sparkapplication spark-pi
+# apiVersion: sparkoperator.k8s.io/v1beta2
+# kind: SparkApplication
+# metadata:
+#   ...
+# spec:
+#  deps: {}
+#
+
+
+### Cillium ###
+
+# helm repo add cilium https://helm.cilium.io/
+
+# kubectl create namespace cilium
+
+# helm install cilium cilium/cilium --version 1.14 \
+#   --namespace cilium \
+#   --set kubeProxyReplacement=partial \
+#   --set hostServices.enabled=false \
+#   --set externalIPs.enabled=true \
+#   --set nodePort.enabled=true \
+#   --set hostPort.enabled=true \
+#   --set bpf.masquerade=false \
+#   --set image.pullPolicy=IfNotPresent \
+#   --set ipam.mode=kubernetes
 
 
 # ### Superset ###
@@ -186,10 +230,7 @@ helm upgrade --install kafka bitnami/kafka --version 24.0.10  \
 # helm install superset /workspace/submodules/apache/superset/helm/superset \
 #     --set configFromSecret=superset-secret-config-py
 
-# export OPENSEARCH_HOST="opensearch-cluster-master.default.svc.cluster.local"
-# export OPENSEARCH_PORT="9200"
-# export OPENSEARCH_USERNAME='admin'
-# export OPENSEARCH_PASSWORD='admin'
+
 
 
 # ### Jaeger All-in-One ###
@@ -239,31 +280,36 @@ helm upgrade --install kafka bitnami/kafka --version 24.0.10  \
 
 # ### Websocket Middleware ###
 # cd /workspace/services/javascript/websocket_middleware/chart && helm install websocket-middleware -f values.yaml .
+echo "Waiting for Helm deployments to be ready"
 
-# ### Dashboard ###
-# cd /workspace/services/javascript/dashboard/chart && helm install dashboard -f values.yaml .
+sleep 5
 
 
-echo "Waiting for pods to be ready"
+# Loop until all deployments are ready
+while true; do
+  all_ready=true
+  
+  # Iterate through all Helm releases
+  for release in $(helm list -q); do
+    # Get the deployment names for the release
+    for deployment in $(helm get manifest $release | kubectl get -f - --ignore-not-found -o=jsonpath='{.items[?(@.kind=="Deployment")].metadata.name}'); do
+      # Check the status of the deployment
+      status=$(kubectl rollout status deployment $deployment --timeout=5s --watch=false 2>/dev/null)
+      
+      # If the status is not complete, continue waiting
+      if [[ "$status" != *"successfully rolled out"* ]]; then
+        all_ready=false
+      fi
+    done
+  done
 
-# Define the watch command
-watch_cmd="kubectl get pods --watch -n default"
-
-# Run the watch command in the background
-${watch_cmd} &
-
-# Save the PID of the watch command
-watch_pid=$!
-
-# Wait for pods to be ready excluding the 'init-db' pod
-kubectl get pods --no-headers -n default | awk '!/init-db/{print $1}' | while read pod; do
-  # Wait for each pod to be ready and print status
-  if kubectl wait --timeout=600s --for=condition=ready pod/$pod -n default; then
-    echo "Pod $pod is ready"
-  else
-    echo "Timeout while waiting for pod $pod to be ready"
+  # Break the loop if all deployments are ready
+  if [ "$all_ready" == true ]; then
+    break
   fi
+
+  # Sleep for 5 seconds before the next check
+  sleep 5
 done
 
-# Kill the watch command
-kill ${watch_pid}
+echo "All Helm deployments are ready"

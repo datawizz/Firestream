@@ -1,9 +1,9 @@
-import os
-import logging
 from time import sleep, time
-import pytest
+import logging
+import os
 
-def setup_logging():
+
+def test_log():
     path = "./logs"
     if not os.path.exists(path):
         os.mkdir(path)
@@ -13,13 +13,16 @@ def setup_logging():
         level=logging.DEBUG,
     )
 
-def log_time(loop):
-    s = f"The time is now {time()} on loop {loop} and {logging.getLoggerClass().root.handlers[0]}"
-    logging.debug(s)
-    print(s)
+    loop = 0
+    while True:
+        s = f"The time is now {time()} on loop {loop} and {logging.getLoggerClass().root.handlers[0]}"
+        logging.debug(s)
+        print(s)
+        loop += 1
+        sleep(0.1)
+        if loop > 5:
+            break
 
-@pytest.mark.parametrize('loop', range(10))
-def test_log(loop):
-    setup_logging()
-    log_time(loop)
-    sleep(0.1)
+
+if __name__ == "__main__":
+    test_log()
