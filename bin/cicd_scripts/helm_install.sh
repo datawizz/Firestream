@@ -80,30 +80,30 @@ helm install postgresql bitnami/postgresql \
 
 
 
-### Project Nessie ###
+# ### Project Nessie ###
 
-# Create a kubernetes secret for the postgres-creds credentials
-# required (and best practice) for this helm chart
+# # Create a kubernetes secret for the postgres-creds credentials
+# # required (and best practice) for this helm chart
 
-# Make a new temporary file
-temp_file=$(mktemp)
+# # Make a new temporary file
+# temp_file=$(mktemp)
 
-# Write the values of the environment variables to the temp file
-echo "postgres_username=${POSTGRES_USER}" > ${temp_file}
-echo "postgres_password=${POSTGRES_PASSWORD}" >> ${temp_file}
-cat ${temp_file}
+# # Write the values of the environment variables to the temp file
+# echo "postgres_username=${POSTGRES_USER}" > ${temp_file}
+# echo "postgres_password=${POSTGRES_PASSWORD}" >> ${temp_file}
+# cat ${temp_file}
 
-# Create the secret from the temp file
-kubectl create secret generic postgres-creds --from-env-file="${temp_file}"
+# # Create the secret from the temp file
+# kubectl create secret generic postgres-creds --from-env-file="${temp_file}"
 
-# Delete the temp file
-rm ${temp_file}
+# # Delete the temp file
+# rm ${temp_file}
 
-cd /workspace/submodules/the-fireworks-company/nessie && \
-helm install nessie helm/nessie \
-  --set versionStoreType=TRANSACTIONAL \
-  --set postgres.jdbcUrl="$JDBC_CONNECTION_STRING" \
-  --set image.tag="$NESSIE_VERSION"
+# cd /workspace/submodules/the-fireworks-company/nessie && \
+# helm install nessie helm/nessie \
+#   --set versionStoreType=TRANSACTIONAL \
+#   --set postgres.jdbcUrl="$JDBC_CONNECTION_STRING" \
+#   --set image.tag="$NESSIE_VERSION"
 
 ### Spark Cluster ###
 # Enables: spark://spark-master:7077
@@ -115,7 +115,7 @@ helm install nessie helm/nessie \
 
 
 ### Minio ###
-helm install minio bitnami/minio -f /workspace/k8s/charts/fireworks/subcharts/minio/chart/values.yaml \
+helm install minio bitnami/minio -f /workspace/charts/fireworks/subcharts/minio/chart/values.yaml \
   --set auth.rootUser="$S3_LOCAL_ACCESS_KEY_ID" \
   --set auth.rootPassword="$S3_LOCAL_SECRET_ACCESS_KEY" \
   --set defaultBuckets="$S3_LOCAL_BUCKET_NAME"
