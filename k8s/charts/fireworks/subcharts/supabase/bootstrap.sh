@@ -1,14 +1,12 @@
 #!/bin/bash
 
-bash /workspace/k8s/ingress/bootstrap.sh
+
 
 # SUPABASE_ANON_KEY=""
 # SUPABASE_SERVICE_KEY=""
 # SUPABASE_SECRET=""
 # SUPABASE_SERVICE_ROLE_KEY=""
-SUPABASE_ANON_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.ewogICAgInJvbGUiOiAiYW5vbiIsCiAgICAiaXNzIjogInN1cGFiYXNlIiwKICAgICJpYXQiOiAxNjc1NDAwNDAwLAogICAgImV4cCI6IDE4MzMxNjY4MDAKfQ.ztuiBzjaVoFHmoljUXWmnuDN6QU2WgJICeqwyzyZO88"
-SUPABASE_SERVICE_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.ewogICAgInJvbGUiOiAic2VydmljZV9yb2xlIiwKICAgICJpc3MiOiAic3VwYWJhc2UiLAogICAgImlhdCI6IDE2NzU0MDA0MDAsCiAgICAiZXhwIjogMTgzMzE2NjgwMAp9.qNsmXzz4tG7eqJPh1Y58DbtIlJBauwpqx39UF-MwM8k"
-SUPABASE_SECRET="abcdefghijklmnopqrstuvwxyz123456"
+
 
 SUPABASE_URL="demo.fireworks.ngrok.io"
 INGRESS_CLASS="ngrok"
@@ -45,8 +43,4 @@ helm upgrade --install supabase oci://registry-1.docker.io/bitnamicharts/supabas
   --set kong.ingressController.enabled="false" \
   --set kong.ingress.enabled="true" \
   --set kong.ingress.hostname=$SUPABASE_URL \
-  --set kong.ingress.tls="false" \
-  --set kong.ingress.ingressClassName=$INGRESS_CLASS 
-  # --set publicURL=$SUPABASE_URL \
-  # --set studio.publicURL=$SUPABASE_URL \
-  # --set kong.ingress.annotations="nginx.ingress.kubernetes.io/rewrite-target: /"
+  --set kong.ingress.tls='false' 

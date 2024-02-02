@@ -12,13 +12,13 @@ on:
 
 env:
   DOCKER_BUILDKIT: 1
-  # DOCKER_HOST: tcp://localhost:2375
-  # BRANCH_ENV: ${{ env.BRANCH }}
+  GIT_COMMIT_HASH: ${{ github.sha }}
+  BRANCH_NAME: ${{ github.ref_name }}
 
 jobs:
   test:
-    timeout-minutes: 30
-    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    runs-on: ubuntu-22.04
 
     steps:
       - name: Checkout
@@ -27,9 +27,19 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v2
 
-      - name: Build Platform
+      - name: Make Space
         run: |
-          bash bootstrap.sh test
+            # Remove the "tools" that Github Actions bundles in every image
+            sudo rm -rf "/usr/local/share/boost"
+            sudo rm -rf "$AGENT_TOOLSDIRECTORY"
+
+      - name: Run Tests
+        run: |
+            make test
+
+      - name: Build Containers
+        run: |
+          make build
 
       - name: Stop containers
         if: always()
