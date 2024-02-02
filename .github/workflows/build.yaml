@@ -12,7 +12,7 @@ on:
 
 env:
   DOCKER_BUILDKIT: 1
-  GIT_COMMIT_HASH: ${{ github.sha }}
+  # GIT_COMMIT_HASH: ${{ github.sha }}
   BRANCH_ENV: ${{ env.BRANCH }}
 
 jobs:
