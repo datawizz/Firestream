@@ -35,7 +35,7 @@ _SRC="/workspace"
 export MACHINE_ID=${MACHINE_ID:-$(cat /var/lib/dbus/machine-id)}
 
 # Define valid deployment modes
-valid_modes=("development" "test" "clean" "cicd" "production" "resume")
+valid_modes=("development" "test" "clean" "cicd" "production" "resume" "build")
 
 # Check if an argument is provided
 if [ $# -eq 0 ]; then
@@ -98,8 +98,8 @@ function check_socket {
     fi
 }
 
-# run the checks if DEPLOYMENT_MODE is "development" or "cicd"
-if [ "$DEPLOYMENT_MODE" == "development" ] || [ "$DEPLOYMENT_MODE" == "cicd" ]; then
+# run the checks if DEPLOYMENT_MODE is "development" or "build"
+if [ "$DEPLOYMENT_MODE" == "development" ] || [ "$DEPLOYMENT_MODE" == "build" ] || [ "$DEPLOYMENT_MODE" == "test" ]; then
     check_docker
     check_socket
 fi
@@ -165,8 +165,12 @@ echo "Environment successfully configured"
 
 # 1. If in test mode
 if [ "$DEPLOYMENT_MODE" = "test" ]; then
-  # TODO make the cluster name random
-  echo "TODO"
+	bash $_SRC/bin/cicd_scripts/test.sh
+fi
+
+# 1. If in build mode
+if [ "$DEPLOYMENT_MODE" = "build" ]; then
+	bash $_SRC/bin/cicd_scripts/build.sh
 fi
 
 # 2. If in development mode
