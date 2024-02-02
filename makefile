@@ -6,30 +6,32 @@
 BASEDIR=$(shell pwd)
 PROJECT_NAME=fireworks
 
-development:
-	cd $(BASEDIR) && bash bootstrap.sh development
 
+
+development:
+	# Deploy the development environment
+	@bash -c 'cd $(BASEDIR) && bash bootstrap.sh development >> makefile_output_log.txt 2>&1'
 
 development_clean:
-	cd $(BASEDIR) && bash bootstrap.sh clean
+	@bash -c 'cd $(BASEDIR) && bash bootstrap.sh clean >> makefile_output_log.txt 2>&1'
 
 # Reuse the existing cluster by re-establishing the network tunnel
 resume:
 	# Useful for resuming the container after a restart
-	export DEPLOYMENT_MODE="resume" && cd $(BASEDIR) && bash bootstrap.sh
+	@bash -c 'cd $(BASEDIR) && bash bootstrap.sh resume >> makefile_output_log.txt 2>&1'
 
 # Test services
 test:
-	make bootstrap
-	export DEPLOYMENT_MODE="test" && cd $(BASEDIR) && python -m pytest
+	make development
+	@bash -c 'bash /workspace/bin/cicd_scripts/test.sh >> makefile_output_log.txt 2>&1'
 
 # Build services
 build:
-	# The development environment contains a Local Registry
-	make development_clean
+	# Establish local container registry through k3d
+	@bash -c 'cd $(BASEDIR) && bash bootstrap.sh clean >> makefile_output_log.txt 2>&1'
 
-	# Run the build scripts
-	bash /workspace/docker/build.sh
+	# Run the container build scripts
+	bash /workspace/bin/cicd_scripts/build.sh
 
 
 # Start services

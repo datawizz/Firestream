@@ -17,8 +17,8 @@ env:
 
 jobs:
   test:
-    timeout-minutes: 30
-    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    runs-on: ubuntu-22.04
 
     steps:
       - name: Checkout
@@ -27,9 +27,17 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v2
 
-      - name: Run Integration Test Suite
+      - name: Build Containers
         run: |
-          docker compose -f docker/docker-compose.test.yml build && docker compose -f docker/docker-compose.test.yml run cicd_container make test
+          make build
+
+      - name: Test
+        run: |
+          make test
+
+      # - name: Deploy
+      #   run: |
+      #     make test
 
       - name: Stop containers
         if: always()
