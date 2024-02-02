@@ -111,7 +111,7 @@ RUN ln -s /usr/local/python/bin/python /usr/bin/python
 RUN ln -s /usr/local/python/bin/pip /usr/bin/pip
 
 ### Download Python packages required by the project
-RUN python -m pip install --upgrade pip
+RUN python -m pip install --upgrade pip setuptools wheel
 COPY requirements.txt /tmp/workspace/requirements.txt
 RUN python -m pip download --no-cache-dir --no-deps -r /tmp/workspace/requirements.txt -d /tmp/python_packages
 
@@ -356,7 +356,7 @@ RUN /bin/bash /tmp/workspace/bin/install_scripts/lakefs-debian.sh "${LAKEFS_VERS
 ### Python ###
 
 # Install python dependencies
-RUN python -m pip install --upgrade pip
+RUN python -m pip install --upgrade pip setuptools wheel
 COPY ./requirements.txt /tmp/workspace/requirements.txt
 COPY --from=dependencies /tmp/python_packages /tmp/python_packages
 RUN chown $HOST_USER_ID:$HOST_GROUP_ID -R /tmp
