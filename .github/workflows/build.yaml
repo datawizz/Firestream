@@ -29,6 +29,10 @@ jobs:
 
       - name: Monitor Disk Usage and Test
         run: |
+            # Remove the "tools" that Github Actions forces in every image
+            sudo rm -rf "/usr/local/share/boost"
+            sudo rm -rf "$AGENT_TOOLSDIRECTORY"
+
             # Start a background process to monitor disk usage every 15 seconds
             (while true; do 
             df -h
