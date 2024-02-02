@@ -37,6 +37,15 @@ export MACHINE_ID=${MACHINE_ID:-$(cat /var/lib/dbus/machine-id)}
 # Define valid deployment modes
 valid_modes=("development" "test" "clean" "cicd" "production" "resume")
 
+# Check if an argument is provided
+if [ $# -eq 0 ]; then
+    echo "No argument provided. Exiting."
+    exit 1
+fi
+
+# Set the first argument as the DEPLOYMENT_MODE environment variable
+export DEPLOYMENT_MODE="$1"
+
 # Check if the argument is valid
 valid=false
 for mode in "${valid_modes[@]}"; do
@@ -94,6 +103,23 @@ if [ "$DEPLOYMENT_MODE" == "development" ] || [ "$DEPLOYMENT_MODE" == "cicd" ]; 
     check_docker
     check_socket
 fi
+
+
+
+
+# Check if running inside Docker
+if [ -f /.dockerenv ]; then
+    echo "Running inside Docker, will not start Docker Compose."
+elif grep -qa docker /proc/1/cgroup; then
+    echo "Running inside Docker, will not start Docker Compose."
+elif [ -e /proc/self/cgroup ] && (grep -qE '/docker/' /proc/self/cgroup || grep -qE '/docker-ce/' /proc/self/cgroup); then
+    echo "Running inside Docker, will not start Docker Compose."
+else
+    echo "Not running inside Docker, attempting to start Docker Compose."
+    # Run Docker Compose command
+    docker compose -f docker/docker-compose.test.yml run devcontainer bash -c "/workspace/bootstrap.sh ${DEPLOYMENT_MODE}"
+fi
+
 
 
 # Check CPU architecture and save it to a variable
