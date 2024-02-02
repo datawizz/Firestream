@@ -27,13 +27,14 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v2
 
+      - name: Test
+        run: |
+          make test
+
       - name: Build Containers
         run: |
           make build
 
-      - name: Test
-        run: |
-          make test
 
       # - name: Deploy
       #   run: |
