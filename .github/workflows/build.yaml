@@ -12,8 +12,8 @@ on:
 
 env:
   DOCKER_BUILDKIT: 1
-  # DOCKER_HOST: tcp://localhost:2375
-  # BRANCH_ENV: ${{ env.BRANCH }}
+  GIT_COMMIT_HASH: ${{ github.sha }}
+  BRANCH_ENV: ${{ env.BRANCH }}
 
 jobs:
   test:
@@ -27,33 +27,19 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v2
 
-      - name: Monitor Disk Usage and Test
+      - name: Make Space
         run: |
-            # Remove the "tools" that Github Actions forces in every image
+            # Remove the "tools" that Github Actions bundles in every image
             sudo rm -rf "/usr/local/share/boost"
             sudo rm -rf "$AGENT_TOOLSDIRECTORY"
 
-            # Start a background process to monitor disk usage every 15 seconds
-            (while true; do 
-            df -h
-            sleep 15
-            done) &
-
-            # Execute the simplified build command
+      - name: Run Tests
+        run: |
             make test
 
-      # - name: Test
-      #   run: |
-      #     make test
-
-      # - name: Build Containers
-      #   run: |
-      #     make build
-
-
-      # - name: Deploy
-      #   run: |
-      #     make test
+      - name: Build Containers
+        run: |
+          make build
 
       - name: Stop containers
         if: always()
