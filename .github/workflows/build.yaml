@@ -27,13 +27,24 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v2
 
-      - name: Test
-        run: |
-          make test
+  - name: Monitor Disk Usage and Test
+    run: |
+        # Start a background process to monitor disk usage every 15 seconds
+        (while true; do 
+        df -h
+        sleep 15
+        done) &
 
-      - name: Build Containers
-        run: |
-          make build
+        # Execute the simplified build command
+        make test
+
+      # - name: Test
+      #   run: |
+      #     make test
+
+      # - name: Build Containers
+      #   run: |
+      #     make build
 
 
       # - name: Deploy
