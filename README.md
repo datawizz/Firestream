@@ -1,11 +1,10 @@
 
-
-![Screenshot](docs/static/images/fireworks_banner.png)
-
+![Screenshot](static/images/fireworks_banner.png)
 
 Fireworks is a production ready development environment for streaming stateful/stateless ETL and streaming Dashboarding. The purpose of Fireworks is to provide a minimal implementation of a modern streaming Data Warehouse using popular technologies that can be deployed to production without additional configuration.
 
 # Table of Contents  
+
 [Tech Stack](#tech-stack)  
 [Getting Started](#getting-started)  
 [Development Container](#development-container)  
@@ -20,10 +19,11 @@ Fireworks makes use of the following technologies.
 
 * Development Container
 * Docker-From-Docker
-* KinD (Kubernetes in Docker)
+* K3D (Rancher Labs K3S in Docker)
 * Helm
 * Kafka (Bitnami)
 * Spark (Bitnami)
+* Spark Operator for Kubernetes
 * Python Kafka Consumer / Producer (librdkafka)
 * Node.js Middlware Websocket proxy
 * Plotly.js Dash (Next.JS, React)
@@ -35,12 +35,10 @@ This project requires Docker and a x86/AMD64 Debian/Ubuntu environment. This pro
 This project implements **Infrustructure as Code** via a Devcontainer (Development Container) defined in a Dockerfile. The project can be run using the following command:
 
 ```
-git clone https://github.com/datawizz/fireworks.git && cd fireworks && sh bootstrap.sh
+git clone https://github.com/datawizz/fireworks.git && cd fireworks && bash bootstrap.sh development
 ```
 
 This will use the Docker Engine of the host and bind to the var/run/docker.sock to create the Devcontainer, open it via a terminal, and bootstrap the project. Once everything is built it will then expose the dashboard on localhost:3000.
-
-
 
 # Development Container
 
@@ -48,18 +46,19 @@ Alternatively you can run this project using the VS Code Devcontainer extension.
 
 The Devcontainer is configured to use IP Tables to resolve Kubernetes internal services using CoreDNS hosted in the Kind Control Plane using the Docker Engine as a bridge on the host's network. This allows anything run within the Devcontainer to reach local Kubernetes services using the same URL as it would inside the Kubernetes cluster!
 
-i.e. 
+i.e.
+
 ```
 ping service_name.namespace.svc.cluster.local
 ```
+
 Is resolvable in the Devcontainer.
 
 This is basically a blanket kubectl proxy command but since it is run within the Devcontainer (and Docker Engine) it is agnostic to the underlying operating system's networking approach. Further this Devcontainer can be used with minimal configuration to forward kubectl commands to any cloud provider (AWS, GCP, etc).
 
 The **Kubernetes** cluster is run using KinD (Kubernetes in Docker).
 
-![Screenshot](images/stack.png)
-
+![Screenshot](static/images/stack.png)
 
 ### Apache Spark Structured Streaming
 
