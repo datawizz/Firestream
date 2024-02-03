@@ -18,11 +18,13 @@ ARG SPARK_HOME="/opt/spark"
 ARG HADOOP_VERSION=3.3.6
 ARG HADOOP_SHA512="de3eaca2e0517e4b569a88b63c89fae19cb8ac6c01ff990f1ff8f0cc0f3128c8e8a23db01577ca562a0e0bb1b4a3889f8c74384e609cd55e537aada3dcaa9f8a  hadoop-3.3.6.tar.gz"
 ARG HADOOP_HOME="/opt/hadoop"
+ARG AIRFLOW_VERSION=2.8.1
+ARG AIRFLOW_SHA512="381a88ca2ef48ec488aea1b64b91ed132bbc7032b9fede467660079daa23265fe992a99e414664faf0ad5373e0b128f3da904d03275dbf26628459f29df55ae1  apache-airflow-2.8.1-source.tar.gz"
+ARG AIRFLOW_HOME="/opt/airflow"
 
 ARG JAVA_VERSION=11
 ARG PYTHON_VERSION=3.11
 ##TODO the python version is being installed from debian, instead of manually which puts the bells and whistles in
-ARG NODE_VERSION=18
 ARG NODE_VERSION=18
 ARG NODE_SHA=""
 
@@ -46,6 +48,9 @@ ARG SPARK_HOME
 ARG HADOOP_VERSION
 ARG HADOOP_SHA512
 ARG HADOOP_HOME
+ARG AIRFLOW_VERSION
+ARG AIRFLOW_SHA512
+ARG AIRFLOW_HOME
 ARG JAVA_VERSION
 ARG PYTHON_VERSION
 ARG NODE_VERSION
@@ -90,6 +95,10 @@ RUN mkdir -p ${HADOOP_HOME} && mv /tmp/hadoop-${HADOOP_VERSION}/* ${HADOOP_HOME}
 # Set Hadoop default logging to WARN (instead of INFO which is very verbose)
 RUN sed -i 's/hadoop.root.logger=INFO,console/hadoop.root.logger=WARN,console/g' ${HADOOP_HOME}/etc/hadoop/log4j.properties
 
+# Airflow
+RUN wget https://dlcdn.apache.org/airflow/2.8.1/apache-airflow-2.8.1-source.tar.gz
+RUN echo $AIRFLOW_SHA512 | sha512sum -c - && echo "Hash matched" || (echo "Hash didn't match" && exit 1) \
+    && mkdir -p ${AIRFLOW_HOME} && tar xvzf apache-airflow-2.8.1-source.tar.gz -C ${AIRFLOW_HOME}
 
 
 # ## Hive Standalone Metastore ##
@@ -172,6 +181,7 @@ COPY ./bin /tmp/workspace/bin
 
 
 
+
 ### Devcontainer ###
 
 # Contains everything (and the kitchen sink) required to build project artifacts and run tests
@@ -186,6 +196,9 @@ ARG SPARK_VERSION
 ARG SPARK_HOME
 ARG HADOOP_VERSION
 ARG HADOOP_HOME
+ARG AIRFLOW_HOME
+ARG AIRFLOW_SHA512
+ARG AIRFLOW_VERSION
 ARG JAVA_VERSION
 ARG PYTHON_VERSION
 ARG NODE_VERSION
@@ -235,7 +248,35 @@ RUN apt-get update && export DEBIAN_FRONTEND=noninteractive \
     pkg-config \
     libssl-dev \
     protobuf-compiler \
+    #Airflow dependencies
+    apt-transport-https \
+    apt-utils ca-certificates \
+    curl \
+    dumb-init \
+    freetds-bin \
+    gosu \
+    krb5-user \
+    libgeos-dev \
+    ldap-utils \
+    libsasl2-2 \
+    libsasl2-modules \
+    libxmlsec1 \
+    locales \
+    libffi8 \
+    libldap-2.5-0 \
+    libssl3 \
+    netcat-openbsd \
+    lsb-release \
+    openssh-client \
+    python3-selinux \
+    rsync \
+    sasl2-bin \
+    sqlite3 \
+    sudo \
+    unixodbc \
     && rm -rf /var/lib/apt/lists/*
+
+
 
 # Python
 COPY --from=dependencies /tmp/workspace/bin/install_scripts/python-debian.sh /tmp/workspace/bin/install_scripts/python-debian.sh
@@ -252,6 +293,9 @@ COPY --from=dependencies ${HADOOP_HOME} ${HADOOP_HOME}
 
 # Spark: Copy previously fetched runtime components
 COPY --from=dependencies ${SPARK_HOME} ${SPARK_HOME}
+
+# Airflow: Copy previously fetched runtime components
+COPY --from=dependencies ${AIRFLOW_HOME} ${AIRFLOW_HOME}
 
 # Copy install scripts
 COPY --from=dependencies /tmp/workspace/bin /tmp/workspace/bin
