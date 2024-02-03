@@ -29,8 +29,6 @@ test:
 # Build services
 build:
 	# Establish local container registry through k3d
-	@bash -c 'cd $(BASEDIR) && bash bootstrap.sh clean'
-
 	@bash -c 'cd $(BASEDIR) && bash bootstrap.sh build'
 
 
