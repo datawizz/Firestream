@@ -296,6 +296,7 @@ COPY --from=dependencies ${SPARK_HOME} ${SPARK_HOME}
 
 # Airflow: Copy previously fetched runtime components
 COPY --from=dependencies ${AIRFLOW_HOME} ${AIRFLOW_HOME}
+RUN chown -R ${HOST_USER_ID}:${HOST_GROUP_ID} ${AIRFLOW_HOME}
 
 # Copy install scripts
 COPY --from=dependencies /tmp/workspace/bin /tmp/workspace/bin
@@ -417,6 +418,7 @@ RUN rm -rf /tmp/workspace
 RUN apt-get autoremove -y && apt-get clean -y && rm -rf /var/lib/apt/lists/*
 USER ${USERNAME}
 WORKDIR /workspace
+
 
 # Install CPU Deep Learning Frameworks
 RUN pip install --upgrade "jax[cpu]"

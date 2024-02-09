@@ -1,4 +1,11 @@
+
+
+
 #!/bin/bash
+
+
+bash /workspace/bin/install_scripts/airflow-debian.sh
+
 
 # Environment variables
 AIRFLOW_HOME=${AIRFLOW_HOME:-"/opt/airflow"}
@@ -36,3 +43,4 @@ echo "Airflow configuration file is set up at ${AIRFLOW_HOME}/airflow.cfg"
 
 
 airflow db migrate
+
