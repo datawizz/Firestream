@@ -1,7 +1,9 @@
 
 set -e
 
-mkdir -p submodules/apache/airflow
+local_dir="/workspace"
+
+mkdir -p $local_dir/submodules/apache/airflow
 
 cd submodules/apache/airflow
 
