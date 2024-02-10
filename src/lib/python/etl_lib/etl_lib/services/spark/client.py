@@ -103,14 +103,14 @@ class SparkClient:
             self.S3_ACCESS_KEY_ID = os.environ.get("S3_LOCAL_ACCESS_KEY_ID")
             self.S3_SECRET_ACCESS_KEY = os.environ.get("S3_LOCAL_SECRET_ACCESS_KEY")
             self.S3_BUCKET_NAME = os.environ.get("S3_LOCAL_BUCKET_NAME")
-            self.S3_PATH = f"{self.S3_BUCKET_NAME}/warehouse"
+            self.S3_PATH = f"s3a://{self.S3_BUCKET_NAME}/warehouse"
             self.S3_DEFAULT_REGION = os.environ.get("S3_LOCAL_DEFAULT_REGION")
         else:
             self.S3_ENDPOINT_URL = os.environ.get("S3_CLOUD_ENDPOINT_URL")
             self.S3_ACCESS_KEY_ID = os.environ.get("S3_CLOUD_ACCESS_KEY_ID")
             self.S3_SECRET_ACCESS_KEY = os.environ.get("S3_CLOUD_SECRET_ACCESS_KEY")
             self.S3_BUCKET_NAME = os.environ.get("S3_CLOUD_BUCKET_NAME")
-            self.S3_PATH = f"{self.S3_BUCKET_NAME}/warehouse"
+            self.S3_PATH = f"s3a://{self.S3_BUCKET_NAME}/warehouse"
             self.S3_DEFAULT_REGION = os.environ.get("S3_CLOUD_DEFAULT_REGION")
 
         self.LOG_PATH = f"s3a://{self.S3_BUCKET_NAME}/spark_logs/"
@@ -140,6 +140,20 @@ class SparkClient:
 
         catalog = self.CATALOG
 
+        # jars_packages = [
+        #     # For Kafka access
+        #     "org.apache.spark:spark-sql-kafka-0-10_2.12:3.3.1",
+        #     "org.apache.spark:spark-streaming-kafka-0-10_2.12:3.3.1",
+        #     "org.apache.kafka:kafka-clients:3.3.1",
+        #     "org.apache.iceberg:iceberg-spark-runtime-3.3_2.12:1.2.1",
+        #     "org.projectnessie.nessie-integrations:nessie-spark-extensions-3.3_2.12:0.58.1",
+        #     "org.apache.hadoop:hadoop-aws:3.3.1",
+        #     "org.apache.hadoop:hadoop-common:3.3.1",
+        #     "org.apache.spark:spark-hadoop-cloud_2.12:3.3.1"
+        # ]
+
+
+
         self.jars_packages = [
             "org.apache.spark:spark-sql-kafka-0-10_2.12:3.4.1",
             "org.apache.spark:spark-streaming-kafka-0-10_2.12:3.4.1",
@@ -148,7 +162,10 @@ class SparkClient:
             "org.apache.hadoop:hadoop-common:3.3.1",
             "org.apache.spark:spark-hadoop-cloud_2.12:3.4.1",
             "io.delta:delta-core_2.12:2.4.0",
-            "io.lakefs:hadoop-lakefs-assembly:0.1.15"
+            "io.lakefs:hadoop-lakefs-assembly:0.1.15",
+            # "io.delta:delta-core_2.12:2.4.0",
+            "org.apache.iceberg:iceberg-spark-runtime-3.3_2.12:1.3.0",
+            "org.projectnessie.nessie-integrations:nessie-spark-extensions-3.3_2.12:0.70.0"
         ]
 
         self.jars_packages = ",".join(self.jars_packages)
@@ -180,6 +197,14 @@ class SparkClient:
             "spark.sql.session.timeZone": "UTC",
             # "spark.sql.streaming.checkpointLocation": "/tmp/spark_checkpoint", # TODO when deployed to K8 does this persist?
             F"spark.sql.catalog.spark_catalog.warehouse": self.S3_PATH,
+            "spark.sql.streaming.checkpointLocation": "/tmp/spark_checkpoint", # TODO when deployed to K8 does this persist, should be be backed by S3?
+            F"spark.sql.catalog.{self.CATALOG}.warehouse": self.S3_PATH,
+            F"spark.sql.catalog.{self.CATALOG}": "org.apache.iceberg.spark.SparkCatalog",
+            F"spark.sql.catalog.{self.CATALOG}.catalog-impl": "org.apache.iceberg.nessie.NessieCatalog",
+            F"spark.sql.catalog.{self.CATALOG}.uri": self.NESSIE_SERVER,
+            F"spark.sql.catalog.{self.CATALOG}.ref": self.BRANCH,
+            F"spark.sql.catalog.{self.CATALOG}.auth_type": "NONE",
+            "spark.sql.extensions": "org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions,org.projectnessie.spark.extensions.NessieSparkSessionExtensions",   
             # Set logging to use S3
             # "spark.eventLog.enabled": "true",
             # "spark.eventLog.dir": self.LOG_PATH,
@@ -271,3 +296,5 @@ if __name__ == "__main__":
 # }
 # df = create_dataframe_from_dict(spark, data_dict)
 # df.show()
+        # return self.spark_session.readStream.format(format).options(**kwargs)
+    
