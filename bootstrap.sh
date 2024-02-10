@@ -1,6 +1,12 @@
 #!/bin/bash
 set -e
 
+if [ -z "${!$DEPLOYMENT_MODE}" ]; then
+    DEPLOYMENT_MODE_MESSAGE="bare_metal"
+else
+    DEPLOYMENT_MODE_MESSAGE=$DEPLOYMENT_MODE
+fi
+
 echo "                                                                     "
 echo "  Welcome to...                                                      "
 echo "                                                                     "
@@ -14,7 +20,7 @@ echo "                            \/                        \/     \/      "
 echo "                                                                     "
 echo "                                                                     "
 echo "                                                                     "
-echo "                    Starting Fireworks in < $DEPLOYMENT_MODE > mode  "
+echo "            Starting Fireworks in < $DEPLOYMENT_MODE_MESSAGE > mode  "
 echo "                                                                     "
 
 ###############################################################################
