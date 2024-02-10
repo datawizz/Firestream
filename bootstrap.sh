@@ -1,10 +1,10 @@
 #!/bin/bash
 set -e
 
-if [ -z "${!$DEPLOYMENT_MODE}" ]; then
+if [ -z "${DEPLOYMENT_MODE}" ] || [ -z "$(eval echo \$$DEPLOYMENT_MODE)" ]; then
     DEPLOYMENT_MODE_MESSAGE="bare_metal"
 else
-    DEPLOYMENT_MODE_MESSAGE=$DEPLOYMENT_MODE
+    DEPLOYMENT_MODE_MESSAGE=$(eval echo \$$DEPLOYMENT_MODE)
 fi
 
 echo "                                                                     "
