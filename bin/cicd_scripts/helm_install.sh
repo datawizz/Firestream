@@ -79,6 +79,25 @@ helm install postgresql bitnami/postgresql \
 #   --set serverDefinitions.servers.firstServer.MaintenanceDB=$POSTGRES_DEFAULT_DB
 
 
+# Check if secret already exists
+if ! kubectl get secret postgres-creds > /dev/null 2>&1; then
+  temp_file=$(mktemp)
+  echo "postgres_username=${POSTGRES_USER}" > ${temp_file}
+  echo "postgres_password=${POSTGRES_PASSWORD}" >> ${temp_file}
+  kubectl create secret generic postgres-creds --from-env-file="${temp_file}"
+  rm ${temp_file}
+fi
+
+# Check if helm release already exists
+if ! helm list -q | grep -q nessie; then
+  helm install nessie nessie/nessie --version "$NESSIE_VERSION" \
+    --set versionStoreType=TRANSACTIONAL \
+    --set postgres.jdbcUrl="$JDBC_CONNECTION_STRING" \
+    --set image.tag="$NESSIE_VERSION"
+fi
+
+
+project_nessie_install
 
 ### Spark Cluster ###
 # Enables: spark://spark-master:7077
@@ -111,8 +130,7 @@ helm upgrade --install kafka bitnami/kafka --version 24.0.10  \
   --set listeners.interbroker.protocol=PLAINTEXT \
   --set listeners.external.protocol=PLAINTEXT
 
-  #  -f /workspace/k8s/charts/fireworks/subcharts/kafka/chart/values.yaml
-
+  
 ### Kyuubi ###
 # cd /workspace/submodules/the-fireworks-company/kyuubi && \
 # helm install kyuubi charts/kyuubi
