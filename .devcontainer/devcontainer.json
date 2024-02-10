@@ -6,7 +6,7 @@
 	"forwardPorts": [
 		3000
 	],
-	"service": "fireworks_devcontainer",
+	"service": "devcontainer",
 	"hostRequirements": {
 		"cpus": 4,
 		"memory": "8gb",
@@ -14,9 +14,9 @@
 	},
 	"remoteUser": "fireworks",
 	// initializeCommand runs on the host before building the container.
-	"initializeCommand": "export DEPLOYMENT_MODE='development' && bash docker/docker_preinit.sh",
+	"initializeCommand": "bash docker/docker_preinit.sh",
 	// Update the 'dockerComposeFile' list if you have more compose files or use different names.
-	"dockerComposeFile": "../docker/docker-compose.yml",
+	"dockerComposeFile": "../docker/docker-compose.devcontainer.yml",
 	// Disables VS Code attempting to keep the container running by relying on the entrypoint.sh called in the Dockerfile
 	"overrideCommand": false,
 	// Use 'postStartCommand' to run commands after the container is started.

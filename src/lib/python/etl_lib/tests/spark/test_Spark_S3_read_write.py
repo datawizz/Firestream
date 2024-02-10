@@ -98,6 +98,45 @@
 #     import pytest
 #     pytest.main([__file__])
 
+
+import pytest
+from etl_lib.services.spark.client import SparkClient
+
+@pytest.fixture(scope='session')
+def spark_client():
+    """
+    Create a SparkClient for testing
+    """
+
+    client = SparkClient(app_name="Pytest", config={}, storage_location="local")
+    yield client
+
+    client.stop()
+
+@pytest.fixture(scope='session')
+def spark_context(spark_client):
+    """
+    Return a SparkContext for testing (aka "spark")
+    """
+
+    spark = spark_client.spark_context
+
+    yield spark
+
+    # spark.session.stop()
+
+
+@pytest.fixture(scope='session')
+def spark_session(spark_context):
+    """
+    Return a SparkSession
+    """
+
+    yield spark_context.session
+
+    # spark_context.stop(), hanlded in spark_context fixture
+
+
 import os
 import pytest
 # from etl_lib.services.spark.client import SparkClient
@@ -139,20 +178,6 @@ class TestSparkApp:
 
 
 
-
-# def test_spark_session(spark_session):
-#     data = [("Alice", 1), ("Bob", 2), ("Catherine", 3)]
-#     df = spark_session.createDataFrame(data, ["Name", "Value"])
-
-#     assert df.count() == 3
-#     assert len(df.columns) == 2
-
-# def test_spark_context(spark_context):
-#     sc = spark_context.session.sparkContext
-#     rdd = sc.parallelize([1, 2, 3, 4, 5])
-#     result = rdd.map(lambda x: x * x).collect()
-
-#     assert result == [1, 4, 9, 16, 25]
 
 
 if __name__ == '__main__':

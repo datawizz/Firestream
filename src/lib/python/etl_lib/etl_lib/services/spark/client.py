@@ -40,6 +40,15 @@ from pyspark.sql import SparkSession
 import boto3
 
 
+
+# TODO this hack is to set the LakeFS credentials, which should be set via the CLI (but cannot be used with MinIO :|  )
+os.environ["LAKEFS_ENDPOINT_URL"] = "https://lakefs.default.svc.cluster.local:80/api/v1"
+os.environ["LAKEFS_ACCESS_KEY"] = "TODO_CHANGE_ME2"
+os.environ["LAKEFS_SECRET_KEY"] = "THIS_IS_A_SECRET_TODO_CHANGE_ME2"
+
+
+
+
 class SparkClient:
 
     """
@@ -53,8 +62,7 @@ class SparkClient:
 
         self.spark_master = kwargs.get("master") or "local[*]"
         self.CATALOG = kwargs.get("catalog") or "delta"
-        self.BRANCH = kwargs.get("branch") or os.environ.get("DEPLOYMENT_MODE") or "main"
-        self.NESSIE_SERVER = os.environ.get("NESSIE_SERVER_URI")
+        self.BRANCH = kwargs.get("branch") or os.environ.get("DEPLOYMENT_MODE", "main")
 
         #TODO this should be set to the spark master in the K8 cluster
         #self.spark_master = "spark://spark-master-0.spark-headless.default.svc.cluster.local:7077"
@@ -66,16 +74,23 @@ class SparkClient:
         # Default to using local S3
         self.storage_location = kwargs.get("storage_location") or "local"
 
-        self.S3_CLOUD_ENDPOINT_URL = os.environ.get("S3_CLOUD_ENDPOINT_URL")
-        self.S3_CLOUD_ACCESS_KEY_ID = os.environ.get("S3_CLOUD_ACCESS_KEY_ID")
-        self.S3_CLOUD_SECRET_ACCESS_KEY = os.environ.get("S3_CLOUD_SECRET_ACCESS_KEY")
-        self.S3_CLOUD_BUCKET_NAME = os.environ.get("S3_CLOUD_BUCKET_NAME")
-        self.S3_CLOUD_PATH = f"s3a://{self.S3_CLOUD_BUCKET_NAME}/warehouse"
-        self.S3_CLOUD_DEFAULT_REGION = os.environ.get("S3_CLOUD_DEFAULT_REGION")
 
+
+        self.S3_ENDPOINT_URL = os.environ.get("S3_LOCAL_ENDPOINT_URL")
+        self.S3_ACCESS_KEY_ID = os.environ.get("S3_LOCAL_ACCESS_KEY_ID")
+        self.S3_SECRET_ACCESS_KEY = os.environ.get("S3_LOCAL_SECRET_ACCESS_KEY")
+        self.S3_BUCKET_NAME = os.environ.get("S3_LOCAL_BUCKET_NAME")
+        self.S3_DEFAULT_REGION = os.environ.get("S3_LOCAL_DEFAULT_REGION")
+
+        self.LAKEFS_ENDPOINT_URL = os.environ.get("LAKEFS_ENDPOINT_URL")
+        self.LAKEFS_ACCESS_KEY = os.environ.get("LAKEFS_ACCESS_KEY")
+        self.LAKEFS_SECRET_KEY = os.environ.get("LAKEFS_SECRET_KEY")
+
+        self.S3_PATH = f"s3a://{self.S3_BUCKET_NAME}/warehouse"
         # Default logging to local S3 (in cluster or vpc)
         # TODO use opentelemetry to log to a remote logging service
-        self.set_bucket()
+        self.LOG_PATH = f"s3a://{self.S3_BUCKET_NAME}/spark_logs/"
+
 
         self.create_logging_dir()
 
@@ -146,6 +161,8 @@ class SparkClient:
             "org.apache.hadoop:hadoop-aws:3.3.1",
             "org.apache.hadoop:hadoop-common:3.3.1",
             "org.apache.spark:spark-hadoop-cloud_2.12:3.4.1",
+            "io.delta:delta-core_2.12:2.4.0",
+            "io.lakefs:hadoop-lakefs-assembly:0.1.15",
             # "io.delta:delta-core_2.12:2.4.0",
             "org.apache.iceberg:iceberg-spark-runtime-3.3_2.12:1.3.0",
             "org.projectnessie.nessie-integrations:nessie-spark-extensions-3.3_2.12:0.70.0"
@@ -154,19 +171,32 @@ class SparkClient:
         self.jars_packages = ",".join(self.jars_packages)
         print(self.jars_packages)
 
+
+
+
         self.config.update({
             "spark.jars.packages": self.jars_packages,
+            "spark.hadoop.fs.lakefs.impl": "io.lakefs.LakeFSFileSystem",
+            # "spark.hadoop.fs.lakefs.api.url": self.LAKEFS_ENDPOINT_URL,
+            "spark.hadoop.fs.lakefs.endpoint": self.LAKEFS_ENDPOINT_URL,
+            "spark.hadoop.fs.lakefs.connection.ssl.enabled": "false", #TODO ssl on everything! This is just for testing
+            "spark.hadoop.fs.lakefs.access.key": self.LAKEFS_ACCESS_KEY,
+            "spark.hadoop.fs.lakefs.secret.key": self.LAKEFS_SECRET_KEY,
+            "spark.hadoop.fs.s3a.impl": "org.apache.hadoop.fs.s3a.S3AFileSystem",
+            "spark.hadoop.fs.s3a.access.key": self.S3_ACCESS_KEY_ID,
+            "spark.hadoop.fs.s3a.secret.key": self.S3_SECRET_ACCESS_KEY,
             "spark.hadoop.fs.s3a.endpoint": self.S3_ENDPOINT_URL,
             "spark.hadoop.fs.s3a.connection.ssl.enabled": "false", # TODO ssl on everything! This is just for testing
             "spark.hadoop.fs.s3a.path.style.access": "true",
-            "spark.hadoop.fs.s3a.committer.name": "directory",
+            # "spark.hadoop.fs.s3a.committer.name": "directory",
             "spark.hadoop.fs.s3a.aws.credentials.provider": "org.apache.hadoop.fs.s3a.SimpleAWSCredentialsProvider",
-            "spark.hadoop.fs.s3a.access.key": self.S3_ACCESS_KEY_ID,
-            "spark.hadoop.fs.s3a.secret.key": self.S3_SECRET_ACCESS_KEY,
-            "spark.hadoop.fs.s3a.impl": "org.apache.hadoop.fs.s3a.S3AFileSystem",
-            "spark.sql.execution.arrow.pyspark.enabled": "true",
+            "spark.sql.catalog.spark_catalog": "org.apache.spark.sql.delta.catalog.DeltaCatalog",
+            # F"spark.sql.catalog.{self.CATALOG}.catalog-impl": "org.apache.spark.sql.delta.catalog.DeltaCatalog",
+            "spark.sql.extensions": "io.delta.sql.DeltaSparkSessionExtension",
             "spark.sql.execution.arrow.pyspark.enabled": "true",
             "spark.sql.session.timeZone": "UTC",
+            # "spark.sql.streaming.checkpointLocation": "/tmp/spark_checkpoint", # TODO when deployed to K8 does this persist?
+            F"spark.sql.catalog.spark_catalog.warehouse": self.S3_PATH,
             "spark.sql.streaming.checkpointLocation": "/tmp/spark_checkpoint", # TODO when deployed to K8 does this persist, should be be backed by S3?
             F"spark.sql.catalog.{self.CATALOG}.warehouse": self.S3_PATH,
             F"spark.sql.catalog.{self.CATALOG}": "org.apache.iceberg.spark.SparkCatalog",
@@ -202,20 +232,69 @@ class SparkClient:
         spark.sparkContext.setLogLevel(self.config.get("spark.log.level", "INFO"))
         return spark
 
-    def stop(self):
-        self.spark_session.stop()
 
-    def create_df(self, data: list, schema: dict) -> DataFrame:
-        return self.spark_session.createDataFrame(data, schema=schema)
+
 
     def read(self, format: str, **kwargs) -> DataFrame:
-        return self.spark_session.read.format(format).options(**kwargs).load()
+        return self.session.read.format(format).options(**kwargs)
     
-    def write(self, df: DataFrame, format: str, **kwargs) -> None:
-        mode = "overwrite" if kwargs.pop('overwrite', False) else "append"
-        df.write.format(format).mode(mode).options(**kwargs).save()
-
+    def write(self, df: DataFrame, format: str, **kwargs) -> DataFrame:
+        return df.write.format(format).options(**kwargs)
     
     def read_stream(self, format: str, **kwargs) -> DataFrame:
-        return self.spark_session.readStream.format(format).options(**kwargs)
+        return self.session.readStream.format(format).options(**kwargs)
+    
+###########
+###TESTS####
+###########
+from pyspark.sql.types import StructType, StructField, StringType
+import pytest
+
+# Test case for read method
+def test_read():
+    app_name = "TestApp"
+    config = {"key": "value"}
+    client = SparkClient(app_name=app_name, config=config, storage_location="local")
+
+    data = [("Alice",), ("Bob",)]
+    schema = StructType([StructField("name", StringType(), True)])
+    df = client.session.createDataFrame(data, schema=schema)
+    path = "/tmp/read_test.parquet"
+    df.write.mode("overwrite").parquet(path)
+    read_df = client.session.read.format("parquet").load(str(path))
+    read_df.show()
+
+    # assert read_df.count() == 2
+
+    client.session.stop()
+
+if __name__ == "__main__":
+    # pytest.main([__file__])
+
+
+    test_read()
+
+
+# from pyspark.sql import SparkSession
+# from pyspark.sql.types import StructType, StructField, StringType
+
+# def create_dataframe_from_dict(spark, data_dict):
+#     schema = StructType([
+#         StructField("name", StringType(), True),
+#         StructField("address", StringType(), True),
+#         StructField("phone", StringType(), True),
+#         StructField("email", StringType(), True)
+#     ])
+    
+#     return spark.createDataFrame(data=[tuple(v for v in record.values()) for record in data_dict.values()], schema=schema)
+
+# # Example usage
+# spark = SparkSession.builder.appName("AddressBook").getOrCreate()
+# data_dict = {
+#     "1": {"name": "John", "address": "123 Main St", "phone": "123-456-7890", "email": "john@example.com"},
+#     "2": {"name": "Jane", "address": "456 High St", "phone": "987-654-3210", "email": "jane@example.com"}
+# }
+# df = create_dataframe_from_dict(spark, data_dict)
+# df.show()
+        # return self.spark_session.readStream.format(format).options(**kwargs)
     

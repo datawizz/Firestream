@@ -14,7 +14,6 @@ _S3_LOCAL_ACCESS_KEY_ID = os.environ.get("S3_LOCAL_ACCESS_KEY_ID")
 _S3_LOCAL_SECRET_ACCESS_KEY = os.environ.get("S3_LOCAL_SECRET_ACCESS_KEY")
 _PATH = f"s3a://{_BUCKET}/spark_warehouse"
 _LOG_PATH = f"s3a://{_BUCKET}/spark_logs"
-os.environ["SPARK_CLASSPATH"] = "/workspace/target/dependency"
 _LOG_DIR = "spark_logs/"
 _REF = "main"
 _CATALOG = "blahblahblah"
@@ -63,8 +62,8 @@ def create_spark_session():
         "org.apache.spark:spark-sql-kafka-0-10_2.12:3.3.1",
         "org.apache.spark:spark-streaming-kafka-0-10_2.12:3.3.1",
         "org.apache.kafka:kafka-clients:3.3.1",
-        "org.apache.iceberg:iceberg-spark-runtime-3.4_2.12:1.3.0",
-        "org.projectnessie.nessie-integrations:nessie-spark-extensions-3.4_2.12:0.70.0",
+        "org.apache.iceberg:iceberg-spark-runtime-3.3_2.12:1.2.1",
+        "org.projectnessie.nessie-integrations:nessie-spark-extensions-3.3_2.12:0.58.1",
         "org.apache.hadoop:hadoop-aws:3.3.1",
         "org.apache.hadoop:hadoop-common:3.3.1",
         "org.apache.spark:spark-hadoop-cloud_2.12:3.3.1"
@@ -98,8 +97,6 @@ def create_spark_session():
         # "spark.history.fs.logDirectory": F"s3a://{_BUCKET}/",
         "spark.eventLog.rolling.enabled": "true",
         "spark.eventLog.rolling.maxFileSize": "128m",
-        # "spark.driver.extraClassPath": "/workspace/target/dependency/*",
-        # "spark.executor.extraClassPath": "/workspace/target/dependency/*"
     }
 
 
@@ -340,3 +337,169 @@ if __name__ == "__main__":
     test_merge_into()
 
     test_extended_pipeline2()
+
+# def create_table(spark):
+#     sc = spark.sparkContext
+#     jvm = sc._gateway.jvm
+
+#     # import jvm libraries for iceberg catalogs and schemas
+#     java_import(jvm, "org.projectnessie.iceberg.NessieCatalog")
+#     java_import(jvm, "org.apache.iceberg.catalog.TableIdentifier")
+#     java_import(jvm, "org.apache.iceberg.Schema")
+#     java_import(jvm, "org.apache.iceberg.types.Types")
+#     java_import(jvm, "org.apache.iceberg.PartitionSpec")
+
+#     # first instantiate the catalog
+#     catalog = jvm.NessieCatalog()
+#     catalog.setConf(sc._jsc.hadoopConfiguration())
+#     # other catalog properties can be added based on the requirement. For example, "io-impl","authentication.type", etc.
+#     catalog.initialize("nessie", {"ref": _REF,
+#         "uri": _SERVER,
+#         "warehouse": f"{bucket}/spark_warehouse/iceberg"})
+
+#     # Creating table by first creating a table name with namespace
+#     region_name = jvm.TableIdentifier.parse("testing.region")
+
+#     # next create the schema
+#     region_schema = jvm.Schema([
+#     jvm.Types.NestedField.optional(
+#         1, "R_REGIONKEY", jvm.Types.LongType.get()
+#     ),
+#     jvm.Types.NestedField.optional(
+#         2, "R_NAME", jvm.Types.StringType.get()
+#     ),
+#     jvm.Types.NestedField.optional(
+#         3, "R_COMMENT", jvm.Types.StringType.get()
+#     ),
+#     ])
+
+#     # and the partition
+#     region_spec = jvm.PartitionSpec.unpartitioned()
+
+#     # finally create the table
+#     region_table = catalog.createTable(region_name, region_schema, region_spec)
+
+
+
+
+
+# def test_write(spark):
+
+#     sc = spark.sparkContext
+#     spark.sparkContext.setLogLevel("WARN")
+#     # print(f"Hadoop version = {sc._jvm.org.apache.hadoop.util.VersionInfo.getVersion()}")
+
+#     # Read the known good data
+#     #TODO make this file read relative to the files instead of the fully qualified domain name
+#     df = spark.read.csv(_DATA, header=True, inferSchema=True)
+
+#     df.show()
+
+#     #df.write.format("parquet").mode("overwrite").save(_PATH)
+
+#     df.write.format("iceberg").mode("overwrite").save("dev_catalog.testing.cities")
+
+
+
+
+
+# def test_read(spark):
+
+#     df = spark.read.parquet(_PATH)
+
+#     df.show()
+#     df.printSchema()
+
+#     df = df.select("State").where(df.State == "CA")
+
+#     df.show()
+
+
+
+# import timeit
+# from pyspark.sql import SparkSession
+
+
+
+# def close_spark_session(spark):
+#     spark.stop()
+
+
+# def time_operation(operation, spark=None):
+#     if spark is None:
+#         spark = create_spark_session()
+#         elapsed_time = timeit.timeit(lambda: operation(spark), number=1)
+#         close_spark_session(spark)
+#     else:
+#         elapsed_time = timeit.timeit(lambda: operation(spark), number=1)
+
+#     return elapsed_time
+
+
+
+# def main():
+#     # Cold start timings
+#     cold_start_op1 = time_operation(test_write)
+#     cold_start_op2 = time_operation(test_read)
+
+#     # Warm start timings
+#     spark = create_spark_session()
+#     warm_start_op1 = time_operation(test_write, spark)
+#     warm_start_op2 = time_operation(test_read, spark)
+#     close_spark_session(spark)
+
+#     print(f"Cold start timings:\nOperation 1: {cold_start_op1:.5f}s\nOperation 2: {cold_start_op2:.5f}s")
+#     print(f"Warm start timings:\nOperation 1: {warm_start_op1:.5f}s\nOperation 2: {warm_start_op2:.5f}s")
+
+# if __name__ == "__main__":
+
+#     spark = create_spark_session()
+#     spark.sql(f"CREATE BRANCH IF NOT EXISTS {_REF} IN {_CATALOG}").toPandas()
+#     spark.sql(f"USE REFERENCE {_REF} IN {_CATALOG}")
+#     spark.sql(
+#     f"""CREATE TABLE IF NOT EXISTS {_CATALOG}.salesdip.sales
+#             (id STRING, name STRING, product STRING, price STRING, date STRING) USING iceberg"""
+#     ).collect()
+#     spark.sql(f"SELECT * FROM {_CATALOG}.salesdip.sales").show()
+#     spark.sql("SHOW TABLES IN salesdip").show()
+
+
+# def test_pipeline_extended():
+
+#     spark = create_spark_session()
+
+#     # Use catalog
+#     spark.sql(F"USE {_CATALOG}").show()
+
+#     # Create branch if not exists
+#     spark.sql(F"CREATE BRANCH IF NOT EXISTS testing IN {_CATALOG}").show()
+#     spark.sql(F"USE REFERENCE testing IN {_CATALOG}").show()
+
+#     # Drop table if exists
+#     spark.sql("DROP TABLE IF EXISTS demo").show()
+
+#     # Create namespace if not exists
+#     spark.sql("CREATE NAMESPACE IF NOT EXISTS testNamespace").show()
+
+#     # Create table in new namespace
+#     spark.sql("CREATE TABLE IF NOT EXISTS testNamespace.demo (id bigint, data string) USING iceberg").show()
+
+#     # Show tables in testNamespace
+#     spark.sql("SHOW TABLES IN testNamespace").show()
+
+#     # Insert data
+#     spark.sql("INSERT INTO testNamespace.demo (id, data) VALUES (1, 'a'), (2, 'b')").show()
+
+#     # Run a query
+#     spark.sql("SELECT * FROM testNamespace.demo").show()
+
+#     # Merge branch 'testing' to 'main'
+#     spark.sql(F"MERGE BRANCH testing TO main IN {_CATALOG}").show()
+
+#     # Switch to 'main' branch
+#     spark.sql(F"USE REFERENCE main IN {_CATALOG}").show()
+
+#     # Read the data in 'main'
+#     spark.sql("SELECT * FROM testNamespace.demo").show()
+
+#     spark.stop()
