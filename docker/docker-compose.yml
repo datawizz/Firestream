@@ -9,8 +9,8 @@ services:
       dockerfile: docker/Dockerfile
       target: devcontainer
     env_file:
+      # Demiliterized
       - ../etc/.env.local
-      - ../etc/.env.secrets
     environment:
       - SSH_AUTH_SOCK=/ssh-auth.sock
     volumes:
