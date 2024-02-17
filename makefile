@@ -12,6 +12,9 @@ development:
 	# Deploy the development environment
 	@bash -c 'cd $(BASEDIR) && bash bootstrap.sh development'
 
+dev_container:
+	bash docker/docker_preinit.sh
+	docker compose -f docker/docker-compose.devcontainer.yml build
 
 development_clean:
 	@bash -c 'cd $(BASEDIR) && bash bootstrap.sh clean'
