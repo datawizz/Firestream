@@ -69,36 +69,75 @@ if [ -z "$HOST_USER_ID" ] || [ -z "$HOST_GROUP_ID" ]; then
     exit 1
 fi
 
-# Check for NVIDIA GPU (Linux) or any GPU on macOS (since macOS does not commonly use NVIDIA hardware for recent models)
-export HOST_GPU_STATUS="false"
-if [ "$os" = "Linux" ] && lspci | grep -i nvidia &> /dev/null; then
-    HOST_GPU_STATUS="true"
-elif [ "$os" = "Mac" ] && system_profiler SPDisplaysDataType | grep "Chipset Model:" &> /dev/null; then
-    HOST_GPU_STATUS="true"
-fi
-if [ -z "$HOST_GPU_STATUS" ]; then
-    echo "Failed to get GPU status."
-    exit 1
+# Function to extract GPU vendor for Linux
+extract_linux_gpu_vendor() {
+    # Check for the presence of lspci command
+    if command -v lspci &> /dev/null; then
+        # Use lspci to find the GPU and extract the vendor name
+        vendor=$(lspci | grep -E "VGA|3D" | sed -r 's/^.*: ([^:]*):.*$/\1/')
+        echo "$vendor"
+    else
+        echo "lspci command not found, unable to extract GPU vendor."
+        exit 1
+    fi
+}
+
+# Function to extract GPU model for macOS
+extract_macos_gpu_vendor() {
+    # Use system_profiler to find the GPU and extract the model
+    model=$(system_profiler SPDisplaysDataType | awk -F: '/Chipset Model/ {print $2}' | head -1 | sed 's/^ *//')
+    echo "$model"
+}
+
+# Check OS and extract GPU information
+if [ "$os" = "Linux" ]; then
+    HOST_GPU_VENDOR=$(extract_linux_gpu_vendor)
+    echo "GPU Vendor/Model: $HOST_GPU_VENDOR"
+elif [ "$os" = "Mac" ]; then
+    HOST_GPU_VENDOR=$(extract_macos_gpu_vendor)
+    echo "GPU Vendor/Model: $HOST_GPU_VENDOR"
 fi
 
-# Create a temporary docker-compose file
+# Check if GPU vendor/model was extracted
+if [ -n "$HOST_GPU_VENDOR" ]; then
+    export HOST_GPU_STATUS="true"
+else
+    echo "Failed to get GPU vendor/model."
+    export HOST_GPU_STATUS="false"
+fi
+
+HOST_USERNAME=$(whoami)
+
+# Create a temporary docker-compose file with environment variables and build arguments
 TEMP_COMPOSE_FILE="docker/docker-compose.temp.yml"
-echo "services:" > $TEMP_COMPOSE_FILE
-echo "  devcontainer:" >> $TEMP_COMPOSE_FILE
-echo "    environment:" >> $TEMP_COMPOSE_FILE
-echo "      HOST_USER_ID: $HOST_USER_ID" >> $TEMP_COMPOSE_FILE
-echo "      HOST_GROUP_ID: $HOST_GROUP_ID" >> $TEMP_COMPOSE_FILE
-echo "      HOST_DOCKER_GID: $HOST_DOCKER_GID" >> $TEMP_COMPOSE_FILE
-echo "      HOST_MACHINE_ID: $HOST_MACHINE_ID" >> $TEMP_COMPOSE_FILE
-echo "      HOST_IP: $HOST_IP" >> $TEMP_COMPOSE_FILE
-echo "      HOST_GPU_STATUS: $HOST_GPU_STATUS" >> $TEMP_COMPOSE_FILE
+{
+  echo "version: '3.8'"
+  echo "services:"
+  echo "  devcontainer:"
+  echo "    environment:"
+  echo "      HOST_USER_ID: $HOST_USER_ID"
+  echo "      HOST_GROUP_ID: $HOST_GROUP_ID"
+  echo "      HOST_DOCKER_GID: $HOST_DOCKER_GID"
+  echo "      HOST_MACHINE_ID: $HOST_MACHINE_ID"
+  echo "      HOST_IP: $HOST_IP"
+  echo "      HOST_GPU_STATUS: $HOST_GPU_STATUS"
+  echo "      HOST_GPU_VENDOR: $HOST_GPU_VENDOR"
+  echo "    build:"
+  echo "      args:"
+  echo "        HOST_USER_ID: $HOST_USER_ID"
+  echo "        HOST_GROUP_ID: $HOST_GROUP_ID"
+  echo "        HOST_GPU_STATUS: $HOST_GPU_STATUS"
+  echo "        HOST_GPU_VENDOR: $HOST_GPU_VENDOR"
+  echo "        HOST_USERNAME: $HOST_USERNAME"
+} > $TEMP_COMPOSE_FILE
 
 
-
-# Combine Compose Files
+# Define the base and override file paths
 BASE_FILE="docker/docker-compose.yml"
+OVERRIDE_FILE="docker/docker-compose.gpu_override.yml"
+
+# Combine Compose Files based on GPU_STATUS
 if [ "$GPU_STATUS" = "true" ]; then
-    OVERRIDE_FILE="docker/docker-compose.gpu_override.yml"
     docker compose -f $BASE_FILE -f $OVERRIDE_FILE -f $TEMP_COMPOSE_FILE config > docker/docker-compose.devcontainer.yml
 else
     docker compose -f $BASE_FILE -f $TEMP_COMPOSE_FILE config > docker/docker-compose.devcontainer.yml
