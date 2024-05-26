@@ -19,7 +19,7 @@ echo "   ██      ██ ██   ██ ███████ ████�
 echo "                                                                                  "
 echo "                                                                                  "
 echo "                                                                                  "
-echo "               Starting FireStream in < $DEPLOYMENT_MODE_MESSAGE > mode            "
+echo "               Starting Firestream in < $DEPLOYMENT_MODE_MESSAGE > mode           "
 echo "                                                                                  "
 
                                                                               
@@ -165,7 +165,7 @@ echo "Environment successfully configured"
 # If this scirpt is being run in a container, assume the host is configured correctly.
 
 #TODO this needs to be run once on new host configuration
-# /home/firestream/FireStream/bin/host_scripts/max_memory_map.sh
+# /home/firestream/Firestream/bin/host_scripts/max_memory_map.sh
 
 ###############################################################################
 ### 2. Deployment                                                           ###
