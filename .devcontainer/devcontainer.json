@@ -49,7 +49,7 @@
 			],
 			// Set *default* container specific settings.json values on container create.
 			"settings": {
-				"python.defaultInterpreterPath": "usr/local/python/bin/python",
+				"python.defaultInterpreterPath": "/usr/local/python/bin/python",
 				"python.linting.enabled": true,
 				"python.linting.pylintEnabled": true,
 				"python.linting.mypyEnabled": true,

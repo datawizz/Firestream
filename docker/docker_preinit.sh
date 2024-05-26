@@ -60,20 +60,20 @@ if [ -z "$HOST_IP" ]; then
     exit 1
 fi
 
-# Get the logged in user ID and Group ID
-# Fixes warning about insecure git repo.
 
+# Set the host user's username, user ID, and group ID
+HOST_USERNAME="fireworks"
+HOST_USER_ID=1000
+HOST_GROUP_ID=1000  
 
+#TODO: Uncomment the following lines to use the host user's Group ID and User.
+# Currently, the zsh shell is not working with the host user's Group ID and User.
 # By using the host user's Group ID and User, 
 # we can avoid permission issues, provide docker access, 
 # and avoid warnings about insecure git repos.
-# HOST_USERNAME="fireworks"
-# HOST_USER_ID=1000
-# HOST_GROUP_ID=1000
-
-HOST_USERNAME=$(whoami)
-HOST_USER_ID=$(id -u)
-HOST_GROUP_ID=$(id -g)
+# HOST_USERNAME=$(whoami)
+# HOST_USER_ID=$(id -u)
+# HOST_GROUP_ID=$(id -g)
 
 if [ -z "$HOST_USER_ID" ] || [ -z "$HOST_GROUP_ID" ]; then
     echo "Failed to get User ID or Group ID."
