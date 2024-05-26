@@ -12,9 +12,13 @@ development:
 	# Deploy the development environment
 	@bash -c 'cd $(BASEDIR) && bash bootstrap.sh development'
 
-dev_container:
+build-devcontainer:
 	bash docker/docker_preinit.sh
-	docker compose -f docker/docker-compose.devcontainer.yml build
+	docker compose -f docker/docker-compose.devcontainer.yml build devcontainer
+
+build-devcontainer-clean:
+	bash docker/docker_preinit.sh
+	docker compose -f docker/docker-compose.devcontainer.yml build devcontainer --no-cache
 
 development_clean:
 	@bash -c 'cd $(BASEDIR) && bash bootstrap.sh clean'
@@ -65,7 +69,7 @@ demo:
 
 
 # Clean up
-boomboom:
+docker-reset:
 	bash bin/commands/delete.sh
 
 
