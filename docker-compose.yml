@@ -1,21 +1,19 @@
-version: "3.7"
-
 services:
   devcontainer:
     init: true
     image: fireworks:latest
     build:
-      context: ..
+      context: .
       dockerfile: docker/Dockerfile
       target: devcontainer
     env_file:
-      - ../etc/.env.local
-      - ../etc/.env.secrets
+      # Demiliterized
+      - ./etc/.env.local
     environment:
       - SSH_AUTH_SOCK=/ssh-auth.sock
     volumes:
       # Mount the project directory on the local file system
-      - ../:/workspace
+      - ./:/workspace
 
       # Enable Docker-from-Docker
       # This uses the host's Docker Engine through socket mapping and is preferred over Docker-in-Docker for security and latency
@@ -28,7 +26,9 @@ services:
 
       # Enables SSH Agent forwarding from the host
       - /run/host-services/ssh-auth.sock:/ssh-auth.sock
-
+    # privileged: false
+    # security_opt:
+    #   - no-new-privileges:true
     command: sleep infinity # Prevents the container from stopping
 
     # Configure DNS resolution to use the internal IP address assigned to the KinD Control Plane
