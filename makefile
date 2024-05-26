@@ -37,7 +37,13 @@ build:
 	@bash -c 'cd $(BASEDIR) && bash bootstrap.sh build'
 
 
+build_devcontainer:
+	@bash -c 'cd $(BASEDIR) && bash docker/docker_preinit.sh'
+	@bash -c 'cd $(BASEDIR) && docker compose -f docker/docker-compose.devcontainer.yml build'
 
+build_devcontainer_no_cache:
+	@bash -c 'cd $(BASEDIR) && bash docker/docker_preinit.sh'
+	@bash -c 'cd $(BASEDIR) && docker compose -f docker/docker-compose.devcontainer.yml build --no-cache'
 
 # Start services
 demo:
