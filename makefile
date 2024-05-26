@@ -1,6 +1,6 @@
 ### Makefile ###
 
-# A Pluripotent Makefile for FireStream.
+# A Pluripotent Makefile for Firestream.
 # Designed to deploy in development, testing, and production environments.
 
 BASEDIR=$(shell pwd)

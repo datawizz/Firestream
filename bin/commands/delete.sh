@@ -1,5 +1,5 @@
 
-echo "WARNING! This command will reset the FireStream environment by killing all Docker containers related to the project, and delete all images, networks, and volumes associated with them. Please reply Y to continue and N to exit"
+echo "WARNING! This command will reset the Firestream environment by killing all Docker containers related to the project, and delete all images, networks, and volumes associated with them. Please reply Y to continue and N to exit"
 read -p "Do you want to continue? (Y/N): " -n 1 -r
 echo    # (optional) move to a new line
 if [[ $REPLY =~ ^[Yy]$ ]]

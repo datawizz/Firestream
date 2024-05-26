@@ -1,5 +1,5 @@
-# FireStream Helm Chart
+# Firestream Helm Chart
 
-Provides a single chart to implement FireStream on any Kubernetes Cluster
+Provides a single chart to implement Firestream on any Kubernetes Cluster
 
 #TODO use GPU resources if available? How to tell?
