@@ -9,7 +9,7 @@ export IMAGE_TAG = $(CONTAINER_REGISTRY_URL):$(CONTAINER_REGISTRY_PORT)/$(SERVIC
 
 run_follow:
 	# Run the websocket-middleware in follow mode
-	# TODO There are more elegant ways to run a multi node cluster of fireworks
+	# TODO There are more elegant ways to run a multi node cluster of firestream
 	export LEAD_FOLLOW=FOLLOW && \
 	node --require ./src/instrumentation.js src/server.js
 
