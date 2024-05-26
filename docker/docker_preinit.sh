@@ -61,8 +61,20 @@ if [ -z "$HOST_IP" ]; then
 fi
 
 # Get the logged in user ID and Group ID
-export HOST_USER_ID=$(id -u)
-export HOST_GROUP_ID=$(id -g)
+# Fixes warning about insecure git repo.
+
+
+# By using the host user's Group ID and User, 
+# we can avoid permission issues, provide docker access, 
+# and avoid warnings about insecure git repos.
+# HOST_USERNAME="fireworks"
+# HOST_USER_ID=1000
+# HOST_GROUP_ID=1000
+
+HOST_USERNAME=$(whoami)
+HOST_USER_ID=$(id -u)
+HOST_GROUP_ID=$(id -g)
+
 if [ -z "$HOST_USER_ID" ] || [ -z "$HOST_GROUP_ID" ]; then
     echo "Failed to get User ID or Group ID."
     exit 1
@@ -108,12 +120,12 @@ else
     export HOST_GPU_STATUS="false"
 fi
 
-HOST_USERNAME=$(whoami)
+
 
 # Function to set variable based on file existence
 set_env_variable() {
-  local example_file_path="../etc/.env.secrets.example"
-  local expected_file_path="../etc/.env.secrets"
+  local example_file_path="./etc/.env.secrets.example"
+  local expected_file_path="./etc/.env.secrets"
 
   # Check if the file exists
   if [ -e "$expected_file_path" ]; then
@@ -160,7 +172,7 @@ TEMP_COMPOSE_FILE="docker/docker-compose.temp.yml"
 } > $TEMP_COMPOSE_FILE
 
 # Define the base and override file paths
-BASE_FILE="docker/docker-compose.yml"
+BASE_FILE="docker-compose.yml"
 
 # Combine Compose Files based on GPU_STATUS
 if [ "$HOST_GPU_VENDOR" = "NVIDIA" ]; then

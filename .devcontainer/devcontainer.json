@@ -32,59 +32,20 @@
 	},
 	// Add the IDs of extensions you want installed when the container is created.
 	"customizations": {
-		"codespaces": {
-			"repositories": {
-				"The-Fireworks-Company/superset": {
-					"permissions": "write-all"
-				},
-				"The-Fireworks-Company/supabase": {
-					"permissions": "write-all"
-				},
-				"The-Fireworks-Company/kyuubi": {
-					"permissions": "write-all"
-				},
-				"The-Fireworks-Company/supabase-kubernetes": {
-					"permissions": "write-all"
-				},
-				"The-Fireworks-Company/OpenSearch": {
-					"permissions": "write-all"
-				},
-				"The-Fireworks-Company/bitnami_charts": {
-					"permissions": "write-all"
-				},
-				"The-Fireworks-Company/Flowise": {
-					"permissions": "write-all"
-				},
-				"The-Fireworks-Company/nessie": {
-					"permissions": "write-all"
-				},
-				"The-Fireworks-Company/spark-on-k8s-operator": {
-					"permissions": "write-all"
-				},
-				"The-Fireworks-Company/spark": {
-					"permissions": "write-all"
-				},
-				"The-Fireworks-Company/opensearch-project-helm-charts": {
-					"permissions": "write-all"
-				}
-			}
-		},
+		"codespaces": {},
 		"vscode": {
 			"extensions": [
 				"ms-python.python",
 				"ms-python.vscode-pylance",
 				"ms-toolsai.jupyter",
 				"ms-toolsai.jupyter-renderers",
-				"ms-azuretools.vscode-docker",
-				"randomfractalsinc.vscode-data-preview",
 				"GitHub.copilot",
 				"scala-lang.scala",
 				"mhutchie.git-graph",
 				"DavidAnson.vscode-markdownlint",
-				"dbaeumer.vscode-eslint",
-				"timonwong.shellcheck",
 				"rust-lang.rust-analyzer",
-				"streetsidesoftware.code-spell-checker"
+				"streetsidesoftware.code-spell-checker",
+				"ms-azuretools.vscode-docker"
 			],
 			// Set *default* container specific settings.json values on container create.
 			"settings": {
