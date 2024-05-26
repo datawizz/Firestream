@@ -42,33 +42,17 @@
 				"GitHub.copilot",
 				"scala-lang.scala",
 				"mhutchie.git-graph",
-				"DavidAnson.vscode-markdownlint",
 				"rust-lang.rust-analyzer",
-				"streetsidesoftware.code-spell-checker",
-				"ms-azuretools.vscode-docker"
+				"ms-python.pylint"
 			],
 			// Set *default* container specific settings.json values on container create.
 			"settings": {
 				"python.defaultInterpreterPath": "/usr/local/python/bin/python",
-				"python.linting.enabled": true,
-				"python.linting.pylintEnabled": true,
-				"python.linting.mypyEnabled": true,
-				"python.linting.banditEnabled": true,
 				"python.formatting.provider": "black",
 				"python.analysis.typeCheckingMode": "basic",
-				"python.linting.lintOnSave": true,
 				"python.formatting.autopep8Path": "/usr/local/py-utils/bin/autopep8",
 				"python.formatting.blackPath": "/usr/local/py-utils/bin/black",
 				"python.formatting.yapfPath": "/usr/local/py-utils/bin/yapf",
-				"python.linting.banditPath": "/usr/local/py-utils/bin/bandit",
-				"python.linting.flake8Path": "/usr/local/py-utils/bin/flake8",
-				"python.linting.mypyPath": "/usr/local/py-utils/bin/mypy",
-				"python.linting.pycodestylePath": "/usr/local/py-utils/bin/pycodestyle",
-				"python.linting.pydocstylePath": "/usr/local/py-utils/bin/pydocstyle",
-				"python.linting.pylintPath": "/usr/local/py-utils/bin/pylint",
-				"python.linting.pylintArgs": [
-					"--errors-only"
-				],
 				"python.tensorboard.logDirectory": "/workspace/logs/",
 				"workbench.colorCustomizations": {
 					"activityBar.background": "#a00909",
