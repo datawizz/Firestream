@@ -4,7 +4,7 @@ kind: Cluster
 containerdConfigPatches:
   - |-
     [plugins."io.containerd.grpc.v1.cri".registry.mirrors."localhost:5000"]
-      endpoint = ["http://fireworks-registry:5000"]
+      endpoint = ["http://firestream-registry:5000"]
 nodes:
   - role: control-plane
   # Set Ingress to accept connections on port 80

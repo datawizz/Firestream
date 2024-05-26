@@ -4,7 +4,7 @@
 # LAKEFS_ACCESS_KEY = "AKIAJV77CIW6QKTEQWSQ"
 # LAKEFS_SECRET_KEY = "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"
 # LAKEFS_ENDPOINT = "http://lakefs.default.svc.cluster.local"
-# REPOSITORY = "fireworks_test_repo"
+# REPOSITORY = "firestream_test_repo"
 
 
 # # import os

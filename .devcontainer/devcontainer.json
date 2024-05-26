@@ -1,7 +1,7 @@
 // For format details, see https://aka.ms/devcontainer.json. For config options, see the README at:
 // https://github.com/microsoft/vscode-dev-containers/tree/v0.209.6/containers/docker-in-docker
 {
-	"name": "Fireworks",
+	"name": "Firestream",
 	// Use 'forwardPorts' to make a list of ports inside the container available locally.
 	"forwardPorts": [
 		3000
@@ -12,7 +12,7 @@
 		"memory": "8gb",
 		"storage": "32gb"
 	},
-	"remoteUser": "fireworks",
+	"remoteUser": "firestream",
 	// initializeCommand runs on the host before building the container.
 	"initializeCommand": "bash docker/docker_preinit.sh",
 	// Update the 'dockerComposeFile' list if you have more compose files or use different names.
