@@ -88,16 +88,16 @@ if ! kubectl get secret postgres-creds > /dev/null 2>&1; then
   rm ${temp_file}
 fi
 
-# Check if helm release already exists
-if ! helm list -q | grep -q nessie; then
-  helm install nessie nessie/nessie --version "$NESSIE_VERSION" \
-    --set versionStoreType=TRANSACTIONAL \
-    --set postgres.jdbcUrl="$JDBC_CONNECTION_STRING" \
-    --set image.tag="$NESSIE_VERSION"
-fi
+
+helm repo add nessie https://charts.projectnessie.org
+
+helm install nessie nessie/nessie --version "$NESSIE_VERSION" \
+  --set versionStoreType=TRANSACTIONAL \
+  --set postgres.jdbcUrl="$JDBC_CONNECTION_STRING" \
+  --set image.tag="$NESSIE_VERSION"
 
 
-project_nessie_install
+
 
 ### Spark Cluster ###
 # Enables: spark://spark-master:7077
