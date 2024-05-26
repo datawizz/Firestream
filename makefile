@@ -6,31 +6,48 @@
 BASEDIR=$(shell pwd)
 PROJECT_NAME=fireworks
 
-development:
-	cd $(BASEDIR) && bash bootstrap.sh development
 
+
+development:
+	# Deploy the development environment
+	@bash -c 'cd $(BASEDIR) && bash bootstrap.sh development'
+
+build-devcontainer:
+	bash docker/docker_preinit.sh
+	docker compose -f docker/docker-compose.devcontainer.yml build devcontainer
+
+build-devcontainer-clean:
+	bash docker/docker_preinit.sh
+	docker compose -f docker/docker-compose.devcontainer.yml build devcontainer --no-cache
 
 development_clean:
-	cd $(BASEDIR) && bash bootstrap.sh clean
+	@bash -c 'cd $(BASEDIR) && bash bootstrap.sh clean'
 
 # Reuse the existing cluster by re-establishing the network tunnel
 resume:
 	# Useful for resuming the container after a restart
-	export DEPLOYMENT_MODE="resume" && cd $(BASEDIR) && bash bootstrap.sh
+	@bash -c 'cd $(BASEDIR) && bash bootstrap.sh resume'
 
 # Test services
 test:
-	make bootstrap
-	export DEPLOYMENT_MODE="test" && cd $(BASEDIR) && python -m pytest
+	make development
+	@bash -c 'cd $(BASEDIR) && bash bootstrap.sh test'
 
 # Build services
 build:
-	# The development environment contains a Local Registry
-	make development_clean
+	# Establish local container registry through k3d
+	@bash -c 'cd $(BASEDIR) && bash bootstrap.sh clean'
 
-	# Run the build scripts
-	bash /workspace/docker/build.sh
+	@bash -c 'cd $(BASEDIR) && bash bootstrap.sh build'
 
+
+build_devcontainer:
+	@bash -c 'cd $(BASEDIR) && bash docker/docker_preinit.sh'
+	@bash -c 'cd $(BASEDIR) && docker compose -f docker/docker-compose.devcontainer.yml build'
+
+build_devcontainer_no_cache:
+	@bash -c 'cd $(BASEDIR) && bash docker/docker_preinit.sh'
+	@bash -c 'cd $(BASEDIR) && docker compose -f docker/docker-compose.devcontainer.yml build --no-cache'
 
 # Start services
 demo:
@@ -52,7 +69,7 @@ demo:
 
 
 # Clean up
-boomboom:
+docker-reset:
 	bash bin/commands/delete.sh
 
 

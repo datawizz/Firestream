@@ -15,7 +15,7 @@ confluent-kafka==2.1.1
 contourpy==1.1.0
 cycler==0.11.0
 dataclasses-json==0.5.8
-datafusion==26.0.0
+datafusion==35.0.0
 deltalake==0.10.0
 elasticsearch==7.13.4
 exceptiongroup==1.1.1
@@ -38,6 +38,7 @@ Jinja2==3.1.2
 jmespath==1.0.1
 kiwisolver==1.4.4
 kubernetes==27.2.0
+lakefs-client==0.108.0
 markdown-it-py==3.0.0
 MarkupSafe==2.1.2
 marshmallow==3.19.0
@@ -98,7 +99,7 @@ toolz==0.12.0
 tqdm==4.65.0
 types-protobuf==4.23.0.2
 typing-inspect==0.9.0
-typing_extensions==4.6.3
+typing_extensions==4.8.0
 tzdata==2023.3
 urllib3==1.26.16
 websocket-client==1.6.1
@@ -107,4 +108,4 @@ XlsxWriter==3.1.2
 xxhash==3.2.0
 yarl==1.9.2
 zipp==3.15.0
-lakefs-client==0.108.0
+py4j

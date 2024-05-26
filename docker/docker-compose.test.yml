@@ -1,13 +1,13 @@
-version: "3.7"
+
 
 services:
-  cicd_container:
+  devcontainer:
     init: true
-    image: fireworks_cicd_container:latest
+    image: devcontainer:latest
     build:
       context: ..
       dockerfile: docker/Dockerfile
-      target: cicd_container
+      target: devcontainer
     env_file:
       - ../etc/.env.local
       - ../etc/.env.secrets.example
@@ -15,7 +15,7 @@ services:
     #   - SSH_AUTH_SOCK=/ssh-auth.sock
     volumes:
       # Mount the project directory on the local file system
-      # - ../:/workspace
+      - ../:/workspace
 
       # Enable Docker-from-Docker
       # This uses the host's Docker Engine through socket mapping and is preferred over Docker-in-Docker for security and latency
@@ -29,7 +29,6 @@ services:
       # # Enables SSH Agent forwarding from the host
       # - /run/host-services/ssh-auth.sock:/ssh-auth.sock
 
-    command: make test
 
     # Configure DNS resolution to use the internal IP address assigned to the KinD Control Plane
     # This allows internal Kubernetes services (which have arbitrary IP address assignments) to be addressed using DNS (i.e. name.svc.cluster.local)

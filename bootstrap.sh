@@ -1,6 +1,12 @@
 #!/bin/bash
 set -e
 
+if [ -z "${DEPLOYMENT_MODE}" ] || [ -z "$(eval echo \$$DEPLOYMENT_MODE)" ]; then
+    DEPLOYMENT_MODE_MESSAGE="bare_metal"
+else
+    DEPLOYMENT_MODE_MESSAGE=$(eval echo \$$DEPLOYMENT_MODE)
+fi
+
 echo "                                                                     "
 echo "  Welcome to...                                                      "
 echo "                                                                     "
@@ -14,7 +20,7 @@ echo "                            \/                        \/     \/      "
 echo "                                                                     "
 echo "                                                                     "
 echo "                                                                     "
-echo "                    Starting Fireworks in < $DEPLOYMENT_MODE > mode  "
+echo "            Starting Fireworks in < $DEPLOYMENT_MODE_MESSAGE > mode  "
 echo "                                                                     "
 
 ###############################################################################
@@ -35,7 +41,16 @@ _SRC="/workspace"
 export MACHINE_ID=${MACHINE_ID:-$(cat /var/lib/dbus/machine-id)}
 
 # Define valid deployment modes
-valid_modes=("development" "test" "clean" "cicd" "production" "resume")
+valid_modes=("development" "test" "clean" "cicd" "production" "resume" "build")
+
+# Check if an argument is provided
+if [ $# -eq 0 ]; then
+    echo "No argument provided. Exiting."
+    exit 1
+fi
+
+# Set the first argument as the DEPLOYMENT_MODE environment variable
+export DEPLOYMENT_MODE="$1"
 
 # Check if the argument is valid
 valid=false
@@ -89,11 +104,28 @@ function check_socket {
     fi
 }
 
-# run the checks if DEPLOYMENT_MODE is "development" or "cicd"
-if [ "$DEPLOYMENT_MODE" == "development" ] || [ "$DEPLOYMENT_MODE" == "cicd" ]; then
+# run the checks if DEPLOYMENT_MODE is "development" or "build"
+if [ "$DEPLOYMENT_MODE" == "development" ] || [ "$DEPLOYMENT_MODE" == "build" ] || [ "$DEPLOYMENT_MODE" == "test" ]; then
     check_docker
     check_socket
 fi
+
+
+
+
+# Check if running inside Docker
+if [ -f /.dockerenv ]; then
+    echo "Running inside Docker, will not start Docker Compose."
+elif grep -qa docker /proc/1/cgroup; then
+    echo "Running inside Docker, will not start Docker Compose."
+elif [ -e /proc/self/cgroup ] && (grep -qE '/docker/' /proc/self/cgroup || grep -qE '/docker-ce/' /proc/self/cgroup); then
+    echo "Running inside Docker, will not start Docker Compose."
+else
+    echo "Not running inside Docker, attempting to start Docker Compose."
+    # Run Docker Compose command
+    docker compose -f docker/docker-compose.test.yml run devcontainer bash -c "/workspace/bootstrap.sh ${DEPLOYMENT_MODE}"
+fi
+
 
 
 # Check CPU architecture and save it to a variable
@@ -139,8 +171,12 @@ echo "Environment successfully configured"
 
 # 1. If in test mode
 if [ "$DEPLOYMENT_MODE" = "test" ]; then
-  # TODO make the cluster name random
-  echo "TODO"
+	bash $_SRC/bin/cicd_scripts/test.sh
+fi
+
+# 1. If in build mode
+if [ "$DEPLOYMENT_MODE" = "build" ]; then
+	bash $_SRC/bin/cicd_scripts/build.sh
 fi
 
 # 2. If in development mode

@@ -8,12 +8,12 @@ ARG HOST_IP
 ARG HOST_DOCKER_GID
 ARG HOST_GPU_STATUS
 
-ARG USERNAME="fireworks"
+ARG HOST_USERNAME
 ARG DOCKER_BUILDKIT=1
 
 
-ARG SPARK_VERSION=3.4.2
-ARG SPARK_SHA512="f3966fce33389706087b1b576ed6e101f7765425cba65c2d68df3e9ec9d5eb9206d13873c1ffcbf9090a5b5f1b239c8674244a5f3b9b6d45ee2dc86133dbaf60  spark-3.4.2-bin-without-hadoop.tgz"
+ARG SPARK_VERSION=3.4.3
+ARG SPARK_SHA512="4959a7b8710a3c37d94f1a5bf89fcbd8c757e68059fbfab8d068fd38105e62a2217ebeb4c68a6d4d4835b8ad2a65f1d00d0d1272e083934531adee69da27651b  spark-3.4.3-bin-without-hadoop.tgz"
 ARG SPARK_HOME="/opt/spark"
 ARG HADOOP_VERSION=3.3.6
 ARG HADOOP_SHA512="de3eaca2e0517e4b569a88b63c89fae19cb8ac6c01ff990f1ff8f0cc0f3128c8e8a23db01577ca562a0e0bb1b4a3889f8c74384e609cd55e537aada3dcaa9f8a  hadoop-3.3.6.tar.gz"
@@ -22,8 +22,7 @@ ARG HADOOP_HOME="/opt/hadoop"
 ARG JAVA_VERSION=11
 ARG PYTHON_VERSION=3.11
 ##TODO the python version is being installed from debian, instead of manually which puts the bells and whistles in
-ARG NODE_VERSION=18
-ARG NODE_VERSION=18
+ARG NODE_VERSION=19
 ARG NODE_SHA=""
 
 ARG LAKEFS_VERSION=0.108.0
@@ -33,6 +32,7 @@ ARG LAKEFS_VERSION=0.108.0
 # Combines downloading of external resources in one place.
 # Allows for efficient multistage build with minimum network activity
 # and assertation of remote resources by good 'ol hard coded hash matching
+# or version pinning where possible.
 
 FROM debian:bookworm as dependencies
 
@@ -103,19 +103,17 @@ RUN sed -i 's/hadoop.root.logger=INFO,console/hadoop.root.logger=WARN,console/g'
 
 # Install Python
 COPY bin/install_scripts/python-debian.sh /tmp/workspace/bin/install_scripts/python-debian.sh
-RUN /bin/bash /tmp/workspace/bin/install_scripts/python-debian.sh "${PYTHON_VERSION}" "/usr/local/python" "/usr/local/py-utils" "${USERNAME}" "true" "false" "false" "false"
+RUN /bin/bash /tmp/workspace/bin/install_scripts/python-debian.sh "${PYTHON_VERSION}" "/usr/local/python" "/usr/local/py-utils" "${HOST_USERNAME}" "true" "false" "false" "false"
+
 # Make "python" and "pip" command available
 RUN ln -s /usr/local/python/bin/python /usr/bin/python
 RUN ln -s /usr/local/python/bin/pip /usr/bin/pip
 
-# RUN apt-get update && apt-get -y install python3 python3-pip
-# # There is only Python3!
-# RUN ln -s /usr/bin/python3 /usr/bin/python
-RUN python -m pip install --upgrade pip
 ### Download Python packages required by the project
+RUN python -m pip install --upgrade pip
 COPY requirements.txt /tmp/workspace/requirements.txt
 RUN python -m pip download --no-cache-dir --no-deps -r /tmp/workspace/requirements.txt -d /tmp/python_packages
-# TODO use the python install script from bin to gaurantee consistency with python version
+
 
 ## NodeJS ##
 # Download NPM Packages
@@ -191,7 +189,7 @@ ARG JAVA_VERSION
 ARG PYTHON_VERSION
 ARG NODE_VERSION
 ARG LAKEFS_VERSION
-ARG USERNAME
+ARG HOST_USERNAME
 ARG HOST_USER_ID
 ARG HOST_GROUP_ID
 ARG HOST_MACHINE_ID
@@ -202,6 +200,7 @@ ARG HOST_GPU_STATUS
 # Install additional OS packages.
 RUN apt-get update && export DEBIAN_FRONTEND=noninteractive \
     && apt-get -y install --no-install-recommends \
+    # required for Python and Node interfaces to Kafka
     librdkafka-dev \
     librdkafka++1 \
     librdkafka1 \
@@ -237,6 +236,22 @@ RUN apt-get update && export DEBIAN_FRONTEND=noninteractive \
     protobuf-compiler \
     && rm -rf /var/lib/apt/lists/*
 
+# Add the user
+RUN useradd -m -u ${HOST_USER_ID} -g ${HOST_GROUP_ID} -o ${HOST_USERNAME} || true;
+
+# Add the group if it doesn't already exist
+RUN if ! getent group ${HOST_GROUP_ID} >/dev/null 2>&1; then \
+    groupadd -g ${HOST_GROUP_ID} hostgroup; \
+    fi
+
+# Python
+COPY --from=dependencies /tmp/workspace/bin/install_scripts/python-debian.sh /tmp/workspace/bin/install_scripts/python-debian.sh
+# Install Python
+RUN /bin/bash /tmp/workspace/bin/install_scripts/python-debian.sh "${PYTHON_VERSION}" "/usr/local/python" "/usr/local/py-utils" "${HOST_USERNAME}" "true" "false" "false" "false"
+# Make "python" command available at the terminal
+RUN ln -s /usr/local/python/bin/python /usr/bin/python
+RUN ln -s /usr/local/python/bin/pip /usr/bin/pip
+
 
 
 # Hadoop: Copy previously fetched runtime components
@@ -263,9 +278,9 @@ ENV SPARK_CLASSPATH /opt/spark/jars/*:$SPARK_DIST_CLASSPATH
 
 
 # # ### Apache Spark ###
-# # Install the binaries for Spark so that "Spark Submit" works locally
-# ENV SPARK_HOME=/usr/local/spark
-# ENV PATH $PATH:$SPARK_HOME/bin
+# Install the binaries for Spark so that "Spark Submit" works locally
+ENV SPARK_HOME=/usr/local/spark
+ENV PATH $PATH:$SPARK_HOME/bin
 # RUN /bin/bash /tmp/library-scripts/spark-debian.sh "${SPARK_HOME}"
 
 
@@ -275,39 +290,8 @@ ARG INSTALL_ZSH="true"
 # [Option] Upgrade OS packages to their latest versions
 ARG UPGRADE_PACKAGES="false"
 
-### Python ###
-
-
-
-# Python
-# RUN apt-get -y install python3 python3-pip
-COPY --from=dependencies /tmp/workspace/bin/install_scripts/python-debian.sh /tmp/workspace/bin/install_scripts/python-debian.sh
-# Install Python
-RUN /bin/bash /tmp/workspace/bin/install_scripts/python-debian.sh "${PYTHON_VERSION}" "/usr/local/python" "/usr/local/py-utils" "${USERNAME}" "true" "false" "false" "false"
-# Make "python" command available
-RUN ln -s /usr/local/python/bin/python /usr/bin/python
-RUN ln -s /usr/local/python/bin/pip /usr/bin/pip
-
-# There is only Python3!
-# RUN ln -s /usr/bin/python3 /usr/bin/python
-RUN python -m pip install --upgrade pip
-
-# Install python dependencies
-COPY ./requirements.txt /tmp/workspace/requirements.txt
-COPY --from=dependencies /tmp/python_packages /tmp/python_packages
-RUN chown $HOST_USER_ID:$HOST_GROUP_ID -R /tmp
-# USER ${USERNAME}
-RUN python -m pip install --no-warn-script-location --no-deps --no-index --find-links file:///tmp/python_packages -r /tmp/workspace/requirements.txt
-# USER root
-
-
-
-
-# ### Scala Build Tools ###
-# RUN /bin/bash /tmp/workspace/bin/install_scripts/sbt-debian.sh
-
 # Install VS Code remote development container features
-RUN /bin/bash /tmp/workspace/bin/install_scripts/common-debian.sh "${INSTALL_ZSH}" "${USERNAME}" "${HOST_USER_ID}" "${HOST_GROUP_ID}" "${UPGRADE_PACKAGES}" "true" "true"
+RUN /bin/bash /tmp/workspace/bin/install_scripts/common-debian.sh "${INSTALL_ZSH}" "${HOST_USERNAME}" "${HOST_USER_ID}" "${HOST_GROUP_ID}" "${UPGRADE_PACKAGES}" "true" "true"
 
 ### Docker ###
 # [Option] Enable non-root Docker access in container
@@ -328,14 +312,11 @@ RUN /bin/bash /tmp/workspace/bin/install_scripts/k3d-debian.sh
 ### Kubectl and Helm ###
 RUN /bin/bash /tmp/workspace/bin/install_scripts/kubectl-helm-debian.sh
 
-# ### KIND (Kubernetes in Docker) ###
-# RUN /bin/bash /tmp/workspace/bin/install_scripts/kind-debian.sh
-
-### Rust ###
-ENV PATH="/usr/local/cargo/bin:$PATH"
-RUN /bin/bash /tmp/workspace/bin/install_scripts/rust-debian.sh && \
-    rustup default stable && \
-    cargo install wasm-pack
+# ### Rust ###
+# ENV PATH="/usr/local/cargo/bin:$PATH"
+# RUN /bin/bash /tmp/workspace/bin/install_scripts/rust-debian.sh && \
+#     rustup default stable && \
+#     cargo install wasm-pack
 
 
 ### Java ###
@@ -346,16 +327,14 @@ ENV LANG="en_US.UTF-8"
 # Switch from `sh -c` to `bash -c` as the shell behind a `RUN` command.
 SHELL ["/bin/bash", "-c"]
 
-#Install sdkman
-USER ${USERNAME}
-ENV HOME /home/${USERNAME}
+# Install sdkman
+USER ${HOST_USERNAME}
+ENV HOME /home/${HOST_USERNAME}
 RUN curl -s "https://get.sdkman.io" | bash
 
-# Install Java, sbt, scala, and maven
+# Install Java and maven
 RUN source "$HOME/.sdkman/bin/sdkman-init.sh" \
     && sdk install java 11.0.12-open \
-    && sdk install sbt 1.4.2 \
-    && sdk install scala 2.12.12 \
     && sdk install maven 3.8.2
 
 # Update environment variables with the new user's paths
@@ -375,30 +354,34 @@ ENV NVM_SYMLINK_CURRENT=true \
 RUN apt-get update && /bin/bash /tmp/workspace/bin/install_scripts/node-debian.sh "${NVM_DIR}" "$NODE_VERSION"
 
 
-# Update npm, install yarn
-RUN npm install -g npm yarn
-
-
-
-
-
+# Update npm, install yarn globally
+# RUN npm install -g npm yarn
 
 ### Lake FS CLI ###
 RUN /bin/bash /tmp/workspace/bin/install_scripts/lakefs-debian.sh "${LAKEFS_VERSION}"
 
+### Python ###
 
-
-
-
-
-
-
+# Install python dependencies
+RUN python -m pip install --upgrade pip
+COPY ./requirements.txt /tmp/workspace/requirements.txt
+COPY --from=dependencies /tmp/python_packages /tmp/python_packages
+RUN chown $HOST_USER_ID:$HOST_GROUP_ID -R /tmp
+USER ${HOST_USERNAME}
+RUN python -m pip install --no-warn-script-location --no-deps --no-index --find-links file:///tmp/python_packages -r /tmp/workspace/requirements.txt
+# Switch back to root user
+USER root
+# Install PySpark and its dependencies (py4j) which are bundled with Spark
+RUN cd /opt/spark/python \
+    && python -m pip install --no-warn-script-location --no-deps --no-index --find-links file:///tmp/python_packages py4j \
+    && python -m pip install .
 
 
 ### Cleanup ###
+USER root
 RUN rm -rf /tmp/workspace
 RUN apt-get autoremove -y && apt-get clean -y && rm -rf /var/lib/apt/lists/*
-USER ${USERNAME}
+USER ${HOST_USERNAME}
 WORKDIR /workspace
 
 # Install CPU Deep Learning Frameworks
@@ -446,9 +429,6 @@ CMD ["sleep", "infinity"]
 FROM devcontainer as cicd_container
 
 WORKDIR /workspace
-
-COPY . .
-RUN python -m pip install pyspark==3.4.1
 
 # Required for Docker-from-Docker
 ENTRYPOINT ["/usr/local/share/docker-init.sh"]

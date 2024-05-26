@@ -194,14 +194,15 @@ if id -u ${USERNAME} > /dev/null 2>&1; then
 else
     # Create user
     if [ "${USER_GID}" = "automatic" ]; then
-        groupadd $USERNAME
+        groupadd $USERNAME 2>/dev/null || echo "Group $USERNAME already exists"
     else
-        groupadd --gid $USER_GID $USERNAME
+        groupadd --gid $USER_GID $USERNAME 2>/dev/null || echo "Group with GID $USER_GID already exists"
     fi
+
     if [ "${USER_UID}" = "automatic" ]; then 
         useradd -s /bin/bash --gid $USERNAME -m $USERNAME
     else
-        useradd -s /bin/bash --uid $USER_UID --gid $USERNAME -m $USERNAME
+        useradd -s /bin/bash --uid $USER_UID --gid $USER_GID -m $USERNAME
     fi
 fi
 
@@ -358,7 +359,7 @@ if [ "${RC_SNIPPET_ALREADY_ADDED}" != "true" ]; then
         echo "${codespaces_bash}" >> "/root/.bashrc"
         echo 'export PROMPT_DIRTRIM=4' >> "/root/.bashrc"
     fi
-    chown ${USERNAME}:${group_name} "${user_rc_path}/.bashrc"
+    chown ${USER_UID}:${USER_GID} "${user_rc_path}/.bashrc"
     RC_SNIPPET_ALREADY_ADDED="true"
 fi
 
@@ -399,7 +400,7 @@ if [ "${INSTALL_ZSH}" = "true" ]; then
         # Copy to non-root user if one is specified
         if [ "${USERNAME}" != "root" ]; then
             cp -rf "${user_rc_file}" "${oh_my_install_dir}" /root
-            chown -R ${USERNAME}:${group_name} "${user_rc_path}"
+            chown -R ${USER_UID}:${USER_GID} "${user_rc_path}"
         fi
     fi
 fi
