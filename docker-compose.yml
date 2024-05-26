@@ -1,7 +1,7 @@
 services:
   devcontainer:
     init: true
-    image: fireworks:latest
+    image: firestream:latest
     build:
       context: .
       dockerfile: docker/Dockerfile
