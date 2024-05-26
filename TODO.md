@@ -89,6 +89,6 @@ Run these SQL commands one at a time through GPT4
 1. Submodules must be cloned to be used in "make demo"
     This depends on Git being able to access the private repos in the repo...
 
-2. Superset requires "helm dependency build" before it will run. Should this be glued to the Fireworks implementation?
+2. Superset requires "helm dependency build" before it will run. Should this be glued to the FireStream implementation?
 
 3. The machine that the repo is run on requires access to git "inside" the contianer, which is not setup from the local environment automatically.

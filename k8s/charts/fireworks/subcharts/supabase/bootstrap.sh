@@ -8,7 +8,7 @@
 # SUPABASE_SERVICE_ROLE_KEY=""
 
 
-SUPABASE_URL="demo.fireworks.ngrok.io"
+SUPABASE_URL="demo.firestream.ngrok.io"
 INGRESS_CLASS="ngrok"
 
 

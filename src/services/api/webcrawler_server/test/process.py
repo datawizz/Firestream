@@ -12,5 +12,5 @@ def process_html(file_path):
         print(text)
 
 if __name__ == "__main__":
-    input_file = "/workspaces/fireworks/src/services/python/web_crawler/output.html"  # Replace with the desired input file name
+    input_file = "/workspaces/firestream/src/services/python/web_crawler/output.html"  # Replace with the desired input file name
     process_html(input_file)

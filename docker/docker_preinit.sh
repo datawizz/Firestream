@@ -62,7 +62,7 @@ fi
 
 
 # Set the host user's username, user ID, and group ID
-HOST_USERNAME="fireworks"
+HOST_USERNAME="firestream"
 HOST_USER_ID=1000
 HOST_GROUP_ID=1000  
 

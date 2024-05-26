@@ -1,9 +1,9 @@
 
 
-![Screenshot](docs/static/images/fireworks_banner.png)
+![Screenshot](docs/static/images/firestream_banner.png)
 
 
-Fireworks is a production ready development environment for streaming stateful/stateless ETL and streaming Dashboarding. The purpose of Fireworks is to provide a minimal implementation of a modern streaming Data Warehouse using popular technologies that can be deployed to production without additional configuration.
+FireStream is a production ready development environment for streaming stateful/stateless ETL and streaming Dashboarding. The purpose of FireStream is to provide a minimal implementation of a modern streaming Data Warehouse using popular technologies that can be deployed to production without additional configuration.
 
 # Table of Contents  
 [Tech Stack](#tech-stack)  
@@ -16,7 +16,7 @@ Fireworks is a production ready development environment for streaming stateful/s
 
 # Tech Stack
 
-Fireworks makes use of the following technologies.
+FireStream makes use of the following technologies.
 
 * Development Container
 * Docker-From-Docker
@@ -35,7 +35,7 @@ This project requires Docker and a x86/AMD64 Debian/Ubuntu environment. This pro
 This project implements **Infrustructure as Code** via a Devcontainer (Development Container) defined in a Dockerfile. The project can be run using the following command:
 
 ```
-git clone https://github.com/datawizz/fireworks.git && cd fireworks && sh bootstrap.sh
+git clone https://github.com/datawizz/firestream.git && cd firestream && sh bootstrap.sh
 ```
 
 This will use the Docker Engine of the host and bind to the var/run/docker.sock to create the Devcontainer, open it via a terminal, and bootstrap the project. Once everything is built it will then expose the dashboard on localhost:3000.

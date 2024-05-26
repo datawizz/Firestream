@@ -8,7 +8,7 @@ import boto3
 import time
 import os
 
-os.environ['LAKEFS_BUCKET_NAME'] = 'fireworks'
+os.environ['LAKEFS_BUCKET_NAME'] = 'firestream'
 
 
 def _client():
