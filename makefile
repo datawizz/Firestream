@@ -1,10 +1,10 @@
 ### Makefile ###
 
-# A Pluripotent Makefile for Fireworks.
+# A Pluripotent Makefile for Firestream.
 # Designed to deploy in development, testing, and production environments.
 
 BASEDIR=$(shell pwd)
-PROJECT_NAME=fireworks
+PROJECT_NAME=firestream
 
 
 

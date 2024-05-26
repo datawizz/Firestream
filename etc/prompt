@@ -86,16 +86,16 @@ spec:
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
-  name: fireworks-ingress
+  name: firestream-ingress
   namespace: default
 spec:
   ingressClassName: ngrok
   tls:
   - hosts:
-    - demo.fireworks.ngrok.dev
+    - demo.firestream.ngrok.dev
     secretName: tls-secret
   rules:
-    - host: demo.fireworks.ngrok.dev #{os.getenv('NGROK_DOMAIN')}
+    - host: demo.firestream.ngrok.dev #{os.getenv('NGROK_DOMAIN')}
       http:
         paths:
           - path: /api

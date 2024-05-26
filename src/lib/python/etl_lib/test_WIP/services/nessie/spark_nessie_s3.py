@@ -1,7 +1,7 @@
 from pyspark.sql import SparkSession
 import os
 os.environ['NESSIE_SERVER_URI'] = "http://nessie.default.svc.cluster.local:19120/api/v1"
-os.environ['S3_LOCAL_BUCKET_NAME'] = "fireworks"
+os.environ['S3_LOCAL_BUCKET_NAME'] = "firestream"
 os.environ['AWS_PROFILE'] = "default"
 os.environ['S3_LOCAL_ENDPOINT_URL'] = "http://minio.default.svc.cluster.local:9000"
 os.environ['AWS_ENDPOINT_URL_S3'] = "http://minio.default.svc.cluster.local:9000"
