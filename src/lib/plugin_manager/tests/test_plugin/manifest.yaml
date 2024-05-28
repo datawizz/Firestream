@@ -1,0 +1,9 @@
+name: Test Plugin
+version: 0.0.1
+author: Test Author
+description: A plugin which does nothing
+path: /workspace/src/api/plugin_manager/tests/test_plugin
+feature_flags:
+  - FEATURE_FLAG_TEST
+template_values: /workspace/src/api/plugin_manager/tests/test_plugin/test_chart/template.values.yaml
+chart_dir: /workspace/src/api/plugin_manager/tests/test_plugin/test_chart

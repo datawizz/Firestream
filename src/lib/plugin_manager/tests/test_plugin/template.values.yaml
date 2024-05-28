@@ -1,0 +1,21 @@
+# values.yaml
+studio:
+  environment:
+    SUPABASE_URL: "https://{{ SUBDOMAIN_ADMIN }}"
+    SUPABASE_REST_URL: "https://{{ SUBDOMAIN_API }}/rest/v1/"
+    STUDIO_PG_META_URL: "http://{{ RELEASE_NAME }}-kong.{{ NAMESPACE }}.svc.cluster.local:8000/pg"
+  ingress:
+    enabled: true
+    className: "ngrok"
+    annotations:
+      nginx.ingress.kubernetes.io/rewrite-target: /
+    hosts:
+      - host: "{{ SUBDOMAIN_ADMIN }}"
+        paths:
+          - path: /studio
+            pathType: Prefix
+            backend:
+              service:
+                name: api
+                port:
+                  number: 3000

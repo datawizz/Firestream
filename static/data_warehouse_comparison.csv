@@ -1,0 +1,9 @@
+Tool/Platform,Cloud Support,Runs on a Laptop,Dynamic Scalability,Code your own ETL,Real-Time Streaming Source,Real-Time Streaming Effects,Built on Open Source,Identity Management,User-Friendly Interface,Kubernetes as a Service,BI Tool Compatible,,Task Orchestration
+Firestream,"Yes, deploy to arbitrary VM(s)",Yes,Yes,Yes,"Webhooks, Websocket, REST","Webhooks, Websocket, REST",100%,#TODO,"CLI, IDE (vscode), Services Interfaces",Yes,Apache Hive 2.0 API w integrated Catelog,,Yes
+Amazon Redshift,Yes,No,Yes,Yes,,No,"~90%, postgres",Yes,GUI,No,Widely Supported,,No
+Google BigQuery,Yes,No,Yes,Yes,,No,0%,Yes,Yes,No,Widely Supported,,No
+Microsoft Azure Synapse,Yes,No,Yes,Yes,,No,0%,Yes,Yes,No,?,,No
+Snowflake,Yes,No,Yes,Yes,,No,0%,Yes,Yes,No,Widely Supported,,No
+Databricks,Yes,No,Yes,Yes,,No,"90%, spark",Yes,Yes,No,Widely Supported,,Yes
+Google Cloud Platform (GCP),Yes,No,Yes,Yes,,With dedicated project,Extensive,Yes,Yes,Yes,N/A,,Yes
+Amazon Web Services (AWS),Yes,No,Yes,Yes,,With dedicated project,Extensive,Yes,Yes,Yes,N/A,,Yes

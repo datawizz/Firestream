@@ -1,0 +1,8 @@
+name: plugin_manager
+version: 1.0.0
+author: Datawizz
+description: The Plugin Manager Service deploys and manages plugins in the kubernetes cluster.
+feature_flags:
+  - FEATURE_FLAG_DOCKER_REGISTRY
+  - FEATURE_FLAG_KAFKA
+  # - FEATURE_FLAG_POSTGRES
