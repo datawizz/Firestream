@@ -1,11 +1,11 @@
 # ETL Lib: An Opinionated Data Platform
 
 
-ETL Lib is a platform to speed up development of Machine Learning models from ideation to production in batch and streaming by providing a batteries included approach to a modern Big Data stack. Fireworks offers a full ML Ops platform that you can run on your laptop, desktop, or public cloud.
+ETL Lib is a platform to speed up development of Machine Learning models from ideation to production in batch and streaming by providing a batteries included approach to a modern Big Data stack. Firestream offers a full ML Ops platform that you can run on your laptop, desktop, or public cloud.
 
-Instead of compatibility with the cornucopia of data science projects available today, Fireworks aims to combine the best in class open software projects for each primary component of a modern Big Data stack. Where other platforms seek to rebrand open source projects or paywall features, Fireworks aims to simply implement the underlying open source software with minimum modifications. Because everything runs in Kubernetes it is easy to deploy Fireworks locally or using a cloud provider like GKE or KMS. Because it's all open source it is easy to deploy in air gapped environments or to be modified to suite your use case.
+Instead of compatibility with the cornucopia of data science projects available today, Firestream aims to combine the best in class open software projects for each primary component of a modern Big Data stack. Where other platforms seek to rebrand open source projects or paywall features, Firestream aims to simply implement the underlying open source software with minimum modifications. Because everything runs in Kubernetes it is easy to deploy Firestream locally or using a cloud provider like GKE or KMS. Because it's all open source it is easy to deploy in air gapped environments or to be modified to suite your use case.
 
-Fireworks creates a production ready environment in a single Docker container which includes the core components of a modern Big Data stack:
+Firestream creates a production ready environment in a single Docker container which includes the core components of a modern Big Data stack:
 
 * Development Environment -> Vs Code + Remote Container
 * Container Service -> Moby + Kind + Kubernetes w/ DinD
@@ -16,7 +16,7 @@ Fireworks creates a production ready environment in a single Docker container wh
 * Object Storage -> MinIO (S3) via Hadoop
 * Storage Format -> Parquet
 * ML Model Tracking / Deployment -> ML Flow
-* Python API -> Fireworks
+* Python API -> Firestream
 
 ## **Installation**
 
@@ -24,25 +24,25 @@ Prerequisites:
 * Debian 11+ / Ubuntu 18.02+ with Docker installed
 
 ```
-git clone https://github.com/symtrade/fireworks && \
-cd fireworks && \
+git clone https://github.com/symtrade/firestream && \
+cd firestream && \
 sh bootstrap.sh
 ```
 
 This will download the repo and begin building the resources. As services are started you will see output in the terminal listing the ports to access each service as http://SERVICE:PORT which will be automatically forwarded to the terminal that invoked bootstrap.sh.
 
-Fireworks makes extensive use of IpTables for internal networking and modification of /etc/hosts for internal DNS and has only been tested on debian 11+.
+Firestream makes extensive use of IpTables for internal networking and modification of /etc/hosts for internal DNS and has only been tested on debian 11+.
 
 
 ## Architecture
 
-![Screenshot](images/Fireworks.png)
+![Screenshot](images/Firestream.png)
 
-Fireworks uses Kafka for pub/sub message passing between Spark executors. Microservices are run as pods for bespoke data connections while Spark Applications are used for processing both streaming and batch data. Using the Fireworks API, models are declared in the abstract. A model called with streaming=True will be executed against the Kafka cluster. If streaming=False the model will be excuted as a spark batch operation against external data or data stored internally in MinIO S3 object store. If --cache is set the model will be materialized as a parquet file increasing re-processing batch speed or checkpointed if streaming. 
+Firestream uses Kafka for pub/sub message passing between Spark executors. Microservices are run as pods for bespoke data connections while Spark Applications are used for processing both streaming and batch data. Using the Firestream API, models are declared in the abstract. A model called with streaming=True will be executed against the Kafka cluster. If streaming=False the model will be excuted as a spark batch operation against external data or data stored internally in MinIO S3 object store. If --cache is set the model will be materialized as a parquet file increasing re-processing batch speed or checkpointed if streaming. 
 
 ## Monitoring
 
-Fireworks uses https://github.com/txn2/kubefwd to make all resources available via port forwarding to the computer that is ssh'ed into the Fireworks main container.
+Firestream uses https://github.com/txn2/kubefwd to make all resources available via port forwarding to the computer that is ssh'ed into the Firestream main container.
 
 
 The state of streaming and batch jobs can be viewed using the Spark History Server at : http://spark_history:5001
@@ -59,7 +59,7 @@ It also runs each of the tests in ./tests
 
 ## Example Model
 
-Fireworks provides a Python API for **Model Driven Engineering** where the transformations are highlighted and the developer (mostly) does not *need* to reason about the state of the underlying processing. This *reason when you want to* approach is considered a feature of Fireworks.
+Firestream provides a Python API for **Model Driven Engineering** where the transformations are highlighted and the developer (mostly) does not *need* to reason about the state of the underlying processing. This *reason when you want to* approach is considered a feature of Firestream.
 
 
 ```
@@ -157,7 +157,7 @@ The process of "Idea" to "Production" usually looks like this:
 
 The existing toolbox of open source "Data Pipelines" is a cornucopia of options to accomplish this process by abstracting away key parts. Enterprise options generally reduce complexity by providing simplified (proprietary) APIs for portions of this process while selling compute resources. Open source projects generally choose a part of the process to focus on and ignore the rest. Projects which attempt to tackle the full process make key parts inaccessible which prevents flexibility in deployment that might be required for your specific use case.
 
-Fireworks approaches this problem by leveraging open source projects to create a ensamble Data Infrustructure Stack, wrapped in a pythonic API to enable *Model Driven Engineering* where models are written once and work everywhere.
+Firestream approaches this problem by leveraging open source projects to create a ensamble Data Infrustructure Stack, wrapped in a pythonic API to enable *Model Driven Engineering* where models are written once and work everywhere.
 
 
 
@@ -186,7 +186,7 @@ ETL Lib uses git submodules and shallow clone to pull specific required director
 
 Building dynamic composistions of data in the abstract with seemless deployment to production and super fast execution via Spark. ETL Lib defines a set of objects which provide a common API for accessing and blending data in motion, at rest, internal, and external, in development and straight to production.
 
-Fireworks is a libary to encompass the full modern data stack. It takes from the best open source projects and combines their strengths with the aim to dazzle.
+Firestream is a libary to encompass the full modern data stack. It takes from the best open source projects and combines their strengths with the aim to dazzle.
 
 - Small - only ~ xxx lines of code
 - Fast - Uses PySpark under the hood

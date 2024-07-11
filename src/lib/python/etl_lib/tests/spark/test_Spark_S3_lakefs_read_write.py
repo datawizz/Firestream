@@ -101,9 +101,9 @@
 
 import os
 os.environ["LAKEFS_ENDPOINT_URL"] = "http://lakefs.default.svc.cluster.local:80/api/v1"
-os.environ["LAKEFS_REPO"] = "fireworks"
+os.environ["LAKEFS_REPO"] = "firestream"
 os.environ['LAKEFS_BRANCH'] = "main"
-os.environ['LAKEFS_BUCKET'] = "fireworks"
+os.environ['LAKEFS_BUCKET'] = "firestream"
 os.environ["LAKEFS_ACCESS_KEY"] = "AKIAJV77CIW6QKTEQWSQ"
 os.environ["LAKEFS_SECRET_KEY"] = "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"
 
