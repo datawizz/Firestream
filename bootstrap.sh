@@ -1,21 +1,29 @@
 #!/bin/bash
 set -e
 
-echo "                                                                     "
-echo "  Welcome to...                                                      "
-echo "                                                                     "
-echo "                                                                     "
-echo "       _____.__                                   __                 "
-echo "     _/ ____\__|______   ______  _  _____________|  | __  ______     "
-echo "     \   __\|  \_  __ \_/ __ \ \/ \/ /  _ \_  __ \  |/ / /  ___/     "
-echo "      |  |  |  ||  | \/\  ___/\     (  <_> )  | \/    <  \___ \      "
-echo "      |__|  |__||__|    \___  >\/\_/ \____/|__|  |__|_ \/____  >     "
-echo "                            \/                        \/     \/      "
-echo "                                                                     "
-echo "                                                                     "
-echo "                                                                     "
-echo "                    Starting Fireworks in < $DEPLOYMENT_MODE > mode  "
-echo "                                                                     "
+if [ -z "${DEPLOYMENT_MODE}" ] || [ -z "$(eval echo \$$DEPLOYMENT_MODE)" ]; then
+    DEPLOYMENT_MODE_MESSAGE="bare_metal"
+else
+    DEPLOYMENT_MODE_MESSAGE=$(eval echo \$$DEPLOYMENT_MODE)
+fi
+
+echo "                                                                                  "
+echo "  Welcome to...                                                                   "
+echo "                                                                                  "
+echo "                                                                                  "
+echo "   ███████ ██ ██████  ███████ ███████ ████████ ██████  ███████  █████  ███    ███ "
+echo "   ██      ██ ██   ██ ██      ██         ██    ██   ██ ██      ██   ██ ████  ████ "
+echo "   █████   ██ ██████  █████   ███████    ██    ██████  █████   ███████ ██ ████ ██ "
+echo "   ██      ██ ██   ██ ██           ██    ██    ██   ██ ██      ██   ██ ██  ██  ██ "
+echo "   ██      ██ ██   ██ ███████ ███████    ██    ██   ██ ███████ ██   ██ ██      ██ "
+echo "                                                                                  "
+echo "                                                                                  "
+echo "                                                                                  "
+echo "               Starting Firestream in < $DEPLOYMENT_MODE_MESSAGE > mode           "
+echo "                                                                                  "
+
+                                                                              
+                                                                               
 
 ###############################################################################
 ### 0. Git Clone                                                            ###
@@ -157,7 +165,7 @@ echo "Environment successfully configured"
 # If this scirpt is being run in a container, assume the host is configured correctly.
 
 #TODO this needs to be run once on new host configuration
-# /home/fireworks/Fireworks/bin/host_scripts/max_memory_map.sh
+# /home/firestream/Firestream/bin/host_scripts/max_memory_map.sh
 
 ###############################################################################
 ### 2. Deployment                                                           ###

@@ -6,6 +6,6 @@ The format is <organization> / <repo name>
 
 
 
-# Fireworks Plugins
+# Firestream Plugins
 
-Plugins are self contained folders which add some sort of functionality to Fireworks. They are almost always external git repos. They may be numerous and are left to a users choice, therefore they are not submodules of the project as there is no dependency except perhaps among plugins which is handled by the plugin system (it won't load a plugins unless all dependencies are also present).
+Plugins are self contained folders which add some sort of functionality to Firestream. They are almost always external git repos. They may be numerous and are left to a users choice, therefore they are not submodules of the project as there is no dependency except perhaps among plugins which is handled by the plugin system (it won't load a plugins unless all dependencies are also present).
