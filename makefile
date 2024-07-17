@@ -11,6 +11,8 @@ development:
 	# Deploy the development environment
 	@bash -c 'cd $(BASEDIR) && bash bootstrap.sh development'
 
+development_clean:
+	@bash -c 'cd $(BASEDIR) && bash bootstrap.sh clean'
 
 build-devcontainer:
 	bash docker/docker_preinit.sh
@@ -21,8 +23,6 @@ build-devcontainer-clean:
 	docker compose -f docker/docker-compose.devcontainer.yml build devcontainer --no-cache
 
 
-development_clean:
-	@bash -c 'cd $(BASEDIR) && bash bootstrap.sh clean'
 
 # Reuse the existing cluster by re-establishing the network tunnel
 resume:
