@@ -1,7 +1,7 @@
 #!/bin/bash
 
-# Install docker on Debian
-# This script should be run directly on a clean Ubuntu host to install the required VM engine.
+# Install Docker on Debian
+# This script should be run directly on a clean Debian host to install the required VM engine.
 
 set -e
 
@@ -18,17 +18,11 @@ else
   echo "This script was run by the root user"
 fi
 
-
-
 export DEBIAN_FRONTEND=noninteractive && apt update -y && apt -y install \
     ca-certificates \
     curl \
     gnupg \
     lsb-release
-
-
-
-
 
 # Define the Docker GPG key and APT source list
 DOCKER_GPG="/usr/share/keyrings/docker-archive-keyring.gpg"
@@ -36,17 +30,16 @@ DOCKER_APT_SOURCE="/etc/apt/sources.list.d/docker.list"
 
 # Check for Docker GPG key and add if it doesn't exist
 if [ ! -f "$DOCKER_GPG" ]; then
-    echo -e "Y\n" | curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o "$DOCKER_GPG"
+    curl -fsSL https://download.docker.com/linux/debian/gpg | gpg --dearmor -o "$DOCKER_GPG"
 fi
 
 # Check for Docker APT source list and add if it doesn't exist
 if [ ! -f "$DOCKER_APT_SOURCE" ]; then
-    echo "deb [arch=$(dpkg --print-architecture) signed-by=$DOCKER_GPG] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" | sudo tee "$DOCKER_APT_SOURCE" > /dev/null
+    echo "deb [arch=$(dpkg --print-architecture) signed-by=$DOCKER_GPG] https://download.docker.com/linux/debian $(lsb_release -cs) stable" | tee "$DOCKER_APT_SOURCE" > /dev/null
 fi
 
-
 # Install Docker
-export DEBIAN_FRONTEND=noninteractive && sudo apt-get update && sudo apt-get -y install docker-ce docker-ce-cli containerd.io docker-compose-plugin
+export DEBIAN_FRONTEND=noninteractive && apt-get update && apt-get -y install docker-ce docker-ce-cli containerd.io docker-compose-plugin
 
 # Check if docker group exists, if not create it
 if ! getent group docker >/dev/null; then
@@ -54,12 +47,11 @@ if ! getent group docker >/dev/null; then
 fi
 
 # Check if the user is in the docker group, if not add him/her
-if ! id -nG "$SUDO_USER" | grep -qw docker; then
-    usermod -aG docker $SUDO_USER
+if [ -n "$SUDO_USER" ]; then
+  if ! id -nG "$SUDO_USER" | grep -qw docker; then
+      usermod -aG docker $SUDO_USER
+  fi
 fi
-
-
-
 
 # Modify permissions on docker socket
 if [ -S /var/run/docker.sock ]; then
@@ -84,11 +76,11 @@ if ! systemctl is-enabled --quiet containerd.service; then
 fi
 
 # Check if docker service is running, if not, start it
-if ! service --status-all | grep -Fq 'docker'; then
-    service docker start
+if ! systemctl is-active --quiet docker; then
+    systemctl start docker
 fi
 
-# Enable service at Start Up if not already enabled
+# Enable service at startup if not already enabled
 if ! ls /etc/rc*.d/*docker* > /dev/null 2>&1; then
     update-rc.d docker defaults
 fi
