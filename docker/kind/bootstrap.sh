@@ -39,7 +39,7 @@ echo "Kind cluster is now ready"
 ### Resolve DNS through Kubernetes Control Plane
 
 # Find the IP of the Kind Control Plane Node (dynamically assigned with each cluster restart)
-export KIND_IP=$(docker container inspect fireworks-control-plane --format '{{ .NetworkSettings.Networks.kind.IPAddress }}')
+export KIND_IP=$(docker container inspect firestream-control-plane --format '{{ .NetworkSettings.Networks.kind.IPAddress }}')
 echo $KIND_IP
 
 

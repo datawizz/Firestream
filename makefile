@@ -1,15 +1,25 @@
 ### Makefile ###
 
-# A Pluripotent Makefile for Fireworks.
+# A Pluripotent Makefile for Firestream.
 # Designed to deploy in development, testing, and production environments.
 
 BASEDIR=$(shell pwd)
-PROJECT_NAME=fireworks
+PROJECT_NAME=firestream
 
 
 development:
 	# Deploy the development environment
 	@bash -c 'cd $(BASEDIR) && bash bootstrap.sh development'
+
+
+build-devcontainer:
+	bash docker/docker_preinit.sh
+	docker compose -f docker/docker-compose.devcontainer.yml build devcontainer
+
+build-devcontainer-clean:
+	bash docker/docker_preinit.sh
+	docker compose -f docker/docker-compose.devcontainer.yml build devcontainer --no-cache
+
 
 development_clean:
 	@bash -c 'cd $(BASEDIR) && bash bootstrap.sh clean'
@@ -43,7 +53,13 @@ airflow:
 	# Run a test
 	python /workspace/src/plugins/airflow/dags/_examples/_template_dag_runnable.py
 
+build_devcontainer:
+	@bash -c 'cd $(BASEDIR) && bash docker/docker_preinit.sh'
+	@bash -c 'cd $(BASEDIR) && docker compose -f docker/docker-compose.devcontainer.yml build'
 
+build_devcontainer_no_cache:
+	@bash -c 'cd $(BASEDIR) && bash docker/docker_preinit.sh'
+	@bash -c 'cd $(BASEDIR) && docker compose -f docker/docker-compose.devcontainer.yml build --no-cache'
 
 # Start services
 demo:
@@ -65,7 +81,7 @@ demo:
 
 
 # Clean up
-boomboom:
+docker-reset:
 	bash bin/commands/delete.sh
 
 

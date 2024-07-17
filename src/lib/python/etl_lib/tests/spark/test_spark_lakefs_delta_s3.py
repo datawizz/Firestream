@@ -6,10 +6,10 @@ import string
 from pyspark.sql.types import StringType, IntegerType, FloatType, StructField, StructType, TimestampType
 from etl_lib.services.spark.client import SparkClient
 
-LAKEFS_PATH = "s3a://fireworks/main/test2.parquet"
+LAKEFS_PATH = "s3a://firestream/main/test2.parquet"
 
-#TODO "lakefs" extension fails with error "WARN fs.FileSystem: Failed to initialize fileystem lakefs://fireworks/main/test2.parquet: java.io.IOException: Failed to get lakeFS blockstore type"
-# LAKEFS_PATH = "lakefs://fireworks/main/test2.parquet"
+#TODO "lakefs" extension fails with error "WARN fs.FileSystem: Failed to initialize fileystem lakefs://firestream/main/test2.parquet: java.io.IOException: Failed to get lakeFS blockstore type"
+# LAKEFS_PATH = "lakefs://firestream/main/test2.parquet"
 
 
 def get_random_string(length):
@@ -64,14 +64,14 @@ if __name__ == "__main__":
 
 
 
-# fireworks ➜ /workspace (FIRE-185-Spark-LakeFS-Delta-S3 ✗) $ python /workspace/src/lib/python/etl_lib/tests/spark/test_spark_lakefs_delta_s3.py
-# Directory s3a://fireworks/spark_logs/ exists.
+# firestream ➜ /workspace (FIRE-185-Spark-LakeFS-Delta-S3 ✗) $ python /workspace/src/lib/python/etl_lib/tests/spark/test_spark_lakefs_delta_s3.py
+# Directory s3a://firestream/spark_logs/ exists.
 # org.apache.spark:spark-sql-kafka-0-10_2.12:3.4.1,org.apache.spark:spark-streaming-kafka-0-10_2.12:3.4.1,org.apache.kafka:kafka-clients:3.4.1,org.apache.hadoop:hadoop-aws:3.3.1,org.apache.hadoop:hadoop-common:3.3.1,org.apache.spark:spark-hadoop-cloud_2.12:3.4.1,io.delta:delta-core_2.12:2.4.0,io.lakefs:hadoop-lakefs-assembly:0.1.15
-# 2023-09-02 20:22:02,227 WARN util.Utils: Your hostname, fireworks-dev resolves to a loopback address: 127.0.1.1; using 10.0.0.215 instead (on interface enp6s18)
+# 2023-09-02 20:22:02,227 WARN util.Utils: Your hostname, firestream-dev resolves to a loopback address: 127.0.1.1; using 10.0.0.215 instead (on interface enp6s18)
 # 2023-09-02 20:22:02,228 WARN util.Utils: Set SPARK_LOCAL_IP if you need to bind to another address
 # :: loading settings :: url = jar:file:/opt/spark/jars/ivy-2.5.1.jar!/org/apache/ivy/core/settings/ivysettings.xml
-# Ivy Default Cache set to: /home/fireworks/.ivy2/cache
-# The jars for the packages stored in: /home/fireworks/.ivy2/jars
+# Ivy Default Cache set to: /home/firestream/.ivy2/cache
+# The jars for the packages stored in: /home/firestream/.ivy2/jars
 # org.apache.spark#spark-sql-kafka-0-10_2.12 added as a dependency
 # org.apache.spark#spark-streaming-kafka-0-10_2.12 added as a dependency
 # org.apache.kafka#kafka-clients added as a dependency

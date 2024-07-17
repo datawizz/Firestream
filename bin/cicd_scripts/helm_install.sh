@@ -79,10 +79,29 @@ helm install postgresql bitnami/postgresql \
 #   --set serverDefinitions.servers.firstServer.MaintenanceDB=$POSTGRES_DEFAULT_DB
 
 
+# Check if secret already exists
+if ! kubectl get secret postgres-creds > /dev/null 2>&1; then
+  temp_file=$(mktemp)
+  echo "postgres_username=${POSTGRES_USER}" > ${temp_file}
+  echo "postgres_password=${POSTGRES_PASSWORD}" >> ${temp_file}
+  kubectl create secret generic postgres-creds --from-env-file="${temp_file}"
+  rm ${temp_file}
+fi
+
+
+helm repo add nessie https://charts.projectnessie.org
+
+helm install nessie nessie/nessie --version "$NESSIE_VERSION" \
+  --set versionStoreType=TRANSACTIONAL \
+  --set postgres.jdbcUrl="$JDBC_CONNECTION_STRING" \
+  --set image.tag="$NESSIE_VERSION"
+
+
+
 
 ### Spark Cluster ###
 # Enables: spark://spark-master:7077
-# helm install spark bitnami/spark #-f /workspace/charts/fireworks/subcharts/spark_cluster/values.yaml
+# helm install spark bitnami/spark #-f /workspace/charts/firestream/subcharts/spark_cluster/values.yaml
 
 # ### MongoDB ###
 # helm install mongodb bitnami/mongodb-sharded
@@ -90,7 +109,7 @@ helm install postgresql bitnami/postgresql \
 
 
 ### Minio ###
-helm install minio bitnami/minio -f /workspace/charts/fireworks/subcharts/minio/chart/values.yaml \
+helm install minio bitnami/minio -f /workspace/charts/firestream/subcharts/minio/chart/values.yaml \
   --set auth.rootUser="$S3_LOCAL_ACCESS_KEY_ID" \
   --set auth.rootPassword="$S3_LOCAL_SECRET_ACCESS_KEY" \
   --set defaultBuckets="$S3_LOCAL_BUCKET_NAME"
@@ -111,19 +130,18 @@ helm upgrade --install kafka bitnami/kafka --version 24.0.10  \
   --set listeners.interbroker.protocol=PLAINTEXT \
   --set listeners.external.protocol=PLAINTEXT
 
-  #  -f /workspace/k8s/charts/fireworks/subcharts/kafka/chart/values.yaml
-
+  
 ### Kyuubi ###
-# cd /workspace/submodules/the-fireworks-company/kyuubi && \
+# cd /workspace/submodules/the-firestream-company/kyuubi && \
 # helm install kyuubi charts/kyuubi
 
 
-# cd /workspace/submodules/the-fireworks-company/superset/helm/superset && helm dependency build
+# cd /workspace/submodules/the-firestream-company/superset/helm/superset && helm dependency build
 
 ### Superset ###
-# cd /workspace/submodules/the-fireworks-company/superset/helm/superset &&
+# cd /workspace/submodules/the-firestream-company/superset/helm/superset &&
 #   helm dependency build && \
-#   cd /workspace/submodules/the-fireworks-company/superset/helm && \
+#   cd /workspace/submodules/the-firestream-company/superset/helm && \
 #   helm install superset superset
 
 
@@ -136,7 +154,7 @@ export OPENSEARCH_USERNAME='admin'
 export OPENSEARCH_PASSWORD='admin'
 
 
-# cd /workspace/submodules/the-fireworks-company/opensearch-project-helm-charts/charts && \
+# cd /workspace/submodules/the-firestream-company/opensearch-project-helm-charts/charts && \
 # helm install opensearch opensearch
 # TODO the configuration of OpenSearch is not trival. 
 # The default username and password are admin/admin, which are used here implicitly.
@@ -158,7 +176,7 @@ export OPENSEARCH_PASSWORD='admin'
 
 
 ### Spark Operator ###
-cd /workspace/submodules/the-fireworks-company/spark-on-k8s-operator/charts/spark-operator-chart && \
+cd /workspace/submodules/the-firestream-company/spark-on-k8s-operator/charts/spark-operator-chart && \
 helm upgrade --install spark-operator . --namespace "default" \
   --set sparkJobNamespace="default" \
   --set webhook.enable=true 

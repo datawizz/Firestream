@@ -16,4 +16,4 @@ export POD_NAME=$(kubectl get pods --namespace default -l "app.kubernetes.io/ins
 
 kubectl exec -it $POD_NAME -- sh
 
-lakefs setup --user-name fireworks --access-key-id TODO_CHANGE_ME2 --secret-access-key THIS_IS_A_SECRET_TODO_CHANGE_ME2
+lakefs setup --user-name firestream --access-key-id TODO_CHANGE_ME2 --secret-access-key THIS_IS_A_SECRET_TODO_CHANGE_ME2

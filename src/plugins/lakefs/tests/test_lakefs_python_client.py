@@ -2,8 +2,8 @@
 # os.environ["LAKEFS_ENDPOINT_URL"] = "http://lakefs.default.svc.cluster.local:80/api/v1"
 # os.environ["LAKEFS_ACCESS_KEY"] = "TODO_CHANGE_ME2"
 # os.environ["LAKEFS_SECRET_KEY"] = "THIS_IS_A_SECRET_TODO_CHANGE_ME2"
-# BUCKET = "fireworks"
-# REPO = "fireworks-test-repo"
+# BUCKET = "firestream"
+# REPO = "firestream-test-repo"
 # BRANCH = "main"
 # BRANCH2 = "forked"
 # CSV_DATA = "/workspace/tests/cities.csv"
@@ -103,8 +103,8 @@ os.environ["LAKEFS_SECRET_KEY"] = "THIS_IS_A_SECRET_TODO_CHANGE_ME2"
 os.environ["LAKEFS_DEFAULT_REGION"] = "us-west-2"
 
 
-REPO = "fireworks"
-BUCKET = 'fireworks'
+REPO = "firestream"
+BUCKET = 'firestream'
 BRANCH = "main"
 BRANCH2 = "forked"
 CSV_DATA = "/workspace/tests/cities.csv"
