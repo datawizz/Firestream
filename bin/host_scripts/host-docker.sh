@@ -1,14 +1,14 @@
 #!/bin/bash
 
-# Install docker on Debian
-# This script should be run directly on a clean Ubuntu host to install the required VM engine.
+# Install Docker on Debian or Ubuntu
+# This script should be run directly on a clean Debian or Ubuntu host to install the required Docker engine.
 
 set -e
 
 # Check if the script was run as root or through sudo
 if [ "$EUID" -ne 0 ]; then 
   echo "Please run this script as sudo"
-  exit
+  exit 1
 fi
 
 # If the script was run with sudo, SUDO_USER will be set to the name of the user that invoked it
@@ -18,48 +18,46 @@ else
   echo "This script was run by the root user"
 fi
 
-
-
+# Update package index and install necessary packages
 export DEBIAN_FRONTEND=noninteractive && apt update -y && apt -y install \
     ca-certificates \
     curl \
     gnupg \
     lsb-release
 
-
-
-
-
 # Define the Docker GPG key and APT source list
-DOCKER_GPG="/usr/share/keyrings/docker-archive-keyring.gpg"
+DOCKER_GPG="/etc/apt/keyrings/docker.asc"
 DOCKER_APT_SOURCE="/etc/apt/sources.list.d/docker.list"
 
-# Check for Docker GPG key and add if it doesn't exist
-if [ ! -f "$DOCKER_GPG" ]; then
-    echo -e "Y\n" | curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o "$DOCKER_GPG"
-fi
+# Create the keyrings directory if it doesn't exist
+install -m 0755 -d /etc/apt/keyrings
 
-# Check for Docker APT source list and add if it doesn't exist
-if [ ! -f "$DOCKER_APT_SOURCE" ]; then
-    echo "deb [arch=$(dpkg --print-architecture) signed-by=$DOCKER_GPG] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" | sudo tee "$DOCKER_APT_SOURCE" > /dev/null
-fi
+# Add Docker's official GPG key
+curl -fsSL https://download.docker.com/linux/$(lsb_release -is | tr '[:upper:]' '[:lower:]')/gpg -o "$DOCKER_GPG"
+chmod a+r "$DOCKER_GPG"
 
+# Add the Docker APT repository
+echo \
+  "deb [arch=$(dpkg --print-architecture) signed-by=$DOCKER_GPG] https://download.docker.com/linux/$(lsb_release -is | tr '[:upper:]' '[:lower:]') \
+  $(lsb_release -cs) stable" | tee "$DOCKER_APT_SOURCE" > /dev/null
 
-# Install Docker
-export DEBIAN_FRONTEND=noninteractive && sudo apt-get update && sudo apt-get -y install docker-ce docker-ce-cli containerd.io docker-compose-plugin
+# Update package index again
+apt-get update
+
+# Install Docker packages
+export DEBIAN_FRONTEND=noninteractive && apt-get -y install docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
 
 # Check if docker group exists, if not create it
 if ! getent group docker >/dev/null; then
     groupadd docker
 fi
 
-# Check if the user is in the docker group, if not add him/her
-if ! id -nG "$SUDO_USER" | grep -qw docker; then
-    usermod -aG docker $SUDO_USER
+# Check if the user is in the docker group, if not add them
+if [ -n "$SUDO_USER" ]; then
+    if ! id -nG "$SUDO_USER" | grep -qw docker; then
+        usermod -aG docker $SUDO_USER
+    fi
 fi
-
-
-
 
 # Modify permissions on docker socket
 if [ -S /var/run/docker.sock ]; then
@@ -97,3 +95,6 @@ fi
 docker run hello-world
 
 echo "Docker Installation Complete. The system needs to be rebooted for changes to take effect."
+
+
+sudo apt install make
