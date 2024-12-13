@@ -20,8 +20,8 @@ ARG SPARK_HOME="/opt/spark"
 ARG HADOOP_VERSION=3.3.6
 ARG HADOOP_SHA512="de3eaca2e0517e4b569a88b63c89fae19cb8ac6c01ff990f1ff8f0cc0f3128c8e8a23db01577ca562a0e0bb1b4a3889f8c74384e609cd55e537aada3dcaa9f8a  hadoop-3.3.6.tar.gz"
 ARG HADOOP_HOME="/opt/hadoop"
-ARG AIRFLOW_VERSION=2.8.1
-ARG AIRFLOW_SHA512="381a88ca2ef48ec488aea1b64b91ed132bbc7032b9fede467660079daa23265fe992a99e414664faf0ad5373e0b128f3da904d03275dbf26628459f29df55ae1  apache-airflow-2.8.1-source.tar.gz"
+ARG AIRFLOW_VERSION=2.9.3
+ARG AIRFLOW_SHA512="e90179a1d5673db905d3f6aaa75f92113b5735be5e7d9bffddbf30c5d54ab15ed9f1512409a681bfa8d36c653895b6f177eef969b37e0e8a3a3f452bf3bf433b  apache-airflow-2.9.3-source.tar.gz"
 ARG AIRFLOW_HOME="/opt/airflow"
 
 ARG JAVA_VERSION=11
@@ -98,9 +98,9 @@ RUN mkdir -p ${HADOOP_HOME} && mv /tmp/hadoop-${HADOOP_VERSION}/* ${HADOOP_HOME}
 RUN sed -i 's/hadoop.root.logger=INFO,console/hadoop.root.logger=WARN,console/g' ${HADOOP_HOME}/etc/hadoop/log4j.properties
 
 # Airflow
-RUN wget https://dlcdn.apache.org/airflow/2.8.1/apache-airflow-2.8.1-source.tar.gz
+RUN wget https://dlcdn.apache.org/airflow/${AIRFLOW_VERSION}/apache-airflow-${AIRFLOW_VERSION}-source.tar.gz
 RUN echo $AIRFLOW_SHA512 | sha512sum -c - && echo "Hash matched" || (echo "Hash didn't match" && exit 1) \
-    && mkdir -p ${AIRFLOW_HOME} && tar xvzf apache-airflow-2.8.1-source.tar.gz -C ${AIRFLOW_HOME}
+    && mkdir -p ${AIRFLOW_HOME} && tar xvzf apache-airflow-${AIRFLOW_VERSION}-source.tar.gz -C ${AIRFLOW_HOME}
 
 
 # ## Hive Standalone Metastore ##
