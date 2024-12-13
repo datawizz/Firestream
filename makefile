@@ -7,10 +7,10 @@ BASEDIR=$(shell pwd)
 PROJECT_NAME=firestream
 
 
-
 development:
 	# Deploy the development environment
 	@bash -c 'cd $(BASEDIR) && bash bootstrap.sh development'
+
 
 build-devcontainer:
 	bash docker/docker_preinit.sh
@@ -19,6 +19,7 @@ build-devcontainer:
 build-devcontainer-clean:
 	bash docker/docker_preinit.sh
 	docker compose -f docker/docker-compose.devcontainer.yml build devcontainer --no-cache
+
 
 development_clean:
 	@bash -c 'cd $(BASEDIR) && bash bootstrap.sh clean'
@@ -36,10 +37,21 @@ test:
 # Build services
 build:
 	# Establish local container registry through k3d
-	@bash -c 'cd $(BASEDIR) && bash bootstrap.sh clean'
-
 	@bash -c 'cd $(BASEDIR) && bash bootstrap.sh build'
 
+airflow:
+	# create the development environment
+	# make development_clean
+	# make development
+
+	# Configure DBT Profile
+	bash /workspace/src/plugins/airflow/config_dbt.sh
+
+	# Deploy airflow locally for CLI testing
+	bash /workspace/src/plugins/airflow/bootstrap_local.sh
+	
+	# Run a test
+	python /workspace/src/plugins/airflow/dags/_examples/_template_dag_runnable.py
 
 build_devcontainer:
 	@bash -c 'cd $(BASEDIR) && bash docker/docker_preinit.sh'

@@ -50,6 +50,9 @@ ARG SPARK_HOME
 ARG HADOOP_VERSION
 ARG HADOOP_SHA512
 ARG HADOOP_HOME
+ARG AIRFLOW_VERSION
+ARG AIRFLOW_SHA512
+ARG AIRFLOW_HOME
 ARG JAVA_VERSION
 ARG PYTHON_VERSION
 ARG NODE_VERSION
@@ -119,7 +122,7 @@ RUN ln -s /usr/local/python/bin/python /usr/bin/python
 RUN ln -s /usr/local/python/bin/pip /usr/bin/pip
 
 ### Download Python packages required by the project
-RUN python -m pip install --upgrade pip
+RUN python -m pip install --upgrade pip setuptools wheel
 COPY requirements.txt /tmp/workspace/requirements.txt
 RUN python -m pip download --no-cache-dir --no-deps -r /tmp/workspace/requirements.txt -d /tmp/python_packages
 
@@ -180,6 +183,7 @@ COPY ./bin /tmp/workspace/bin
 
 
 
+
 ### Devcontainer ###
 
 # Contains everything (and the kitchen sink) required to build project artifacts and run tests
@@ -194,6 +198,9 @@ ARG SPARK_VERSION
 ARG SPARK_HOME
 ARG HADOOP_VERSION
 ARG HADOOP_HOME
+ARG AIRFLOW_HOME
+ARG AIRFLOW_SHA512
+ARG AIRFLOW_VERSION
 ARG JAVA_VERSION
 ARG PYTHON_VERSION
 ARG NODE_VERSION
@@ -243,15 +250,39 @@ RUN apt-get update && export DEBIAN_FRONTEND=noninteractive \
     pkg-config \
     libssl-dev \
     protobuf-compiler \
+    #Airflow dependencies
+    apt-transport-https \
+    apt-utils ca-certificates \
+    curl \
+    dumb-init \
+    freetds-bin \
+    gosu \
+    krb5-user \
+    libgeos-dev \
+    ldap-utils \
+    libsasl2-2 \
+    libsasl2-modules \
+    libxmlsec1 \
+    locales \
+    libffi8 \
+    libldap-2.5-0 \
+    libssl3 \
+    netcat-openbsd \
+    lsb-release \
+    openssh-client \
+    python3-selinux \
+    rsync \
+    sasl2-bin \
+    sqlite3 \
+    sudo \
+    unixodbc \
     && rm -rf /var/lib/apt/lists/*
+
 
 # Add the user
 RUN useradd -m -u ${HOST_USER_ID} -g ${HOST_GROUP_ID} -o ${HOST_USERNAME} || true;
 
-# Add the group if it doesn't already exist
-RUN if ! getent group ${HOST_GROUP_ID} >/dev/null 2>&1; then \
-    groupadd -g ${HOST_GROUP_ID} hostgroup; \
-    fi
+
 
 # Python
 COPY --from=dependencies /tmp/workspace/bin/install_scripts/python-debian.sh /tmp/workspace/bin/install_scripts/python-debian.sh
@@ -268,6 +299,10 @@ COPY --from=dependencies ${HADOOP_HOME} ${HADOOP_HOME}
 
 # Spark: Copy previously fetched runtime components
 COPY --from=dependencies ${SPARK_HOME} ${SPARK_HOME}
+
+# Airflow: Copy previously fetched runtime components
+COPY --from=dependencies ${AIRFLOW_HOME} ${AIRFLOW_HOME}
+RUN chown -R ${HOST_USER_ID}:${HOST_GROUP_ID} ${AIRFLOW_HOME}
 
 # Copy install scripts
 COPY --from=dependencies /tmp/workspace/bin /tmp/workspace/bin
@@ -372,7 +407,7 @@ RUN /bin/bash /tmp/workspace/bin/install_scripts/lakefs-debian.sh "${LAKEFS_VERS
 ### Python ###
 
 # Install python dependencies
-RUN python -m pip install --upgrade pip
+RUN python -m pip install --upgrade pip setuptools wheel
 COPY ./requirements.txt /tmp/workspace/requirements.txt
 COPY --from=dependencies /tmp/python_packages /tmp/python_packages
 RUN chown $HOST_USER_ID:$HOST_GROUP_ID -R /tmp
@@ -392,6 +427,7 @@ RUN rm -rf /tmp/workspace
 RUN apt-get autoremove -y && apt-get clean -y && rm -rf /var/lib/apt/lists/*
 USER ${HOST_USERNAME}
 WORKDIR /workspace
+
 
 # Install CPU Deep Learning Frameworks
 RUN pip install --upgrade "jax[cpu]"
