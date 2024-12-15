@@ -1,6 +1,15 @@
 #!/bin/bash
 set -e
 
+# Enable debug mode with environment variable
+if [ "${DEBUG:-false}" = "true" ]; then
+    set -x
+fi
+
+# Get script directory and project root
+SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
+PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
+
 # Determine OS platform
 OS_PLATFORM="$(uname -s)"
 
@@ -33,7 +42,7 @@ handle_linux() {
 handle_mac() {
     # macOS Docker desktop manages group permissions differently.
     echo "Handling macOS specifics. Docker GID management not required."
-    
+
     # Get the Machine ID for macOS
     export HOST_MACHINE_ID=$(sysctl -n kern.uuid)
 }
@@ -53,45 +62,60 @@ if [ -z "$HOST_MACHINE_ID" ]; then
     exit 1
 fi
 
-# Get the IP address of the host
-export HOST_IP=$(hostname -I 2>/dev/null || ipconfig getifaddr en0)
-if [ -z "$HOST_IP" ]; then
-    echo "Failed to get Host IP."
-    exit 1
-fi
+get_host_ip() {
+    # Try ip command first (most modern Linux)
+    if command -v ip >/dev/null 2>&1; then
+        HOST_IP=$(ip -4 addr show scope global | grep -oP '(?<=inet\s)\d+(\.\d+){3}' | head -n1)
+    # Try hostname -I (some Linux distributions)
+    elif command -v hostname >/dev/null 2>&1; then
+        HOST_IP=$(hostname -I | awk '{print $1}')
+    # Try ifconfig (macOS and some Unix systems)
+    elif command -v ifconfig >/dev/null 2>&1; then
+        # For macOS en0 or Linux eth0/ens0
+        HOST_IP=$(ifconfig | grep -Eo 'inet (addr:)?([0-9]*\.){3}[0-9]*' | grep -Eo '([0-9]*\.){3}[0-9]*' | grep -v '127.0.0.1' | head -n1)
+    else
+        echo "No supported IP address detection methods found."
+        return 1
+    fi
 
+    if [ -z "$HOST_IP" ]; then
+        echo "Failed to get Host IP."
+        return 1
+    fi
+
+    echo "$HOST_IP"
+    return 0
+}
+
+# Use the function
+HOST_IP=$(get_host_ip)
+if [ $? -ne 0 ]; then
+    echo "Warning: Failed to get Host IP, continuing anyway..."
+fi
 
 # Set the host user's username, user ID, and group ID
 HOST_USERNAME="firestream"
 HOST_USER_ID=1000
-HOST_GROUP_ID=1000  
+HOST_GROUP_ID=1000
 
-#TODO: Uncomment the following lines to use the host user's Group ID and User.
-# Currently, the zsh shell is not working with the host user's Group ID and User.
-# By using the host user's Group ID and User, 
-# we can avoid permission issues, provide docker access, 
-# and avoid warnings about insecure git repos.
-# HOST_USERNAME=$(whoami)
-# HOST_USER_ID=$(id -u)
-# HOST_GROUP_ID=$(id -g)
-
-if [ -z "$HOST_USER_ID" ] || [ -z "$HOST_GROUP_ID" ]; then
-    echo "Failed to get User ID or Group ID."
-    exit 1
-fi
-
+# Extract GPU vendor for Linux
 # Extract GPU vendor for Linux
 extract_linux_gpu_vendor() {
     if command -v lspci &> /dev/null; then
-        # Simplify extraction logic to focus on identifying NVIDIA
+        # If lspci is available, check for NVIDIA
         if lspci | grep -E "VGA|3D" | grep -iq "nvidia"; then
             echo "NVIDIA"
         else
             echo "Other"
         fi
     else
-        echo "lspci command not found, unable to extract GPU vendor."
-        exit 1
+        # If lspci is not available, try alternative methods
+        if [ -d "/proc/driver/nvidia" ] || [ -d "/usr/local/cuda" ]; then
+            echo "NVIDIA"
+        else
+            # Default to "Other" if we can't detect GPU
+            echo "Other"
+        fi
     fi
 }
 
@@ -120,69 +144,80 @@ else
     export HOST_GPU_STATUS="false"
 fi
 
-
-
 # Function to set variable based on file existence
 set_env_variable() {
-  local example_file_path="./etc/.env.secrets.example"
-  local expected_file_path="./etc/.env.secrets"
+    local example_file_path="${PROJECT_ROOT}/etc/.env.secrets.example"
+    local expected_file_path="${PROJECT_ROOT}/etc/.env.secrets"
 
-  # Check if the file exists
-  if [ -e "$expected_file_path" ]; then
-    # File exists, set the variable to the file path
-    ENV_SECRETS_PATH="$expected_file_path"
-  else
-    # File does not exist, use the example secrets
-    ENV_SECRETS_PATH="$example_file_path"
-  fi
+    if [ -e "$expected_file_path" ]; then
+        ENV_SECRETS_PATH="$expected_file_path"
+    elif [ -e "$example_file_path" ]; then
+        ENV_SECRETS_PATH="$example_file_path"
+    else
+        echo "Error: Neither .env.secrets nor .env.secrets.example found"
+        exit 1
+    fi
 
-  # Export the variable for global use (optional)
-  export ENV_SECRETS_PATH
-
-  # For debugging or confirmation, you can display the variable value
-  echo "ENV_SECRETS_PATH is set to: $ENV_SECRETS_PATH"
+    export ENV_SECRETS_PATH
+    echo "ENV_SECRETS_PATH is set to: $ENV_SECRETS_PATH"
 }
 
-# To use this function, simply call it
+# Set up environment variables
 set_env_variable
 
-# Create a temporary docker-compose file with environment variables and build arguments
-TEMP_COMPOSE_FILE="docker/docker-compose.temp.yml"
-{
-  echo "version: '3.8'"
-  echo "services:"
-  echo "  devcontainer:"
-  echo "    environment:"
-  echo "      HOST_USER_ID: $HOST_USER_ID"
-  echo "      HOST_GROUP_ID: $HOST_GROUP_ID"
-  echo "      HOST_DOCKER_GID: $HOST_DOCKER_GID"
-  echo "      HOST_MACHINE_ID: $HOST_MACHINE_ID"
-  echo "      HOST_IP: $HOST_IP"
-  echo "      HOST_GPU_STATUS: $HOST_GPU_STATUS"
-  echo "      HOST_GPU_VENDOR: $HOST_GPU_VENDOR"
-  echo "    build:"
-  echo "      args:"
-  echo "        HOST_USER_ID: $HOST_USER_ID"
-  echo "        HOST_GROUP_ID: $HOST_GROUP_ID"
-  echo "        HOST_GPU_STATUS: $HOST_GPU_STATUS"
-  echo "        HOST_GPU_VENDOR: $HOST_GPU_VENDOR"
-  echo "        HOST_USERNAME: $HOST_USERNAME"
-  echo "    env_file:"
-  echo "      - $ENV_SECRETS_PATH"
-} > $TEMP_COMPOSE_FILE
+# Define file paths
+BASE_FILE="${PROJECT_ROOT}/docker-compose.yml"
+TEMP_COMPOSE_FILE="${PROJECT_ROOT}/docker-compose.temp.yml"
 
-# Define the base and override file paths
-BASE_FILE="docker-compose.yml"
+# Check if base compose file exists
+if [ ! -f "$BASE_FILE" ]; then
+    echo "Error: Base docker-compose.yml not found at: $BASE_FILE"
+    exit 1
+fi
+
+# Create a temporary docker-compose file with environment variables and build arguments
+{
+    echo "version: '3.8'"
+    echo "services:"
+    echo "  devcontainer:"
+    echo "    environment:"
+    echo "      HOST_USER_ID: $HOST_USER_ID"
+    echo "      HOST_GROUP_ID: $HOST_GROUP_ID"
+    echo "      HOST_DOCKER_GID: $HOST_DOCKER_GID"
+    echo "      HOST_MACHINE_ID: $HOST_MACHINE_ID"
+    echo "      HOST_IP: $HOST_IP"
+    echo "      HOST_GPU_STATUS: $HOST_GPU_STATUS"
+    echo "      HOST_GPU_VENDOR: $HOST_GPU_VENDOR"
+    echo "    build:"
+    echo "      args:"
+    echo "        HOST_USER_ID: $HOST_USER_ID"
+    echo "        HOST_GROUP_ID: $HOST_GROUP_ID"
+    echo "        HOST_GPU_STATUS: $HOST_GPU_STATUS"
+    echo "        HOST_GPU_VENDOR: $HOST_GPU_VENDOR"
+    echo "        HOST_USERNAME: $HOST_USERNAME"
+    echo "    env_file:"
+    echo "      - $ENV_SECRETS_PATH"
+} > "$TEMP_COMPOSE_FILE"
 
 # Combine Compose Files based on GPU_STATUS
 if [ "$HOST_GPU_VENDOR" = "NVIDIA" ]; then
-    OVERRIDE_FILE="docker/docker-compose.gpu_nvidia.yml"
-    docker compose -f $BASE_FILE -f $OVERRIDE_FILE -f $TEMP_COMPOSE_FILE config > docker/docker-compose.devcontainer.yml
+    OVERRIDE_FILE="${PROJECT_ROOT}/docker/docker-compose.gpu_nvidia.yml"
+    if [ ! -f "$OVERRIDE_FILE" ]; then
+        echo "Error: NVIDIA override file not found at: $OVERRIDE_FILE"
+        exit 1
+    fi
+    if ! docker compose -f "$BASE_FILE" -f "$OVERRIDE_FILE" -f "$TEMP_COMPOSE_FILE" config > "${PROJECT_ROOT}/docker/docker-compose.devcontainer.yml"; then
+        echo "Error: Failed to generate docker-compose.devcontainer.yml with NVIDIA config"
+        exit 1
+    fi
 else
-    docker compose -f $BASE_FILE -f $TEMP_COMPOSE_FILE config > docker/docker-compose.devcontainer.yml
+    if ! docker compose -f "$BASE_FILE" -f "$TEMP_COMPOSE_FILE" config > "${PROJECT_ROOT}/docker/docker-compose.devcontainer.yml"; then
+        echo "Error: Failed to generate docker-compose.devcontainer.yml"
+        exit 1
+    fi
 fi
 
 # Remove the temporary docker-compose file
-rm $TEMP_COMPOSE_FILE
+rm "$TEMP_COMPOSE_FILE"
 
 echo "Pre-init script complete."
