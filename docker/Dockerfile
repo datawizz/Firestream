@@ -12,16 +12,14 @@ ARG HOST_USERNAME
 ARG DOCKER_BUILDKIT=1
 
 
-ARG SPARK_VERSION=3.4.3
-ARG SPARK_SHA512="4959a7b8710a3c37d94f1a5bf89fcbd8c757e68059fbfab8d068fd38105e62a2217ebeb4c68a6d4d4835b8ad2a65f1d00d0d1272e083934531adee69da27651b  spark-3.4.3-bin-without-hadoop.tgz"
-ARG SPARK_VERSION=3.4.3
-ARG SPARK_SHA512="4959a7b8710a3c37d94f1a5bf89fcbd8c757e68059fbfab8d068fd38105e62a2217ebeb4c68a6d4d4835b8ad2a65f1d00d0d1272e083934531adee69da27651b  spark-3.4.3-bin-without-hadoop.tgz"
+ARG SPARK_VERSION=3.4.4
+ARG SPARK_SHA512="405f604532c11c3793b757aae41bbae0f86f3bcab65f47dea07be9003532c382429feab67d8ed19721ee539801842b21d32685c37a97372f96d50b318f5b1bb0  spark-3.4.4-bin-without-hadoop.tgz"
 ARG SPARK_HOME="/opt/spark"
 ARG HADOOP_VERSION=3.3.6
 ARG HADOOP_SHA512="de3eaca2e0517e4b569a88b63c89fae19cb8ac6c01ff990f1ff8f0cc0f3128c8e8a23db01577ca562a0e0bb1b4a3889f8c74384e609cd55e537aada3dcaa9f8a  hadoop-3.3.6.tar.gz"
 ARG HADOOP_HOME="/opt/hadoop"
-ARG AIRFLOW_VERSION=2.9.3
-ARG AIRFLOW_SHA512="e90179a1d5673db905d3f6aaa75f92113b5735be5e7d9bffddbf30c5d54ab15ed9f1512409a681bfa8d36c653895b6f177eef969b37e0e8a3a3f452bf3bf433b  apache-airflow-2.9.3-source.tar.gz"
+ARG AIRFLOW_VERSION=2.10.3
+ARG AIRFLOW_SHA512="94b576176b4ba6f9e90fe82ddce2aa198a2c85685a4a3faa844ba5121a25d6189e52feab66df73859152503ada98f6507e7e836f09a0924777a380817f1e8ea5  apache-airflow-2.10.3-source.tar.gz"
 ARG AIRFLOW_HOME="/opt/airflow"
 
 ARG JAVA_VERSION=11
@@ -348,7 +346,7 @@ ARG DOCKER_VERSION="latest"
 ENV DOCKER_BUILDKIT=1
 
 ### Docker from Docker
-RUN /bin/bash /tmp/workspace/bin/install_scripts/docker-from-docker-debian.sh 
+RUN /bin/bash /tmp/workspace/bin/install_scripts/docker-from-docker-debian.sh
 
 ### K3D ###
 RUN /bin/bash /tmp/workspace/bin/install_scripts/k3d-debian.sh
