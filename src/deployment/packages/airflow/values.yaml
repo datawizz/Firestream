@@ -1,0 +1,39 @@
+# Disable loading example DAGs for simplicity
+loadExamples: true
+
+# Basic Airflow credentials:
+auth:
+  username: "admin"
+  password: "admin"
+  # 32-byte base64-encoded Fernet key; replace with your own!
+  fernetKey: "MzJfQnl0ZVN0cmluZ1RoaXNJc1Rvb0xvbmc="
+  # A random string used by Flask for session encryption
+  secretKey: "some-random-long-string"
+
+# Use a LocalExecutor so tasks run in the Scheduler's pod
+executor: LocalExecutor
+
+# Disable Redis (not needed for LocalExecutor)
+redis:
+  enabled: false
+
+# Minimal embedded Postgres database
+# postgresql:
+#   enabled: true
+#   auth:
+#     username: bn_airflow
+#     password: airflowdb
+#     database: bitnami_airflow
+
+# Make the Scheduler + Webserver request minimal resources
+scheduler:
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+
+web:
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi

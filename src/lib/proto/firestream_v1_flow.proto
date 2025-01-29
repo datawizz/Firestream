@@ -1,0 +1,173 @@
+syntax = "proto3";
+
+package firestream_v1_flow;
+
+import "google/protobuf/descriptor.proto"; // Required for custom options
+
+// Define the custom option
+extend google.protobuf.MessageOptions {
+  QuestionFlow default_flow = 50000; // Number must be > 1000 for custom options
+}
+
+// Question flow configuration
+message QuestionFlow { repeated Question questions = 1; }
+
+// Rest of your existing flow.proto file...
+message Question {
+  string id = 1;
+  string field_path = 2;
+  string message = 3;
+  QuestionType type = 4;
+  repeated Dependency dependencies = 5;
+  Validation validation = 6;
+  UIHints ui_hints = 7;
+}
+
+enum QuestionType {
+  QUESTION_TYPE_UNSPECIFIED = 0;
+  QUESTION_TYPE_ENUM = 1;
+  QUESTION_TYPE_BOOL = 2;
+  QUESTION_TYPE_STRING = 3;
+  QUESTION_TYPE_INT = 4;
+}
+
+message Dependency {
+  string field_path = 1;
+  repeated string allowed_values = 2;
+  DependencyType type = 3;
+
+  enum DependencyType {
+    DEPENDENCY_TYPE_UNSPECIFIED = 0;
+    DEPENDENCY_TYPE_EQUALS = 1;
+    DEPENDENCY_TYPE_NOT_EQUALS = 2;
+    DEPENDENCY_TYPE_IN = 3;
+    DEPENDENCY_TYPE_NOT_IN = 4;
+    DEPENDENCY_TYPE_GREATER_THAN = 5;
+    DEPENDENCY_TYPE_LESS_THAN = 6;
+  }
+}
+
+message Validation {
+  repeated string required_fields = 1;
+  string regex_pattern = 2;
+  int32 min_value = 3;
+  int32 max_value = 4;
+  repeated string allowed_values = 5;
+  string custom_validator = 6;
+}
+
+message UIHints {
+  string default_value = 1;
+  string placeholder = 2;
+  bool is_password = 3;
+  string help_text = 4;
+  repeated string choices = 5;
+}
+
+// Example flow configuration
+message ExampleFlow {
+  option (default_flow) = {
+    questions : [
+      {
+        id : "provider"
+        field_path : "infrastructure.provider"
+        message : "Select infrastructure provider:"
+        type : QUESTION_TYPE_ENUM
+        ui_hints : {help_text : "Choose your infrastructure provider"}
+      },
+      {
+        id : "ingress"
+        field_path : "infrastructure.ingress_type"
+        message : "Select ingress type:"
+        type : QUESTION_TYPE_ENUM
+        dependencies : [ {
+          field_path : "infrastructure.provider"
+          allowed_values : [ "PROVIDER_LOCAL", "PROVIDER_GCP" ]
+          type : DEPENDENCY_TYPE_IN
+        } ]
+      },
+      {
+        id : "https"
+        field_path : "infrastructure.https.enabled"
+        message : "Enable HTTPS?"
+        type : QUESTION_TYPE_BOOL
+        dependencies : [
+          {
+            field_path : "infrastructure.provider"
+            allowed_values : [ "PROVIDER_LOCAL" ]
+            type : DEPENDENCY_TYPE_EQUALS
+          },
+          {
+            field_path : "infrastructure.ingress_type"
+            allowed_values : [ "INGRESS_LOCAL" ]
+            type : DEPENDENCY_TYPE_EQUALS
+          }
+        ]
+      },
+      {
+        id : "cloudflare_account"
+        field_path : "cloudflare.account_id"
+        message : "Enter Cloudflare Account ID:"
+        type : QUESTION_TYPE_STRING
+        dependencies : [ {
+          field_path : "infrastructure.ingress_type"
+          allowed_values : [ "INGRESS_CLOUDFLARE" ]
+          type : DEPENDENCY_TYPE_EQUALS
+        } ]
+        validation : {
+          regex_pattern : "^[0-9a-fA-F]{32}$"
+          required_fields : [ "cloudflare.zone_id", "cloudflare.api_token" ]
+        }
+      },
+      {
+        id : "gcp_project"
+        field_path : "gcp.project_id"
+        message : "Enter GCP Project ID:"
+        type : QUESTION_TYPE_STRING
+        dependencies : [ {
+          field_path : "infrastructure.provider"
+          allowed_values : [ "PROVIDER_GCP" ]
+          type : DEPENDENCY_TYPE_EQUALS
+        } ]
+        validation : {regex_pattern : "^[a-z][a-z0-9-]{4,28}[a-z0-9]$"}
+      },
+      {
+        id : "gcp_region"
+        field_path : "gcp.region"
+        message : "Select GCP Region:"
+        type : QUESTION_TYPE_ENUM
+        dependencies : [ {
+          field_path : "infrastructure.provider"
+          allowed_values : [ "PROVIDER_GCP" ]
+          type : DEPENDENCY_TYPE_EQUALS
+        } ]
+      },
+      {
+        id : "security_level"
+        field_path : "infrastructure.security_level"
+        message : "Select security level:"
+        type : QUESTION_TYPE_ENUM
+        validation : {required_fields : [ "infrastructure.provider" ]}
+      },
+      {
+        id : "tailscale"
+        field_path : "tailscale.enabled"
+        message : "Enable Tailscale access?"
+        type : QUESTION_TYPE_BOOL
+      },
+      {
+        id : "tailscale_api_key"
+        field_path : "tailscale.api_key"
+        message : "Enter Tailscale API Key:"
+        type : QUESTION_TYPE_STRING
+        dependencies : [ {
+          field_path : "tailscale.enabled"
+          allowed_values : [ "true" ]
+          type : DEPENDENCY_TYPE_EQUALS
+        } ]
+        validation : {regex_pattern : "^tskey-[a-zA-Z0-9]{60}$"}
+        ui_hints : {is_password : true}
+      }
+    ]
+  };
+}

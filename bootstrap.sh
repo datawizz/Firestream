@@ -22,8 +22,8 @@ echo "                                                                          
 echo "               Starting Firestream in < $DEPLOYMENT_MODE_MESSAGE > mode           "
 echo "                                                                                  "
 
-                                                                              
-                                                                               
+               # TODO work this in
+                #    helm repo add bitnami https://charts.bitnami.com/bitnami
 
 ###############################################################################
 ### 0. Git Clone                                                            ###
@@ -235,7 +235,7 @@ fi
 
 # 3. If in production mode
 if [ "$DEPLOYMENT_MODE" = "production" ]; then
-  
+
   #TODO
 
   # 3.1   Build the project's container images and artifacts
@@ -246,4 +246,3 @@ if [ "$DEPLOYMENT_MODE" = "production" ]; then
   echo "TODO"
   exit 1
 fi
-
