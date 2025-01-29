@@ -1,0 +1,126 @@
+syntax = "proto3";
+package firestream_v1;
+
+import "google/protobuf/timestamp.proto";
+
+// Infrastructure provider
+enum Provider {
+  PROVIDER_UNSPECIFIED = 0;
+  PROVIDER_LOCAL = 1;
+  PROVIDER_GCP = 2;
+  PROVIDER_AWS = 3;
+  PROVIDER_AZURE = 4;
+  PROVIDER_ON_PREMISE = 5;
+}
+
+// Type of ingress configuration
+enum IngressType {
+  INGRESS_TYPE_UNSPECIFIED = 0;
+  INGRESS_TYPE_LOADBALANCER = 1;
+  INGRESS_TYPE_NODEPORT = 2;
+  INGRESS_TYPE_INGRESS = 3;
+  INGRESS_TYPE_CLOUDFLARE = 4;
+  INGRESS_TYPE_LOCAL = 5;
+}
+
+// Security level for various configurations
+enum SecurityLevel {
+  SECURITY_LEVEL_UNSPECIFIED = 0;
+  SECURITY_LEVEL_PUBLIC = 1;
+  SECURITY_LEVEL_PRIVATE = 2;
+  SECURITY_LEVEL_INTERNAL = 3;
+  SECURITY_LEVEL_BASIC = 4;
+  SECURITY_LEVEL_ENHANCED = 5;
+  SECURITY_LEVEL_HIGH = 6;
+}
+
+// GCP specific enums
+enum Region {
+  REGION_UNSPECIFIED = 0;
+  REGION_US_CENTRAL1 = 1;
+  REGION_US_EAST1 = 2;
+  REGION_US_WEST1 = 3;
+  REGION_EUROPE_WEST1 = 4;
+  REGION_ASIA_EAST1 = 5;
+}
+
+enum RegionZone {
+  REGION_ZONE_UNSPECIFIED = 0;
+  REGION_ZONE_A = 1;
+  REGION_ZONE_B = 2;
+  REGION_ZONE_C = 3;
+  REGION_ZONE_D = 4;
+}
+
+enum MachineType {
+  MACHINE_TYPE_UNSPECIFIED = 0;
+  MACHINE_TYPE_E2_MICRO = 1;
+  MACHINE_TYPE_E2_SMALL = 2;
+  MACHINE_TYPE_E2_MEDIUM = 3;
+  MACHINE_TYPE_E2_STANDARD_2 = 4;
+  MACHINE_TYPE_E2_STANDARD_4 = 5;
+  MACHINE_TYPE_E2_STANDARD_8 = 6;
+}
+
+enum Environment {
+  ENVIRONMENT_UNSPECIFIED = 0;
+  ENVIRONMENT_DEVELOPMENT = 1;
+  ENVIRONMENT_STAGING = 2;
+  ENVIRONMENT_PRODUCTION = 3;
+}
+
+enum NetworkProtocol {
+  PROTOCOL_UNSPECIFIED = 0;
+  PROTOCOL_HTTP = 1;
+  PROTOCOL_GRPC = 2;
+  PROTOCOL_TCP = 3;
+}
+
+enum BackupStrategy {
+  BACKUP_STRATEGY_UNSPECIFIED = 0;
+  BACKUP_STRATEGY_FULL = 1;
+  BACKUP_STRATEGY_INCREMENTAL = 2;
+  BACKUP_STRATEGY_DIFFERENTIAL = 3;
+}
+
+enum StorageClass {
+  STORAGE_CLASS_UNSPECIFIED = 0;
+  STORAGE_CLASS_STANDARD = 1;
+  STORAGE_CLASS_NEARLINE = 2;
+  STORAGE_CLASS_COLDLINE = 3;
+  STORAGE_CLASS_ARCHIVE = 4;
+}
+
+enum AlertSeverity {
+  ALERT_SEVERITY_UNSPECIFIED = 0;
+  ALERT_SEVERITY_INFO = 1;
+  ALERT_SEVERITY_WARNING = 2;
+  ALERT_SEVERITY_ERROR = 3;
+  ALERT_SEVERITY_CRITICAL = 4;
+}
+
+// Status message for tracking operation status
+message Status {
+  enum State {
+    STATE_UNSPECIFIED = 0;
+    STATE_PENDING = 1;
+    STATE_RUNNING = 2;
+    STATE_SUCCEEDED = 3;
+    STATE_FAILED = 4;
+    STATE_CANCELLED = 5;
+    STATE_UNKNOWN = 6;
+  }
+  State state = 1;
+  string message = 2;
+  google.protobuf.Timestamp last_updated = 3;
+}
+
+// Resource metrics for monitoring
+message ResourceMetrics {
+  double cpu_usage = 1;
+  double memory_usage = 2;
+  double disk_usage = 3;
+  double network_in = 4;
+  double network_out = 5;
+  google.protobuf.Timestamp timestamp = 6;
+}

@@ -1,0 +1,262 @@
+syntax = "proto3";
+
+package firestream_v1;
+
+import "google/protobuf/timestamp.proto";
+import "google/protobuf/empty.proto";
+import "google/protobuf/duration.proto";
+import "common.proto";
+
+// Configuration messages
+message FirestreamConfig {
+  SystemInfo system_info = 1;
+  InfrastructureConfig infrastructure = 2;
+  optional CloudflareConfig cloudflare = 3;
+  optional TailscaleConfig tailscale = 4;
+  optional GcpConfig gcp = 5;
+  reserved 6; // Reserved for AWS
+}
+
+message SystemInfo {
+  string cpu_architecture = 1;
+  int32 total_cpu = 2;
+  int32 total_memory_mb = 3;
+  bool has_nvidia_gpu = 4;
+  bool has_kvm = 5;
+  bool has_docker = 6;
+}
+
+message InfrastructureConfig {
+  Provider provider = 1;
+  IngressType ingress_type = 2;
+  optional HttpsConfig https = 3;
+  SecurityLevel security_level = 4;
+
+  message HttpsConfig {
+    bool enabled = 1;
+    bool self_signed = 2;
+  }
+}
+
+message CloudflareConfig {
+  string account_id = 1;
+  string zone_id = 2;
+  string api_token = 3;
+  SecurityLevel security_level = 4;
+}
+
+message TailscaleConfig {
+  string api_key = 1;
+  string tailnet_name = 2;
+  SecurityLevel security_level = 3;
+}
+
+message GcpConfig {
+  string project_id = 1;
+  Region region = 2;
+  RegionZone region_zone = 3;
+  MachineType machine_type = 4;
+  string deployment_name = 5;
+  string customer_name = 6;
+  string customer_email_domain = 7;
+  Environment environment = 8;
+  int32 rotation_days = 9;
+  string machine_prefix = 10;
+  StorageClass storage_class = 11;
+  BackupStrategy backup_strategy = 12;
+  SecurityLevel security_level = 13;
+}
+
+// Deployment and operational messages
+message Deployment {
+  string id = 1;
+  string name = 2;
+  google.protobuf.Timestamp created_at = 3;
+  Status status = 4;
+  FirestreamConfig config = 5;
+  ResourceMetrics metrics = 6;
+}
+
+message Service {
+  string id = 1;
+  string name = 2;
+  Status status = 3;
+  ResourceMetrics metrics = 4;
+  repeated Endpoint endpoints = 5;
+  map<string, string> labels = 6;
+}
+
+message Endpoint {
+  string url = 1;
+  string protocol = 2; // e.g., "http", "grpc", "tcp"
+  int32 port = 3;
+  bool is_public = 4;
+}
+
+message ClusterNode {
+  string id = 1;
+  string name = 2;
+  Status status = 3;
+  ResourceMetrics metrics = 4;
+  string ip_address = 5;
+  map<string, string> labels = 6;
+}
+
+message BackupConfig {
+  string destination = 1;
+  google.protobuf.Duration retention_period = 2;
+  bool encrypt = 3;
+  string encryption_key_id = 4;
+}
+
+message Backup {
+  string id = 1;
+  google.protobuf.Timestamp created_at = 2;
+  string size = 3;
+  Status status = 4;
+  string destination = 5;
+}
+
+message MaintenanceWindow {
+  google.protobuf.Timestamp start_time = 1;
+  google.protobuf.Duration duration = 2;
+  bool auto_approve = 3;
+}
+
+message Alert {
+  string id = 1;
+  google.protobuf.Timestamp timestamp = 2;
+
+  enum Severity {
+    SEVERITY_UNSPECIFIED = 0;
+    SEVERITY_INFO = 1;
+    SEVERITY_WARNING = 2;
+    SEVERITY_ERROR = 3;
+    SEVERITY_CRITICAL = 4;
+  }
+  Severity severity = 3;
+
+  string message = 4;
+  string source = 5;
+  map<string, string> metadata = 6;
+}
+
+// Request/Response messages for services
+message DeployRequest {
+  FirestreamConfig config = 1;
+  bool dry_run = 2;
+}
+
+message DeployResponse {
+  string deployment_id = 1;
+  Status status = 2;
+}
+
+message ListServicesRequest {
+  int32 page_size = 1;
+  string page_token = 2;
+  string filter = 3;
+}
+
+message ListServicesResponse {
+  repeated Service services = 1;
+  string next_page_token = 2;
+}
+
+message CreateBackupRequest {
+  BackupConfig config = 1;
+  repeated string service_ids = 2;
+}
+
+message GetLogsRequest {
+  string service_id = 1;
+  google.protobuf.Timestamp start_time = 2;
+  google.protobuf.Timestamp end_time = 3;
+  string filter = 4;
+  int32 limit = 5;
+}
+
+message LogEntry {
+  google.protobuf.Timestamp timestamp = 1;
+  string service_id = 2;
+  string message = 3;
+  map<string, string> metadata = 4;
+}
+
+message ScaleRequest {
+  string service_id = 1;
+  int32 replicas = 2;
+}
+
+service DeploymentService {
+  // Deployment operations
+  rpc Deploy(DeployRequest) returns (DeployResponse);
+  rpc GetDeployment(DeploymentIdRequest) returns (Deployment);
+  rpc ListDeployments(ListServicesRequest) returns (stream Deployment);
+  rpc DeleteDeployment(DeploymentIdRequest) returns (Status);
+
+  // Service management
+  rpc ListServices(ListServicesRequest) returns (ListServicesResponse);
+  rpc GetService(ServiceIdRequest) returns (Service);
+  rpc ScaleService(ScaleRequest) returns (Status);
+  rpc RestartService(ServiceIdRequest) returns (Status);
+
+  // Node management
+  rpc ListNodes(ListServicesRequest) returns (stream ClusterNode);
+  rpc DrainNode(NodeIdRequest) returns (Status);
+  rpc CordonNode(NodeIdRequest) returns (Status);
+}
+
+service OperationsService {
+  // Backup operations
+  rpc CreateBackup(CreateBackupRequest) returns (Backup);
+  rpc ListBackups(ListServicesRequest) returns (stream Backup);
+  rpc RestoreBackup(BackupIdRequest) returns (Status);
+
+  // Maintenance
+  rpc ScheduleMaintenance(MaintenanceWindow) returns (Status);
+  rpc GetMaintenanceWindows(google.protobuf.Empty)
+      returns (stream MaintenanceWindow);
+
+  // Monitoring
+  rpc GetMetrics(ServiceIdRequest) returns (stream ResourceMetrics);
+  rpc GetLogs(GetLogsRequest) returns (stream LogEntry);
+  rpc GetAlerts(ListServicesRequest) returns (stream Alert);
+
+  // Health checks
+  rpc GetHealth(google.protobuf.Empty) returns (Status);
+  rpc GetServiceHealth(ServiceIdRequest) returns (Status);
+}
+
+message ValidationResult {
+  bool is_valid = 1;
+  repeated ValidationError errors = 2;
+}
+
+message ValidationError {
+  string field = 1;
+  string message = 2;
+
+  enum ErrorSeverity {
+    ERROR = 0;
+    WARNING = 1;
+  }
+  ErrorSeverity severity = 3;
+}
+
+// Request messages for string parameters
+message DeploymentIdRequest { string deployment_id = 1; }
+
+message ServiceIdRequest { string service_id = 1; }
+
+message NodeIdRequest { string node_id = 1; }
+
+message BackupIdRequest { string backup_id = 1; }
+
+// Service definitions
+service ConfigurationService {
+  // Configuration management
+  rpc ValidateConfig(FirestreamConfig) returns (ValidationResult);
+  rpc GetConfig(google.protobuf.Empty) returns (FirestreamConfig);
+  rpc UpdateConfig(FirestreamConfig) returns (Status);
+}

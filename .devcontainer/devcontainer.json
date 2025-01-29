@@ -14,9 +14,9 @@
 	},
 	"remoteUser": "firestream",
 	// initializeCommand runs on the host before building the container.
-	"initializeCommand": "bash docker/docker_preinit.sh",
+	"initializeCommand": "bash docker/firestream/docker_preinit.sh",
 	// Update the 'dockerComposeFile' list if you have more compose files or use different names.
-	"dockerComposeFile": "../docker/docker-compose.devcontainer.yml",
+	"dockerComposeFile": "../docker/firestream/docker-compose.devcontainer.yml",
 	// Disables VS Code attempting to keep the container running by relying on the entrypoint.sh called in the Dockerfile
 	"overrideCommand": false,
 	// Use 'postStartCommand' to run commands after the container is started.
@@ -43,11 +43,14 @@
 				"scala-lang.scala",
 				"mhutchie.git-graph",
 				"rust-lang.rust-analyzer",
-				"ms-python.pylint"
+				"ms-python.pylint",
+				"zxh404.vscode-proto3"
 			],
 			// Set *default* container specific settings.json values on container create.
 			"settings": {
-				"python.defaultInterpreterPath": "/usr/local/python/bin/python",
+				"python.defaultInterpreterPath": "/home/firestream/.python",
+				"jupyter.defaultKernelPath": "/home/firestream/.python",
+				"python.pythonPath": "/home/firestream/.python",
 				"python.formatting.provider": "black",
 				"python.analysis.typeCheckingMode": "basic",
 				"python.formatting.autopep8Path": "/usr/local/py-utils/bin/autopep8",

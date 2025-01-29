@@ -1,6 +1,0 @@
-name: Quadratic
-version: 1.0.0
-author: Datawizz
-description: A plugin deployment of Quadratic Data Science Spreadsheet
-feature_flags:
-  - FEATURE_FLAG_WEBSOCKET_MIDDLEWARE

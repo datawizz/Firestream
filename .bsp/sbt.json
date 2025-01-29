@@ -1,1 +1,0 @@
-{"name":"sbt","version":"1.4.2","bspVersion":"2.0.0-M5","languages":["scala"],"argv":["/home/vscode/.sdkman/candidates/java/11.0.12-open/bin/java","-Xms100m","-Xmx100m","-classpath","/home/vscode/.sdkman/candidates/sbt/1.4.2/bin/sbt-launch.jar","xsbt.boot.Boot","-bsp"]}
