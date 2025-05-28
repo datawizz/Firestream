@@ -6,6 +6,8 @@ services:
       context: ../../
       dockerfile: docker/firestream/Dockerfile
       target: devcontainer
+      args:
+        HOST_DOCKER_GID: ${HOST_DOCKER_GID:-997}
     env_file:
       - ../../etc/.env.local
     volumes:
@@ -13,7 +15,7 @@ services:
       - ../..:/workspace
 
       # Enable Docker-from-Docker
-      # This uses the host's Docker Engine through socket mapping and is preferred over Docker-in-Docker for security and latency
+      # This uses the host's Docker Engine through socket mapping and is preferred over Docker-from-Docker for security and latency
       - /var/run/docker.sock:/var/run/docker-host.sock
 
       # Persist images built in devcontainer

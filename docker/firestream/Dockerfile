@@ -128,9 +128,11 @@ RUN apt-get update && export DEBIAN_FRONTEND=noninteractive \
     && rm -rf /var/lib/apt/lists/*
 
 
-# Add the user
+# Add the user and docker group
 RUN groupadd -g ${HOST_GROUP_ID} ${HOST_USERNAME} || true \
+    && groupadd -g ${HOST_DOCKER_GID:-997} docker || true \
     && useradd -m -d /home/${HOST_USERNAME} -u ${HOST_USER_ID} -g ${HOST_GROUP_ID} -s /bin/bash -o ${HOST_USERNAME} || true \
+    && usermod -aG docker ${HOST_USERNAME} || true \
     && chown -R ${HOST_USER_ID}:${HOST_GROUP_ID} /home/${HOST_USERNAME}
 
 
@@ -143,27 +145,7 @@ ARG UPGRADE_PACKAGES="false"
 COPY bin/install_scripts/common-debian.sh /tmp/workspace/bin/install_scripts/common-debian.sh
 RUN /bin/bash /tmp/workspace/bin/install_scripts/common-debian.sh "${INSTALL_ZSH}" "${HOST_USERNAME}" "${HOST_USER_ID}" "${HOST_GROUP_ID}" "${UPGRADE_PACKAGES}" "true" "true"
 
-### Docker ###
-# [Option] Enable non-root Docker access in container
-ARG ENABLE_NONROOT_DOCKER="true"
-# [Option] Use the OSS Moby Engine instead of the licensed Docker Engine
-ARG USE_MOBY="true"
-# [Option] Engine/CLI Version
-ARG DOCKER_VERSION="latest"
-# Enable new "BUILDKIT" mode for Docker CLI (set permanently)
-ENV DOCKER_BUILDKIT=1
 
-### Docker from Docker
-COPY bin/install_scripts/docker-from-docker-debian.sh /tmp/workspace/bin/install_scripts/docker-from-docker-debian.sh
-RUN /bin/bash /tmp/workspace/bin/install_scripts/docker-from-docker-debian.sh
-
-### K3D ###
-COPY bin/install_scripts/k3d-debian.sh /tmp/workspace/bin/install_scripts/k3d-debian.sh
-RUN /bin/bash /tmp/workspace/bin/install_scripts/k3d-debian.sh
-
-### Kubectl and Helm ###
-COPY bin/install_scripts/kubectl-helm-debian.sh /tmp/workspace/bin/install_scripts/kubectl-helm-debian.sh
-RUN /bin/bash /tmp/workspace/bin/install_scripts/kubectl-helm-debian.sh
 
 USER root
 
@@ -178,6 +160,7 @@ ENV NIXPKGS_ALLOW_UNFREE=1
 ENV NIX_VERSION="nixos.org.2.24.9"
 WORKDIR /home/$HOST_USERNAME
 
+# Prep all directories as root
 # Install Nix as the non-root user
 
 COPY bin/install_scripts/nix_setup.sh nix_setup.sh
@@ -202,6 +185,7 @@ RUN /bin/bash /home/$HOST_USERNAME/nix_install.sh
 COPY flake.nix flake.nix
 COPY flake.lock flake.lock
 COPY rust-toolchain.toml rust-toolchain.toml
+COPY bin/nix bin/nix
 
 # Build the flake
 RUN nix build .#container
@@ -227,11 +211,21 @@ RUN /bin/bash /home/$HOST_USERNAME/result/bin/setup-container
 USER root
 RUN rm -rf /tmp/workspace
 RUN apt-get autoremove -y && apt-get clean -y && rm -rf /var/lib/apt/lists/*
+
+# Required for Docker-from-Docker
+# Create a wrapper script that handles the case where docker-init.sh doesn't exist
+RUN echo '#!/bin/bash' > /entrypoint.sh && \
+    echo 'if [ -f /usr/local/share/docker-init.sh ]; then' >> /entrypoint.sh && \
+    echo '    exec /usr/local/share/docker-init.sh "$@"' >> /entrypoint.sh && \
+    echo 'else' >> /entrypoint.sh && \
+    echo '    echo "Warning: docker-init.sh not found, running command directly"' >> /entrypoint.sh && \
+    echo '    exec "$@"' >> /entrypoint.sh && \
+    echo 'fi' >> /entrypoint.sh && \
+    chmod +x /entrypoint.sh
+
 USER ${HOST_USERNAME}
 WORKDIR /workspace
 
-
-
-# Required for Docker-from-Docker
-ENTRYPOINT ["/usr/local/share/docker-init.sh"]
+# Set ENTRYPOINT to the wrapper script
+ENTRYPOINT ["/entrypoint.sh"]
 CMD ["sleep", "infinity"]
