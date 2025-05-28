@@ -1,0 +1,47 @@
+# PostgreSQL Service Configuration
+api_version = "1.0.0"
+
+[metadata]
+name = "postgresql"
+version = "16.1"
+description = "PostgreSQL - Open source relational database"
+category = "database"
+
+[spec]
+enabled = true
+dependencies = []
+
+[spec.resources.requests]
+cpu = "0.5"
+memory = "1Gi"
+
+[spec.resources.limits]
+cpu = "2.0"
+memory = "4Gi"
+
+[[spec.ports]]
+name = "postgres"
+container_port = 5432
+host_port = 5432
+protocol = "TCP"
+
+[spec.environment]
+POSTGRES_DB = "firestream"
+POSTGRES_USER = "firestream"
+POSTGRES_PASSWORD = "changeme"
+PGDATA = "/var/lib/postgresql/data"
+
+[[spec.volumes]]
+name = "postgres-data"
+mount_path = "/var/lib/postgresql/data"
+read_only = false
+
+[spec.health_check]
+initial_delay_seconds = 30
+period_seconds = 10
+timeout_seconds = 5
+success_threshold = 1
+failure_threshold = 3
+
+[spec.health_check.check_type]
+exec = { command = ["pg_isready", "-U", "firestream"] }
