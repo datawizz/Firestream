@@ -12,7 +12,7 @@ development:
 	@bash -c 'cd $(BASEDIR) && bash bootstrap.sh development'
 
 
-build-devcontainer:
+devcontainer:
 	bash docker/firestream/docker_preinit.sh
 	docker compose -f docker/firestream/docker-compose.devcontainer.yml build devcontainer
 

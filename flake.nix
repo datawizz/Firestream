@@ -51,6 +51,9 @@
     mkContainerConfig = system: let
       pkgs = pkgsForSystem system;
       charts = getBitnamiCharts pkgs;
+      
+      # Import Docker-in-Docker module
+      dockerInDocker = import ./bin/nix/docker-in-docker.nix { inherit pkgs; };
 
       # Define the shell packages
       shellPackages = with pkgs; [
@@ -62,6 +65,11 @@
         # rustfmt
         rustup
         # TODO rustup makes things non-deterministic. Normal Nix install doesn't include linked C libraries and struggles with rust-src required for linting
+
+        # kubernetes
+        k3d
+        kubectl
+        kubernetes-helm
 
 
         # Node
@@ -113,7 +121,7 @@
 
         # Build Tools
         pkg-config
-      ];
+      ] ++ dockerInDocker.packages;
 
       # Create a profile script that sets up the environment
       profileScript = pkgs.writeText "nix-env.sh" ''
@@ -156,6 +164,9 @@
 
         # Bindgen configuration
         export LIBCLANG_PATH="${pkgs.lib.makeLibraryPath [ pkgs.llvmPackages_latest.libclang.lib ]}"
+        
+        # Docker-in-Docker configuration
+        ${dockerInDocker.profileScript}
       '';
 
     in pkgs.runCommand "container-env" {
@@ -191,6 +202,22 @@
         echo "Container environment setup complete!"
         echo "To activate in current shell, run:"
         echo "  source /etc/profile.d/nix-env.sh"
+        
+        # Copy docker-init.sh to /usr/local/share if it exists in the output
+        if [ -f $out/bin/docker-init.sh ]; then
+          echo "Installing docker-init.sh..."
+          mkdir -p /usr/local/share
+          cp -pf $out/bin/docker-init.sh /usr/local/share/docker-init.sh
+          chmod 755 /usr/local/share/docker-init.sh 2>/dev/null || true
+        fi
+        
+        # Run Docker-in-Docker setup if available
+        if [ -f ${dockerInDocker.setupDocker}/bin/setup-docker-in-docker ]; then
+          echo "Running Docker-in-Docker setup..."
+          ${dockerInDocker.setupDocker}/bin/setup-docker-in-docker || {
+            echo "Warning: Docker-in-Docker setup failed, but continuing..."
+          }
+        fi
         EOF
 
         chmod +x $out/bin/setup-container
@@ -200,6 +227,11 @@
         ${pkgs.lib.concatMapStrings (pkg: ''
           ln -s ${pkg} $out/packages/$(basename ${pkg})
         '') shellPackages}
+        
+        # Add Docker-in-Docker scripts
+        mkdir -p $out/bin
+        ln -s ${dockerInDocker.dockerInit}/bin/* $out/bin/
+        ln -s ${dockerInDocker.setupDocker}/bin/* $out/bin/
       '';
 
   in {
