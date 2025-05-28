@@ -1,0 +1,17 @@
+# Firestream Global Configuration
+version = "1.0.0"
+
+[cluster]
+name = "default"
+namespace = "firestream"
+container_runtime = "docker"
+# kubeconfig_path = "/path/to/kubeconfig"  # Optional, will use default if not specified
+
+[defaults]
+log_level = "info"
+timeout_seconds = 300
+
+[defaults.resource_limits]
+cpu_cores = 4.0
+memory_mb = 8192
+disk_gb = 100

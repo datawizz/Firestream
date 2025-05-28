@@ -1,0 +1,54 @@
+# Kafka Service Configuration
+api_version = "1.0.0"
+
+[metadata]
+name = "kafka"
+version = "3.7.0"
+description = "Apache Kafka - Distributed streaming platform"
+category = "streaming"
+
+[spec]
+enabled = true
+dependencies = ["zookeeper"]
+
+[spec.resources.requests]
+cpu = "1.0"
+memory = "2Gi"
+
+[spec.resources.limits]
+cpu = "2.0"
+memory = "4Gi"
+
+[[spec.ports]]
+name = "broker"
+container_port = 9092
+protocol = "TCP"
+
+[[spec.ports]]
+name = "controller"
+container_port = 9093
+protocol = "TCP"
+
+[spec.environment]
+KAFKA_BROKER_ID = "1"
+KAFKA_ZOOKEEPER_CONNECT = "zookeeper:2181"
+KAFKA_ADVERTISED_LISTENERS = "PLAINTEXT://kafka:9092"
+KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR = "1"
+KAFKA_TRANSACTION_STATE_LOG_MIN_ISR = "1"
+KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR = "1"
+KAFKA_LOG_DIRS = "/var/lib/kafka/data"
+
+[[spec.volumes]]
+name = "kafka-data"
+mount_path = "/var/lib/kafka/data"
+read_only = false
+
+[spec.health_check]
+initial_delay_seconds = 30
+period_seconds = 10
+timeout_seconds = 5
+success_threshold = 1
+failure_threshold = 3
+
+[spec.health_check.check_type]
+tcp = { port = 9092 }
