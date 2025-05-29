@@ -12,6 +12,16 @@ pub struct GlobalConfig {
     pub version: String,
     pub cluster: ClusterConfig,
     pub defaults: DefaultSettings,
+    /// Project information
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub project: Option<ProjectConfig>,
+}
+
+/// Project configuration
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct ProjectConfig {
+    pub name: String,
+    pub environment: String,
 }
 
 impl Default for GlobalConfig {
@@ -20,6 +30,7 @@ impl Default for GlobalConfig {
             version: "1.0.0".to_string(),
             cluster: ClusterConfig::default(),
             defaults: DefaultSettings::default(),
+            project: None,
         }
     }
 }

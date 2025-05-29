@@ -1,0 +1,65 @@
+# Example Firestream configuration with K3D cluster setup
+
+[project]
+name = "my-firestream-project"
+environment = "development"
+
+[cluster]
+name = "firestream-local"
+namespace = "default"
+container_runtime = "docker"
+
+# K3D-specific configuration
+[cluster.k3d]
+name = "firestream-local"
+api_port = 6550
+http_port = 80
+https_port = 443
+servers = 1
+agents = 2
+k3s_version = "v1.31.2-k3s1"
+
+[cluster.k3d.registry]
+enabled = true
+name = "registry.localhost"
+port = 5000
+
+[cluster.k3d.tls]
+enabled = true
+secret_name = "firestream-tls"
+
+[cluster.k3d.tls.certificate]
+country = "US"
+state = "New Mexico"
+locality = "Roswell"
+organization = "ACME Co, LLC."
+organizational_unit = "ACME Department"
+common_name = "*.firestream.local"
+email = "admin@firestream.local"
+
+[cluster.k3d.network]
+configure_routes = true
+configure_dns = true
+patch_etc_hosts = true
+pod_cidr = "10.42.0.0/16"
+service_cidr = "10.43.0.0/16"
+
+# Enable development mode with automatic port forwarding
+[cluster.k3d.dev_mode]
+port_forward_all = true
+port_offset = 10000
+
+[defaults]
+log_level = "info"
+timeout_seconds = 300
+
+[defaults.resource_limits]
+cpu_cores = 2.0
+memory_mb = 4096
+disk_gb = 100
+
+# Example service configurations can be added here
+# [[services]]
+# name = "postgresql"
+# enabled = true
+# ...

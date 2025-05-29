@@ -6,10 +6,13 @@
 pub mod cli;
 pub mod config;
 pub mod core;
+pub mod deploy;
 pub mod services;
+pub mod state;
 pub mod tui;
 
 // Re-export commonly used types
 pub use config::{GlobalConfig, ServiceConfig};
 pub use core::error::{FirestreamError, Result};
 pub use services::ServiceManager;
+pub use state::StateManager;

@@ -1,6 +1,6 @@
 # Firestream CLI/TUI
 
-A dual-interface tool providing both command-line arguments and an interactive text-based UI for managing data infrastructure services.
+A Kubernetes deployment platform with state-based plan/apply workflow, providing both command-line and interactive text-based UI for managing infrastructure and services.
 
 ## Features
 
@@ -12,6 +12,7 @@ A dual-interface tool providing both command-line arguments and an interactive t
 - **Service Discovery**: List available and installed services
 - **Basic Monitoring**: View logs and resource usage
 - **Offline Mode**: Works without Kubernetes connection for testing
+- **K3D Cluster Management**: State-managed local Kubernetes clusters with advanced networking
 
 ## Installation
 
@@ -21,6 +22,48 @@ cargo build --release
 ```
 
 ## Usage
+
+### Plan/Apply Workflow
+
+Firestream uses a state-based approach similar to Terraform:
+
+```bash
+# Initialize a new project
+firestream init --name my-project
+cd my-project
+
+# Edit firestream.toml to configure your infrastructure and services
+
+# Generate an execution plan
+firestream plan
+
+# Apply the changes
+firestream apply
+
+# Apply without confirmation
+firestream apply --auto-approve
+
+# Target specific resources
+firestream plan --target deployment.postgresql
+firestream apply --target deployment.postgresql
+```
+
+### State Management
+
+```bash
+# Show current state
+firestream state show
+
+# Lock/unlock state
+firestream state lock
+firestream state unlock
+
+# Import existing resources
+firestream import deployment my-existing-app --data resource.json
+
+# Refresh state from actual resources
+firestream refresh
+```
 
 ### CLI Mode
 
@@ -45,6 +88,28 @@ firestream logs kafka --follow
 
 # Show resource usage
 firestream resources
+```
+
+### Cluster Management
+
+```bash
+# Create a k3d cluster with defaults
+firestream cluster create
+
+# Create with configuration file
+firestream cluster create --config examples/k3d-cluster.toml
+
+# Create with development mode (auto port-forwarding)
+firestream cluster create --dev-mode
+
+# Delete cluster
+firestream cluster delete
+
+# Get cluster info
+firestream cluster info
+
+# Setup port forwarding
+firestream cluster port-forward
 ```
 
 ### TUI Mode

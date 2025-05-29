@@ -1,0 +1,88 @@
+# Example Firestream deployment configuration
+# This file demonstrates how to configure deployments for plan/apply
+
+# Global configuration
+version = "1.0.0"
+
+[cluster]
+name = "firestream-dev"
+namespace = "firestream"
+container_runtime = "docker"
+
+[defaults]
+log_level = "info"
+timeout_seconds = 300
+
+[defaults.resource_limits]
+cpu_cores = 2.0
+memory_mb = 4096
+disk_gb = 100
+
+# Infrastructure configuration (will be passed to Pulumi)
+[infrastructure]
+provider = "aws"
+region = "us-west-2"
+
+[infrastructure.vpc]
+cidr = "10.0.0.0/16"
+enable_nat_gateway = true
+enable_vpn_gateway = false
+
+[infrastructure.eks]
+cluster_version = "1.28"
+node_groups = [
+    { name = "default", instance_type = "t3.medium", min_size = 2, max_size = 5 }
+]
+
+# Build configurations
+[[builds]]
+name = "api-server"
+dockerfile = "builds/api/Dockerfile"
+context = "."
+platforms = ["linux/amd64", "linux/arm64"]
+
+[builds.build_args]
+VERSION = "${GIT_COMMIT}"
+
+[[builds]]
+name = "worker"
+dockerfile = "builds/worker/Dockerfile" 
+context = "."
+platforms = ["linux/amd64"]
+
+# Deployment configurations
+[[deployments]]
+name = "postgresql"
+chart = "bitnami/postgresql"
+version = "12.0.0"
+namespace = "firestream"
+
+[deployments.values]
+auth.database = "firestream"
+auth.username = "firestream"
+auth.password = "changeme"  # In production, use secrets
+persistence.size = "10Gi"
+
+[[deployments]]
+name = "kafka"
+chart = "bitnami/kafka"
+version = "26.0.0"
+namespace = "firestream"
+depends_on = ["postgresql"]
+
+[deployments.values]
+listeners.client.protocol = "PLAINTEXT"
+persistence.size = "8Gi"
+zookeeper.persistence.size = "8Gi"
+
+[[deployments]]
+name = "api-server"
+chart = "./charts/api-server"
+version = "0.1.0"
+namespace = "firestream"
+depends_on = ["postgresql", "kafka"]
+
+[deployments.values]
+image.repository = "firestream/api-server"
+image.tag = "${builds.api-server.tag}"
+replicaCount = 2

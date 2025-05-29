@@ -37,6 +37,65 @@ pub struct Cli {
 
 #[derive(Subcommand, Debug)]
 pub enum Command {
+    /// Initialize a new Firestream project
+    Init {
+        /// Project name
+        #[arg(long)]
+        name: Option<String>,
+    },
+    
+    /// Generate execution plan
+    Plan {
+        /// Target specific resources
+        #[arg(long)]
+        target: Vec<String>,
+        
+        /// Output format (text, json)
+        #[arg(long, default_value = "text")]
+        output: String,
+        
+        /// Save plan to file
+        #[arg(long)]
+        out: Option<PathBuf>,
+    },
+    
+    /// Apply changes from plan
+    Apply {
+        /// Plan ID or file
+        #[arg(long)]
+        plan: Option<String>,
+        
+        /// Auto-approve changes
+        #[arg(long)]
+        auto_approve: bool,
+        
+        /// Target specific resources
+        #[arg(long)]
+        target: Vec<String>,
+    },
+    
+    /// Refresh state from actual resources
+    Refresh,
+    
+    /// Import existing resources
+    Import {
+        /// Resource type (infrastructure, build, deployment, cluster)
+        resource_type: String,
+        
+        /// Resource ID
+        resource_id: String,
+        
+        /// Resource data file (JSON)
+        #[arg(long)]
+        data: Option<PathBuf>,
+    },
+    
+    /// Manage state
+    State {
+        #[command(subcommand)]
+        command: StateCommand,
+    },
+    
     /// Install a service
     Install {
         /// Service name
@@ -110,6 +169,65 @@ pub enum Command {
     /// Launch the TUI interface
     #[command(name = "tui")]
     Tui,
+    
+    /// Manage Kubernetes clusters
+    Cluster {
+        #[command(subcommand)]
+        command: ClusterCommand,
+    },
+}
+
+#[derive(Subcommand, Debug)]
+pub enum ClusterCommand {
+    /// Create a new k3d cluster
+    Create {
+        /// Cluster name
+        #[arg(long)]
+        name: Option<String>,
+        
+        /// Use configuration from file
+        #[arg(short, long)]
+        config: Option<PathBuf>,
+        
+        /// Clean mode - delete existing cluster first
+        #[arg(long)]
+        clean: bool,
+        
+        /// Number of server nodes
+        #[arg(long, default_value = "1")]
+        servers: u32,
+        
+        /// Number of agent nodes
+        #[arg(long, default_value = "1")]
+        agents: u32,
+        
+        /// Enable development mode with port forwarding
+        #[arg(long)]
+        dev_mode: bool,
+    },
+    
+    /// Delete k3d cluster
+    Delete {
+        /// Cluster name
+        name: Option<String>,
+    },
+    
+    /// Show cluster info
+    Info {
+        /// Cluster name
+        name: Option<String>,
+    },
+    
+    /// Setup port forwarding for development
+    PortForward {
+        /// Service name (or "all" for all services)
+        #[arg(default_value = "all")]
+        service: String,
+        
+        /// Port offset for external ports
+        #[arg(long, default_value = "10000")]
+        offset: u16,
+    },
 }
 
 #[derive(Subcommand, Debug)]
@@ -131,4 +249,41 @@ pub enum ConfigCommand {
         /// Service name or config file path
         target: String,
     },
+}
+
+#[derive(Subcommand, Debug)]
+pub enum StateCommand {
+    /// Show current state
+    Show {
+        /// Show specific resource
+        #[arg(long)]
+        resource: Option<String>,
+        
+        /// Output format (text, json)
+        #[arg(long, default_value = "text")]
+        output: String,
+    },
+    
+    /// Lock state
+    Lock {
+        /// Lock timeout in seconds
+        #[arg(long, default_value = "300")]
+        timeout: u64,
+    },
+    
+    /// Unlock state
+    Unlock {
+        /// Force unlock
+        #[arg(long)]
+        force: bool,
+    },
+    
+    /// List state locks
+    Locks,
+    
+    /// Pull remote state
+    Pull,
+    
+    /// Push local state to remote
+    Push,
 }
