@@ -23,7 +23,7 @@ pub enum FirestreamError {
     KubernetesError(String),
     
     /// IO error
-    IoError(std::io::Error),
+    IoError(String),
     
     /// General error with message
     GeneralError(String),
@@ -37,7 +37,7 @@ impl fmt::Display for FirestreamError {
             FirestreamError::DependencyError(msg) => write!(f, "Dependency error: {}", msg),
             FirestreamError::ResourceConstraint(msg) => write!(f, "Resource constraint: {}", msg),
             FirestreamError::KubernetesError(msg) => write!(f, "Kubernetes error: {}", msg),
-            FirestreamError::IoError(err) => write!(f, "IO error: {}", err),
+            FirestreamError::IoError(msg) => write!(f, "IO error: {}", msg),
             FirestreamError::GeneralError(msg) => write!(f, "Error: {}", msg),
         }
     }
@@ -47,13 +47,33 @@ impl std::error::Error for FirestreamError {}
 
 impl From<std::io::Error> for FirestreamError {
     fn from(err: std::io::Error) -> Self {
-        FirestreamError::IoError(err)
+        FirestreamError::IoError(err.to_string())
     }
 }
+
+
 
 impl From<anyhow::Error> for FirestreamError {
     fn from(err: anyhow::Error) -> Self {
         FirestreamError::GeneralError(err.to_string())
+    }
+}
+
+impl From<serde_json::Error> for FirestreamError {
+    fn from(err: serde_json::Error) -> Self {
+        FirestreamError::GeneralError(format!("JSON error: {}", err))
+    }
+}
+
+impl From<toml::ser::Error> for FirestreamError {
+    fn from(err: toml::ser::Error) -> Self {
+        FirestreamError::GeneralError(format!("TOML serialization error: {}", err))
+    }
+}
+
+impl From<toml::de::Error> for FirestreamError {
+    fn from(err: toml::de::Error) -> Self {
+        FirestreamError::GeneralError(format!("TOML deserialization error: {}", err))
     }
 }
 
