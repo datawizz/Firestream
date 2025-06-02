@@ -391,20 +391,45 @@ impl StateManager {
     
     /// Apply deployment change
     async fn apply_deployment_change(&self, change: &PlannedChange) -> Result<()> {
+        use crate::deploy::helm::{deploy_chart_lifecycle, chart_from_deployment};
+        use crate::deploy::helm_lifecycle::HelmAction;
+        
         info!("Applying deployment change: {}", change.description);
         
         match change.change_type {
-            ChangeType::Create => {
-                // Install Helm chart
-                // helm::install_chart(...).await?;
-            }
-            ChangeType::Update => {
-                // Upgrade Helm release
-                // helm::upgrade_release(...).await?;
+            ChangeType::Create | ChangeType::Update => {
+                // Extract deployment info from new_value
+                if let Some(new_value) = &change.new_value {
+                    let deployment_name = change.resource_id.clone();
+                    let chart_ref = new_value["chart"].as_str()
+                        .ok_or_else(|| FirestreamError::GeneralError("Missing chart reference".to_string()))?;
+                    let namespace = new_value["namespace"].as_str().unwrap_or("default");
+                    let values = new_value["values"].clone();
+                    
+                    // Create chart instance
+                    let chart = chart_from_deployment(&deployment_name, chart_ref, values, namespace)?;
+                    
+                    // Deploy using lifecycle system
+                    deploy_chart_lifecycle(chart, None).await?;
+                }
             }
             ChangeType::Delete => {
-                // Uninstall Helm release
-                // helm::uninstall_release(...).await?;
+                // Extract deployment info
+                if let Some(old_value) = &change.old_value {
+                    let deployment_name = change.resource_id.clone();
+                    let namespace = old_value["namespace"].as_str().unwrap_or("default");
+                    
+                    // Create chart instance for deletion
+                    let chart_info = crate::deploy::helm_lifecycle::ChartInfo {
+                        name: deployment_name,
+                        custom_namespace: Some(namespace.to_string()),
+                        action: HelmAction::Destroy,
+                        ..Default::default()
+                    };
+                    
+                    let chart = Box::new(crate::deploy::helm_lifecycle::CommonChart::new(chart_info));
+                    deploy_chart_lifecycle(chart, None).await?;
+                }
             }
             _ => {}
         }

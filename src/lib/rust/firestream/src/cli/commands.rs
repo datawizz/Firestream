@@ -5,7 +5,7 @@
 use super::args::{Cli, Command, ConfigCommand, StateCommand, ClusterCommand};
 use crate::services::ServiceManager;
 use crate::config::{ConfigManager, ServiceState, ServiceStatus, ResourceUsage};
-use crate::state::{StateManager, ResourceType, K3dClusterConfig, K3dDevModeConfig, FirestreamState};
+use crate::state::{StateManager, ResourceType, K3dClusterConfig, FirestreamState};
 use crate::deploy::k3d_advanced::{K3dClusterManager};
 use crate::core::{FirestreamError, Result};
 use std::path::PathBuf;
@@ -168,6 +168,10 @@ pub async fn execute_command(cli: Cli) -> Result<()> {
         
         Some(Command::Cluster { ref command }) => {
             execute_cluster_command(command, &state_dir).await?;
+        }
+        
+        Some(Command::Template { name, project_type, output, non_interactive, values }) => {
+            crate::template::execute_template(name, &project_type, &output, non_interactive, values.as_ref()).await?;
         }
         
         None => {
@@ -541,7 +545,7 @@ async fn execute_cluster_command(command: &ClusterCommand, state_dir: &PathBuf) 
                 config.agents = *agents;
                 
                 if *dev_mode {
-                    config.dev_mode = Some(crate::state::K3dDevModeConfig {
+                    config.dev_mode = Some(crate::state::schema::K3dDevModeConfig {
                         port_forward_all: true,
                         port_offset: 10000,
                     });
@@ -690,7 +694,7 @@ async fn execute_cluster_command(command: &ClusterCommand, state_dir: &PathBuf) 
                 let config = K3dClusterConfig::default();
                 let manager = K3dClusterManager::new(config);
                 
-                let dev_config = crate::state::K3dDevModeConfig {
+                let dev_config = crate::state::schema::K3dDevModeConfig {
                     port_forward_all: true,
                     port_offset: *offset,
                 };
@@ -703,6 +707,238 @@ async fn execute_cluster_command(command: &ClusterCommand, state_dir: &PathBuf) 
                 println!("Port forwarding for specific services not yet implemented.");
             }
         }
+        
+        ClusterCommand::Logs { resource_type, resource_name, namespace, follow, tail, all_containers, previous } => {
+            execute_cluster_logs(resource_type, resource_name.as_deref(), namespace, *follow, *tail, *all_containers, *previous).await?;
+        }
+        
+        ClusterCommand::Diagnostics { all, nodes, pods, services, events, namespace } => {
+            execute_cluster_diagnostics(*all, *nodes, *pods, *services, *events, namespace).await?;
+        }
+    }
+    
+    Ok(())
+}
+
+/// Execute cluster logs command
+async fn execute_cluster_logs(
+    resource_type: &str,
+    resource_name: Option<&str>,
+    namespace: &str,
+    follow: bool,
+    tail: u32,
+    all_containers: bool,
+    previous: bool,
+) -> Result<()> {
+    use tokio::process::Command;
+    
+    println!("Fetching logs from {} resources in namespace '{}'...", resource_type, namespace);
+    
+    if let Some(name) = resource_name {
+        // Get logs for specific resource
+        let mut cmd = Command::new("kubectl");
+        cmd.arg("logs")
+            .arg("-n")
+            .arg(namespace)
+            .arg(&format!("{}/{}", resource_type, name))
+            .arg("--tail")
+            .arg(tail.to_string());
+        
+        if follow {
+            cmd.arg("-f");
+        }
+        
+        if all_containers {
+            cmd.arg("--all-containers");
+        }
+        
+        if previous {
+            cmd.arg("--previous");
+        }
+        
+        let status = cmd.status().await?;
+        
+        if !status.success() {
+            return Err(FirestreamError::GeneralError("Failed to get logs".to_string()));
+        }
+    } else {
+        // Get all resources of the type
+        let output = Command::new("kubectl")
+            .args(&["get", resource_type, "-n", namespace, "-o", "name"])
+            .output()
+            .await?;
+        
+        if !output.status.success() {
+            return Err(FirestreamError::GeneralError(format!("Failed to list {}", resource_type)));
+        }
+        
+        let resources = String::from_utf8_lossy(&output.stdout);
+        let resource_list: Vec<&str> = resources.lines().collect();
+        
+        if resource_list.is_empty() {
+            println!("No {} found in namespace '{}'", resource_type, namespace);
+            return Ok(());
+        }
+        
+        println!("\nShowing last {} lines from each resource:\n", tail);
+        
+        for resource in resource_list {
+            println!("\n=== {} ===", resource);
+            
+            let mut cmd = Command::new("kubectl");
+            cmd.arg("logs")
+                .arg("-n")
+                .arg(namespace)
+                .arg(resource)
+                .arg("--tail")
+                .arg(tail.to_string());
+            
+            if all_containers {
+                cmd.arg("--all-containers");
+            }
+            
+            let _ = cmd.status().await;
+        }
+    }
+    
+    Ok(())
+}
+
+/// Execute cluster diagnostics command
+async fn execute_cluster_diagnostics(
+    all: bool,
+    nodes: bool,
+    pods: bool,
+    services: bool,
+    events: bool,
+    namespace: &str,
+) -> Result<()> {
+    use tokio::process::Command;
+    
+    let show_nodes = all || nodes;
+    let show_pods = all || pods;
+    let show_services = all || services;
+    let show_events = all || events;
+    
+    println!("Gathering cluster diagnostics...\n");
+    
+    // Node information
+    if show_nodes {
+        println!("=== NODES ===");
+        let output = Command::new("kubectl")
+            .args(&["get", "nodes", "-o", "wide"])
+            .output()
+            .await?;
+        
+        if output.status.success() {
+            println!("{}", String::from_utf8_lossy(&output.stdout));
+        }
+        
+        // Node resource usage
+        println!("=== NODE RESOURCES ===");
+        let output = Command::new("kubectl")
+            .args(&["top", "nodes"])
+            .output()
+            .await?;
+        
+        if output.status.success() {
+            println!("{}", String::from_utf8_lossy(&output.stdout));
+        }
+    }
+    
+    // Pod information
+    if show_pods {
+        println!("\n=== PODS ===");
+        let mut cmd = Command::new("kubectl");
+        cmd.args(&["get", "pods", "-o", "wide"]);
+        
+        if namespace == "all" {
+            cmd.arg("--all-namespaces");
+        } else {
+            cmd.arg("-n").arg(namespace);
+        }
+        
+        let output = cmd.output().await?;
+        
+        if output.status.success() {
+            println!("{}", String::from_utf8_lossy(&output.stdout));
+        }
+        
+        // Pod resource usage
+        println!("\n=== POD RESOURCES ===");
+        let mut cmd = Command::new("kubectl");
+        cmd.args(&["top", "pods"]);
+        
+        if namespace == "all" {
+            cmd.arg("--all-namespaces");
+        } else {
+            cmd.arg("-n").arg(namespace);
+        }
+        
+        let output = cmd.output().await?;
+        
+        if output.status.success() {
+            println!("{}", String::from_utf8_lossy(&output.stdout));
+        }
+    }
+    
+    // Service information
+    if show_services {
+        println!("\n=== SERVICES ===");
+        let mut cmd = Command::new("kubectl");
+        cmd.args(&["get", "services", "-o", "wide"]);
+        
+        if namespace == "all" {
+            cmd.arg("--all-namespaces");
+        } else {
+            cmd.arg("-n").arg(namespace);
+        }
+        
+        let output = cmd.output().await?;
+        
+        if output.status.success() {
+            println!("{}", String::from_utf8_lossy(&output.stdout));
+        }
+    }
+    
+    // Events
+    if show_events {
+        println!("\n=== RECENT EVENTS ===");
+        let mut cmd = Command::new("kubectl");
+        cmd.args(&["get", "events", "--sort-by=.metadata.creationTimestamp"]);
+        
+        if namespace == "all" {
+            cmd.arg("--all-namespaces");
+        } else {
+            cmd.arg("-n").arg(namespace);
+        }
+        
+        let output = cmd.output().await?;
+        
+        if output.status.success() {
+            let events = String::from_utf8_lossy(&output.stdout);
+            // Show only last 20 events
+            let lines: Vec<&str> = events.lines().collect();
+            if lines.len() > 20 {
+                println!("{}", lines[0]); // Header
+                for line in lines.iter().skip(lines.len() - 20) {
+                    println!("{}", line);
+                }
+            } else {
+                println!("{}", events);
+            }
+        }
+    }
+    
+    // Cluster health summary
+    println!("\n=== CLUSTER HEALTH SUMMARY ===");
+    let output = Command::new("kubectl")
+        .args(&["cluster-info"])
+        .output()
+        .await?;
+    
+    if output.status.success() {
+        println!("{}", String::from_utf8_lossy(&output.stdout));
     }
     
     Ok(())

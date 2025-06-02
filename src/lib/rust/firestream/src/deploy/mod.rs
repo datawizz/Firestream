@@ -5,10 +5,12 @@
 
 pub mod environment;
 pub mod docker;
-pub mod k3d;
-pub mod k3d_advanced;
 pub mod helm;
+pub mod helm_lifecycle;
 pub mod builder;
+
+// Re-export k3d functionality from k8s_manager
+pub use k8s_manager::k3d;
 
 use crate::core::{FirestreamError, Result};
 use serde::{Deserialize, Serialize};

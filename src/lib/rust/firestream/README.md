@@ -13,6 +13,7 @@ A Kubernetes deployment platform with state-based plan/apply workflow, providing
 - **Basic Monitoring**: View logs and resource usage
 - **Offline Mode**: Works without Kubernetes connection for testing
 - **K3D Cluster Management**: State-managed local Kubernetes clusters with advanced networking
+- **Helm Lifecycle Management**: Comprehensive lifecycle hooks for Helm chart deployments (inspired by Qovery)
 
 ## Installation
 
@@ -110,6 +111,16 @@ firestream cluster info
 
 # Setup port forwarding
 firestream cluster port-forward
+
+# View logs from cluster resources
+firestream cluster logs
+firestream cluster logs pod my-pod --follow
+firestream cluster logs deployment my-app -n production
+
+# Get cluster diagnostics
+firestream cluster diagnostics --all
+firestream cluster diagnostics --nodes --pods
+firestream cluster diagnostics --events -n kube-system
 ```
 
 ### TUI Mode
@@ -201,6 +212,32 @@ See `examples/kafka.toml` and `examples/postgresql.toml` for complete examples.
 - [ ] Auto-discovery of services from packages directory
 - [ ] Multi-cluster support
 - [ ] Plugin system
+
+## Helm Lifecycle Management
+
+Firestream includes a powerful Helm lifecycle management system inspired by Qovery's approach:
+
+### Features
+- **Comprehensive lifecycle hooks**: pre_exec, exec, post_exec, validate, on_deploy_failure
+- **Built-in chart implementations**: Prometheus, PostgreSQL, Kafka, NGINX, and more
+- **Custom chart support**: Implement the HelmChart trait for custom behavior
+- **Breaking version handling**: Automatic handling of major version upgrades
+- **Advanced validation**: Ensure deployments are working correctly
+
+### Example
+```rust
+use firestream::deploy::helm_lifecycle::{PrometheusOperatorChart, PostgresqlChart};
+
+// Deploy Prometheus with lifecycle management
+let prometheus = PrometheusOperatorChart::default();
+let result = prometheus.run(&kubeconfig, &envs).await?;
+
+// Deploy PostgreSQL for development
+let postgres = PostgresqlChart::development();
+let result = postgres.run(&kubeconfig, &envs).await?;
+```
+
+See `docs/HELM_LIFECYCLE_GUIDE.md` for detailed documentation.
 
 ## Testing
 

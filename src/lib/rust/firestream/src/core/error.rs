@@ -77,6 +77,24 @@ impl From<toml::de::Error> for FirestreamError {
     }
 }
 
+impl From<tera::Error> for FirestreamError {
+    fn from(err: tera::Error) -> Self {
+        FirestreamError::GeneralError(format!("Template error: {}", err))
+    }
+}
+
+impl From<dialoguer::Error> for FirestreamError {
+    fn from(err: dialoguer::Error) -> Self {
+        FirestreamError::GeneralError(format!("Dialog error: {}", err))
+    }
+}
+
+impl From<serde_yaml::Error> for FirestreamError {
+    fn from(err: serde_yaml::Error) -> Self {
+        FirestreamError::GeneralError(format!("YAML error: {}", err))
+    }
+}
+
 /// Result type alias for Firestream operations
 pub type Result<T> = std::result::Result<T, FirestreamError>;
 
