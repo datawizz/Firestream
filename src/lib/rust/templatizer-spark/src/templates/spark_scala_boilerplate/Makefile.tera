@@ -1,0 +1,127 @@
+# Makefile for {{ app_name }}
+
+# Variables
+APP_NAME := {{ app_name | lower | replace(from=" ", to="-") }}
+VERSION := {{ version }}
+DOCKER_REGISTRY := {{ docker_registry }}
+DOCKER_IMAGE := $(DOCKER_REGISTRY)/$(APP_NAME):$(VERSION)
+NAMESPACE := {{ namespace | default(value="spark-apps") }}
+SCALA_VERSION := {{ scala_major_version | default(value="2.13") }}
+
+# Colors for output
+GREEN := \033[0;32m
+YELLOW := \033[0;33m
+RED := \033[0;31m
+NC := \033[0m # No Color
+
+.PHONY: help
+help: ## Display this help message
+	@echo "$(GREEN){{ app_name }} - Available targets:$(NC)"
+	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "  $(YELLOW)%-20s$(NC) %s\n", $$1, $$2}'
+
+.PHONY: clean
+clean: ## Clean build artifacts
+	@echo "$(GREEN)Cleaning build artifacts...$(NC)"
+	sbt clean
+	rm -rf target/
+	rm -rf project/target/
+	rm -rf project/project/
+
+.PHONY: compile
+compile: ## Compile the project
+	@echo "$(GREEN)Compiling Scala sources...$(NC)"
+	sbt compile
+
+.PHONY: test
+test: ## Run tests
+	@echo "$(GREEN)Running tests...$(NC)"
+	sbt test
+
+.PHONY: assembly
+assembly: ## Build assembly JAR
+	@echo "$(GREEN)Building assembly JAR...$(NC)"
+	sbt assembly
+	@echo "$(GREEN)JAR created at: target/scala-$(SCALA_VERSION)/$(APP_NAME)-$(VERSION).jar$(NC)"
+
+.PHONY: docker-build
+docker-build: assembly ## Build Docker image
+	@echo "$(GREEN)Building Docker image: $(DOCKER_IMAGE)$(NC)"
+	docker build -t $(DOCKER_IMAGE) .
+
+.PHONY: docker-push
+docker-push: docker-build ## Push Docker image to registry
+	@echo "$(GREEN)Pushing Docker image: $(DOCKER_IMAGE)$(NC)"
+	docker push $(DOCKER_IMAGE)
+
+.PHONY: k8s-create-namespace
+k8s-create-namespace: ## Create Kubernetes namespace
+	@echo "$(GREEN)Creating namespace: $(NAMESPACE)$(NC)"
+	kubectl create namespace $(NAMESPACE) --dry-run=client -o yaml | kubectl apply -f -
+
+.PHONY: k8s-apply-rbac
+k8s-apply-rbac: k8s-create-namespace ## Apply RBAC configuration
+	@echo "$(GREEN)Applying RBAC configuration...$(NC)"
+	kubectl apply -f k8s/rbac.yaml
+
+.PHONY: k8s-apply-config
+k8s-apply-config: k8s-create-namespace ## Apply ConfigMap
+	@echo "$(GREEN)Applying ConfigMap...$(NC)"
+	kubectl apply -f k8s/configmap.yaml
+
+.PHONY: k8s-deploy
+k8s-deploy: k8s-apply-rbac k8s-apply-config ## Deploy Spark application to Kubernetes
+	@echo "$(GREEN)Deploying Spark application...$(NC)"
+	kubectl apply -f k8s/spark-application.yaml
+
+.PHONY: k8s-delete
+k8s-delete: ## Delete Spark application from Kubernetes
+	@echo "$(YELLOW)Deleting Spark application...$(NC)"
+	kubectl delete -f k8s/spark-application.yaml --ignore-not-found
+	kubectl delete -f k8s/configmap.yaml --ignore-not-found
+	kubectl delete -f k8s/rbac.yaml --ignore-not-found
+
+.PHONY: k8s-status
+k8s-status: ## Check application status
+	@echo "$(GREEN)Checking application status...$(NC)"
+	kubectl get sparkapplication $(APP_NAME) -n $(NAMESPACE)
+	@echo ""
+	kubectl get pods -n $(NAMESPACE) -l app=$(APP_NAME)
+
+.PHONY: k8s-logs
+k8s-logs: ## View driver logs
+	@echo "$(GREEN)Fetching driver logs...$(NC)"
+	kubectl logs -f $(APP_NAME)-driver -n $(NAMESPACE)
+
+.PHONY: k8s-ui
+k8s-ui: ## Port-forward Spark UI
+	@echo "$(GREEN)Port-forwarding Spark UI to http://localhost:4040$(NC)"
+	kubectl port-forward $(APP_NAME)-driver 4040:4040 -n $(NAMESPACE)
+
+.PHONY: run-local
+run-local: compile ## Run application locally
+	@echo "$(GREEN)Running application locally...$(NC)"
+	sbt "run {% for arg in local_run_args %}{{ arg }} {% endfor %}"
+
+.PHONY: format
+format: ## Format code with scalafmt
+	@echo "$(GREEN)Formatting code...$(NC)"
+	sbt scalafmtAll
+
+.PHONY: lint
+lint: ## Run scalastyle linter
+	@echo "$(GREEN)Running linter...$(NC)"
+	sbt scalastyle
+
+.PHONY: all
+all: clean test assembly docker-build ## Clean, test, and build everything
+
+.PHONY: deploy
+deploy: docker-push k8s-deploy ## Build, push, and deploy to Kubernetes
+	@echo "$(GREEN)Deployment complete!$(NC)"
+
+# Custom targets
+{% if custom_make_targets %}{% for target in custom_make_targets %}
+.PHONY: {{ target.name }}
+{{ target.name }}: {{ target.dependencies | join(sep=" ") }} ## {{ target.description }}
+	{{ target.commands | join(sep="\n\t") }}
+{% endfor %}{% endif %}

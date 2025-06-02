@@ -1,0 +1,79 @@
+# Use the official Spark image as base
+FROM {{ spark_base_image | default(value="apache/spark-py:v3.5.1") }}
+
+# Switch to root to install dependencies
+USER root
+
+# Set Python version
+ENV PYTHON_VERSION={{ python_version | default(value="3.10") }}
+
+# Install system dependencies
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+        python${PYTHON_VERSION} \
+        python${PYTHON_VERSION}-dev \
+        python3-pip \
+        {% for pkg in apt_packages %}
+        {{ pkg }} \
+        {% endfor %}
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
+
+# Set Python aliases
+RUN update-alternatives --install /usr/bin/python python /usr/bin/python${PYTHON_VERSION} 1 && \
+    update-alternatives --install /usr/bin/python3 python3 /usr/bin/python${PYTHON_VERSION} 1
+
+# Upgrade pip
+RUN python -m pip install --upgrade pip setuptools wheel
+
+# Set working directory
+WORKDIR /opt/spark/work-dir
+
+# Copy requirements and install Python dependencies
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Copy application source code
+COPY src/ ./{{ package_name | default(value="spark_app") }}/
+
+# Copy configuration files
+{% if config_files %}
+{% for file in config_files %}
+COPY {{ file.source }} {{ file.destination }}
+{% endfor %}
+{% endif %}
+
+# Copy resources
+COPY resources/ ./resources/
+
+{% if additional_files %}
+# Copy additional files
+{% for file in additional_files %}
+COPY {{ file.source }} {{ file.destination }}
+{% endfor %}
+{% endif %}
+
+# Set PYTHONPATH
+ENV PYTHONPATH=/opt/spark/work-dir:$PYTHONPATH
+
+{% if environment_vars %}
+# Set environment variables
+{% for var in environment_vars %}
+ENV {{ var.name }}="{{ var.value }}"
+{% endfor %}
+{% endif %}
+
+# Create necessary directories
+RUN mkdir -p /opt/spark/logs /opt/spark/tmp
+
+# Set permissions
+RUN chown -R ${spark_uid}:${spark_uid} /opt/spark/work-dir /opt/spark/logs /opt/spark/tmp
+
+# Switch back to spark user
+USER ${spark_uid}
+
+# Set the entrypoint
+ENTRYPOINT ["/opt/entrypoint.sh"]
+
+# Default command
+CMD ["python", "-m", "{{ package_name | default(value="spark_app") }}.main"]

@@ -1,0 +1,54 @@
+# Python specific
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.coverage
+htmlcov/
+.mypy_cache/
+
+# Development
+.git/
+.gitignore
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Testing
+tests/
+conftest.py
+pytest.ini
+.coverage*
+coverage.xml
+
+# Documentation
+README.md
+docs/
+*.md
+
+# Build artifacts
+build/
+dist/
+*.egg-info/
+
+# Virtual environments
+venv/
+env/
+.env
+
+# Mac
+.DS_Store
+
+# Logs
+*.log
+
+# Jupyter notebooks
+*.ipynb
+.ipynb_checkpoints/
+
+# Other
+Makefile
+.dockerignore
+Dockerfile
+k8s/

@@ -1,0 +1,188 @@
+# {{ app_name }}
+
+{{ description | default(value="A Spark application for data processing") }}
+
+## Overview
+
+This is a Spark application written in Scala that {{ app_purpose | default(value="processes data") }}.
+
+## Prerequisites
+
+- Java {{ java_version | default(value="11") }}
+- Scala {{ scala_version | default(value="2.13.15") }}
+- SBT {{ sbt_version | default(value="1.9.7") }}
+- Docker (for containerization)
+- Kubernetes cluster with Spark Operator installed
+
+## Project Structure
+
+```
+{{ app_name | lower | replace(from=" ", to="-") }}/
+├── build.sbt                   # SBT build configuration
+├── project/
+│   ├── build.properties        # SBT version
+│   └── plugins.sbt             # SBT plugins
+├── src/
+│   └── main/
+│       ├── scala/
+│       │   └── {{ main_class_name | default(value="SparkApp") }}.scala
+│       └── resources/
+│           ├── application.conf
+│           └── log4j.properties
+├── Dockerfile                  # Docker image definition
+└── k8s/
+    ├── spark-application.yaml  # SparkApplication resource
+    ├── rbac.yaml              # RBAC configuration
+    └── configmap.yaml         # Configuration files
+```
+
+## Building the Application
+
+### Local Development
+
+1. **Compile the application:**
+   ```bash
+   sbt compile
+   ```
+
+2. **Run tests:**
+   ```bash
+   sbt test
+   ```
+
+3. **Build the assembly JAR:**
+   ```bash
+   sbt assembly
+   ```
+
+### Docker Image
+
+1. **Build the Docker image:**
+   ```bash
+   docker build -t {{ docker_registry }}/{{ app_name | lower | replace(from=" ", to="-") }}:{{ version }} .
+   ```
+
+2. **Push to registry:**
+   ```bash
+   docker push {{ docker_registry }}/{{ app_name | lower | replace(from=" ", to="-") }}:{{ version }}
+   ```
+
+## Deployment
+
+### Prerequisites
+
+1. **Install Spark Operator:**
+   ```bash
+   helm repo add spark-operator https://kubeflow.github.io/spark-operator
+   helm repo update
+   helm install spark-operator spark-operator/spark-operator \
+     --namespace spark-operator \
+     --create-namespace
+   ```
+
+2. **Create namespace:**
+   ```bash
+   kubectl create namespace {{ namespace | default(value="spark-apps") }}
+   ```
+
+### Deploy the Application
+
+1. **Apply RBAC configuration:**
+   ```bash
+   kubectl apply -f k8s/rbac.yaml
+   ```
+
+2. **Create ConfigMap (if needed):**
+   ```bash
+   kubectl apply -f k8s/configmap.yaml
+   ```
+
+3. **Submit the Spark application:**
+   ```bash
+   kubectl apply -f k8s/spark-application.yaml
+   ```
+
+### Monitoring
+
+1. **Check application status:**
+   ```bash
+   kubectl get sparkapplication {{ app_name | lower | replace(from=" ", to="-") }} -n {{ namespace | default(value="spark-apps") }}
+   ```
+
+2. **View driver logs:**
+   ```bash
+   kubectl logs -f {{ app_name | lower | replace(from=" ", to="-") }}-driver -n {{ namespace | default(value="spark-apps") }}
+   ```
+
+3. **Access Spark UI:**
+   ```bash
+   kubectl port-forward {{ app_name | lower | replace(from=" ", to="-") }}-driver 4040:4040 -n {{ namespace | default(value="spark-apps") }}
+   ```
+   Then open http://localhost:4040
+
+## Configuration
+
+### Application Configuration
+
+The application can be configured through:
+
+1. **Environment Variables:**
+   {% if config_fields %}{% for field in config_fields %}
+   - `{{ field.env_var | default(value=field.name | upper) }}`: {% if field.description %}{{ field.description }}{% else %}{{ field.name | replace(from="_", to=" ") | capitalize }}{% endif %}
+   {% endfor %}{% endif %}
+
+2. **Command Line Arguments:**
+   {% if arguments %}{% for i in range(end=arguments | length) %}
+   - Argument {{ i }}: {% if arguments[i].description %}{{ arguments[i].description }}{% else %}Argument {{ i }}{% endif %}
+   {% endfor %}{% else %}{% if config_fields %}{% for field in config_fields %}{% if field.arg_index is defined %}
+   - Argument {{ field.arg_index }}: {% if field.description %}{{ field.description }}{% else %}{{ field.name | replace(from="_", to=" ") | capitalize }}{% endif %}
+   {% endif %}{% endfor %}{% endif %}{% endif %}
+
+3. **Configuration Files:**
+   - `application.conf`: Main application configuration
+   - `log4j.properties`: Logging configuration
+
+### Spark Configuration
+
+Key Spark configurations:
+{% if spark_conf %}{% for key, value in spark_conf %}
+- `{{ key }}`: {{ value }}
+{% endfor %}{% else %}{% if spark_configs %}{% for conf in spark_configs %}
+- `{{ conf.key }}`: {{ conf.value }}
+{% endfor %}{% endif %}{% endif %}
+
+## Troubleshooting
+
+### Common Issues
+
+1. **Out of Memory Errors:**
+   - Increase executor/driver memory in `spark-application.yaml`
+   - Adjust `spark.sql.shuffle.partitions`
+
+2. **Pod Failures:**
+   - Check RBAC permissions: `kubectl describe serviceaccount {{ service_account | default(value="spark") }} -n {{ namespace | default(value="spark-apps") }}`
+   - Review driver logs for errors
+
+3. **Performance Issues:**
+   - Enable adaptive query execution
+   - Tune executor instances and cores
+   - Review data partitioning strategy
+
+## Development
+
+### Adding Dependencies
+
+Add new dependencies to `build.sbt`:
+```scala
+libraryDependencies += "group" %% "artifact" % "version"
+```
+
+### Running Locally
+
+```bash
+sbt "run arg1 arg2"
+```
+
+## License
+
+{{ license | default(value="Apache 2.0") }}
