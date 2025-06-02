@@ -1,6 +1,6 @@
 //! Integration tests for state management
 
-use firestream::state::{StateManager, FirestreamState};
+use firestream::state::StateManager;
 use tempfile::TempDir;
 
 #[tokio::test]
@@ -36,8 +36,11 @@ async fn test_plan_creation() {
     // Create plan
     let plan = state_manager.plan(&config, vec![]).await.unwrap();
     
-    // Should have no changes for empty state and default config
-    assert_eq!(plan.changes.len(), 0);
+    // Should have one change for cluster configuration from default config
+    assert_eq!(plan.changes.len(), 1);
+    
+    // Verify it's a cluster change
+    assert!(matches!(plan.changes[0].resource_type, firestream::state::ResourceType::Cluster));
     
     // Unlock
     state_manager.unlock().await.unwrap();

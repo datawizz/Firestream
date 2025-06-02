@@ -75,6 +75,48 @@ firestream cluster port-forward --offset 20000
 firestream cluster port-forward my-service
 ```
 
+### View Logs
+
+```bash
+# View logs from all pods in default namespace
+firestream cluster logs
+
+# View logs from specific pod
+firestream cluster logs pod my-pod
+
+# View logs from deployment
+firestream cluster logs deployment my-deployment
+
+# Follow logs from a service
+firestream cluster logs service my-service --follow
+
+# View logs from all containers in a pod
+firestream cluster logs pod my-pod --all-containers
+
+# View previous container logs
+firestream cluster logs pod my-pod --previous
+
+# View logs from specific namespace
+firestream cluster logs -n kube-system
+```
+
+### Cluster Diagnostics
+
+```bash
+# Get all diagnostic information
+firestream cluster diagnostics --all
+
+# Get specific diagnostics
+firestream cluster diagnostics --nodes --pods
+firestream cluster diagnostics --services --events
+
+# Get diagnostics for specific namespace
+firestream cluster diagnostics --pods -n default
+
+# Get diagnostics for all namespaces
+firestream cluster diagnostics --pods -n all
+```
+
 ## Configuration File
 
 Create a `firestream.toml` file:

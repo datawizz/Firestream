@@ -175,6 +175,29 @@ pub enum Command {
         #[command(subcommand)]
         command: ClusterCommand,
     },
+    
+    /// Generate a new project from templates
+    Template {
+        /// Project name
+        #[arg(long)]
+        name: Option<String>,
+        
+        /// Project type (python-fastapi, helm, kubernetes, docker)
+        #[arg(long, default_value = "python-fastapi")]
+        project_type: String,
+        
+        /// Output directory
+        #[arg(short, long, default_value = ".")]
+        output: PathBuf,
+        
+        /// Non-interactive mode with defaults
+        #[arg(long)]
+        non_interactive: bool,
+        
+        /// Values file for non-interactive mode
+        #[arg(long)]
+        values: Option<PathBuf>,
+    },
 }
 
 #[derive(Subcommand, Debug)]
@@ -227,6 +250,63 @@ pub enum ClusterCommand {
         /// Port offset for external ports
         #[arg(long, default_value = "10000")]
         offset: u16,
+    },
+    
+    /// View logs from Kubernetes resources
+    Logs {
+        /// Resource type (pod, deployment, service, etc.)
+        #[arg(default_value = "pod")]
+        resource_type: String,
+        
+        /// Resource name (optional, shows all if not specified)
+        resource_name: Option<String>,
+        
+        /// Namespace
+        #[arg(short, long, default_value = "default")]
+        namespace: String,
+        
+        /// Follow log output
+        #[arg(short, long)]
+        follow: bool,
+        
+        /// Number of lines to show from the end
+        #[arg(long, default_value = "100")]
+        tail: u32,
+        
+        /// Show logs from all containers
+        #[arg(long)]
+        all_containers: bool,
+        
+        /// Show previous container logs
+        #[arg(long)]
+        previous: bool,
+    },
+    
+    /// Get diagnostic information from the cluster
+    Diagnostics {
+        /// Show all diagnostics
+        #[arg(long)]
+        all: bool,
+        
+        /// Show node information
+        #[arg(long)]
+        nodes: bool,
+        
+        /// Show pod information
+        #[arg(long)]
+        pods: bool,
+        
+        /// Show service information
+        #[arg(long)]
+        services: bool,
+        
+        /// Show events
+        #[arg(long)]
+        events: bool,
+        
+        /// Namespace (use "all" for all namespaces)
+        #[arg(short, long, default_value = "all")]
+        namespace: String,
     },
 }
 

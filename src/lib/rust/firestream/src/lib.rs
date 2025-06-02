@@ -9,6 +9,7 @@ pub mod core;
 pub mod deploy;
 pub mod services;
 pub mod state;
+pub mod template;
 pub mod tui;
 
 // Re-export commonly used types

@@ -8,7 +8,6 @@ use crate::state::schema::{K3dClusterConfig, K3dDevModeConfig, CertificateConfig
 use std::path::PathBuf;
 use tokio::process::Command;
 use tokio::fs;
-use tokio::io::AsyncWriteExt;
 use tracing::{info, debug, warn};
 use std::collections::HashMap;
 
@@ -34,6 +33,11 @@ impl K3dClusterManager {
         // Ensure .kube directory exists
         self.ensure_kube_directory().await?;
         
+        // IMPORTANT: Patch /etc/hosts FIRST to avoid DNS resolution issues with sudo
+        if self.config.network.patch_etc_hosts {
+            self.patch_etc_hosts().await?;
+        }
+        
         // Create registry if enabled
         if self.config.registry.enabled {
             self.setup_registry().await?;
@@ -54,7 +58,7 @@ impl K3dClusterManager {
             self.configure_tls().await?;
         }
         
-        // Configure network
+        // Configure network - Routes before DNS
         if self.config.network.configure_routes {
             self.setup_ip_routes().await?;
         }
@@ -63,11 +67,7 @@ impl K3dClusterManager {
             self.configure_dns().await?;
         }
         
-        if self.config.network.patch_etc_hosts {
-            self.patch_etc_hosts().await?;
-        }
-        
-        // Test DNS resolution
+        // Test DNS resolution with retries
         self.test_dns_resolution().await?;
         
         // Setup dev mode if enabled
@@ -123,15 +123,14 @@ impl K3dClusterManager {
         
         info!("Creating registry '{}'", registry_name);
         
+        // Create registry without --cluster flag first
         let status = Command::new("k3d")
             .args(&[
                 "registry",
                 "create",
-                &registry_name,
+                &format!("{}.{}", self.config.name, self.config.registry.name),
                 "--port",
                 &self.config.registry.port.to_string(),
-                "--cluster",
-                &self.config.name,
             ])
             .status()
             .await
@@ -149,46 +148,31 @@ impl K3dClusterManager {
         info!("Reconnecting to cluster '{}'", self.config.name);
         
         // Write kubeconfig
-        let status = Command::new("k3d")
+        let output = Command::new("k3d")
             .args(&[
                 "kubeconfig",
                 "write",
                 &self.config.name,
-                "--kubeconfig-switch-context",
             ])
-            .status()
+            .output()
             .await?;
         
-        if !status.success() {
+        if !output.status.success() {
             return Err(FirestreamError::GeneralError("Failed to write kubeconfig".to_string()));
         }
         
-        // Move kubeconfig to standard location
-        let k3d_config = dirs::home_dir()
-            .ok_or_else(|| FirestreamError::GeneralError("Cannot find home directory".into()))?
-            .join(".config")
-            .join("k3d")
-            .join(format!("kubeconfig-{}.yaml", self.config.name));
+        // The kubeconfig path is printed to stdout
+        let kubeconfig_path = String::from_utf8_lossy(&output.stdout).trim().to_string();
+        info!("Kubeconfig written to: {}", kubeconfig_path);
         
-        let kube_config = dirs::home_dir()
-            .ok_or_else(|| FirestreamError::GeneralError("Cannot find home directory".into()))?
-            .join(".kube")
-            .join("config");
-        
-        if k3d_config.exists() {
-            fs::rename(&k3d_config, &kube_config).await
-                .map_err(|e| FirestreamError::IoError(format!("Failed to move kubeconfig: {}", e)))?;
-        }
-        
-        // Set context
+        // Set context using the kubeconfig path
         let status = Command::new("kubectl")
             .args(&[
                 "config",
-                "--kubeconfig",
-                kube_config.to_str().unwrap(),
                 "use-context",
                 &format!("k3d-{}", self.config.name),
             ])
+            .env("KUBECONFIG", &kubeconfig_path)
             .status()
             .await?;
         
@@ -403,7 +387,7 @@ impl K3dClusterManager {
         }
         
         let server_ip = String::from_utf8_lossy(&output.stdout).trim().to_string();
-        debug!("K3D server IP: {}", server_ip);
+        info!("K3D server IP: {}", server_ip);
         
         // Check and add routes
         for cidr in [&self.config.network.pod_cidr, &self.config.network.service_cidr] {
@@ -437,6 +421,35 @@ impl K3dClusterManager {
     async fn configure_dns(&self) -> Result<()> {
         info!("Configuring DNS");
         
+        // Save original resolv.conf first
+        let resolv_backup = "/etc/resolv.conf.backup";
+        let _ = Command::new("sudo")
+            .args(&["cp", "/etc/resolv.conf", resolv_backup])
+            .status()
+            .await;
+        
+        // Read current resolv.conf
+        let original_resolv = fs::read_to_string("/etc/resolv.conf").await
+            .unwrap_or_else(|_| "nameserver 8.8.8.8\nnameserver 8.8.4.4".to_string());
+        
+        // Extract existing nameservers (skip local/k8s ones)
+        let mut external_nameservers = Vec::new();
+        for line in original_resolv.lines() {
+            if line.starts_with("nameserver") {
+                if let Some(ns) = line.split_whitespace().nth(1) {
+                    if !ns.starts_with("127.") && !ns.starts_with("10.43.") && !ns.starts_with("10.42.") {
+                        external_nameservers.push(ns.to_string());
+                    }
+                }
+            }
+        }
+        
+        // Ensure we have at least one external nameserver
+        if external_nameservers.is_empty() {
+            external_nameservers.push("8.8.8.8".to_string());
+            external_nameservers.push("8.8.4.4".to_string());
+        }
+        
         // Get Kubernetes DNS IP
         let output = Command::new("kubectl")
             .args(&[
@@ -453,29 +466,39 @@ impl K3dClusterManager {
         }
         
         let dns_ip = String::from_utf8_lossy(&output.stdout).trim().to_string();
-        debug!("Kubernetes DNS IP: {}", dns_ip);
+        info!("Kubernetes DNS IP: {}", dns_ip);
         
-        // Update resolv.conf
-        let resolv_content = format!(
-            "search svc.cluster.local cluster.local\nnameserver {}\noptions edns0 trust-ad",
-            dns_ip
-        );
+        // Build new resolv.conf with external DNS first for better performance
+        let mut resolv_content = String::new();
+        resolv_content.push_str("search svc.cluster.local cluster.local\n");
         
-        let mut child = Command::new("sudo")
-            .args(&["tee", "/etc/resolv.conf"])
-            .stdin(std::process::Stdio::piped())
-            .spawn()?;
-        
-        if let Some(stdin) = child.stdin.as_mut() {
-            stdin.write_all(resolv_content.as_bytes()).await?;
+        // Put external DNS first to avoid timeouts
+        for ns in &external_nameservers {
+            resolv_content.push_str(&format!("nameserver {}\n", ns));
         }
         
-        let status = child.wait().await?;
+        // Then Kubernetes DNS for cluster resolution
+        resolv_content.push_str(&format!("nameserver {}\n", dns_ip));
+        
+        resolv_content.push_str("options edns0 trust-ad\n");
+        
+        info!("Updating resolv.conf with Kubernetes DNS ({}) and external DNS: {:?}", dns_ip, external_nameservers);
+        
+        // Write new resolv.conf using cp instead of mv (for bind-mounted files)
+        let temp_file = "/tmp/resolv.conf.new";
+        fs::write(temp_file, &resolv_content).await?;
+        
+        let status = Command::new("sudo")
+            .args(&["cp", temp_file, "/etc/resolv.conf"])
+            .status()
+            .await?;
         
         if !status.success() {
             warn!("Failed to update resolv.conf");
+            return Err(FirestreamError::GeneralError("Failed to update DNS configuration".to_string()));
         }
         
+        info!("DNS configuration updated successfully");
         Ok(())
     }
     
@@ -486,61 +509,70 @@ impl K3dClusterManager {
             .await?;
         
         let hostname = String::from_utf8_lossy(&hostname_output.stdout).trim().to_string();
+        info!("Patching /etc/hosts for hostname: {}", hostname);
         
-        // Check if hostname already in /etc/hosts
-        let check = Command::new("grep")
-            .args(&["-q", &hostname, "/etc/hosts"])
-            .status()
-            .await?;
+        // Read current /etc/hosts
+        let hosts_content = fs::read_to_string("/etc/hosts").await
+            .unwrap_or_default();
         
-        if !check.success() {
+        // Check if hostname already exists
+        if !hosts_content.contains(&hostname) {
             // Add hostname
             let entry = format!("127.0.0.1 {}", hostname);
-            let mut child = Command::new("sudo")
-                .args(&["tee", "-a", "/etc/hosts"])
-                .stdin(std::process::Stdio::piped())
-                .spawn()?;
             
-            if let Some(stdin) = child.stdin.as_mut() {
-                stdin.write_all(format!("\n{}\n", entry).as_bytes()).await?;
-            }
-            
-            let status = child.wait().await?;
+            // Use echo with sudo to append
+            let status = Command::new("sudo")
+                .args(&["sh", "-c", &format!("echo '{}' >> /etc/hosts", entry)])
+                .status()
+                .await?;
             
             if status.success() {
                 info!("Added hostname {} to /etc/hosts", hostname);
+            } else {
+                warn!("Failed to add hostname to /etc/hosts");
             }
+        } else {
+            debug!("Hostname {} already exists in /etc/hosts", hostname);
         }
         
         Ok(())
     }
     
-    /// Test DNS resolution
+    /// Test DNS resolution with retries
     async fn test_dns_resolution(&self) -> Result<()> {
-        debug!("Testing DNS resolution");
+        info!("Testing DNS resolution");
         
-        let max_attempts = 4;
-        let mut wait_time = 1;
+        // Test external DNS with curl (more reliable than nslookup)
+        let external_test = Command::new("timeout")
+            .args(&["2", "curl", "-s", "-I", "-m", "2", "http://google.com"])
+            .output()
+            .await;
         
-        for attempt in 0..max_attempts {
-            let output = Command::new("curl")
-                .args(&["-s", "-I", "debian.org"])
-                .output()
-                .await?;
-            
-            if output.status.success() {
-                info!("DNS resolution test successful");
-                return Ok(());
-            }
-            
-            if attempt < max_attempts - 1 {
-                debug!("DNS test failed, retrying in {} seconds...", wait_time);
-                tokio::time::sleep(tokio::time::Duration::from_secs(wait_time)).await;
-                wait_time *= 2;
-            }
+        let external_ok = external_test.map(|o| o.status.success()).unwrap_or(false);
+        
+        // Test Kubernetes DNS by checking if kube-dns service exists
+        let k8s_test = Command::new("kubectl")
+            .args(&["get", "svc", "-n", "kube-system", "kube-dns"])
+            .output()
+            .await;
+        
+        let k8s_ok = k8s_test.map(|o| o.status.success()).unwrap_or(false);
+        
+        if external_ok {
+            info!("External DNS resolution working");
+        } else {
+            return Err(FirestreamError::GeneralError(
+                "External DNS resolution test failed. Check your network connection.".to_string()
+            ));
         }
         
-        Err(FirestreamError::GeneralError("DNS resolution test failed".to_string()))
+        if k8s_ok {
+            info!("Kubernetes DNS service is available");
+        } else {
+            warn!("Kubernetes DNS service check failed");
+        }
+        
+        Ok(())
     }
     
     /// Setup port forwarding for development

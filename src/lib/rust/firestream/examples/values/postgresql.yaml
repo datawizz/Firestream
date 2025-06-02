@@ -1,0 +1,75 @@
+# PostgreSQL Values for Development
+# This file contains additional values for PostgreSQL deployment
+
+# Enable development mode
+global:
+  postgresql:
+    auth:
+      postgresPassword: "dev-password"
+      database: "firestream_dev"
+
+# Resource configuration for development
+primary:
+  resources:
+    limits:
+      cpu: 200m
+      memory: 256Mi
+    requests:
+      cpu: 100m
+      memory: 128Mi
+  
+  # Smaller disk for development
+  persistence:
+    size: 2Gi
+    storageClass: "local-path"  # For K3D
+
+# Enable additional databases
+initdbScripts:
+  init.sql: |
+    -- Create additional databases
+    CREATE DATABASE IF NOT EXISTS firestream_test;
+    CREATE DATABASE IF NOT EXISTS firestream_analytics;
+    
+    -- Create application user
+    CREATE USER IF NOT EXISTS firestream_app WITH PASSWORD 'app-password';
+    GRANT ALL PRIVILEGES ON DATABASE firestream_dev TO firestream_app;
+
+# PostgreSQL configuration
+postgresqlConfiguration:
+  max_connections: 100
+  shared_buffers: 128MB
+  effective_cache_size: 256MB
+  maintenance_work_mem: 32MB
+  work_mem: 4MB
+  
+  # Enable query logging for development
+  log_statement: 'all'
+  log_duration: on
+
+# Metrics configuration
+metrics:
+  enabled: true
+  serviceMonitor:
+    enabled: true
+    namespace: prometheus
+    interval: 30s
+  
+  # Custom metrics queries
+  customMetrics:
+    pg_database_size:
+      query: "SELECT datname, pg_database_size(datname) as size_bytes FROM pg_database"
+      metrics:
+        - datname:
+            usage: "LABEL"
+            description: "Name of the database"
+        - size_bytes:
+            usage: "GAUGE"
+            description: "Size of the database in bytes"
+
+# Backup configuration (using pg_dump)
+backup:
+  enabled: true
+  schedule: "0 2 * * *"  # Daily at 2 AM
+  retentionDays: 7
+  storage:
+    size: 10Gi
