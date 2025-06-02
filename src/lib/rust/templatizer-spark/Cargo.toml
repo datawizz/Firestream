@@ -1,0 +1,21 @@
+[package]
+name = "templatizer-spark"
+version = "0.1.0"
+edition = "2024"
+authors = ["Your Name <your.email@example.com>"]
+description = "Generate Spark applications for Scala and Python using Tera templates"
+license = ""
+
+[dependencies]
+tera = "1.20"
+clap = { version = "4.5.39", features = ["derive"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+tempfile = "3.8"
+
+[dev-dependencies]
+tempfile = "3.8"
+
+[[bin]]
+name = "templatizer-spark"
+path = "src/main.rs"

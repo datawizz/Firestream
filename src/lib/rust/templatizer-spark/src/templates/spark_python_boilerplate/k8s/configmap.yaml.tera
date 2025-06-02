@@ -1,0 +1,47 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ app_name | lower | replace(from=" ", to="-") }}-config
+  namespace: {{ namespace | default(value="spark-apps") }}
+data:
+  {% if include_log4j %}
+  log4j.properties: |
+    # Set root logger level
+    log4j.rootCategory={{ log_level | default(value="INFO") }}, console
+    
+    # Console appender
+    log4j.appender.console=org.apache.log4j.ConsoleAppender
+    log4j.appender.console.target=System.err
+    log4j.appender.console.layout=org.apache.log4j.PatternLayout
+    log4j.appender.console.layout.ConversionPattern=%d{yy/MM/dd HH:mm:ss} %p %c{1}: %m%n
+    
+    # Settings to quiet third party logs
+    log4j.logger.org.apache.spark=WARN
+    log4j.logger.org.apache.hadoop=WARN
+    log4j.logger.py4j=WARN
+  {% endif %}
+  {% if include_app_config %}
+  config.{{ config_format | default(value="json") }}: |
+    {% if config_format == "yaml" %}
+    app_name: "{{ app_name }}"
+    {% for field in config_fields %}
+    {{ field.name }}: {{ field.runtime_value | default(value=field.default_value) }}
+    {% endfor %}
+    {% elif config_format == "toml" %}
+    app_name = "{{ app_name }}"
+    {% for field in config_fields %}
+    {{ field.name }} = {{ field.runtime_value | default(value=field.default_value) | json_encode }}
+    {% endfor %}
+    {% else %}
+    {
+      "app_name": "{{ app_name }}",
+      {% for field in config_fields %}
+      "{{ field.name }}": {{ field.runtime_value | default(value=field.default_value) | json_encode }}{% if not loop.last %},{% endif %}
+      {% endfor %}
+    }
+    {% endif %}
+  {% endif %}
+  {% for file in additional_config_files %}
+  {{ file.name }}: |
+{{ file.content | indent(width=4) }}
+  {% endfor %}
