@@ -1,4 +1,0 @@
-# my-app/.dockerignore
-.git
-helm
-*.md
