@@ -1,0 +1,402 @@
+{
+    "dashboard": {
+        "title": "Sales Analytics Dashboard",
+        "description": "Real-time sales performance metrics and insights",
+        "slug": "sales-analytics",
+        "published": true,
+        "refresh_frequency": 0,
+        "css": "",
+        "certification": {
+            "certified_by": "Data Team",
+            "details": "Approved for executive reporting"
+        }
+    },
+    "database": {
+        "name": "Production PostgreSQL",
+        "connection": {
+            "host": "localhost",
+            "port": 5432,
+            "database": "analytics_db",
+            "username": "${POSTGRES_USER}",
+            "password": "${POSTGRES_PASSWORD}",
+            "sslmode": "require"
+        },
+        "options": {
+            "allow_csv_upload": true,
+            "allow_ctas": true,
+            "allow_cvas": true,
+            "allow_dml": false,
+            "expose_in_sqllab": true,
+            "cache_timeout": null
+        }
+    },
+    "datasets": [
+        {
+            "name": "sales_data",
+            "table_name": "fact_sales",
+            "schema": "public",
+            "description": "Transactional sales data with customer and product dimensions",
+            "time_column": "order_date",
+            "cache_timeout": 3600,
+            "columns": [
+                {
+                    "name": "order_id",
+                    "type": "BIGINT",
+                    "display_name": "Order ID",
+                    "description": "Unique order identifier",
+                    "groupable": true,
+                    "filterable": true
+                },
+                {
+                    "name": "order_date",
+                    "type": "TIMESTAMP",
+                    "display_name": "Order Date",
+                    "description": "Timestamp of order placement",
+                    "is_temporal": true,
+                    "groupable": true,
+                    "filterable": true
+                },
+                {
+                    "name": "customer_id",
+                    "type": "INTEGER",
+                    "display_name": "Customer ID",
+                    "description": "Foreign key to customer dimension",
+                    "groupable": true,
+                    "filterable": true
+                },
+                {
+                    "name": "product_id",
+                    "type": "INTEGER",
+                    "display_name": "Product ID",
+                    "description": "Foreign key to product dimension",
+                    "groupable": true,
+                    "filterable": true
+                },
+                {
+                    "name": "quantity",
+                    "type": "INTEGER",
+                    "display_name": "Quantity",
+                    "description": "Number of items ordered",
+                    "groupable": false,
+                    "filterable": true
+                },
+                {
+                    "name": "unit_price",
+                    "type": "DECIMAL",
+                    "display_name": "Unit Price",
+                    "description": "Price per unit",
+                    "groupable": false,
+                    "filterable": true
+                },
+                {
+                    "name": "total_amount",
+                    "type": "DECIMAL",
+                    "display_name": "Total Amount",
+                    "description": "Total order value",
+                    "groupable": false,
+                    "filterable": true
+                }
+            ],
+            "metrics": [
+                {
+                    "name": "revenue",
+                    "expression": "SUM(total_amount)",
+                    "display_name": "Total Revenue",
+                    "description": "Sum of all order amounts",
+                    "format": "$,.2f"
+                },
+                {
+                    "name": "order_count",
+                    "expression": "COUNT(DISTINCT order_id)",
+                    "display_name": "Order Count",
+                    "description": "Number of unique orders",
+                    "format": ",.0f"
+                },
+                {
+                    "name": "avg_order_value",
+                    "expression": "AVG(total_amount)",
+                    "display_name": "Average Order Value",
+                    "description": "Average revenue per order",
+                    "format": "$,.2f"
+                },
+                {
+                    "name": "units_sold",
+                    "expression": "SUM(quantity)",
+                    "display_name": "Units Sold",
+                    "description": "Total quantity of items sold",
+                    "format": ",.0f"
+                }
+            ]
+        },
+        {
+            "name": "customer_data",
+            "table_name": "dim_customers",
+            "schema": "public",
+            "description": "Customer dimension with demographics and segmentation",
+            "columns": [
+                {
+                    "name": "customer_id",
+                    "type": "INTEGER",
+                    "display_name": "Customer ID",
+                    "is_primary_key": true
+                },
+                {
+                    "name": "customer_name",
+                    "type": "VARCHAR",
+                    "display_name": "Customer Name"
+                },
+                {
+                    "name": "segment",
+                    "type": "VARCHAR",
+                    "display_name": "Customer Segment",
+                    "groupable": true,
+                    "filterable": true
+                },
+                {
+                    "name": "region",
+                    "type": "VARCHAR",
+                    "display_name": "Region",
+                    "groupable": true,
+                    "filterable": true
+                },
+                {
+                    "name": "lifetime_value",
+                    "type": "DECIMAL",
+                    "display_name": "Customer LTV"
+                }
+            ],
+            "metrics": [
+                {
+                    "name": "customer_count",
+                    "expression": "COUNT(DISTINCT customer_id)",
+                    "display_name": "Customer Count",
+                    "format": ",.0f"
+                },
+                {
+                    "name": "avg_ltv",
+                    "expression": "AVG(lifetime_value)",
+                    "display_name": "Average LTV",
+                    "format": "$,.2f"
+                }
+            ]
+        }
+    ],
+    "charts": [
+        {
+            "name": "revenue_trend",
+            "title": "Monthly Revenue Trend",
+            "type": "line",
+            "dataset": "sales_data",
+            "description": "Revenue trend over the last 12 months",
+            "config": {
+                "metrics": [
+                    "revenue"
+                ],
+                "dimensions": [],
+                "time": {
+                    "column": "order_date",
+                    "grain": "month",
+                    "range": "Last year"
+                },
+                "filters": [],
+                "options": {
+                    "show_legend": true,
+                    "x_axis_label": "Month",
+                    "y_axis_label": "Revenue ($)",
+                    "color_scheme": "supersetColors"
+                }
+            }
+        },
+        {
+            "name": "sales_by_segment",
+            "title": "Sales by Customer Segment",
+            "type": "pie",
+            "dataset": "sales_data",
+            "description": "Revenue distribution across customer segments",
+            "config": {
+                "metrics": [
+                    "revenue"
+                ],
+                "dimensions": [
+                    "customer.segment"
+                ],
+                "time": {
+                    "column": "order_date",
+                    "range": "Last quarter"
+                },
+                "options": {
+                    "donut": true,
+                    "show_labels": true,
+                    "label_type": "percent"
+                }
+            }
+        },
+        {
+            "name": "top_products",
+            "title": "Top 10 Products by Revenue",
+            "type": "bar",
+            "dataset": "sales_data",
+            "description": "Best performing products",
+            "config": {
+                "metrics": [
+                    "revenue",
+                    "units_sold"
+                ],
+                "dimensions": [
+                    "product.name"
+                ],
+                "time": {
+                    "column": "order_date",
+                    "range": "Last month"
+                },
+                "options": {
+                    "orientation": "horizontal",
+                    "sort_by": "revenue",
+                    "sort_order": "desc",
+                    "limit": 10
+                }
+            }
+        },
+        {
+            "name": "orders_table",
+            "title": "Recent Orders",
+            "type": "table",
+            "dataset": "sales_data",
+            "description": "Detailed view of recent orders",
+            "config": {
+                "columns": [
+                    "order_id",
+                    "order_date",
+                    "customer.name",
+                    "total_amount"
+                ],
+                "metrics": [],
+                "time": {
+                    "column": "order_date",
+                    "range": "Last 7 days"
+                },
+                "options": {
+                    "page_size": 25,
+                    "include_search": true,
+                    "cell_bars": [
+                        "total_amount"
+                    ]
+                }
+            }
+        },
+        {
+            "name": "kpi_cards",
+            "title": "Key Performance Indicators",
+            "type": "big_number_total",
+            "dataset": "sales_data",
+            "description": "High-level KPI metrics",
+            "config": {
+                "metrics": [
+                    "revenue"
+                ],
+                "time": {
+                    "column": "order_date",
+                    "range": "Last day"
+                },
+                "options": {
+                    "compare_lag": 7,
+                    "compare_suffix": "WoW",
+                    "show_trend": true,
+                    "header_font_size": 0.4,
+                    "subheader_font_size": 0.15
+                }
+            }
+        }
+    ],
+    "layout": {
+        "type": "grid",
+        "width": 12,
+        "rows": [
+            {
+                "height": 8,
+                "components": [
+                    {
+                        "type": "chart",
+                        "chart": "kpi_cards",
+                        "width": 3
+                    },
+                    {
+                        "type": "chart",
+                        "chart": "revenue_trend",
+                        "width": 9
+                    }
+                ]
+            },
+            {
+                "height": 10,
+                "components": [
+                    {
+                        "type": "chart",
+                        "chart": "sales_by_segment",
+                        "width": 4
+                    },
+                    {
+                        "type": "chart",
+                        "chart": "top_products",
+                        "width": 8
+                    }
+                ]
+            },
+            {
+                "height": 12,
+                "components": [
+                    {
+                        "type": "chart",
+                        "chart": "orders_table",
+                        "width": 12
+                    }
+                ]
+            }
+        ]
+    },
+    "filters": {
+        "native_filters": [
+            {
+                "name": "date_range",
+                "title": "Date Range",
+                "type": "time_range",
+                "targets": [
+                    {
+                        "dataset": "sales_data",
+                        "column": "order_date"
+                    }
+                ],
+                "default_value": "Last 30 days",
+                "config": {
+                    "display_all_options": false,
+                    "can_clear": true
+                }
+            },
+            {
+                "name": "region_filter",
+                "title": "Region",
+                "type": "select",
+                "targets": [
+                    {
+                        "dataset": "customer_data",
+                        "column": "region"
+                    }
+                ],
+                "config": {
+                    "multiple": true,
+                    "search_enabled": true,
+                    "clear_enabled": true
+                }
+            }
+        ]
+    },
+    "access": {
+        "owners": [
+            "admin"
+        ],
+        "roles": [
+            "Alpha",
+            "Gamma"
+        ]
+    }
+}

@@ -1,0 +1,29 @@
+dashboard_title: {{ title }}
+description: {{ description | default(value="") }}
+css: |
+  {{ css | default(value="") }}
+slug: {{ slug }}
+{% if certified_by -%}
+certified_by: {{ certified_by }}
+{% endif -%}
+{% if certification_details -%}
+certification_details: {{ certification_details }}
+{% endif -%}
+published: {{ published }}
+uuid: {{ uuid }}
+position: |
+  {{ position | json_encode(pretty=true) | indent(first=false, blank=true) }}
+metadata:
+  native_filter_configuration: {{ native_filters | json_encode }}
+  chart_configuration: {}
+  label_colors: {}
+  shared_label_colors: {}
+  color_scheme: {{ color_scheme | default(value="supersetColors") }}
+  refresh_frequency: {{ refresh_frequency }}
+  expanded_slices: {}
+  filter_scopes: {}
+  timed_refresh_immune_slices: []
+  default_filters: '{}'
+  stagger_refresh: false
+  stagger_time: 0
+version: 1.0.0
