@@ -3,7 +3,7 @@
 
   inputs = {
     # Fixed nixpkgs version fixes system packages that float on the latest Debian
-    nixpkgs.url = "github:NixOS/nixpkgs/release-24.11";
+    nixpkgs.url = "github:NixOS/nixpkgs/release-25.05";
   };
 
   outputs = { self, nixpkgs }: let
@@ -39,8 +39,19 @@
     getBitnamiCharts = pkgs: pkgs.fetchgit {
       name = "bitnami-charts";
       url = "https://github.com/bitnami/charts.git";  # Public repository
-      rev = "9bc801b4caa0b2fff6ae3392f6b417877a056965";  # Git commit hash
-      sha256 = "8No+rUyEmugs26c7XYo1SAwlafG8sKrhsk6FnaJwL/U=";    # Hash of the files in the repository
+      rev = "76c10cf217c5f37c4806bfc3b06683b849d8903f";  # Git commit hash
+      sha256 = "7kx42VCkuTMCSmJ3lHX48nwL1mri46Ss9R0sJNiWgro=";    # Hash of the files in the repository
+
+      # Optional configurations
+      fetchSubmodules = false;  # Set to true if you need submodules
+      deepClone = false;        # Keep this false for better performance
+    };
+
+    getSparkOperator = pkgs: pkgs.fetchgit {
+      name = "spark-operator-charts";
+      url = "https://github.com/kubeflow/spark-operator.git";  # Public repository
+      rev = "53dc38ef551a7b7ed2c933e14cd5550d74fcee26";  # Git commit hash
+      sha256 = "=";    # Hash of the files in the repository
 
       # Optional configurations
       fetchSubmodules = false;  # Set to true if you need submodules
@@ -51,9 +62,19 @@
     mkContainerConfig = system: let
       pkgs = pkgsForSystem system;
       charts = getBitnamiCharts pkgs;
-      
-      # Import Docker-in-Docker module
-      dockerInDocker = import ./bin/nix/docker-in-docker.nix { inherit pkgs; };
+
+      # Import Docker-from-Docker module
+      dockerInDocker = import ./bin/nix/docker-from-docker.nix { inherit pkgs; };
+
+      # Import Python packages from python.nix
+      pythonModule = import ./bin/nix/python.nix {
+        inherit pkgs;
+        lib = nixpkgs.lib;
+        config = {};
+      };
+
+      # Extract Python packages from the module
+      pythonPackages = pythonModule.environment.systemPackages;
 
       # Define the shell packages
       shellPackages = with pkgs; [
@@ -73,7 +94,7 @@
 
 
         # Node
-        nodejs_18
+        nodejs_22
 
         # Distribution of protoc and the gRPC Node protoc plugin for ease of installation with npm
         grpc-tools
@@ -82,12 +103,6 @@
         grpcurl
         grpcui
 
-        # Python 3.11
-        python311
-        python311Packages.pip
-        python311Packages.protobuf
-        python311Packages.types-protobuf
-
         # Kafka connector
         rdkafka
 
@@ -95,11 +110,15 @@
         maven
         jdk11
 
+        # Spark
+        # Version: 3.5.4 ships with Nix 25.05
+        spark
+
         # Scala
-        scala_2_11
+        scala_2_13
         scalafmt
         metals
-        sbt-with-scala-native
+        (sbt.override { jre = jdk11; })
 
         # RockDB
         rocksdb
@@ -121,12 +140,33 @@
 
         # Build Tools
         pkg-config
-      ] ++ dockerInDocker.packages;
+      ] ++ pythonPackages ++ dockerInDocker.packages;
 
       # Create a profile script that sets up the environment
       profileScript = pkgs.writeText "nix-env.sh" ''
         # Add packages to the path
         export PATH="${pkgs.lib.makeBinPath shellPackages}:$PATH"
+
+        # Ensure pkg-config can find system libraries
+        export PKG_CONFIG_PATH="${pkgs.xz}/lib/pkgconfig:${pkgs.openssl.dev}/lib/pkgconfig:$PKG_CONFIG_PATH"
+
+        # C library paths for building Python packages with C extensions
+        export C_INCLUDE_PATH="${pkgs.rdkafka.dev}/include:${pkgs.xz.dev}/include:${pkgs.zlib.dev}/include:${pkgs.openssl.dev}/include:$C_INCLUDE_PATH"
+        export LIBRARY_PATH="${pkgs.rdkafka}/lib:${pkgs.xz}/lib:${pkgs.zlib}/lib:${pkgs.openssl.out}/lib:$LIBRARY_PATH"
+        export PKG_CONFIG_PATH="${pkgs.rdkafka.dev}/lib/pkgconfig:$PKG_CONFIG_PATH"
+
+        # OpenSSL specific environment variables for Rust builds
+        export OPENSSL_DIR="${pkgs.openssl.dev}"
+        export OPENSSL_LIB_DIR="${pkgs.openssl.out}/lib"
+        export OPENSSL_INCLUDE_DIR="${pkgs.openssl.dev}/include"
+
+        # Additional build flags for packages that need explicit paths
+        export CFLAGS="-I${pkgs.rdkafka.dev}/include -I${pkgs.zlib.dev}/include -I${pkgs.openssl.dev}/include"
+        export LDFLAGS="-L${pkgs.rdkafka}/lib -L${pkgs.zlib}/lib -L${pkgs.openssl.out}/lib"
+
+        # Some Python packages look for these specific variables
+        export RDKAFKA_INCLUDE_DIR="${pkgs.rdkafka.dev}/include"
+        export RDKAFKA_LIB_DIR="${pkgs.rdkafka}/lib"
 
         # Create symlink to Python in home directory if it doesn't exist
         if [ ! -L "$HOME/.python" ]; then
@@ -137,6 +177,16 @@
         export PYTHONPATH="$HOME/.python"
         export JUPYTER_PATH="$HOME/.python/share/jupyter"
         export IPYTHONDIR="$HOME/.python"
+
+        # Force UV to use Nix Python
+        export UV_PYTHON_DOWNLOADS=never
+        export UV_PYTHON="${pkgs.python312}/bin/python"
+        export UV_LINK_MODE=copy
+
+        # Auto-detect and use UV when in a project
+        alias python='[[ -f pyproject.toml ]] && uv run python || ${pkgs.python312}/bin/python'
+        alias pip='[[ -f pyproject.toml ]] && uv pip || ${pkgs.python312}/bin/python -m pip'
+        alias jupyter='[[ -f pyproject.toml ]] && uv run jupyter || jupyter'
 
         # Set up Nix environment
         export NIX_PATH="nixpkgs=${pkgs.path}"
@@ -150,8 +200,8 @@
         fi
         export BITNAMI_CHARTS_HOME="$HOME/bitnami-charts/"
 
-        # Ensure pkg-config can find system libraries
-        export PKG_CONFIG_PATH="${pkgs.xz}/lib/pkgconfig:$PKG_CONFIG_PATH"
+        # Ensure pkg-config can find system libraries (already set above, removing duplicate)
+        # export PKG_CONFIG_PATH="${pkgs.xz}/lib/pkgconfig:$PKG_CONFIG_PATH"
 
         # Try to use system lzma if available
         export LZMA_API_STATIC=1
@@ -164,8 +214,8 @@
 
         # Bindgen configuration
         export LIBCLANG_PATH="${pkgs.lib.makeLibraryPath [ pkgs.llvmPackages_latest.libclang.lib ]}"
-        
-        # Docker-in-Docker configuration
+
+        # Docker-from-Docker configuration
         ${dockerInDocker.profileScript}
       '';
 
@@ -202,7 +252,7 @@
         echo "Container environment setup complete!"
         echo "To activate in current shell, run:"
         echo "  source /etc/profile.d/nix-env.sh"
-        
+
         # Copy docker-init.sh to /usr/local/share if it exists in the output
         if [ -f $out/bin/docker-init.sh ]; then
           echo "Installing docker-init.sh..."
@@ -210,12 +260,12 @@
           cp -pf $out/bin/docker-init.sh /usr/local/share/docker-init.sh
           chmod 755 /usr/local/share/docker-init.sh 2>/dev/null || true
         fi
-        
-        # Run Docker-in-Docker setup if available
-        if [ -f ${dockerInDocker.setupDocker}/bin/setup-docker-in-docker ]; then
-          echo "Running Docker-in-Docker setup..."
-          ${dockerInDocker.setupDocker}/bin/setup-docker-in-docker || {
-            echo "Warning: Docker-in-Docker setup failed, but continuing..."
+
+        # Run Docker-from-Docker setup if available
+        if [ -f ${dockerInDocker.setupDocker}/bin/setup-docker-from-docker ]; then
+          echo "Running Docker-from-Docker setup..."
+          ${dockerInDocker.setupDocker}/bin/setup-docker-from-docker || {
+            echo "Warning: Docker-from-Docker setup failed, but continuing..."
           }
         fi
         EOF
@@ -227,8 +277,8 @@
         ${pkgs.lib.concatMapStrings (pkg: ''
           ln -s ${pkg} $out/packages/$(basename ${pkg})
         '') shellPackages}
-        
-        # Add Docker-in-Docker scripts
+
+        # Add Docker-from-Docker scripts
         mkdir -p $out/bin
         ln -s ${dockerInDocker.dockerInit}/bin/* $out/bin/
         ln -s ${dockerInDocker.setupDocker}/bin/* $out/bin/
