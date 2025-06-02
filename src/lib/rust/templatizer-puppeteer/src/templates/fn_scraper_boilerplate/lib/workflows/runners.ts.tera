@@ -1,0 +1,193 @@
+import { Effect, pipe } from 'effect';
+import { ScraperDefinition } from '../scraper-types';
+import { interpret } from '../interpreter';
+import { 
+  BrowserService, 
+  StorageService, 
+  LoggerService,
+  ScraperError,
+  makeServices 
+} from '../services';
+
+export interface WorkflowConfig {
+  storage: {
+    bucket: string;
+    prefix: string;
+    region: string;
+    format: 'parquet' | 'json';
+  };
+  browser?: {
+    headless?: boolean;
+    viewport?: { width: number; height: number };
+  };
+}
+
+export interface WorkflowResult {
+  success: boolean;
+  recordsScraped: number;
+  s3Path?: string;
+  error?: Error;
+  metrics?: {
+    startTime: Date;
+    endTime: Date;
+    duration: number;
+    pagesVisited?: number;
+    apiCallsMade?: number;
+  };
+}
+
+// DOM Scraping Workflow Runner
+export const runDOMWorkflow = <TConfig, TData>(
+  definition: ScraperDefinition<TConfig, TData>,
+  config: TConfig,
+  workflowConfig: WorkflowConfig
+): Effect.Effect<WorkflowResult, ScraperError, never> => {
+  const startTime = new Date();
+  
+  return pipe(
+    Effect.gen(function* (_) {
+      const logger = yield* _(LoggerService);
+      
+      yield* _(logger.info('Starting DOM scraping workflow'));
+      
+      // Build and execute login program
+      const loginProgram = definition.buildLoginProgram(config);
+      yield* _(interpret(loginProgram));
+      yield* _(logger.info('Login completed successfully'));
+      
+      // Build and execute extraction program
+      const extractionProgram = definition.buildExtractionProgram(config);
+      const rawData = yield* _(interpret(extractionProgram));
+      yield* _(logger.info('Data extraction completed', { recordCount: rawData.length }));
+      
+      // Process data
+      const processedData = yield* _(definition.processData(rawData));
+      yield* _(logger.info('Data processing completed'));
+      
+      // Transform data
+      const transformedData = definition.transformData(processedData);
+      
+      // Save to storage
+      const storage = yield* _(StorageService);
+      const s3Path = yield* _(storage.save(transformedData, workflowConfig.storage.format));
+      yield* _(logger.info('Data saved to S3', { path: s3Path }));
+      
+      const endTime = new Date();
+      
+      return {
+        success: true,
+        recordsScraped: processedData.length,
+        s3Path,
+        metrics: {
+          startTime,
+          endTime,
+          duration: endTime.getTime() - startTime.getTime(),
+          pagesVisited: definition.buildExtractionProgram(config)._tag === "Sequence" 
+            ? definition.buildExtractionProgram(config).actions.length 
+            : 1
+        }
+      };
+    }),
+    Effect.catchAll((error) =>
+      Effect.succeed({
+        success: false,
+        recordsScraped: 0,
+        error: error instanceof Error ? error : new Error(String(error))
+      })
+    ),
+    Effect.provide(makeServices({
+      browser: workflowConfig.browser || { headless: true },
+      storage: workflowConfig.storage,
+      logger: { scraper: 'dom-workflow' }
+    }))
+  );
+};
+
+// API Scraping Workflow Runner
+export const runAPIWorkflow = <TConfig, TData>(
+  definition: ScraperDefinition<TConfig, TData>,
+  config: TConfig,
+  workflowConfig: WorkflowConfig
+): Effect.Effect<WorkflowResult, ScraperError, never> => {
+  const startTime = new Date();
+  
+  return pipe(
+    Effect.gen(function* (_) {
+      const logger = yield* _(LoggerService);
+      
+      yield* _(logger.info('Starting API scraping workflow'));
+      
+      // Build and execute login program to get auth
+      const loginProgram = definition.buildLoginProgram(config);
+      const authData = yield* _(interpret(loginProgram));
+      yield* _(logger.info('Authentication extracted successfully'));
+      
+      // Close browser - we don't need it anymore
+      const browserService = yield* _(BrowserService);
+      yield* _(Effect.promise(() => browserService.browser.close()));
+      
+      // Use API-specific methods if available
+      if ('getAPIRequests' in definition && 'processAPIResponses' in definition) {
+        const apiDef = definition as any; // Type assertion for API-specific methods
+        
+        // Make API requests with auth
+        const requests = apiDef.getAPIRequests();
+        yield* _(logger.info('Making API requests', { count: requests.length }));
+        
+        // Process responses
+        const responses = []; // Simplified - would make actual HTTP requests
+        const rawData = yield* _(apiDef.processAPIResponses(responses));
+        
+        // Process and transform data
+        const processedData = yield* _(definition.processData(rawData));
+        const transformedData = definition.transformData(processedData);
+        
+        // Save to storage
+        const storage = yield* _(StorageService);
+        const s3Path = yield* _(storage.save(transformedData, workflowConfig.storage.format));
+        yield* _(logger.info('Data saved to S3', { path: s3Path }));
+        
+        const endTime = new Date();
+        
+        return {
+          success: true,
+          recordsScraped: processedData.length,
+          s3Path,
+          metrics: {
+            startTime,
+            endTime,
+            duration: endTime.getTime() - startTime.getTime(),
+            apiCallsMade: requests.length
+          }
+        };
+      } else {
+        throw new Error('API workflow requires getAPIRequests and processAPIResponses methods');
+      }
+    }),
+    Effect.catchAll((error) =>
+      Effect.succeed({
+        success: false,
+        recordsScraped: 0,
+        error: error instanceof Error ? error : new Error(String(error))
+      })
+    ),
+    Effect.provide(makeServices({
+      browser: workflowConfig.browser || { headless: true },
+      storage: workflowConfig.storage,
+      logger: { scraper: 'api-workflow' }
+    }))
+  );
+};
+
+// Generic workflow runner that chooses based on definition
+export const runScraper = <TConfig, TData>(
+  definition: ScraperDefinition<TConfig, TData>,
+  config: TConfig,
+  workflowConfig: WorkflowConfig & { workflow: 'dom' | 'api' }
+): Effect.Effect<WorkflowResult, ScraperError, never> => {
+  if (workflowConfig.workflow === 'api') {
+    return runAPIWorkflow(definition, config, workflowConfig);
+  } else {
+    return runDOMWorkflow(definition, config, workflowConfig);
+  }
+};

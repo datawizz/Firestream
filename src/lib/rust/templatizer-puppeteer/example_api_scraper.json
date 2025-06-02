@@ -1,0 +1,151 @@
+{
+  "site_name": "cultivera",
+  "site_url": "https://wa.cultiverapro.com",
+  "workflow_type": "api-scraping",
+  
+  "auth_type": "form",
+  "login_path": "#/sign-in",
+  
+  "login_username_selector": "#login-box-holder input[type='email']",
+  "login_password_selector": "#login-box-holder input[type='password']",
+  "login_submit_selector": "#login-box-holder button",
+  "login_success_selector": "#app",
+  "login_error_selector": ".error-message",
+  
+  "auth_storage": "localStorage",
+  "auth_token_key": "auth_token",
+  "auth_header_format": "Bearer {token}",
+  
+  "s3_bucket": "cannabis-data-lake",
+  "s3_region": "us-west-2",
+  "output_format": "parquet",
+  
+  "enable_retry": true,
+  "retry_attempts": 5,
+  "retry_backoff": 5000,
+  
+  "api_version": "v1",
+  "api_endpoints": [
+    {
+      "name": "available-products",
+      "method": "POST",
+      "path": "/api/v1/product/available-products",
+      "data": {
+        "Page": {
+          "take": 100,
+          "skip": 0,
+          "page": 1,
+          "pageSize": 100,
+          "sort": []
+        }
+      }
+    },
+    {
+      "name": "order-summary",
+      "method": "POST",
+      "path": "/api/v1/Orders/get-order-summary",
+      "data": {
+        "take": 100,
+        "skip": 0,
+        "page": 1,
+        "pageSize": 100,
+        "sort": [{"field": "OrderNumber", "dir": "asc"}],
+        "SubmittedDateFrom": "01/01/2020",
+        "SubmittedDateTo": "12/31/2024",
+        "HideSamplesOnly": true
+      }
+    },
+    {
+      "name": "product-categories",
+      "method": "GET",
+      "path": "/api/v1/product/categories"
+    }
+  ],
+  
+  "api_headers": [
+    {
+      "name": "Accept",
+      "value": "application/json"
+    },
+    {
+      "name": "Content-Type",
+      "value": "application/json"
+    }
+  ],
+  
+  "data_schema": {
+    "fields": [
+      {
+        "name": "productId",
+        "type": "string",
+        "required": true,
+        "description": "Product ID"
+      },
+      {
+        "name": "productName",
+        "type": "string",
+        "required": true,
+        "description": "Product name"
+      },
+      {
+        "name": "category",
+        "type": "string",
+        "required": false,
+        "description": "Product category"
+      },
+      {
+        "name": "price",
+        "type": "number",
+        "required": false,
+        "description": "Product price"
+      },
+      {
+        "name": "availableQuantity",
+        "type": "number",
+        "required": false,
+        "description": "Available quantity"
+      },
+      {
+        "name": "orderNumber",
+        "type": "string",
+        "required": false,
+        "description": "Order number (from orders endpoint)"
+      }
+    ]
+  },
+  
+  "api_extraction": {
+    "response_mappings": {
+      "available-products": {
+        "data_path": "data",
+        "item_transform": "item => ({ productId: item.ProductId, productName: item.ProductName, category: item.CategoryName, price: item.Price, availableQuantity: item.AvailableQuantity })",
+        "filter": "item => item.AvailableQuantity > 0"
+      },
+      "order-summary": {
+        "data_path": "data",
+        "item_transform": "item => ({ orderNumber: item.OrderNumber, productId: item.ProductId, productName: item.ProductName })"
+      },
+      "product-categories": {
+        "data_path": "",
+        "item_transform": "item => ({ category: item.Name, productId: '', productName: '' })"
+      }
+    }
+  },
+  
+  "validation_rules": [
+    {
+      "field": "productId",
+      "rule": "required",
+      "message": "Product ID is required"
+    },
+    {
+      "field": "price",
+      "rule": "min",
+      "value": 0,
+      "message": "Price must be non-negative"
+    }
+  ],
+  
+  "docker_registry": "ecr.us-west-2.amazonaws.com/mycompany",
+  "maintainer_email": "platform@cannabistech.com"
+}

@@ -1,0 +1,118 @@
+# Makefile for {{ site_name }} scraper
+
+# Variables
+IMAGE_NAME := {{ site_name }}-scraper
+IMAGE_TAG := latest
+REGISTRY := {{ docker_registry | default(value="docker.io/myorg") }}
+FULL_IMAGE := $(REGISTRY)/$(IMAGE_NAME):$(IMAGE_TAG)
+
+# Colors for output
+BLUE := \033[0;34m
+GREEN := \033[0;32m
+RED := \033[0;31m
+NC := \033[0m # No Color
+
+.PHONY: help install build test lint docker-build docker-push run clean
+
+help: ## Show this help message
+	@echo '{{ site_name | capitalize }} Scraper - Available targets:'
+	@awk 'BEGIN {FS = ":.*?## "} /^[a-zA-Z_-]+:.*?## / {printf "  $(BLUE)%-15s$(NC) %s\n", $$1, $$2}' $(MAKEFILE_LIST)
+
+install: ## Install dependencies
+	@echo "$(BLUE)Installing dependencies...$(NC)"
+	npm ci
+
+build: ## Build TypeScript
+	@echo "$(BLUE)Building TypeScript...$(NC)"
+	npm run build
+
+test: ## Run tests
+	@echo "$(BLUE)Running tests...$(NC)"
+	npm test
+
+lint: ## Run linter
+	@echo "$(BLUE)Running linter...$(NC)"
+	npm run lint
+
+docker-build: ## Build Docker image
+	@echo "$(BLUE)Building Docker image: $(FULL_IMAGE)$(NC)"
+	docker build -t $(FULL_IMAGE) .
+
+docker-push: docker-build ## Push Docker image to registry
+	@echo "$(BLUE)Pushing Docker image: $(FULL_IMAGE)$(NC)"
+	docker push $(FULL_IMAGE)
+
+run: ## Run scraper locally (requires .env file)
+	@echo "$(BLUE)Running scraper locally...$(NC)"
+	@if [ ! -f .env ]; then \
+		echo "$(RED)Error: .env file not found. Copy .env.example and configure it.$(NC)"; \
+		exit 1; \
+	fi
+	npm run dev
+
+docker-run: ## Run scraper in Docker
+	@echo "$(BLUE)Running scraper in Docker...$(NC)"
+	@if [ ! -f .env ]; then \
+		echo "$(RED)Error: .env file not found. Copy .env.example and configure it.$(NC)"; \
+		exit 1; \
+	fi
+	docker run --rm \
+		--env-file .env \
+		$(FULL_IMAGE)
+
+clean: ## Clean build artifacts
+	@echo "$(BLUE)Cleaning build artifacts...$(NC)"
+	rm -rf dist/
+	rm -rf node_modules/
+	rm -f *.log
+
+# Development helpers
+dev-setup: ## Set up development environment
+	@echo "$(BLUE)Setting up development environment...$(NC)"
+	@if [ ! -f .env ]; then \
+		cp .env.example .env; \
+		echo "$(GREEN)Created .env file. Please configure it with your credentials.$(NC)"; \
+	else \
+		echo "$(GREEN).env file already exists.$(NC)"; \
+	fi
+	make install
+	@echo "$(GREEN)Development environment ready!$(NC)"
+
+# Kubernetes helpers
+k8s-secret: ## Create Kubernetes secret from .env file
+	@echo "$(BLUE)Creating Kubernetes secret...$(NC)"
+	@if [ ! -f .env ]; then \
+		echo "$(RED)Error: .env file not found.$(NC)"; \
+		exit 1; \
+	fi
+	kubectl create secret generic {{ site_name }}-credentials \
+		--from-env-file=.env \
+		--dry-run=client -o yaml | kubectl apply -f -
+	@echo "$(GREEN)Secret created/updated.$(NC)"
+
+# Debugging
+debug-selectors: ## Run scraper with screenshot debugging
+	@echo "$(BLUE)Running with screenshot debugging...$(NC)"
+	DEBUG=true npm run dev
+
+check-env: ## Verify environment variables are set
+	@echo "$(BLUE)Checking environment variables...$(NC)"
+	@node -e " \
+		const required = [ \
+			{% if auth_type == "form" -%} \
+			'{{ site_name | upper }}_USERNAME', \
+			'{{ site_name | upper }}_PASSWORD', \
+			{%- elif auth_type == "api-key" -%} \
+			'{{ site_name | upper }}_API_KEY', \
+			{%- endif %} \
+			'S3_BUCKET', \
+			'AWS_REGION' \
+		]; \
+		const missing = required.filter(k => !process.env[k]); \
+		if (missing.length > 0) { \
+			console.error('$(RED)Missing environment variables:$(NC)', missing.join(', ')); \
+			process.exit(1); \
+		} else { \
+			console.log('$(GREEN)All required environment variables are set!$(NC)'); \
+		} \
+	"

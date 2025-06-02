@@ -1,0 +1,86 @@
+import { config } from './src/config';
+{% if workflow_type == "dom-scraping" -%}
+import { {{ site_name | capitalize }}DataExtractor } from './src/data-extractor';
+{%- else -%}
+import { {{ site_name | capitalize }}APIClient } from './src/api-client';
+{%- endif %}
+import { DOMWorkflow } from './lib/workflows/dom-workflow';
+import { APIWorkflow } from './lib/workflows/api-workflow';
+import { Logger } from './lib/utils/logger';
+
+// Load environment variables
+import * as dotenv from 'dotenv';
+dotenv.config();
+
+async function main() {
+  const logger = new Logger({
+    scraper: '{{ site_name }}',
+    workflow: '{{ workflow_type }}',
+    environment: process.env.NODE_ENV || 'production'
+  });
+  
+  try {
+    logger.info('Starting {{ site_name }} scraper', { 
+      workflow: config.workflow,
+      site: config.name 
+    });
+    
+    // Validate environment variables
+    validateEnvironment();
+    
+    // Create and execute appropriate workflow
+    {% if workflow_type == "dom-scraping" -%}
+    const implementation = new {{ site_name | capitalize }}DataExtractor();
+    const workflow = new DOMWorkflow(implementation, config, logger);
+    {%- else -%}
+    const implementation = new {{ site_name | capitalize }}APIClient();
+    const workflow = new APIWorkflow(implementation, config, logger);
+    {%- endif %}
+    
+    // Execute workflow
+    const result = await workflow.execute();
+    
+    if (result.success) {
+      logger.info('Scraping completed successfully', {
+        records: result.recordsScraped,
+        s3Path: result.s3Path,
+        duration: result.metrics?.duration,
+        {% if workflow_type == "dom-scraping" -%}
+        pagesVisited: result.metrics?.pagesVisited
+        {%- else -%}
+        apiCallsMade: result.metrics?.apiCallsMade
+        {%- endif %}
+      });
+      process.exit(0); // Success for Airflow
+    } else {
+      logger.error('Scraping failed', result.error);
+      process.exit(1); // Failure for Airflow
+    }
+    
+  } catch (error) {
+    logger.error('Unexpected error', error);
+    process.exit(2); // Unexpected failure
+  }
+}
+
+function validateEnvironment(): void {
+  const required = [
+    {% if auth_type == "form" -%}
+    '{{ site_name | upper }}_USERNAME',
+    '{{ site_name | upper }}_PASSWORD',
+    {%- elif auth_type == "api-key" -%}
+    '{{ site_name | upper }}_API_KEY',
+    {%- endif %}
+    'S3_BUCKET',
+    'AWS_REGION'
+  ];
+  
+  const missing = required.filter(key => !process.env[key]);
+  
+  if (missing.length > 0) {
+    throw new Error(`Missing required environment variables: ${missing.join(', ')}`);
+  }
+}
+
+// Run the scraper
+main();

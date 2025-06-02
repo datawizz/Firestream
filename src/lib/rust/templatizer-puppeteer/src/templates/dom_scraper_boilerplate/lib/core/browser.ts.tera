@@ -1,0 +1,94 @@
+import puppeteer, { Browser, Page, Cookie } from 'puppeteer';
+import { BrowserConfig } from './types';
+import { Logger } from '../utils/logger';
+
+export class BrowserManager {
+  private logger: Logger;
+
+  constructor(logger: Logger) {
+    this.logger = logger;
+  }
+
+  async launch(config: BrowserConfig): Promise<Browser> {
+    this.logger.info('Launching browser', { headless: config.headless });
+    
+    const browser = await puppeteer.launch({
+      headless: config.headless ? 'new' : false,
+      args: [
+        '--no-sandbox',
+        '--disable-dev-shm-usage',
+        '--disable-gpu',
+        '--disable-setuid-sandbox',
+        ...(config.args || [])
+      ],
+      // Use system Chrome in K8s
+      executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || undefined
+    });
+
+    this.logger.info('Browser launched successfully');
+    return browser;
+  }
+
+  async createPage(browser: Browser, config?: BrowserConfig): Promise<Page> {
+    const page = await browser.newPage();
+    
+    if (config?.viewport) {
+      await page.setViewport(config.viewport);
+    } else {
+      await page.setViewport({ width: 1280, height: 800 });
+    }
+
+    // Set reasonable timeouts
+    page.setDefaultTimeout(30000);
+    page.setDefaultNavigationTimeout(30000);
+
+    return page;
+  }
+
+  async setupRequestInterception(page: Page, options?: {
+    blockResources?: string[];
+    interceptCallback?: (request: any) => void;
+  }): Promise<void> {
+    await page.setRequestInterception(true);
+
+    const defaultBlockList = [
+      'image',
+      'font',
+      'media',
+      'stylesheet'  // Often not needed for data extraction
+    ];
+
+    const blockList = options?.blockResources || defaultBlockList;
+
+    page.on('request', (request) => {
+      if (blockList.includes(request.resourceType())) {
+        request.abort();
+      } else {
+        if (options?.interceptCallback) {
+          options.interceptCallback(request);
+        }
+        request.continue();
+      }
+    });
+  }
+
+  async takeScreenshot(page: Page, name: string): Promise<void> {
+    const screenshotPath = `/tmp/screenshots/${name}.png`;
+    await page.screenshot({ path: screenshotPath, fullPage: true });
+    this.logger.info('Screenshot taken', { path: screenshotPath });
+  }
+
+  async getCookies(page: Page): Promise<Cookie[]> {
+    return await page.cookies();
+  }
+
+  async setCookies(page: Page, cookies: Cookie[]): Promise<void> {
+    await page.setCookie(...cookies);
+  }
+
+  async close(browser: Browser): Promise<void> {
+    this.logger.info('Closing browser');
+    await browser.close();
+    this.logger.info('Browser closed');
+  }
+}

@@ -1,0 +1,188 @@
+import { Page } from 'puppeteer';
+import { DOMScrapingImplementation, NavigationStep, WaitForOption } from './workflow-types';
+import { SiteConfig, ExecutionResult } from '../core/types';
+import { BrowserManager } from '../core/browser';
+import { AuthHandler } from '../core/auth';
+import { StorageManager } from '../core/storage';
+import { Logger } from '../utils/logger';
+
+export class DOMWorkflow {
+  private browserManager: BrowserManager;
+  private authHandler: AuthHandler;
+  private storageManager: StorageManager;
+
+  constructor(
+    private implementation: DOMScrapingImplementation,
+    private config: SiteConfig,
+    private logger: Logger
+  ) {
+    this.browserManager = new BrowserManager(logger);
+    this.authHandler = new AuthHandler(logger);
+    this.storageManager = new StorageManager(config.storage, logger);
+  }
+
+  async execute(): Promise<ExecutionResult> {
+    const startTime = new Date();
+    const browser = await this.browserManager.launch({ 
+      headless: true,
+      viewport: { width: 1920, height: 1080 }
+    });
+
+    try {
+      const page = await this.browserManager.createPage(browser);
+      
+      // Optional: Setup request interception to speed up scraping
+      await this.browserManager.setupRequestInterception(page, {
+        blockResources: ['image', 'font', 'media']
+      });
+
+      // Step 1: Login
+      await this.login(page);
+
+      // Step 2: Navigate and extract data from each page
+      const allData: any[] = [];
+      const steps = this.implementation.getNavigationSteps();
+      
+      this.logger.info('Starting navigation', { totalSteps: steps.length });
+      
+      for (const [index, step] of steps.entries()) {
+        this.logger.info('Navigating to step', { 
+          step: index + 1, 
+          total: steps.length,
+          name: step.name,
+          url: step.url 
+        });
+        
+        await this.navigateToPage(page, step);
+        
+        // Take screenshot if requested
+        if (step.screenshot) {
+          await this.browserManager.takeScreenshot(page, `${this.config.name}-${step.name}`);
+        }
+        
+        // Extract data
+        const data = await this.implementation.extractData(page, step);
+        this.logger.info('Data extracted', { 
+          step: step.name, 
+          recordsFound: data.length 
+        });
+        
+        allData.push(...data);
+      }
+
+      // Step 3: Validate data (optional)
+      if (this.implementation.validateData) {
+        const validation = this.implementation.validateData(allData);
+        if (!validation.valid) {
+          throw new Error(`Data validation failed: ${validation.errors?.join(', ')}`);
+        }
+      }
+
+      // Step 4: Transform data
+      const transformed = await this.implementation.transformData(allData);
+      
+      // Step 5: Save to S3 as Parquet
+      const s3Path = await this.storageManager.save(transformed);
+      
+      const endTime = new Date();
+      
+      return {
+        success: true,
+        recordsScraped: allData.length,
+        s3Path,
+        metrics: {
+          startTime,
+          endTime,
+          duration: endTime.getTime() - startTime.getTime(),
+          pagesVisited: steps.length
+        }
+      };
+      
+    } catch (error) {
+      this.logger.error('Workflow failed', error);
+      return {
+        success: false,
+        recordsScraped: 0,
+        error: error as Error
+      };
+    } finally {
+      await this.browserManager.close(browser);
+    }
+  }
+
+  private async login(page: Page): Promise<void> {
+    this.logger.info('Starting login process');
+    
+    const selectors = this.implementation.getLoginSelectors();
+    
+    // Navigate to login page
+    await page.goto(this.config.auth.loginUrl || `${this.config.baseUrl}/login`, {
+      waitUntil: 'networkidle2'
+    });
+
+    // Use custom login if provided
+    if (this.implementation.performLogin) {
+      await this.implementation.performLogin(page, this.config.auth.credentials);
+    } else {
+      // Default login flow
+      await this.authHandler.performFormLogin(page, selectors, this.config.auth.credentials);
+    }
+
+    // Verify login success
+    if (selectors.successIndicator) {
+      try {
+        await page.waitForSelector(selectors.successIndicator, { timeout: 10000 });
+        this.logger.info('Login successful');
+      } catch {
+        throw new Error('Login failed: success indicator not found');
+      }
+    }
+
+    // Check for error indicator
+    if (selectors.errorIndicator) {
+      const hasError = await page.$(selectors.errorIndicator);
+      if (hasError) {
+        throw new Error('Login failed: error indicator present');
+      }
+    }
+  }
+
+  private async navigateToPage(page: Page, step: NavigationStep): Promise<void> {
+    const fullUrl = step.url.startsWith('http') 
+      ? step.url 
+      : `${this.config.baseUrl}${step.url}`;
+    
+    await page.goto(fullUrl, { waitUntil: 'networkidle2' });
+    
+    // Handle different wait conditions
+    await this.handleWaitCondition(page, step.waitFor);
+  }
+
+  private async handleWaitCondition(page: Page, waitFor: WaitForOption): Promise<void> {
+    switch (waitFor.type) {
+      case 'selector':
+        await page.waitForSelector(waitFor.value, { visible: true });
+        break;
+      
+      case 'navigation':
+        // Already handled by goto
+        break;
+      
+      case 'networkidle':
+        // Puppeteer doesn't have waitForLoadState, already handled by goto
+        await page.waitForTimeout(1000);
+        break;
+      
+      case 'timeout':
+        await page.waitForTimeout(waitFor.value);
+        break;
+      
+      case 'function':
+        await page.waitForFunction(waitFor.value);
+        break;
+      
+      default:
+        this.logger.warn('Unknown wait condition', { type: (waitFor as any).type });
+    }
+  }
+}

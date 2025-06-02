@@ -1,0 +1,60 @@
+// Main exports for the functional scraper library
+
+// Core DSL and types
+export {
+  // Types
+  ScraperAction,
+  Url,
+  CssSelector,
+  AuthData,
+  Extractor,
+  
+  // Constructors
+  Scraper,
+  Extractors,
+  
+  // Common patterns
+  login,
+  paginatedExtraction
+} from './dsl';
+
+// Scraper definition types
+export {
+  ScraperDefinition,
+  APIScraperDefinition,
+  TransformedData,
+  ProcessingError,
+  APIRequest,
+  APIResponse,
+  validateData,
+  transformToParquet
+} from './scraper-types';
+
+// Interpreter
+export { interpret } from './interpreter';
+
+// Services
+export {
+  ScraperError,
+  StorageError,
+  BrowserService,
+  StorageService,
+  LoggerService,
+  makeServices,
+  makeBrowserService,
+  makeS3StorageService,
+  makeLoggerService
+} from './services';
+
+// Workflow runners
+export {
+  runDOMWorkflow,
+  runAPIWorkflow,
+  runScraper,
+  WorkflowConfig,
+  WorkflowResult
+} from './workflows/runners';
+
+// Re-export Effect utilities for convenience
+export { Effect, pipe } from 'effect';
+export { Schema } from '@effect/schema';

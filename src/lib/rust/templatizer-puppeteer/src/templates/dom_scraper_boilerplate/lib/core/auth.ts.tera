@@ -1,0 +1,113 @@
+import { Page } from 'puppeteer';
+import { LoginSelectors, AuthData } from './types';
+import { Logger } from '../utils/logger';
+
+export class AuthHandler {
+  constructor(private logger: Logger) {}
+
+  async performFormLogin(
+    page: Page, 
+    selectors: LoginSelectors, 
+    credentials: any
+  ): Promise<void> {
+    this.logger.info('Performing form login');
+    
+    // Wait for form elements
+    await page.waitForSelector(selectors.usernameField, { visible: true });
+    await page.waitForSelector(selectors.passwordField, { visible: true });
+    await page.waitForSelector(selectors.submitButton, { visible: true });
+    
+    // Clear fields first
+    await page.click(selectors.usernameField, { clickCount: 3 });
+    await page.keyboard.press('Backspace');
+    
+    await page.click(selectors.passwordField, { clickCount: 3 });
+    await page.keyboard.press('Backspace');
+    
+    // Type credentials
+    await page.type(selectors.usernameField, credentials.username, { delay: 50 });
+    await page.type(selectors.passwordField, credentials.password, { delay: 50 });
+    
+    // Submit form
+    await Promise.all([
+      page.click(selectors.submitButton),
+      page.waitForNavigation({ waitUntil: 'networkidle2' }).catch(() => {
+        // Navigation might not happen for SPA apps
+        this.logger.debug('No navigation after login submit');
+      })
+    ]);
+  }
+
+  async captureAuthData(
+    page: Page, 
+    loginAction: () => Promise<AuthData>
+  ): Promise<AuthData> {
+    // Set up network monitoring
+    const capturedTokens: string[] = [];
+    
+    page.on('request', request => {
+      const headers = request.headers();
+      if (headers.authorization) {
+        capturedTokens.push(headers.authorization);
+        this.logger.debug('Captured auth header', { 
+          url: request.url(),
+          auth: headers.authorization.substring(0, 20) + '...'
+        });
+      }
+    });
+
+    page.on('response', async response => {
+      try {
+        const headers = response.headers();
+        // Check for auth tokens in response headers
+        const authHeaders = ['x-auth-token', 'authorization', 'x-access-token'];
+        for (const header of authHeaders) {
+          if (headers[header]) {
+            capturedTokens.push(headers[header]);
+            this.logger.debug('Captured auth from response', { 
+              header,
+              value: headers[header].substring(0, 20) + '...'
+            });
+          }
+        }
+      } catch (e) {
+        // Ignore errors from reading response
+      }
+    });
+
+    // Execute login action
+    const authData = await loginAction();
+    
+    // Merge captured tokens
+    if (capturedTokens.length > 0 && !authData.token) {
+      authData.token = capturedTokens[capturedTokens.length - 1];
+    }
+    
+    return authData;
+  }
+
+  async extractTokenFromLocalStorage(page: Page, keys: string[]): Promise<string | null> {
+    for (const key of keys) {
+      const token = await page.evaluate((k) => localStorage.getItem(k), key);
+      if (token) {
+        this.logger.debug('Found token in localStorage', { key });
+        return token;
+      }
+    }
+    return null;
+  }
+
+  async extractTokenFromCookies(page: Page, cookieNames: string[]): Promise<string | null> {
+    const cookies = await page.cookies();
+    
+    for (const cookieName of cookieNames) {
+      const cookie = cookies.find(c => c.name === cookieName);
+      if (cookie) {
+        this.logger.debug('Found token in cookie', { name: cookieName });
+        return cookie.value;
+      }
+    }
+    
+    return null;
+  }
+}
