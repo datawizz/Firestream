@@ -1,6 +1,59 @@
-[package]
-name = "firestream"
-version = "0.1.0"
-edition = "2024"
+[workspace]
+resolver = "3"
 
-[dependencies]
+members = [
+    "src/lib/rust/firestream",
+    "src/lib/rust/k8s_manager",
+    "src/lib/rust/templatizer-puppeteer",
+    "src/lib/rust/templatizer-spark",
+    "src/lib/rust/templatizer-superset"
+]
+
+[workspace.dependencies]
+# Standard Library
+tokio = { version = "1", features = ["full"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+uuid = { version = "1.10", features = ["v4"] }
+
+toml = "0.8"
+anyhow = "1"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+
+directories = "5"
+chrono = { version = "0.4", features = ["serde"] }
+sysinfo = "0.31"
+bollard = "0.17"
+which = "6.0"
+indoc = "2.0"
+futures = "0.3"
+semver = "1.0"
+whoami = "1.5"
+dirs = "6.0.0"
+async-trait = "0.1"
+tempfile = "3.8"
+tera = "1"
+dialoguer = "0.11"
+once_cell = "1.19"
+serde_yaml = "0.9"
+regex = "1.10"
+
+
+# Terminal User Interface (TUI) / Command Line Interface (CLI)
+clap = { version = "4", features = ["derive"] }
+ratatui = "0.28"
+crossterm = "0.28"
+
+# Kubernetes
+kube = { version = "1.1.0", features = ["runtime", "derive"] }
+# The feature flag must match the version of kubernetes that is the target
+# K3D is provided
+k8s-openapi = { version = "0.25", features = ["v1_31"] }
+
+
+
+
+#[workspace.dev-dependencies]
+#tempfile = "3.8"
+#k8s-openapi = { version = "0.25", features = ["v1_31"] }

@@ -10,7 +10,7 @@ License
 
 <picture width="500">
   <img
-    src="static/images/firestream_banner.png"
+    src="assets/images/firestream_banner.png"
     alt="Firestream Logo"
   />
 </picture>
@@ -178,7 +178,7 @@ This is basically a blanket kubectl proxy command but since it is run within the
 
 The **Kubernetes** cluster is run using KinD (Kubernetes in Docker).
 
-![Screenshot](static/images/stack.png)
+![Screenshot](assets/images/stack.png)
 
 
 ### Apache Spark Structured Streaming
