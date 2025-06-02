@@ -1,0 +1,21 @@
+[package]
+name = "templatizer-puppeteer"
+version = "0.1.0"
+edition = "2024"
+authors = ["Your Name <your.email@example.com>"]
+description = "Generate production-ready web scrapers for Airflow/K8s using Tera templates"
+license = "MIT"
+
+[dependencies]
+tera = "1.20"
+clap = { version = "4.5", features = ["derive"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+tempfile = "3.8"
+
+[dev-dependencies]
+tempfile = "3.8"
+
+[[bin]]
+name = "templatizer-puppeteer"
+path = "src/main.rs"
