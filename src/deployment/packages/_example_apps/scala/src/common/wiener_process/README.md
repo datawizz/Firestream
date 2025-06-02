@@ -1,2 +1,0 @@
-# Wiener Process
-
