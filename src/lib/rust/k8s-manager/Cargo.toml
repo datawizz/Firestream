@@ -1,5 +1,5 @@
 [package]
-name = "k8s_manager"
+name = "k8s-manager"
 version = "0.1.0"
 edition = "2021"
 default-run = "k8s-manager"
