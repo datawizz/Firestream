@@ -35,5 +35,12 @@ services:
     # NOTE: This will make the internet inaccessible until the KinD Control Plane has created and connected via the "bootstrap.sh" command
     cap_add:
       - NET_ADMIN
-
     network_mode: "host" # Enables K3D access from within container
+
+  postgres:
+    image: "postgres"
+    restart: always
+    #environment:
+    # set via .env
+    ports:
+      - 5432:5432

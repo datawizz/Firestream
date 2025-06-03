@@ -3,7 +3,16 @@ resolver = "3"
 
 members = [
     "src/lib/rust/firestream",
-    "src/lib/rust/k8s_manager",
+    "src/lib/rust/firestream-api-server/cli",
+    "src/lib/rust/firestream-api-server/config",
+    "src/lib/rust/firestream-api-server/db",
+    "src/lib/rust/firestream-api-server/web",
+    "src/lib/rust/firestream-api-server/macros".
+    "src/lib/rust/firestream-tui",
+    "src/lib/rust/firestream-api",
+    "src/lib/rust/firestream-app-generators",
+    "src/lib/rust/filesystem-tool",
+    "src/lib/rust/k8s-manager",
     "src/lib/rust/templatizer-puppeteer",
     "src/lib/rust/templatizer-spark",
     "src/lib/rust/templatizer-superset"
@@ -43,7 +52,7 @@ regex = "1.10"
 # Terminal User Interface (TUI) / Command Line Interface (CLI)
 clap = { version = "4", features = ["derive"] }
 ratatui = "0.28"
-crossterm = "0.28"
+crossterm = { version = "0.28", features = ["event-stream"] }
 
 # Kubernetes
 kube = { version = "1.1.0", features = ["runtime", "derive"] }

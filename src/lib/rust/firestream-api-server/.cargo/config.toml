@@ -1,3 +1,0 @@
-[alias]
-db = ["run", "--package", "firestream-api-server-cli", "--bin", "db", "--"]
-generate = ["run", "--package", "firestream-api-server-cli", "--bin", "generate", "--"]
