@@ -1,0 +1,168 @@
+# Firestream TUI Configuration
+
+Example configuration file for different environments.
+
+```toml
+# ~/.firestream/config.toml
+
+# Default profile
+[default]
+api_url = "http://localhost:8080/api/v1"
+environment = "local-k3d"
+theme = "dark"
+refresh_interval = 5  # seconds
+
+# Authentication
+[default.auth]
+type = "api_key"
+api_key_env = "FIRESTREAM_API_KEY"  # Read from environment variable
+
+# UI preferences
+[default.ui]
+show_hidden_resources = false
+default_namespace = "default"
+log_tail_lines = 100
+tree_indent_size = 2
+
+# Production profile
+[production]
+api_url = "https://firestream.prod.example.com/api/v1"
+environment = "production"
+theme = "dark"
+refresh_interval = 10
+
+[production.auth]
+type = "oauth2"
+client_id = "firestream-tui"
+auth_url = "https://auth.example.com/oauth2/authorize"
+token_url = "https://auth.example.com/oauth2/token"
+
+[production.ui]
+show_hidden_resources = false
+default_namespace = "production"
+log_tail_lines = 500
+confirm_destructive_actions = true
+
+# Development profile
+[development]
+api_url = "http://localhost:8080/api/v1"
+environment = "dev"
+theme = "dark"
+refresh_interval = 2
+mock_backend = true  # Use mock data
+
+[development.ui]
+show_hidden_resources = true
+default_namespace = "dev"
+log_tail_lines = 1000
+debug_mode = true
+
+# Staging profile
+[staging]
+api_url = "https://firestream.staging.example.com/api/v1"
+environment = "staging"
+theme = "dark"
+refresh_interval = 5
+
+[staging.auth]
+type = "bearer"
+token_file = "~/.firestream/staging-token"
+
+# Key bindings (optional customization)
+[keybindings]
+quit = ["q", "ctrl+c"]
+help = ["?", "f1"]
+search = ["/", "ctrl+f"]
+command_palette = [":", "ctrl+p"]
+navigate_up = ["k", "up"]
+navigate_down = ["j", "down"]
+navigate_left = ["h", "left"]
+navigate_right = ["l", "right"]
+select = ["enter", "space"]
+expand = ["space", "right"]
+collapse = ["space", "left"]
+new_resource = ["n", "ctrl+n"]
+delete_resource = ["d", "delete"]
+scale_deployment = ["s"]
+view_logs = ["l"]
+refresh = ["r", "f5"]
+
+# Theme configuration
+[themes.dark]
+background = "#1e1e1e"
+foreground = "#d4d4d4"
+selection = "#3a3a3a"
+border = "#444444"
+border_focused = "#00a6ff"
+status_ok = "#4ec9b0"
+status_warning = "#ffcc00"
+status_error = "#f44747"
+status_pending = "#999999"
+
+[themes.light]
+background = "#ffffff"
+foreground = "#333333"
+selection = "#e0e0e0"
+border = "#cccccc"
+border_focused = "#0066cc"
+status_ok = "#008000"
+status_warning = "#ff8c00"
+status_error = "#dc143c"
+status_pending = "#666666"
+
+# Aliases for quick commands
+[aliases]
+dp = "deploy"
+del = "delete"
+k = "kubectl"
+tf = "terraform"
+
+# Cluster-specific settings
+[clusters.local]
+name = "local-k3d"
+context = "k3d-firestream"
+namespace = "default"
+
+[clusters.production]
+name = "prod-gke"
+context = "gke_project_us-central1_firestream-prod"
+namespace = "production"
+read_only = true  # Prevent accidental modifications
+
+[clusters.staging]
+name = "staging-eks"
+context = "arn:aws:eks:us-west-2:123456789:cluster/firestream-staging"
+namespace = "staging"
+```
+
+## Usage
+
+```bash
+# Use default profile
+firestream-tui
+
+# Use specific profile
+firestream-tui --profile production
+
+# Override API URL
+firestream-tui --api-url http://localhost:9090/api/v1
+
+# Use mock backend for testing
+firestream-tui --mock
+
+# Specify config file location
+firestream-tui --config ~/.config/firestream/config.toml
+```
+
+## Environment Variables
+
+The TUI respects the following environment variables:
+
+- `FIRESTREAM_API_URL`: Override the API URL
+- `FIRESTREAM_API_KEY`: API key for authentication
+- `FIRESTREAM_PROFILE`: Default profile to use
+- `FIRESTREAM_CONFIG`: Path to config file
+- `FIRESTREAM_LOG_LEVEL`: Logging level (debug, info, warn, error)
+- `FIRESTREAM_THEME`: Color theme (dark, light)
+- `NO_COLOR`: Disable colored output
+- `KUBECONFIG`: Path to Kubernetes config file
