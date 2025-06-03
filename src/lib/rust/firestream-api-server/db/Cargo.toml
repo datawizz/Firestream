@@ -1,0 +1,24 @@
+[package]
+name = "firestream-api-server-db"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+[lib]
+# examples in docs don't run without a running database, etc.
+doctest = false
+
+[features]
+test-helpers = ["dep:fake", "dep:rand", "dep:regex"]
+
+[dependencies]
+anyhow = "1.0"
+fake = { version = "4.0", features = ["derive"], optional = true }
+firestream-api-server-config = { path = "../config" }
+rand = { version = "0.9", optional = true }
+regex = { version = "1.10", optional = true }
+serde = { version = "1.0", features = ["derive"] }
+sqlx = { version = "0.8", features = [ "runtime-tokio", "tls-rustls", "postgres", "macros", "uuid", "migrate", "chrono" ] }
+thiserror = "2.0"
+uuid = { version = "1.5", features = ["serde"] }
+validator = { version = "0.20", features = ["derive"] }
