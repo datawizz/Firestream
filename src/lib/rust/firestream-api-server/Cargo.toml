@@ -1,0 +1,10 @@
+[workspace]
+members = [
+    "cli",
+    "config",
+    "db",
+    "web",
+    "macros"
+]
+resolver = "2"
+default-members = ["web"]
