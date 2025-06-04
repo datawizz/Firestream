@@ -2,20 +2,17 @@
 resolver = "3"
 
 members = [
-    "src/lib/rust/firestream",
+    "src/lib/rust/firestream-tui",
     "src/lib/rust/firestream-api-server/cli",
     "src/lib/rust/firestream-api-server/config",
     "src/lib/rust/firestream-api-server/db",
     "src/lib/rust/firestream-api-server/web",
-    "src/lib/rust/firestream-api-server/macros".
-    "src/lib/rust/firestream-tui",
-    "src/lib/rust/firestream-api",
-    "src/lib/rust/firestream-app-generators",
-    "src/lib/rust/filesystem-tool",
-    "src/lib/rust/k8s-manager",
-    "src/lib/rust/templatizer-puppeteer",
-    "src/lib/rust/templatizer-spark",
-    "src/lib/rust/templatizer-superset"
+    "src/lib/rust/firestream-api-server/macros",
+    "src/lib/rust/tools/filesystem-manager",
+    "src/lib/rust/tools/k8s-manager",
+    "src/lib/rust/tools/templatizer-puppeteer",
+    "src/lib/rust/tools/templatizer-spark",
+    "src/lib/rust/tools/templatizer-superset"
 ]
 
 [workspace.dependencies]
