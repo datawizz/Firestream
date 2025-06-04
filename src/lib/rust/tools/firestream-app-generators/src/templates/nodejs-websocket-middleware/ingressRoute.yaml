@@ -1,0 +1,15 @@
+apiVersion: traefik.containo.us/v1alpha1
+kind: IngressRoute
+metadata:
+  name: websocket-ingress
+spec:
+  entryPoints:
+    - web
+    - websecure
+  routes:
+    - match: PathPrefix(`/ws`)
+      kind: Rule
+      services:
+        - name: websocket-middleware
+          port: 8080
+  tls: {}
