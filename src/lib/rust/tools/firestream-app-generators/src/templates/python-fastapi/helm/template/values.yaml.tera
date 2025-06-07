@@ -1,0 +1,52 @@
+replicaCount: {{ replicaCount }}
+
+image:
+  repository: {{ image.repository }}
+  pullPolicy: {{ image.pullPolicy }}
+  tag: {{ image.tag }}
+
+imagePullSecrets: []
+nameOverride: ""
+fullnameOverride: ""
+
+serviceAccount:
+  create: true
+  annotations: {}
+  name: ""
+
+podAnnotations: {}
+podSecurityContext: {}
+securityContext: {}
+
+service:
+  type: ClusterIP
+  port: {{ service.port }}
+
+ingress:
+  enabled: {{ ingress.enabled }}
+  className: "nginx"
+  annotations: {}
+  hosts:
+    - host: {{ ingress.host }}
+      paths:
+        - path: {{ ingress.path }}
+          pathType: ImplementationSpecific
+  tls: []
+
+resources:
+  limits:
+    cpu: {{ resources.limits.cpu }}
+    memory: {{ resources.limits.memory }}
+  requests:
+    cpu: {{ resources.requests.cpu }}
+    memory: {{ resources.requests.memory }}
+
+autoscaling:
+  enabled: false
+  minReplicas: 1
+  maxReplicas: 100
+  targetCPUUtilizationPercentage: 80
+
+nodeSelector: {}
+tolerations: []
+affinity: {}

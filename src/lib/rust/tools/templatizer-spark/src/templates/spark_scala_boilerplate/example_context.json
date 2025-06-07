@@ -1,0 +1,214 @@
+{
+  "app_name": "Example Spark App",
+  "organization": "com.example",
+  "version": "1.0.0",
+  "description": "An example Spark application for data processing",
+  "package_name": "com.example.spark",
+  "main_class_name": "ExampleApp",
+  "scala_version": "2.13.15",
+  "spark_version": "3.5.1",
+  "sbt_version": "1.10.11",
+  "streaming_enabled": false,
+  "mllib_enabled": false,
+  "s3_enabled": true,
+  "delta_enabled": false,
+  "config_enabled": true,
+  "checkpoint_enabled": false,
+  "cache_input": true,
+  "monitoring_enabled": true,
+  "input_format": "parquet",
+  "output_format": "parquet",
+  "output_mode": "overwrite",
+  "compression": "snappy",
+  "config_fields": [
+    {
+      "name": "inputPath",
+      "type": "String",
+      "config_type": "String",
+      "config_path": "input.path",
+      "default_value": "s3a://my-bucket/input",
+      "env_var": "INPUT_PATH",
+      "arg_index": 0
+    },
+    {
+      "name": "outputPath",
+      "type": "String",
+      "config_type": "String",
+      "config_path": "output.path",
+      "default_value": "s3a://my-bucket/output",
+      "env_var": "OUTPUT_PATH",
+      "arg_index": 1
+    },
+    {
+      "name": "numPartitions",
+      "type": "Int",
+      "config_type": "Int",
+      "config_path": "output.partitions",
+      "default_value": "10",
+      "env_var": "OUTPUT_PARTITIONS"
+    }
+  ],
+  "transformations": [
+    {
+      "method": "filter",
+      "args": [
+        "col(\"value\").isNotNull"
+      ]
+    },
+    {
+      "method": "withColumn",
+      "args": [
+        "\"processed_date\"",
+        "current_date()"
+      ]
+    }
+  ],
+  "aggregations": [
+    {
+      "function": "count",
+      "column": "*",
+      "alias": "count"
+    },
+    {
+      "function": "avg",
+      "column": "value",
+      "alias": "avg_value"
+    }
+  ],
+  "group_by_columns": [
+    "category",
+    "processed_date"
+  ],
+  "spark_configs": [
+    {
+      "key": "spark.sql.adaptive.enabled",
+      "value": "true"
+    },
+    {
+      "key": "spark.sql.adaptive.coalescePartitions.enabled",
+      "value": "true"
+    }
+  ],
+  "docker_registry": "myregistry.io",
+  "namespace": "spark-apps",
+  "service_account": "spark",
+  "driver_cores": 1,
+  "driver_memory": "2g",
+  "executor_cores": 2,
+  "executor_instances": 3,
+  "executor_memory": "4g",
+  "spark_conf": {
+    "spark.kubernetes.container.image.pullPolicy": "Always",
+    "spark.hadoop.fs.s3a.access.key": "${S3_ACCESS_KEY}",
+    "spark.hadoop.fs.s3a.secret.key": "${S3_SECRET_KEY}"
+  },
+  "driver_env_vars": [
+    {
+      "name": "S3_ACCESS_KEY",
+      "valueFrom": {
+        "secretKeyRef": {
+          "name": "s3-credentials",
+          "key": "access-key"
+        }
+      }
+    },
+    {
+      "name": "S3_SECRET_KEY",
+      "valueFrom": {
+        "secretKeyRef": {
+          "name": "s3-credentials",
+          "key": "secret-key"
+        }
+      }
+    }
+  ],
+  "volumes": [
+    {
+      "name": "spark-config",
+      "configMap": {
+        "name": "example-spark-app-config"
+      }
+    }
+  ],
+  "driver_volume_mounts": [
+    {
+      "name": "spark-config",
+      "mountPath": "/opt/spark/conf"
+    }
+  ],
+  "executor_volume_mounts": [
+    {
+      "name": "spark-config",
+      "mountPath": "/opt/spark/conf"
+    }
+  ],
+  "log_level": "INFO",
+  "include_log4j": true,
+  "include_app_conf": true,
+  "test_sample_data": [
+    "(\"id1\", 100.0, \"category1\")",
+    "(\"id2\", 200.0, \"category2\")",
+    "(\"id3\", 150.0, \"category1\")"
+  ],
+  "test_columns": [
+    "id",
+    "value",
+    "category"
+  ],
+  "local_run_args": [
+    "local-input",
+    "local-output"
+  ],
+  "file_logging": false,
+  "log_file_path": "/tmp/spark-app.log",
+  "log_file_size": "100MB",
+  "log_file_count": 10,
+  "custom_loggers": [],
+  "labels": {},
+  "driver_labels": {},
+  "executor_labels": {},
+  "driver_node_selector": {},
+  "executor_node_selector": {},
+  "image_pull_secrets": [],
+  "arguments": [],
+  "driver_tolerations": [],
+  "executor_tolerations": [],
+  "hadoop_conf": {},
+  "spark_event_log_enabled": false,
+  "driver_core_limit": "1200m",
+  "restart_policy_type": "OnFailure",
+  "on_failure_retries": 3,
+  "on_failure_retry_interval": 10,
+  "on_submission_failure_retries": 5,
+  "on_submission_failure_retry_interval": 20,
+  "executor_env_vars": [],
+  "spark_ui_port": "4040",
+  "dynamic_allocation": null,
+  "image_pull_policy": "Always",
+  "spark_event_log_dir": "/tmp/spark-events",
+  "jmx_exporter_version": "0.11.0",
+  "prometheus_port": 8090,
+  "sbt_assembly_version": "2.1.5",
+  "additional_plugins": [],
+  "additional_dependencies": [],
+  "dependency_overrides": [],
+  "additional_imports": [],
+  "utility_functions": [],
+  "custom_make_targets": [],
+  "additional_tests": [],
+  "additional_gitignore_patterns": [],
+  "additional_config_files": [],
+  "hadoop_version": "3.3.4",
+  "scala_major_version": "2.13",
+  "spark_base_image": "apache/spark:3.5.1-scala2.13-java11-ubuntu",
+  "java_version": "11",
+  "license": "Apache-2.0",
+  "app_purpose": "Example Spark application for data processing",
+  "logging_config": true,
+  "environment_vars": [],
+  "config_files": [],
+  "additional_jars": [],
+  "apt_packages": [],
+  "include_utils": true,
+  "additional_rbac_rules": []
+}

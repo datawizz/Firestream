@@ -1,0 +1,163 @@
+{
+  "site_name": "shopify_store",
+  "site_url": "https://mystore.myshopify.com",
+  "workflow_type": "dom-scraping",
+  
+  "auth_type": "form",
+  "login_path": "account/login",
+  
+  "login_username_selector": "input#CustomerEmail",
+  "login_password_selector": "input#CustomerPassword",
+  "login_submit_selector": "button[type='submit']",
+  "login_success_selector": ".customer-logged-in",
+  "login_error_selector": ".errors",
+  
+  "s3_bucket": "ecommerce-data-lake",
+  "s3_region": "us-east-1",
+  "output_format": "parquet",
+  
+  "enable_retry": true,
+  "retry_attempts": 3,
+  "retry_backoff": 2000,
+  
+  "navigation_steps": [
+    {
+      "name": "collections",
+      "url": "/collections",
+      "wait_type": "selector",
+      "wait_value": ".collection-grid",
+      "screenshot": true
+    },
+    {
+      "name": "all-products",
+      "url": "/collections/all",
+      "wait_type": "selector",
+      "wait_value": ".product-grid-container",
+      "screenshot": false
+    },
+    {
+      "name": "best-sellers",
+      "url": "/collections/best-sellers",
+      "wait_type": "networkidle",
+      "wait_value": "",
+      "screenshot": true
+    }
+  ],
+  
+  "data_schema": {
+    "fields": [
+      {
+        "name": "id",
+        "type": "string",
+        "required": true,
+        "description": "Product ID"
+      },
+      {
+        "name": "title",
+        "type": "string",
+        "required": true,
+        "description": "Product title"
+      },
+      {
+        "name": "price",
+        "type": "number",
+        "required": false,
+        "description": "Product price"
+      },
+      {
+        "name": "comparePrice",
+        "type": "number",
+        "required": false,
+        "description": "Original price before discount"
+      },
+      {
+        "name": "availability",
+        "type": "boolean",
+        "required": false,
+        "description": "Product availability"
+      },
+      {
+        "name": "imageUrl",
+        "type": "string",
+        "required": false,
+        "description": "Product image URL"
+      },
+      {
+        "name": "productUrl",
+        "type": "string",
+        "required": false,
+        "description": "Product page URL"
+      }
+    ]
+  },
+  
+  "dom_extraction": {
+    "item_selector": ".product-item",
+    "pagination_selector": "a.next-page",
+    "fields": {
+      "id": {
+        "type": "attribute",
+        "selector": "[data-product-id]",
+        "attribute": "data-product-id"
+      },
+      "title": {
+        "type": "text",
+        "selector": ".product-item__title"
+      },
+      "price": {
+        "type": "text",
+        "selector": ".price-item--sale",
+        "transform": "text => parseFloat(text.replace(/[^0-9.]/g, ''))"
+      },
+      "comparePrice": {
+        "type": "text",
+        "selector": ".price-item--regular",
+        "transform": "text => text ? parseFloat(text.replace(/[^0-9.]/g, '')) : null"
+      },
+      "availability": {
+        "type": "text",
+        "selector": ".product-item__availability",
+        "transform": "text => !text.toLowerCase().includes('sold out')"
+      },
+      "imageUrl": {
+        "type": "attribute",
+        "selector": ".product-item__image img",
+        "attribute": "src",
+        "transform": "src => src.startsWith('//') ? 'https:' + src : src"
+      },
+      "productUrl": {
+        "type": "attribute",
+        "selector": ".product-item__link",
+        "attribute": "href",
+        "transform": "href => new URL(href, 'https://mystore.myshopify.com').toString()"
+      }
+    }
+  },
+  
+  "validation_rules": [
+    {
+      "field": "id",
+      "rule": "required",
+      "message": "Product ID is required"
+    },
+    {
+      "field": "title",
+      "rule": "required",
+      "message": "Product title is required"
+    },
+    {
+      "field": "price",
+      "rule": "min",
+      "value": 0,
+      "message": "Price must be non-negative"
+    }
+  ],
+  
+  "transformations": {
+    "priceInCents": "Math.round((item.price || 0) * 100)",
+    "hasDiscount": "!!item.comparePrice && item.comparePrice > item.price"
+  },
+  
+  "docker_registry": "ghcr.io/mycompany",
+  "maintainer_email": "data-engineering@mycompany.com"
+}

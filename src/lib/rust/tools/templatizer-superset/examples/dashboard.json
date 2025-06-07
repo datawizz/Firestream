@@ -1,0 +1,461 @@
+{
+  "dashboard": {
+    "title": "E-Commerce Analytics Dashboard",
+    "description": "Real-time analytics for e-commerce operations",
+    "slug": "ecommerce-analytics",
+    "published": true,
+    "certification": {
+      "certified_by": "Analytics Team",
+      "details": "Approved for C-suite reporting"
+    }
+  },
+  "database": {
+    "name": "E-Commerce PostgreSQL",
+    "connection": {
+      "host": "${POSTGRES_HOST}",
+      "port": 5432,
+      "database": "ecommerce_db",
+      "username": "${POSTGRES_USER}",
+      "password": "${POSTGRES_PASSWORD}",
+      "sslmode": "require"
+    },
+    "options": {
+      "allow_csv_upload": true,
+      "expose_in_sqllab": true
+    }
+  },
+  "datasets": [
+    {
+      "name": "orders",
+      "table_name": "fact_orders",
+      "schema": "public",
+      "description": "Order transactions with line items",
+      "time_column": "created_at",
+      "columns": [
+        {
+          "name": "order_id",
+          "type": "UUID",
+          "display_name": "Order ID",
+          "description": "Unique order identifier"
+        },
+        {
+          "name": "created_at",
+          "type": "TIMESTAMP",
+          "display_name": "Order Date",
+          "is_temporal": true
+        },
+        {
+          "name": "customer_id",
+          "type": "UUID",
+          "display_name": "Customer ID"
+        },
+        {
+          "name": "status",
+          "type": "VARCHAR",
+          "display_name": "Order Status"
+        },
+        {
+          "name": "total_amount",
+          "type": "DECIMAL",
+          "display_name": "Order Total",
+          "groupable": false
+        },
+        {
+          "name": "item_count",
+          "type": "INTEGER",
+          "display_name": "Number of Items",
+          "groupable": false
+        }
+      ],
+      "metrics": [
+        {
+          "name": "total_revenue",
+          "expression": "SUM(total_amount)",
+          "display_name": "Total Revenue",
+          "description": "Sum of all order amounts",
+          "format": "$,.2f"
+        },
+        {
+          "name": "order_count",
+          "expression": "COUNT(DISTINCT order_id)",
+          "display_name": "Number of Orders",
+          "format": ",.0f"
+        },
+        {
+          "name": "aov",
+          "expression": "AVG(total_amount)",
+          "display_name": "Average Order Value",
+          "format": "$,.2f"
+        }
+      ]
+    },
+    {
+      "name": "customers",
+      "table_name": "dim_customers",
+      "schema": "public",
+      "description": "Customer dimension table",
+      "columns": [
+        {
+          "name": "customer_id",
+          "type": "UUID",
+          "display_name": "Customer ID",
+          "is_primary_key": true
+        },
+        {
+          "name": "email",
+          "type": "VARCHAR",
+          "display_name": "Email"
+        },
+        {
+          "name": "country",
+          "type": "VARCHAR",
+          "display_name": "Country"
+        },
+        {
+          "name": "segment",
+          "type": "VARCHAR",
+          "display_name": "Customer Segment"
+        },
+        {
+          "name": "created_at",
+          "type": "TIMESTAMP",
+          "display_name": "Registration Date",
+          "is_temporal": true
+        }
+      ],
+      "metrics": [
+        {
+          "name": "customer_count",
+          "expression": "COUNT(DISTINCT customer_id)",
+          "display_name": "Total Customers",
+          "format": ",.0f"
+        }
+      ]
+    },
+    {
+      "name": "revenue_by_segment_sql",
+      "type": "virtual",
+      "sql": "SELECT \n  c.segment,\n  DATE_TRUNC('month', o.created_at) as month,\n  COUNT(DISTINCT o.order_id) as order_count,\n  SUM(o.total_amount) as revenue,\n  AVG(o.total_amount) as avg_order_value\nFROM fact_orders o\nJOIN dim_customers c ON o.customer_id = c.customer_id\nWHERE o.created_at >= CURRENT_DATE - INTERVAL '6 months'\nGROUP BY 1, 2\nORDER BY 1, 2",
+      "description": "Monthly revenue metrics by customer segment (SQL virtual dataset)",
+      "time_column": "month",
+      "columns": [
+        {
+          "name": "segment",
+          "type": "VARCHAR",
+          "display_name": "Customer Segment",
+          "groupable": true,
+          "filterable": true
+        },
+        {
+          "name": "month",
+          "type": "TIMESTAMP",
+          "display_name": "Month",
+          "is_temporal": true
+        },
+        {
+          "name": "order_count",
+          "type": "INTEGER",
+          "display_name": "Number of Orders",
+          "groupable": false
+        },
+        {
+          "name": "revenue",
+          "type": "DECIMAL",
+          "display_name": "Revenue",
+          "groupable": false
+        },
+        {
+          "name": "avg_order_value",
+          "type": "DECIMAL",
+          "display_name": "Average Order Value",
+          "groupable": false
+        }
+      ],
+      "metrics": [
+        {
+          "name": "total_revenue",
+          "expression": "SUM(revenue)",
+          "display_name": "Total Revenue",
+          "format": "$,.2f"
+        },
+        {
+          "name": "total_orders",
+          "expression": "SUM(order_count)",
+          "display_name": "Total Orders",
+          "format": ",.0f"
+        }
+      ]
+    },
+    {
+      "name": "top_products_last_30d",
+      "type": "virtual",
+      "sql": "WITH product_sales AS (\n  SELECT \n    p.product_name,\n    p.category,\n    SUM(oi.quantity) as units_sold,\n    SUM(oi.quantity * oi.unit_price) as revenue\n  FROM order_items oi\n  JOIN products p ON oi.product_id = p.product_id\n  WHERE oi.order_date >= CURRENT_DATE - INTERVAL '30 days'\n  GROUP BY 1, 2\n)\nSELECT \n  *,\n  RANK() OVER (ORDER BY revenue DESC) as revenue_rank\nFROM product_sales\nWHERE revenue > 0\nORDER BY revenue DESC\nLIMIT 100",
+      "description": "Top selling products in the last 30 days",
+      "columns": [
+        {
+          "name": "product_name",
+          "type": "VARCHAR",
+          "display_name": "Product Name"
+        },
+        {
+          "name": "category",
+          "type": "VARCHAR",
+          "display_name": "Category"
+        },
+        {
+          "name": "units_sold",
+          "type": "INTEGER",
+          "display_name": "Units Sold"
+        },
+        {
+          "name": "revenue",
+          "type": "DECIMAL",
+          "display_name": "Revenue"
+        },
+        {
+          "name": "revenue_rank",
+          "type": "INTEGER",
+          "display_name": "Rank"
+        }
+      ]
+    }
+  ],
+  "charts": [
+    {
+      "name": "revenue_kpi",
+      "title": "Today's Revenue",
+      "type": "big_number_total",
+      "dataset": "orders",
+      "description": "Total revenue for today",
+      "config": {
+        "metrics": ["total_revenue"],
+        "time": {
+          "column": "created_at",
+          "range": "today"
+        },
+        "options": {
+          "compare_lag": 1,
+          "compare_suffix": "DoD",
+          "show_trend": true
+        }
+      }
+    },
+    {
+      "name": "revenue_trend",
+      "title": "Monthly Revenue Trend",
+      "type": "line",
+      "dataset": "orders",
+      "description": "Revenue trend over the last 12 months",
+      "config": {
+        "metrics": ["total_revenue"],
+        "time": {
+          "column": "created_at",
+          "grain": "month",
+          "range": "Last year"
+        },
+        "options": {
+          "x_axis_label": "Month",
+          "y_axis_label": "Revenue",
+          "show_legend": false
+        }
+      }
+    },
+    {
+      "name": "orders_by_status",
+      "title": "Orders by Status",
+      "type": "pie",
+      "dataset": "orders",
+      "description": "Distribution of orders by status",
+      "config": {
+        "metrics": ["order_count"],
+        "dimensions": ["status"],
+        "time": {
+          "column": "created_at",
+          "range": "Last 30 days"
+        },
+        "options": {
+          "donut": true,
+          "show_labels": true,
+          "label_type": "key_percent"
+        }
+      }
+    },
+    {
+      "name": "customer_segments",
+      "title": "Revenue by Customer Segment",
+      "type": "bar",
+      "dataset": "orders",
+      "description": "Revenue breakdown by customer segment",
+      "config": {
+        "metrics": ["total_revenue"],
+        "dimensions": ["customers.segment"],
+        "time": {
+          "column": "created_at",
+          "range": "Last quarter"
+        },
+        "options": {
+          "orientation": "vertical",
+          "y_axis_label": "Revenue ($)",
+          "x_axis_label": "Customer Segment"
+        }
+      }
+    },
+    {
+      "name": "recent_orders",
+      "title": "Recent Orders",
+      "type": "table",
+      "dataset": "orders",
+      "description": "List of recent orders",
+      "config": {
+        "columns": ["order_id", "created_at", "customer_id", "status", "total_amount"],
+        "time": {
+          "column": "created_at",
+          "range": "Last 24 hours"
+        },
+        "options": {
+          "page_size": 50,
+          "include_search": true
+        }
+      }
+    },
+    {
+      "name": "segment_revenue_trend",
+      "title": "Revenue Trend by Customer Segment",
+      "type": "line",
+      "dataset": "revenue_by_segment_sql",
+      "description": "Monthly revenue trends across customer segments (from SQL dataset)",
+      "config": {
+        "metrics": ["revenue"],
+        "dimensions": ["segment"],
+        "time": {
+          "column": "month",
+          "grain": "month",
+          "range": "Last 6 months"
+        },
+        "options": {
+          "x_axis_label": "Month",
+          "y_axis_label": "Revenue ($)",
+          "show_legend": true,
+          "color_scheme": "supersetColors"
+        }
+      }
+    },
+    {
+      "name": "top_products_table",
+      "title": "Top Products Last 30 Days",
+      "type": "table",
+      "dataset": "top_products_last_30d",
+      "description": "Best selling products from SQL virtual dataset",
+      "config": {
+        "columns": ["revenue_rank", "product_name", "category", "units_sold", "revenue"],
+        "metrics": [],
+        "options": {
+          "page_size": 25,
+          "include_search": true,
+          "cell_bars": ["revenue", "units_sold"]
+        }
+      }
+    }
+  ],
+  "layout": {
+    "type": "grid",
+    "width": 12,
+    "rows": [
+      {
+        "height": 8,
+        "components": [
+          {
+            "type": "chart",
+            "chart": "revenue_kpi",
+            "width": 3
+          },
+          {
+            "type": "chart",
+            "chart": "revenue_trend",
+            "width": 9
+          }
+        ]
+      },
+      {
+        "height": 10,
+        "components": [
+          {
+            "type": "chart",
+            "chart": "orders_by_status",
+            "width": 4
+          },
+          {
+            "type": "chart",
+            "chart": "customer_segments",
+            "width": 8
+          }
+        ]
+      },
+      {
+        "height": 12,
+        "components": [
+          {
+            "type": "chart",
+            "chart": "recent_orders",
+            "width": 12
+          }
+        ]
+      },
+      {
+        "height": 10,
+        "components": [
+          {
+            "type": "chart",
+            "chart": "segment_revenue_trend",
+            "width": 12
+          }
+        ]
+      },
+      {
+        "height": 12,
+        "components": [
+          {
+            "type": "chart",
+            "chart": "top_products_table",
+            "width": 12
+          }
+        ]
+      }
+    ]
+  },
+  "filters": {
+    "native_filters": [
+      {
+        "name": "date_range",
+        "title": "Date Range",
+        "type": "time_range",
+        "targets": [
+          {
+            "dataset": "orders",
+            "column": "created_at"
+          }
+        ],
+        "default_value": "Last 30 days"
+      },
+      {
+        "name": "country_filter",
+        "title": "Country",
+        "type": "select",
+        "targets": [
+          {
+            "dataset": "customers",
+            "column": "country"
+          }
+        ],
+        "config": {
+          "multiple": true,
+          "search_enabled": true
+        }
+      }
+    ]
+  },
+  "access": {
+    "owners": ["admin"],
+    "roles": ["Alpha", "Executive"]
+  }
+}

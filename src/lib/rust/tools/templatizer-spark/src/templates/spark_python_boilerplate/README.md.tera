@@ -1,0 +1,285 @@
+# {{ app_name }}
+
+{{ description }}
+
+## Overview
+
+This is a PySpark application that {{ app_purpose | default(value="processes data") }}.
+
+## Prerequisites
+
+- Python {{ python_version | default(value="3.8+") }}
+- Apache Spark {{ spark_version | default(value="3.5.1") }}
+- Docker (for containerization)
+- Kubernetes cluster with Spark Operator installed
+
+## Project Structure
+
+```
+{{ app_name | lower | replace(from=" ", to="-") }}/
+├── src/
+│   └── {{ package_name | default(value="spark_app") }}/
+│       ├── __init__.py
+│       ├── main.py          # Main application entry point
+│       ├── config.py        # Configuration management
+│       └── utils.py         # Utility functions
+├── tests/
+│   ├── __init__.py
+│   ├── conftest.py         # Pytest configuration
+│   └── test_main.py        # Unit tests
+├── resources/
+│   ├── config.json         # Default configuration
+│   └── log4j.properties    # Logging configuration
+├── k8s/
+│   ├── spark-application.yaml  # SparkApplication resource
+│   ├── rbac.yaml              # RBAC configuration
+│   └── configmap.yaml         # ConfigMap for configs
+├── requirements.txt        # Python dependencies
+├── setup.py               # Package setup
+├── Dockerfile            # Docker image definition
+└── Makefile             # Build automation
+```
+
+## Installation
+
+### Local Development
+
+1. **Create virtual environment:**
+   ```bash
+   python -m venv venv
+   source venv/bin/activate  # On Windows: venv\Scripts\activate
+   ```
+
+2. **Install dependencies:**
+   ```bash
+   make install
+   # or
+   pip install -r requirements.txt
+   ```
+
+3. **Install development dependencies:**
+   ```bash
+   make install-dev
+   ```
+
+## Usage
+
+### Running Locally
+
+```bash
+# Using make
+make run-local
+
+# Or directly
+python -m {{ package_name | default(value="spark_app") }}.main <input_path> <output_path>
+
+# With Spark
+spark-submit src/{{ package_name | default(value="spark_app") }}/main.py <input_path> <output_path>
+```
+
+### Testing
+
+```bash
+# Run all tests
+make test
+
+# Run with coverage
+make test-coverage
+
+# Run only integration tests
+make test-integration
+```
+
+### Code Quality
+
+```bash
+# Format code
+make format
+
+# Run linting
+make lint
+
+# Type checking
+make type-check
+```
+
+## Building and Deployment
+
+### Docker Image
+
+1. **Build the Docker image:**
+   ```bash
+   make docker-build
+   # or
+   docker build -t {{ docker_registry }}/{{ app_name | lower | replace(from=" ", to="-") }}:{{ version }} .
+   ```
+
+2. **Push to registry:**
+   ```bash
+   make docker-push
+   ```
+
+### Kubernetes Deployment
+
+1. **Prerequisites:**
+   ```bash
+   # Install Spark Operator
+   helm repo add spark-operator https://kubeflow.github.io/spark-operator
+   helm repo update
+   helm install spark-operator spark-operator/spark-operator \
+     --namespace spark-operator \
+     --create-namespace
+   ```
+
+2. **Deploy the application:**
+   ```bash
+   # Create namespace and RBAC
+   make k8s-create-namespace
+   make k8s-apply-rbac
+   make k8s-apply-config
+   
+   # Deploy application
+   make k8s-deploy
+   ```
+
+3. **Monitor the application:**
+   ```bash
+   # Check status
+   make k8s-status
+   
+   # View logs
+   make k8s-logs
+   
+   # Access Spark UI
+   make k8s-ui
+   ```
+
+## Configuration
+
+The application can be configured through multiple sources (in order of precedence):
+
+1. **Command-line arguments**
+   {% for i in range(end=arguments | length) %}
+   - Argument {{ i }}: {{ arguments[i].description }}
+   {% endfor %}
+
+2. **Environment variables**
+   {% for field in config_fields %}
+   - `{{ field.env_var | default(value=field.name | upper) }}`: {{ field.description }}
+   {% endfor %}
+
+3. **Configuration file**
+   - Set `CONFIG_FILE` environment variable to point to a JSON/YAML/TOML config file
+
+4. **Default values**
+   - See `resources/config.json` for defaults
+
+### Example Configuration
+
+```json
+{
+  "app_name": "{{ app_name }}",
+  {% for field in config_fields %}
+  "{{ field.name }}": {{ field.default_value | json_encode }}{% if not loop.last %},{% endif %}
+  {% endfor %}
+}
+```
+
+## Development
+
+### Project Setup
+
+```bash
+# Clone the repository
+git clone <repository-url>
+cd {{ app_name | lower | replace(from=" ", to="-") }}
+
+# Create virtual environment
+python -m venv venv
+source venv/bin/activate
+
+# Install in development mode
+pip install -e .
+pip install -r requirements.txt
+```
+
+### Adding Dependencies
+
+1. Add to `requirements.txt`:
+   ```
+   package-name>=version
+   ```
+
+2. Update Docker image:
+   ```bash
+   make docker-build
+   ```
+
+### Running with Jupyter
+
+```bash
+make notebook
+# or
+PYTHONPATH=src:$PYTHONPATH jupyter notebook
+```
+
+### Interactive Shell
+
+```bash
+make shell
+# Opens IPython with Spark pre-configured
+```
+
+## Troubleshooting
+
+### Common Issues
+
+1. **Out of Memory Errors:**
+   - Increase executor/driver memory in `k8s/spark-application.yaml`
+   - Adjust `spark.sql.shuffle.partitions` in configuration
+
+2. **Module Import Errors:**
+   - Ensure `PYTHONPATH` includes the src directory
+   - Check that all dependencies are installed
+
+3. **Spark Submit Failures:**
+   - Verify Python version compatibility
+   - Check driver/executor logs for detailed errors
+
+4. **Performance Issues:**
+   - Enable adaptive query execution (enabled by default)
+   - Review data partitioning strategy
+   - Monitor resource usage
+
+### Debugging
+
+1. **Enable debug logging:**
+   ```bash
+   export LOG_LEVEL=DEBUG
+   ```
+
+2. **Access driver logs:**
+   ```bash
+   kubectl logs {{ app_name | lower | replace(from=" ", to="-") }}-driver -n {{ namespace | default(value="spark-apps") }}
+   ```
+
+3. **Check executor logs:**
+   ```bash
+   kubectl logs -l spark-role=executor -n {{ namespace | default(value="spark-apps") }}
+   ```
+
+## Contributing
+
+1. Fork the repository
+2. Create a feature branch
+3. Make your changes
+4. Run tests and linting
+5. Submit a pull request
+
+## License
+
+{{ license | default(value="Apache 2.0") }}
+
+## Contact
+
+{{ contact_info | default(value="For questions or support, please open an issue on GitHub.") }}

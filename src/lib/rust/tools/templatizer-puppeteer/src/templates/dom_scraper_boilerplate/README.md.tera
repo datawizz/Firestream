@@ -1,0 +1,242 @@
+# {{ site_name | capitalize }} Scraper
+
+Web scraper for {{ site_name }} using the {{ workflow_type }} workflow.
+
+## Overview
+
+This scraper is designed to run as a single-execution pod in Kubernetes, scheduled by Apache Airflow. It extracts data from {{ site_url }} and saves it to S3 in {{ output_format | default(value="parquet") }} format.
+
+## Workflow Type: {{ workflow_type | capitalize | replace(from="-", to=" ") }}
+
+{% if workflow_type == "dom-scraping" -%}
+This scraper uses the DOM scraping workflow:
+1. Launches a headless browser using Puppeteer
+2. Logs into the website using form authentication
+3. Navigates through specified pages
+4. Extracts data from the DOM
+5. Transforms and saves data to S3
+{%- else -%}
+This scraper uses the API scraping workflow:
+1. Launches a headless browser to perform authentication
+2. Extracts authentication tokens/cookies
+3. Closes the browser and uses the auth data for API calls
+4. Makes configured API requests
+5. Processes responses and saves data to S3
+{%- endif %}
+
+## Site-Specific Implementation
+
+The following files contain the site-specific logic that needs to be implemented:
+
+{% if workflow_type == "dom-scraping" -%}
+- `src/data-extractor.ts` - Contains the data extraction logic
+  - `getLoginSelectors()` - CSS selectors for the login form
+  - `getNavigationSteps()` - Pages to visit for data extraction
+  - `extractData()` - Logic to extract data from each page
+  - `transformData()` - Data transformation and cleanup
+{%- else -%}
+- `src/api-client.ts` - Contains the API interaction logic
+  - `getLoginSelectors()` - CSS selectors for the login form
+  - `extractAuth()` - Extract authentication data after login
+  - `configureClient()` - Configure the HTTP client with auth
+  - `getAPIRequests()` - Define API endpoints to call
+  - `processResponses()` - Process API responses into data
+  - `transformData()` - Data transformation and cleanup
+{%- endif %}
+
+## Configuration
+
+### Environment Variables
+
+Create a `.env` file based on `.env.example`:
+
+```bash
+{% if auth_type == "form" -%}
+{{ site_name | upper }}_USERNAME=your-username
+{{ site_name | upper }}_PASSWORD=your-password
+{%- elif auth_type == "api-key" -%}
+{{ site_name | upper }}_API_KEY=your-api-key
+{%- endif %}
+S3_BUCKET=your-s3-bucket
+AWS_REGION={{ s3_region | default(value="us-east-1") }}
+```
+
+### Site Configuration
+
+The main configuration is in `src/config.ts`. This includes:
+- Site URL and authentication settings
+- S3 storage configuration
+- Retry policies
+
+## Development
+
+### Prerequisites
+
+- Node.js 18+
+- Chrome/Chromium installed locally
+- AWS credentials configured
+
+### Local Development
+
+1. Install dependencies:
+   ```bash
+   npm install
+   ```
+
+2. Implement the site-specific logic in `src/{% if workflow_type == "dom-scraping" %}data-extractor{% else %}api-client{% endif %}.ts`
+
+3. Run in development mode:
+   ```bash
+   npm run dev
+   ```
+
+4. Build for production:
+   ```bash
+   npm run build
+   ```
+
+### Testing Your Implementation
+
+1. Start with a simple test to verify login works
+2. Test individual data extraction methods
+3. Verify the complete workflow with a small dataset
+4. Check the S3 output format
+
+## Docker Build
+
+Build the Docker image:
+
+```bash
+docker build -t {{ site_name }}-scraper:latest .
+```
+
+Test locally with Docker:
+
+```bash
+docker run --rm \
+  -e {{ site_name | upper }}_USERNAME="$USERNAME" \
+  -e {{ site_name | upper }}_PASSWORD="$PASSWORD" \
+  -e S3_BUCKET="$BUCKET" \
+  -e AWS_REGION="{{ s3_region | default(value="us-east-1") }}" \
+  -e AWS_ACCESS_KEY_ID="$AWS_ACCESS_KEY_ID" \
+  -e AWS_SECRET_ACCESS_KEY="$AWS_SECRET_ACCESS_KEY" \
+  {{ site_name }}-scraper:latest
+```
+
+## Kubernetes Deployment
+
+Example Kubernetes Job:
+
+```yaml
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ site_name }}-scraper-{{ "{{ .Date }}" }}
+spec:
+  template:
+    spec:
+      containers:
+      - name: scraper
+        image: your-registry/{{ site_name }}-scraper:latest
+        env:
+        - name: {{ site_name | upper }}_USERNAME
+          valueFrom:
+            secretKeyRef:
+              name: {{ site_name }}-credentials
+              key: username
+        - name: {{ site_name | upper }}_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: {{ site_name }}-credentials
+              key: password
+        - name: S3_BUCKET
+          value: "{{ s3_bucket }}"
+        - name: AWS_REGION
+          value: "{{ s3_region | default(value="us-east-1") }}"
+        resources:
+          requests:
+            memory: "2Gi"
+            cpu: "1"
+          limits:
+            memory: "4Gi"
+            cpu: "2"
+      restartPolicy: Never
+      serviceAccountName: scraper-sa  # Should have S3 write permissions
+```
+
+## Airflow Integration
+
+Example DAG configuration:
+
+```python
+from airflow.providers.kubernetes.operators.kubernetes_pod import KubernetesPodOperator
+
+scrape_task = KubernetesPodOperator(
+    task_id='scrape_{{ site_name }}',
+    name='{{ site_name }}-scraper',
+    namespace='scrapers',
+    image='your-registry/{{ site_name }}-scraper:latest',
+    env_vars={
+        '{{ site_name | upper }}_USERNAME': '{{ "{{ var.value." }}{{ site_name }}_username }}',
+        '{{ site_name | upper }}_PASSWORD': '{{ "{{ var.value." }}{{ site_name }}_password }}',
+        'S3_BUCKET': '{{ "{{ var.value.scraper_bucket }}" }}',
+        'AWS_REGION': '{{ s3_region | default(value="us-east-1") }}'
+    },
+    resources={
+        'request_memory': '2Gi',
+        'request_cpu': '1000m',
+        'limit_memory': '4Gi',
+        'limit_cpu': '2000m'
+    },
+    is_delete_operator_pod=True,
+    get_logs=True
+)
+```
+
+## Output Format
+
+Data is saved to S3 with the following structure:
+- **Location**: `s3://{{ s3_bucket }}/scraped-data/{{ site_name }}/YYYY-MM-DD/data-TIMESTAMP.{{ output_format | default(value="parquet") }}`
+- **Format**: {{ output_format | default(value="Parquet") }} with schema inferred from the data
+
+## Troubleshooting
+
+### Common Issues
+
+1. **Login failures**
+   - Verify selectors in `getLoginSelectors()` match the current site
+   - Check if the site has captcha or rate limiting
+   - Try increasing delays between actions
+
+2. **No data extracted**
+   - Verify the CSS selectors in `extractData()` are correct
+   - Check if the site structure has changed
+   - Enable DEBUG mode to see page screenshots
+
+3. **S3 upload failures**
+   - Verify AWS credentials and permissions
+   - Check S3 bucket exists and is accessible
+   - Ensure the IAM role has `s3:PutObject` permission
+
+### Debug Mode
+
+Set `DEBUG=true` in environment variables to:
+- Enable verbose logging
+- Save screenshots at each step
+- Log all network requests (API workflow)
+
+## Monitoring
+
+The scraper outputs structured JSON logs suitable for aggregation in K8s logging systems. Key metrics logged:
+- Total execution time
+- Number of records scraped
+- S3 output location
+- Error details if any
+
+## Exit Codes
+
+- `0` - Success
+- `1` - Known error (e.g., login failed, no data)
+- `2` - Unexpected error
+
+These codes are used by Airflow to determine task success/failure.

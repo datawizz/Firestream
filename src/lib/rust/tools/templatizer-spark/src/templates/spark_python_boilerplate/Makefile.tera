@@ -1,0 +1,183 @@
+# Makefile for {{ app_name }}
+
+# Variables
+APP_NAME := {{ app_name | lower | replace(from=" ", to="-") }}
+VERSION := {{ version }}
+DOCKER_REGISTRY := {{ docker_registry }}
+DOCKER_IMAGE := $(DOCKER_REGISTRY)/$(APP_NAME):$(VERSION)
+NAMESPACE := {{ namespace | default(value="spark-apps") }}
+PYTHON := python{{ python_major_version | default(value="3") }}
+PACKAGE_NAME := {{ package_name | default(value="spark_app") }}
+
+# Colors for output
+GREEN := \033[0;32m
+YELLOW := \033[0;33m
+RED := \033[0;31m
+NC := \033[0m # No Color
+
+.PHONY: help
+help: ## Display this help message
+	@echo "$(GREEN){{ app_name }} - Available targets:$(NC)"
+	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "  $(YELLOW)%-20s$(NC) %s\n", $$1, $$2}'
+
+.PHONY: clean
+clean: ## Clean build artifacts
+	@echo "$(GREEN)Cleaning build artifacts...$(NC)"
+	rm -rf build/ dist/ *.egg-info/
+	rm -rf .pytest_cache/ .coverage htmlcov/
+	find . -type d -name __pycache__ -exec rm -rf {} +
+	find . -type f -name "*.pyc" -delete
+	find . -type f -name "*.pyo" -delete
+
+.PHONY: install
+install: ## Install dependencies
+	@echo "$(GREEN)Installing dependencies...$(NC)"
+	pip install -r requirements.txt
+
+.PHONY: install-dev
+install-dev: install ## Install development dependencies
+	@echo "$(GREEN)Installing development dependencies...$(NC)"
+	pip install -r requirements-dev.txt || pip install pytest pytest-cov black flake8 mypy
+
+.PHONY: format
+format: ## Format code with black
+	@echo "$(GREEN)Formatting code...$(NC)"
+	black src/ tests/
+
+.PHONY: lint
+lint: ## Run linting checks
+	@echo "$(GREEN)Running flake8...$(NC)"
+	flake8 src/ tests/ --max-line-length={{ max_line_length | default(value=100) }}
+
+.PHONY: type-check
+type-check: ## Run type checking with mypy
+	@echo "$(GREEN)Running mypy...$(NC)"
+	mypy src/ --ignore-missing-imports
+
+.PHONY: test
+test: ## Run tests
+	@echo "$(GREEN)Running tests...$(NC)"
+	pytest tests/ -v
+
+.PHONY: test-coverage
+test-coverage: ## Run tests with coverage
+	@echo "$(GREEN)Running tests with coverage...$(NC)"
+	pytest tests/ --cov=$(PACKAGE_NAME) --cov-report=html --cov-report=term
+
+.PHONY: test-integration
+test-integration: ## Run integration tests
+	@echo "$(GREEN)Running integration tests...$(NC)"
+	pytest tests/ -v -m integration
+
+.PHONY: build
+build: clean ## Build Python package
+	@echo "$(GREEN)Building Python package...$(NC)"
+	$(PYTHON) setup.py sdist bdist_wheel
+
+.PHONY: docker-build
+docker-build: ## Build Docker image
+	@echo "$(GREEN)Building Docker image: $(DOCKER_IMAGE)$(NC)"
+	docker build -t $(DOCKER_IMAGE) .
+
+.PHONY: docker-push
+docker-push: docker-build ## Push Docker image to registry
+	@echo "$(GREEN)Pushing Docker image: $(DOCKER_IMAGE)$(NC)"
+	docker push $(DOCKER_IMAGE)
+
+.PHONY: docker-run
+docker-run: ## Run Docker container locally
+	@echo "$(GREEN)Running Docker container locally...$(NC)"
+	docker run --rm -it \
+		-e SPARK_LOCAL_IP=127.0.0.1 \
+		$(DOCKER_IMAGE) \
+		/opt/spark/bin/spark-submit \
+		--master local[*] \
+		--driver-memory 2g \
+		/opt/spark/work-dir/$(PACKAGE_NAME)/main.py \
+		{% for arg in local_run_args %}{{ arg }} {% endfor %}
+
+.PHONY: k8s-create-namespace
+k8s-create-namespace: ## Create Kubernetes namespace
+	@echo "$(GREEN)Creating namespace: $(NAMESPACE)$(NC)"
+	kubectl create namespace $(NAMESPACE) --dry-run=client -o yaml | kubectl apply -f -
+
+.PHONY: k8s-apply-rbac
+k8s-apply-rbac: k8s-create-namespace ## Apply RBAC configuration
+	@echo "$(GREEN)Applying RBAC configuration...$(NC)"
+	kubectl apply -f k8s/rbac.yaml
+
+.PHONY: k8s-apply-config
+k8s-apply-config: k8s-create-namespace ## Apply ConfigMap
+	@echo "$(GREEN)Applying ConfigMap...$(NC)"
+	kubectl apply -f k8s/configmap.yaml
+
+.PHONY: k8s-deploy
+k8s-deploy: k8s-apply-rbac k8s-apply-config ## Deploy Spark application to Kubernetes
+	@echo "$(GREEN)Deploying Spark application...$(NC)"
+	kubectl apply -f k8s/spark-application.yaml
+
+.PHONY: k8s-delete
+k8s-delete: ## Delete Spark application from Kubernetes
+	@echo "$(YELLOW)Deleting Spark application...$(NC)"
+	kubectl delete -f k8s/spark-application.yaml --ignore-not-found
+	kubectl delete -f k8s/configmap.yaml --ignore-not-found
+	kubectl delete -f k8s/rbac.yaml --ignore-not-found
+
+.PHONY: k8s-status
+k8s-status: ## Check application status
+	@echo "$(GREEN)Checking application status...$(NC)"
+	kubectl get sparkapplication $(APP_NAME) -n $(NAMESPACE)
+	@echo ""
+	kubectl get pods -n $(NAMESPACE) -l app=$(APP_NAME)
+
+.PHONY: k8s-logs
+k8s-logs: ## View driver logs
+	@echo "$(GREEN)Fetching driver logs...$(NC)"
+	kubectl logs -f $(APP_NAME)-driver -n $(NAMESPACE)
+
+.PHONY: k8s-ui
+k8s-ui: ## Port-forward Spark UI
+	@echo "$(GREEN)Port-forwarding Spark UI to http://localhost:4040$(NC)"
+	kubectl port-forward $(APP_NAME)-driver 4040:4040 -n $(NAMESPACE)
+
+.PHONY: run-local
+run-local: ## Run application locally
+	@echo "$(GREEN)Running application locally...$(NC)"
+	$(PYTHON) -m $(PACKAGE_NAME).main {% for arg in local_run_args %}{{ arg }} {% endfor %}
+
+{% if use_pre_commit %}
+.PHONY: pre-commit
+pre-commit: ## Run pre-commit hooks
+	@echo "$(GREEN)Running pre-commit hooks...$(NC)"
+	pre-commit run --all-files
+
+.PHONY: pre-commit-install
+pre-commit-install: ## Install pre-commit hooks
+	@echo "$(GREEN)Installing pre-commit hooks...$(NC)"
+	pre-commit install
+{% endif %}
+
+.PHONY: all
+all: clean lint test build ## Clean, lint, test, and build
+
+.PHONY: deploy
+deploy: docker-push k8s-deploy ## Build, push, and deploy to Kubernetes
+	@echo "$(GREEN)Deployment complete!$(NC)"
+
+# Development helpers
+.PHONY: shell
+shell: ## Start Python shell with Spark
+	@echo "$(GREEN)Starting Python shell with Spark...$(NC)"
+	PYTHONPATH=src:$$PYTHONPATH $(PYTHON) -c "from pyspark.sql import SparkSession; spark = SparkSession.builder.appName('shell').master('local[*]').getOrCreate(); import IPython; IPython.embed()"
+
+.PHONY: notebook
+notebook: ## Start Jupyter notebook
+	@echo "$(GREEN)Starting Jupyter notebook...$(NC)"
+	PYTHONPATH=src:$$PYTHONPATH jupyter notebook
+
+# Custom targets
+{% for target in custom_make_targets %}
+.PHONY: {{ target.name }}
+{{ target.name }}: {{ target.dependencies | join(sep=" ") }} ## {{ target.description }}
+	{{ target.commands | join(sep="\n\t") }}
+{% endfor %}

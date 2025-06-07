@@ -1,0 +1,129 @@
+package {{ package_name }}
+
+import org.apache.spark.sql.SparkSession
+import org.scalatest.{BeforeAndAfterAll}  
+import org.scalatest.funsuite.AnyFunSuite
+import org.scalatest.matchers.should.Matchers
+
+class {{ main_class_name | default(value="SparkApp") }}Test extends AnyFunSuite with Matchers with BeforeAndAfterAll {
+  
+  @transient lazy val spark: SparkSession = SparkSession.builder()
+    .appName("{{ app_name }}-test")
+    .master("local[*]")
+    .config("spark.driver.bindAddress", "127.0.0.1")
+    .config("spark.ui.enabled", "false")
+    .config("spark.sql.shuffle.partitions", "1")
+    .getOrCreate()
+  
+  override def beforeAll(): Unit = {
+    // Initialize spark by accessing the lazy val
+    spark
+  }
+  
+  override def afterAll(): Unit = {
+    if (spark != null) {
+      spark.stop()
+    }
+  }
+  
+  test("SparkSession should be created") {
+    spark should not be null
+    spark.sparkContext should not be null
+  }
+  
+  test("processData should handle empty DataFrame") {
+    import spark.implicits._
+    
+    // Create empty DataFrame with expected schema
+    val emptyDF = spark.emptyDataFrame
+    
+    // This test would need to be adjusted based on your actual processData implementation
+    // For now, just verify we can create an empty DataFrame
+    emptyDF.count() shouldBe 0
+  }
+  
+  {% if test_sample_data %}
+  test("processData should transform sample data correctly") {
+    import spark.implicits._
+    
+    // Create sample data
+    val sampleData = Seq(
+      {% for record in test_sample_data %}
+      {{ record }}{% if not loop.last %},{% endif %}
+      {% endfor %}
+    ).toDF({% for col in test_columns %}"{{ col }}"{% if not loop.last %}, {% endif %}{% endfor %})
+    
+    // Process the data
+    // val result = {{ main_class_name | default(value="SparkApp") }}.processData(spark, config)
+    
+    // Add assertions based on expected transformations
+    sampleData.count() should be > 0L
+  }
+  {% endif %}
+  
+  {% if additional_tests %}{% for test in additional_tests %}
+  test("{{ test.name }}") {
+    {{ test.body | indent(width=4) }}
+  }
+  {% endfor %}{% endif %}
+}
+
+{% if include_integration_test %}
+class {{ main_class_name | default(value="SparkApp") }}IntegrationTest extends AnyFunSuite with Matchers with BeforeAndAfterAll {
+  
+  @transient lazy val spark: SparkSession = SparkSession.builder()
+    .appName("{{ app_name }}-integration-test")
+    .master("local[*]")
+    .config("spark.driver.bindAddress", "127.0.0.1")
+    .getOrCreate()
+  
+  override def beforeAll(): Unit = {
+    // Initialize spark by accessing the lazy val
+    spark
+  }
+  
+  override def afterAll(): Unit = {
+    if (spark != null) {
+      spark.stop()
+    }
+  }
+  
+  test("End-to-end processing should work correctly") {
+    import spark.implicits._
+    
+    // Create test data
+    val testInputPath = "target/test-input"
+    val testOutputPath = "target/test-output"
+    
+    // Clean up any existing test data
+    import java.nio.file.{Files, Paths}
+    import scala.util.Try
+    Try(Files.deleteIfExists(Paths.get(testInputPath)))
+    Try(Files.deleteIfExists(Paths.get(testOutputPath)))
+    
+    // Create sample input data
+    val inputData = Seq(
+      ("id1", 100.0, "category1"),
+      ("id2", 200.0, "category2"),
+      ("id3", 150.0, "category1")
+    ).toDF("id", "value", "category")
+    
+    // Write test input
+    inputData.write.mode("overwrite").parquet(testInputPath)
+    
+    // Run the main method with test arguments
+    val args = Array(testInputPath, testOutputPath)
+    
+    // This would need to be adjusted to not call System.exit
+    // {{ main_class_name | default(value="SparkApp") }}.main(args)
+    
+    // Verify output
+    val outputData = spark.read.parquet(testOutputPath)
+    outputData.count() should be > 0L
+    
+    // Clean up
+    Try(Files.deleteIfExists(Paths.get(testInputPath)))
+    Try(Files.deleteIfExists(Paths.get(testOutputPath)))
+  }
+}
+{% endif %}

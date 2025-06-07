@@ -1,0 +1,391 @@
+import { Brand, Schema } from '@effect/schema';
+import { pipe } from 'effect/Function';
+
+// Branded types for type safety
+export type Url = string & Brand.Brand<"Url">;
+export type CssSelector = string & Brand.Brand<"CssSelector">;
+export type XPath = string & Brand.Brand<"XPath">;
+
+// Smart constructors with validation
+export const Url = pipe(
+  Schema.String,
+  Schema.filter(
+    (s): s is Url => /^https?:\/\/.+/.test(s),
+    { message: () => "Invalid URL format" }
+  ),
+  Schema.brand("Url")
+);
+
+export const CssSelector = pipe(
+  Schema.String,
+  Schema.filter(
+    (s): s is CssSelector => {
+      try {
+        document.querySelector(s); // Browser validation
+        return true;
+      } catch {
+        return s.length > 0; // Basic validation in Node
+      }
+    },
+    { message: () => "Invalid CSS selector" }
+  ),
+  Schema.brand("CssSelector")
+);
+
+// Core ADT for scraper actions
+export type ScraperAction<T> = 
+  | Navigate
+  | Click
+  | Type
+  | Wait
+  | Extract<T>
+  | ExtractAll<T>
+  | ExtractAuth
+  | Screenshot
+  | Sequence<T>
+  | Parallel<T>
+  | Map<any, T>
+  | FlatMap<any, T>
+  | Retry<T>
+  | WithTimeout<T>;
+
+export interface Navigate {
+  readonly _tag: "Navigate";
+  readonly url: Url;
+  readonly waitUntil?: "load" | "domcontentloaded" | "networkidle0" | "networkidle2";
+}
+
+export interface Click {
+  readonly _tag: "Click";
+  readonly selector: CssSelector;
+  readonly options?: {
+    readonly clickCount?: number;
+    readonly delay?: number;
+  };
+}
+
+export interface Type {
+  readonly _tag: "Type";
+  readonly selector: CssSelector;
+  readonly text: string;
+  readonly options?: {
+    readonly delay?: number;
+    readonly clear?: boolean;
+  };
+}
+
+export interface Wait {
+  readonly _tag: "Wait";
+  readonly condition:
+    | { readonly type: "selector"; readonly value: CssSelector }
+    | { readonly type: "xpath"; readonly value: XPath }
+    | { readonly type: "timeout"; readonly value: number }
+    | { readonly type: "function"; readonly value: string }
+    | { readonly type: "navigation" };
+}
+
+export interface Extract<T> {
+  readonly _tag: "Extract";
+  readonly extractor: Extractor<T>;
+}
+
+export interface ExtractAll<T> {
+  readonly _tag: "ExtractAll";
+  readonly selector: CssSelector;
+  readonly itemExtractor: Extractor<T>;
+}
+
+export interface ExtractAuth {
+  readonly _tag: "ExtractAuth";
+  readonly storage: "localStorage" | "sessionStorage" | "cookies";
+  readonly keys: readonly string[];
+}
+
+export interface Screenshot {
+  readonly _tag: "Screenshot";
+  readonly name: string;
+  readonly fullPage?: boolean;
+}
+
+export interface Sequence<T> {
+  readonly _tag: "Sequence";
+  readonly actions: readonly ScraperAction<any>[];
+  readonly keepLast?: boolean; // Only return last result
+}
+
+export interface Parallel<T> {
+  readonly _tag: "Parallel";
+  readonly actions: readonly ScraperAction<any>[];
+  readonly maxConcurrency?: number;
+}
+
+export interface Map<A, B> {
+  readonly _tag: "Map";
+  readonly action: ScraperAction<A>;
+  readonly fn: (a: A) => B;
+}
+
+export interface FlatMap<A, B> {
+  readonly _tag: "FlatMap";
+  readonly action: ScraperAction<A>;
+  readonly fn: (a: A) => ScraperAction<B>;
+}
+
+export interface Retry<T> {
+  readonly _tag: "Retry";
+  readonly action: ScraperAction<T>;
+  readonly times: number;
+  readonly delay?: number;
+}
+
+export interface WithTimeout<T> {
+  readonly _tag: "WithTimeout";
+  readonly action: ScraperAction<T>;
+  readonly timeoutMs: number;
+}
+
+// Extractor types
+export type Extractor<T> = 
+  | TextExtractor
+  | AttributeExtractor
+  | HtmlExtractor
+  | JsonExtractor<T>
+  | CompositeExtractor<T>;
+
+export interface TextExtractor {
+  readonly _tag: "TextExtractor";
+  readonly selector: CssSelector;
+  readonly transform?: (text: string) => string;
+}
+
+export interface AttributeExtractor {
+  readonly _tag: "AttributeExtractor";
+  readonly selector: CssSelector;
+  readonly attribute: string;
+}
+
+export interface HtmlExtractor {
+  readonly _tag: "HtmlExtractor";
+  readonly selector: CssSelector;
+  readonly inner?: boolean;
+}
+
+export interface JsonExtractor<T> {
+  readonly _tag: "JsonExtractor";
+  readonly selector: CssSelector;
+  readonly schema: Schema.Schema<T>;
+}
+
+export interface CompositeExtractor<T> {
+  readonly _tag: "CompositeExtractor";
+  readonly fields: {
+    readonly [K in keyof T]: Extractor<T[K]>;
+  };
+}
+
+// Constructors (Scraper DSL)
+export const Scraper = {
+  // Navigation
+  navigate: (url: Url, waitUntil?: Navigate["waitUntil"]): ScraperAction<void> => ({
+    _tag: "Navigate",
+    url,
+    waitUntil
+  }),
+
+  // Interactions
+  click: (selector: CssSelector, options?: Click["options"]): ScraperAction<void> => ({
+    _tag: "Click",
+    selector,
+    options
+  }),
+
+  type: (selector: CssSelector, text: string, options?: Type["options"]): ScraperAction<void> => ({
+    _tag: "Type",
+    selector,
+    text,
+    options
+  }),
+
+  // Waiting
+  wait: (condition: Wait["condition"]): ScraperAction<void> => ({
+    _tag: "Wait",
+    condition
+  }),
+
+  waitForSelector: (selector: CssSelector): ScraperAction<void> => ({
+    _tag: "Wait",
+    condition: { type: "selector", value: selector }
+  }),
+
+  waitForTimeout: (ms: number): ScraperAction<void> => ({
+    _tag: "Wait",
+    condition: { type: "timeout", value: ms }
+  }),
+
+  // Extraction
+  extract: <T>(extractor: Extractor<T>): ScraperAction<T> => ({
+    _tag: "Extract",
+    extractor
+  }),
+
+  extractAll: <T>(selector: CssSelector, itemExtractor: Extractor<T>): ScraperAction<T[]> => ({
+    _tag: "ExtractAll",
+    selector,
+    itemExtractor
+  }),
+
+  extractAuth: (storage: ExtractAuth["storage"], keys: readonly string[]): ScraperAction<AuthData> => ({
+    _tag: "ExtractAuth",
+    storage,
+    keys
+  }),
+
+  // Screenshots
+  screenshot: (name: string, fullPage = true): ScraperAction<void> => ({
+    _tag: "Screenshot",
+    name,
+    fullPage
+  }),
+
+  // Combinators
+  sequence: <T>(...actions: ScraperAction<any>[]): ScraperAction<T> => ({
+    _tag: "Sequence",
+    actions,
+    keepLast: true
+  }),
+
+  sequenceAll: <T>(...actions: ScraperAction<T>[]): ScraperAction<T[]> => ({
+    _tag: "Sequence",
+    actions,
+    keepLast: false
+  }),
+
+  parallel: <T>(...actions: ScraperAction<T>[]): ScraperAction<T[]> => ({
+    _tag: "Parallel",
+    actions
+  }),
+
+  // Transformations
+  map: <A, B>(action: ScraperAction<A>, fn: (a: A) => B): ScraperAction<B> => ({
+    _tag: "Map",
+    action,
+    fn
+  }),
+
+  flatMap: <A, B>(action: ScraperAction<A>, fn: (a: A) => ScraperAction<B>): ScraperAction<B> => ({
+    _tag: "FlatMap",
+    action,
+    fn
+  }),
+
+  // Error handling
+  retry: <T>(action: ScraperAction<T>, times: number, delay?: number): ScraperAction<T> => ({
+    _tag: "Retry",
+    action,
+    times,
+    delay
+  }),
+
+  withTimeout: <T>(action: ScraperAction<T>, timeoutMs: number): ScraperAction<T> => ({
+    _tag: "WithTimeout",
+    action,
+    timeoutMs
+  })
+};
+
+// Extractor constructors
+export const Extractors = {
+  text: (selector: CssSelector, transform?: (text: string) => string): Extractor<string> => ({
+    _tag: "TextExtractor",
+    selector,
+    transform
+  }),
+
+  attribute: (selector: CssSelector, attribute: string): Extractor<string> => ({
+    _tag: "AttributeExtractor",
+    selector,
+    attribute
+  }),
+
+  html: (selector: CssSelector, inner = true): Extractor<string> => ({
+    _tag: "HtmlExtractor",
+    selector,
+    inner
+  }),
+
+  json: <T>(selector: CssSelector, schema: Schema.Schema<T>): Extractor<T> => ({
+    _tag: "JsonExtractor",
+    selector,
+    schema
+  }),
+
+  composite: <T>(fields: CompositeExtractor<T>["fields"]): Extractor<T> => ({
+    _tag: "CompositeExtractor",
+    fields
+  })
+};
+
+// Common patterns
+export const login = (
+  username: string,
+  password: string,
+  selectors: {
+    usernameField: CssSelector;
+    passwordField: CssSelector;
+    submitButton: CssSelector;
+  }
+): ScraperAction<void> =>
+  Scraper.sequence(
+    Scraper.type(selectors.usernameField, username, { clear: true }),
+    Scraper.type(selectors.passwordField, password, { clear: true }),
+    Scraper.click(selectors.submitButton),
+    Scraper.waitForTimeout(2000) // Wait for login to process
+  );
+
+export const paginatedExtraction = <T>(
+  firstPageUrl: Url,
+  nextPageSelector: CssSelector,
+  itemExtractor: Extractor<T>
+): ScraperAction<T[]> => {
+  const extractPage = (url: Url): ScraperAction<{ items: T[]; hasNext: boolean }> =>
+    Scraper.sequence(
+      Scraper.navigate(url),
+      Scraper.parallel(
+        Scraper.extractAll(CssSelector(".item"), itemExtractor),
+        Scraper.extract(Extractors.attribute(nextPageSelector, "href"))
+          .pipe(
+            Scraper.map(href => href !== null && href !== "")
+          )
+      ).pipe(
+        Scraper.map(([items, hasNext]) => ({ items, hasNext }))
+      )
+    );
+
+  // Note: This is simplified - real implementation would need recursive handling
+  return extractPage(firstPageUrl).pipe(
+    Scraper.map(result => result.items)
+  );
+};
+
+// Types
+export interface AuthData {
+  token?: string;
+  cookies?: Array<{ name: string; value: string }>;
+  headers?: Record<string, string>;
+}
+
+// Helper for pipe-style API
+declare module "./dsl" {
+  interface ScraperAction<T> {
+    pipe<B>(this: ScraperAction<T>, fn: (action: ScraperAction<T>) => ScraperAction<B>): ScraperAction<B>;
+  }
+}
+
+// Add pipe method to prototype for ergonomics
+Object.defineProperty(Object.prototype, 'pipe', {
+  value: function<A, B>(this: ScraperAction<A>, fn: (action: ScraperAction<A>) => ScraperAction<B>): ScraperAction<B> {
+    return fn(this);
+  },
+  enumerable: false,
+  configurable: true
+});

@@ -1,0 +1,39 @@
+import { SiteConfig } from '../lib/core/types';
+
+// TODO: Configure your site-specific settings
+export const config: SiteConfig = {
+  name: '{{ site_name }}',
+  baseUrl: '{{ site_url }}',
+  workflow: '{{ workflow_type }}', // 'dom-scraping' or 'api-scraping'
+  auth: {
+    type: '{{ auth_type }}', // 'form', 'oauth', 'api-key', or 'custom'
+    {% if auth_type == "form" -%}
+    loginUrl: '{{ site_url }}/{{ login_path | default(value="login") }}',
+    credentials: {
+      username: process.env.{{ site_name | upper }}_USERNAME!,
+      password: process.env.{{ site_name | upper }}_PASSWORD!,
+    }
+    {%- elif auth_type == "api-key" -%}
+    credentials: {
+      apiKey: process.env.{{ site_name | upper }}_API_KEY!,
+    }
+    {%- else -%}
+    // TODO: Configure auth for {{ auth_type }}
+    credentials: {}
+    {%- endif %}
+  },
+  storage: {
+    s3: {
+      bucket: process.env.S3_BUCKET || '{{ s3_bucket }}',
+      prefix: `scraped-data/{{ site_name }}/{{ "{{ new Date().toISOString().split('T')[0] }}/" }}`,
+      region: process.env.AWS_REGION || '{{ s3_region | default(value="us-east-1") }}'
+    },
+    format: '{{ output_format | default(value="parquet") }}'
+  },
+  {% if enable_retry -%}
+  retry: {
+    maxAttempts: {{ retry_attempts | default(value=3) }},
+    backoffMs: {{ retry_backoff | default(value=1000) }}
+  }
+  {%- endif %}
+};

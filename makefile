@@ -12,9 +12,23 @@ development:
 	@bash -c 'cd $(BASEDIR) && bash bootstrap.sh development'
 
 
-build-devcontainer:
-	bash docker/docker_preinit.sh
-	docker compose -f docker/docker-compose.devcontainer.yml build devcontainer
+devcontainer:
+	bash docker/firestream/docker_preinit.sh
+	docker compose -f docker/firestream/docker-compose.devcontainer.yml build devcontainer
+
+nix-up:
+	# Build the flake
+	nix build .#container
+
+nix-fix:
+	# Delete old generations
+	nix-collect-garbage -d
+
+# # Run the setup script so paths are correctly set at login
+# RUN /bin/bash /home/$HOST_USERNAME/result/bin/setup-container
+
+
+
 
 build-devcontainer-clean:
 	bash docker/docker_preinit.sh
@@ -49,7 +63,7 @@ airflow:
 
 	# Deploy airflow locally for CLI testing
 	bash /workspace/src/plugins/airflow/bootstrap_local.sh
-	
+
 	# Run a test
 	python /workspace/src/plugins/airflow/dags/_examples/_template_dag_runnable.py
 

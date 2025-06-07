@@ -1,0 +1,30 @@
+auth:
+  rootUser: ""
+  rootPassword: ""
+
+
+defaultBuckets: ""
+
+
+# service:
+#   nodePorts:
+#     api: 39000
+#     console: 39001
+# gateway:
+#   enabled: true
+#   type: s3
+#   auth:
+#     s3:
+#       accessKey: mock-access-key-id
+#       secretKey: mock-secret-key
+# ingress:
+#   enabled: true
+
+# apiIngress:
+#   enabled: true
+
+# # Nodeport
+# service:
+#   nodePorts:
+#     api: 9000
+#     console: 9001

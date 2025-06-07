@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Firebase Auth Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .auth-container {
+            border: 1px solid #ccc;
+            padding: 20px;
+            border-radius: 8px;
+            margin-top: 20px;
+        }
+
+        .form-group {
+            margin-bottom: 15px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+        }
+
+        .form-group input {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+
+        button {
+            background-color: #4CAF50;
+            color: white;
+            padding: 10px 15px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+
+        button:hover {
+            background-color: #45a049;
+        }
+
+        #auth-status {
+            margin-top: 20px;
+            padding: 10px;
+            border-radius: 4px;
+        }
+
+        .success {
+            background-color: #dff0d8;
+            color: #3c763d;
+        }
+
+        .error {
+            background-color: #f2dede;
+            color: #a94442;
+        }
+    </style>
+</head>
+
+<body>
+    <h1>Firebase Authentication Test</h1>
+
+    <div class="auth-container">
+        <div id="auth-form">
+            <div class="form-group">
+                <label for="email">Email:</label>
+                <input type="email" id="email" name="email" required>
+            </div>
+            <div class="form-group">
+                <label for="password">Password:</label>
+                <input type="password" id="password" name="password" required>
+            </div>
+            <button onclick="login()">Login</button>
+        </div>
+        <div id="auth-status"></div>
+    </div>
+
+    <script src="https://www.gstatic.com/firebasejs/8.0/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.0/firebase-auth.js"></script>
+
+    <script>
+        // Initialize Firebase
+        var config = {
+            apiKey: "AIzaSyBh5p1HID21M8ppMw-_yTJXMyDWUA0g82o",
+            authDomain: "pleasantrees-prod.firebaseapp.com",
+        };
+        firebase.initializeApp(config);
+
+        // Login function
+        function login() {
+            const email = document.getElementById('email').value;
+            const password = document.getElementById('password').value;
+            const statusDiv = document.getElementById('auth-status');
+
+            firebase.auth().signInWithEmailAndPassword(email, password)
+                .then((userCredential) => {
+                    statusDiv.className = 'success';
+                    statusDiv.textContent = 'Successfully logged in! User ID: ' + userCredential.user.uid;
+                })
+                .catch((error) => {
+                    statusDiv.className = 'error';
+                    statusDiv.textContent = 'Error: ' + error.message;
+                });
+        }
+
+        // Auth state observer
+        firebase.auth().onAuthStateChanged((user) => {
+            const statusDiv = document.getElementById('auth-status');
+            if (user) {
+                statusDiv.className = 'success';
+                statusDiv.textContent = 'User is signed in. User ID: ' + user.uid;
+            } else {
+                statusDiv.textContent = 'No user is signed in.';
+            }
+        });
+    </script>
+</body>
+
+</html>

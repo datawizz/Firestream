@@ -3,7 +3,7 @@
 /.pytest_cache
 *.pyc
 **__pycache__**
-
+**/.venv/**
 
 
 ## Note JS packages
@@ -12,7 +12,7 @@
 ## Java
 *.jar
 **/target
-/target 
+/target
 
 ## Development Logs
 logs/**
@@ -25,7 +25,7 @@ logs/**
 .env.secrets
 
 # Created docker-compose file (contains secrets!)
-docker/docker-compose.devcontainer.yml
+docker/firestream/docker-compose.devcontainer.yml
 
 ## Downloaded Software / Plugins ##
 submodules/plugins/**
@@ -39,3 +39,10 @@ submodules/plugins/**
 # WIP Hacking
 submodules/examples/**
 _WIP/**
+
+
+# Rendered Deployment files
+src/deploy/rendered/**
+**/.pulumi/**
+_build/**
+target-ra/**
