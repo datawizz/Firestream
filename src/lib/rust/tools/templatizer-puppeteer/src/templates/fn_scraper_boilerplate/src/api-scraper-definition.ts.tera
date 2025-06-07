@@ -1,0 +1,164 @@
+import { 
+  APIScraperDefinition, 
+  Scraper, 
+  Extractors,
+  CssSelector,
+  Url,
+  Effect,
+  Schema,
+  ProcessingError,
+  validateData,
+  transformToParquet,
+  login,
+  APIRequest,
+  APIResponse
+} from '../lib';
+
+// TODO: Define your configuration schema
+const ConfigSchema = Schema.Struct({
+  loginUrl: Schema.String.pipe(Schema.brand("Url")),
+  apiBaseUrl: Schema.String.pipe(Schema.brand("Url")),
+  credentials: Schema.Struct({
+    {% if auth_type == "form" -%}
+    username: Schema.String,
+    password: Schema.String
+    {%- elif auth_type == "api-key" -%}
+    apiKey: Schema.String
+    {%- endif %}
+  })
+});
+
+type Config = Schema.Schema.Type<typeof ConfigSchema>;
+
+// TODO: Define your data schema
+const {{ site_name | capitalize }}APIDataSchema = Schema.Struct({
+  // TODO: Define your API data structure
+  // Example:
+  // id: Schema.String,
+  // name: Schema.String,
+  // data: Schema.Unknown
+});
+
+type {{ site_name | capitalize }}APIData = Schema.Schema.Type<typeof {{ site_name | capitalize }}APIDataSchema>;
+
+// API scraper definition
+export const {{ site_name }}APIScraper: APIScraperDefinition<Config, {{ site_name | capitalize }}APIData> = {
+  configSchema: ConfigSchema,
+  
+  // Build login program to extract auth
+  buildLoginProgram: (config) => 
+    Scraper.sequence(
+      Scraper.navigate(config.loginUrl as Url),
+      login(
+        {% if auth_type == "form" -%}
+        config.credentials.username,
+        config.credentials.password,
+        {%- elif auth_type == "api-key" -%}
+        config.credentials.apiKey,
+        '',  // No password for API key auth
+        {%- endif %}
+        {
+          usernameField: CssSelector('{{ login_username_selector | default(value="#username") }}'),
+          passwordField: CssSelector('{{ login_password_selector | default(value="#password") }}'),
+          submitButton: CssSelector('{{ login_submit_selector | default(value="#login-button") }}')
+        }
+      ),
+      Scraper.waitForSelector(CssSelector('{{ login_success_selector | default(value=".dashboard") }}')),
+      // Extract auth data
+      Scraper.extractAuth(
+        '{{ auth_storage | default(value="localStorage") }}',
+        ['{{ auth_token_key | default(value="auth_token") }}', 'access_token', 'jwt']
+      )
+    ),
+  
+  // Build extraction program (not used in API workflow but required by interface)
+  buildExtractionProgram: (_config) => 
+    Scraper.sequence(
+      // API workflow doesn't use browser extraction
+      Scraper.extract(Extractors.text(CssSelector('body')))
+    ),
+  
+  // Define API requests to make
+  getAPIRequests: (): APIRequest[] => [
+    {% for endpoint in api_endpoints -%}
+    {
+      method: '{{ endpoint.method | default(value="GET") }}',
+      endpoint: '{{ endpoint.path }}',
+      {% if endpoint.params -%}
+      params: {{ endpoint.params | json_encode }},
+      {% endif -%}
+      {% if endpoint.data -%}
+      data: {{ endpoint.data | json_encode }},
+      {% endif -%}
+      name: '{{ endpoint.name }}'
+    },
+    {% endfor -%}
+    // TODO: Add or modify API endpoints as needed
+  ],
+  
+  // Process API responses
+  processAPIResponses: (responses: APIResponse[]) =>
+    Effect.gen(function* (_) {
+      const allData: {{ site_name | capitalize }}APIData[] = [];
+      
+      // TODO: Process each API response
+      for (const response of responses) {
+        if (!response.data) {
+          console.warn(`No data in response for ${response.name}`);
+          continue;
+        }
+        
+        // TODO: Handle different response formats based on endpoint
+        // Example:
+        /*
+        if (response.name === 'products' && response.data.items) {
+          allData.push(...response.data.items);
+        } else if (response.name === 'categories' && Array.isArray(response.data)) {
+          allData.push(...response.data);
+        }
+        */
+        
+        console.warn(`Response processing not implemented for ${response.name}`);
+      }
+      
+      // Validate all data
+      const validated = yield* _(
+        Schema.decodeUnknown(Schema.Array({{ site_name | capitalize }}APIDataSchema))(allData),
+        Effect.mapError(error => new ProcessingError('API data validation failed', error))
+      );
+      
+      return validated;
+    }),
+  
+  // Process raw data (shared with DOM scraper)
+  processData: (raw: unknown) =>
+    Effect.gen(function* (_) {
+      const parsed = yield* _(
+        Schema.decodeUnknown(Schema.Array({{ site_name | capitalize }}APIDataSchema))(raw),
+        Effect.mapError(error => new ProcessingError('Data validation failed', error))
+      );
+      
+      yield* _(validateData<{{ site_name | capitalize }}APIData>(data => {
+        const errors: string[] = [];
+        
+        if (data.length === 0) {
+          errors.push('No data extracted from API');
+        }
+        
+        // TODO: Add validation logic
+        
+        return { valid: errors.length === 0, errors };
+      })(parsed));
+      
+      return parsed;
+    }),
+  
+  // Transform data to final format
+  transformData: transformToParquet('{{ site_name }}-api', (item: {{ site_name | capitalize }}APIData) => ({
+    ...item,
+    source: 'api',
+    apiVersion: '{{ api_version | default(value="v1") }}',
+    extractedAt: new Date().toISOString()
+    // TODO: Add any transformations
+  }))
+};

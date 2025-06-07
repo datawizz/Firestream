@@ -1,0 +1,57 @@
+[package]
+name = "templatizer-superset"
+version = "0.1.0"
+edition = "2021"
+authors = ["Cogent Creation Co"]
+description = "Elegant Superset dashboard generator from JSON configurations"
+license = ""
+repository = ""
+keywords = ["superset", "dashboard", "visualization", "postgresql", "analytics"]
+categories = ["visualization", "api-bindings", "database"]
+readme = "README.md"
+
+[[bin]]
+name = "superset-gen"
+path = "src/bin/superset-gen.rs"
+
+[[example]]
+name = "generate"
+path = "examples/generate.rs"
+
+[[example]]
+name = "api_server"
+path = "examples/api_server.rs"
+
+[[example]]
+name = "programmatic"
+path = "examples/programmatic.rs"
+
+[dependencies]
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+serde_yaml = "0.9"
+tera = "1"
+uuid = { version = "1.6", features = ["v4", "serde"] }
+chrono = { version = "0.4", features = ["serde"] }
+thiserror = "1.0"
+anyhow = "1.0"
+reqwest = { version = "0.11", features = ["json", "multipart", "stream"] }
+tokio = { version = "1", features = ["full"] }
+zip = "0.6"
+tempfile = "3"
+lazy_static = "1.4"
+regex = "1"
+base64 = "0.21"
+url = "2"
+dotenv = "0.15"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+md5 = "0.7"
+clap = { version = "4.4", features = ["derive"] }
+
+[dev-dependencies]
+tokio-test = "0.4"
+mockito = "1.2"
+axum = "0.7"
+tower = "0.4"
+tower-http = { version = "0.5", features = ["trace"] }

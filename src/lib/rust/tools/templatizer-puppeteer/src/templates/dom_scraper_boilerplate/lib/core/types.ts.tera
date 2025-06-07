@@ -1,0 +1,72 @@
+// Core configuration types
+export interface SiteConfig {
+  name: string;
+  baseUrl: string;
+  workflow: 'dom-scraping' | 'api-scraping';
+  auth: AuthConfig;
+  storage: StorageConfig;
+  retry?: RetryConfig;
+}
+
+export interface AuthConfig {
+  type: 'form' | 'oauth' | 'api-key' | 'custom';
+  loginUrl?: string;
+  credentials: {
+    username: string;
+    password: string;
+  } | {
+    apiKey: string;
+  };
+}
+
+export interface StorageConfig {
+  s3: {
+    bucket: string;
+    prefix: string;
+    region: string;
+  };
+  format: 'parquet' | 'json';
+}
+
+export interface RetryConfig {
+  maxAttempts: number;
+  backoffMs: number;
+}
+
+// Data types
+export interface ScrapedData<T = unknown> {
+  timestamp: Date;
+  source: string;
+  data: T[];
+  metadata?: Record<string, unknown>;
+}
+
+export interface ExecutionResult {
+  success: boolean;
+  recordsScraped: number;
+  s3Path?: string;
+  error?: Error;
+  metrics?: ExecutionMetrics;
+}
+
+export interface ExecutionMetrics {
+  startTime: Date;
+  endTime: Date;
+  duration: number;
+  pagesVisited?: number;
+  apiCallsMade?: number;
+}
+
+// Auth types
+export interface AuthData {
+  token?: string;
+  cookies?: any[];
+  headers?: Record<string, string>;
+}
+
+// Browser types
+export interface BrowserConfig {
+  headless: boolean;
+  args?: string[];
+  viewport?: { width: number; height: number };
+}

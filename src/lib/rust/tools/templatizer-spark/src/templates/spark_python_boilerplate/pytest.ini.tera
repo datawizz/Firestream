@@ -1,0 +1,28 @@
+[pytest]
+minversion = 6.0
+addopts = 
+    -ra 
+    -q 
+    --strict-markers
+    --doctest-modules
+    --cov={{ package_name | default(value="spark_app") }}
+    --cov-report=term-missing:skip-covered
+    --cov-report=html
+    --cov-report=xml
+    --cov-branch
+testpaths = tests
+python_files = test_*.py
+python_classes = Test*
+python_functions = test_*
+markers =
+    integration: marks tests as integration tests (deselect with '-m "not integration"')
+    slow: marks tests as slow (deselect with '-m "not slow"')
+    unit: marks tests as unit tests
+    {% for marker in additional_pytest_markers %}
+    {{ marker.name }}: {{ marker.description }}
+    {% endfor %}
+filterwarnings =
+    ignore::DeprecationWarning
+    ignore::PendingDeprecationWarning
+log_cli = true
+log_cli_level = INFO

@@ -1,0 +1,232 @@
+import { Effect, Context, Layer, pipe } from 'effect';
+import { Data } from 'effect/Data';
+import puppeteer, { Browser, Page } from 'puppeteer';
+import * as AWS from 'aws-sdk';
+import * as fs from 'fs/promises';
+import * as path from 'path';
+
+// Error types
+export class ScraperError extends Data.TaggedError("ScraperError")<{
+  message: string;
+  cause?: unknown;
+}> {}
+
+export class StorageError extends Data.TaggedError("StorageError")<{
+  message: string;
+  cause?: unknown;
+}> {}
+
+// Browser service
+export interface BrowserService {
+  readonly browser: Browser;
+  readonly page: Page;
+}
+
+export const BrowserService = Context.GenericTag<BrowserService>("BrowserService");
+
+export const makeBrowserService = (config: {
+  headless?: boolean;
+  viewport?: { width: number; height: number };
+  args?: string[];
+}) => Layer.scoped(
+  BrowserService,
+  Effect.gen(function* (_) {
+    // Launch browser
+    const browser = yield* _(
+      Effect.tryPromise({
+        try: () => puppeteer.launch({
+          headless: config.headless ?? true,
+          args: [
+            '--no-sandbox',
+            '--disable-dev-shm-usage',
+            '--disable-gpu',
+            '--disable-setuid-sandbox',
+            ...(config.args || [])
+          ],
+          executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || undefined
+        }),
+        catch: (error) => new ScraperError({
+          message: "Failed to launch browser",
+          cause: error
+        })
+      })
+    );
+
+    // Create page
+    const page = yield* _(
+      Effect.tryPromise({
+        try: async () => {
+          const page = await browser.newPage();
+          await page.setViewport(config.viewport || { width: 1920, height: 1080 });
+          page.setDefaultTimeout(30000);
+          page.setDefaultNavigationTimeout(30000);
+          return page;
+        },
+        catch: (error) => new ScraperError({
+          message: "Failed to create page",
+          cause: error
+        })
+      })
+    );
+
+    // Ensure cleanup on scope close
+    yield* _(
+      Effect.addFinalizer(() =>
+        Effect.promise(async () => {
+          await browser.close();
+        })
+      )
+    );
+
+    return { browser, page };
+  })
+);
+
+// Storage service
+export interface StorageService {
+  save(data: any, format: 'parquet' | 'json'): Effect.Effect<string, StorageError>;
+}
+
+export const StorageService = Context.GenericTag<StorageService>("StorageService");
+
+export const makeS3StorageService = (config: {
+  bucket: string;
+  prefix: string;
+  region: string;
+}) => Layer.succeed(
+  StorageService,
+  {
+    save: (data: any, format: 'parquet' | 'json') =>
+      Effect.gen(function* (_) {
+        const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+        const filename = `data-${timestamp}.${format}`;
+        const s3Key = `${config.prefix}${filename}`;
+        
+        const s3 = new AWS.S3({ region: config.region });
+        
+        if (format === 'json') {
+          yield* _(
+            Effect.tryPromise({
+              try: () => s3.putObject({
+                Bucket: config.bucket,
+                Key: s3Key,
+                Body: JSON.stringify(data, null, 2),
+                ContentType: 'application/json'
+              }).promise(),
+              catch: (error) => new StorageError({
+                message: `Failed to upload to S3: ${s3Key}`,
+                cause: error
+              })
+            })
+          );
+        } else {
+          // Simplified - real implementation would use parquetjs
+          const jsonKey = s3Key.replace('.parquet', '.json');
+          yield* _(
+            Effect.tryPromise({
+              try: () => s3.putObject({
+                Bucket: config.bucket,
+                Key: jsonKey,
+                Body: JSON.stringify(data, null, 2),
+                ContentType: 'application/json'
+              }).promise(),
+              catch: (error) => new StorageError({
+                message: `Failed to upload to S3: ${jsonKey}`,
+                cause: error
+              })
+            })
+          );
+        }
+        
+        return `s3://${config.bucket}/${s3Key}`;
+      })
+  }
+);
+
+// Logger service
+export interface LoggerService {
+  info(message: string, data?: Record<string, any>): Effect.Effect<void>;
+  error(message: string, error?: unknown, data?: Record<string, any>): Effect.Effect<void>;
+  warn(message: string, data?: Record<string, any>): Effect.Effect<void>;
+  debug(message: string, data?: Record<string, any>): Effect.Effect<void>;
+}
+
+export const LoggerService = Context.GenericTag<LoggerService>("LoggerService");
+
+export const makeLoggerService = (context?: Record<string, any>) => Layer.succeed(
+  LoggerService,
+  {
+    info: (message: string, data?: Record<string, any>) =>
+      Effect.sync(() => {
+        console.log(JSON.stringify({
+          timestamp: new Date().toISOString(),
+          level: 'INFO',
+          message,
+          ...context,
+          ...data
+        }));
+      }),
+      
+    error: (message: string, error?: unknown, data?: Record<string, any>) =>
+      Effect.sync(() => {
+        const errorData = error instanceof Error ? {
+          error: {
+            message: error.message,
+            stack: error.stack,
+            name: error.name
+          }
+        } : error ? { error } : {};
+        
+        console.log(JSON.stringify({
+          timestamp: new Date().toISOString(),
+          level: 'ERROR',
+          message,
+          ...context,
+          ...errorData,
+          ...data
+        }));
+      }),
+      
+    warn: (message: string, data?: Record<string, any>) =>
+      Effect.sync(() => {
+        console.log(JSON.stringify({
+          timestamp: new Date().toISOString(),
+          level: 'WARN',
+          message,
+          ...context,
+          ...data
+        }));
+      }),
+      
+    debug: (message: string, data?: Record<string, any>) =>
+      Effect.sync(() => {
+        if (process.env.DEBUG === 'true') {
+          console.log(JSON.stringify({
+            timestamp: new Date().toISOString(),
+            level: 'DEBUG',
+            message,
+            ...context,
+            ...data
+          }));
+        }
+      })
+  }
+);
+
+// Combined services layer
+export const makeServices = (config: {
+  browser: {
+    headless?: boolean;
+    viewport?: { width: number; height: number };
+  };
+  storage: {
+    bucket: string;
+    prefix: string;
+    region: string;
+  };
+  logger?: Record<string, any>;
+}) => pipe(
+  makeBrowserService(config.browser),
+  Layer.provideMerge(makeS3StorageService(config.storage)),
+  Layer.provideMerge(makeLoggerService(config.logger))
+);

@@ -1,0 +1,144 @@
+"""
+Pytest configuration for {{ app_name }}.
+"""
+
+import os
+import sys
+import logging
+from typing import Generator
+
+import pytest
+from pyspark.sql import SparkSession
+
+# Configure logging for tests
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+
+# Add src to Python path
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
+
+# Pytest markers
+pytest_markers = [
+    "integration: marks tests as integration tests (deselect with '-m \"not integration\"')",
+    "slow: marks tests as slow (deselect with '-m \"not slow\"')",
+    {% if additional_pytest_markers %}{% for marker in additional_pytest_markers %}
+    "{{ marker.name }}: {{ marker.description }}",
+    {% endfor %}{% endif %}
+]
+
+
+def pytest_configure(config):
+    """Configure pytest with custom markers."""
+    for marker in pytest_markers:
+        config.addinivalue_line("markers", marker)
+
+
+@pytest.fixture(scope="session")
+def spark_session() -> Generator[SparkSession, None, None]:
+    """
+    Create a SparkSession for the test session.
+    This is a session-scoped fixture to avoid creating multiple sessions.
+    """
+    os.environ["SPARK_LOCAL_IP"] = "127.0.0.1"
+    
+    spark = SparkSession.builder \
+        .appName("{{ app_name }}-pytest") \
+        .master("local[2]") \
+        .config("spark.driver.bindAddress", "127.0.0.1") \
+        .config("spark.driver.host", "127.0.0.1") \
+        .config("spark.ui.enabled", "false") \
+        .config("spark.ui.showConsoleProgress", "false") \
+        .config("spark.sql.shuffle.partitions", "2") \
+        .config("spark.sql.adaptive.enabled", "false") \
+        .config("spark.default.parallelism", "2") \
+        .config("spark.sql.warehouse.dir", "/tmp/spark-warehouse") \
+        .getOrCreate()
+    
+    # Set log level
+    spark.sparkContext.setLogLevel("WARN")
+    
+    yield spark
+    
+    spark.stop()
+
+
+@pytest.fixture
+def test_data_path(tmp_path) -> str:
+    """Create a temporary directory for test data."""
+    data_dir = tmp_path / "test_data"
+    data_dir.mkdir(exist_ok=True)
+    return str(data_dir)
+
+
+{% if s3_enabled %}
+@pytest.fixture
+def mock_s3():
+    """Mock S3 for testing."""
+    import boto3
+    from moto import mock_s3
+    
+    with mock_s3():
+        # Create mock S3 bucket
+        s3 = boto3.client('s3', region_name='us-east-1')
+        s3.create_bucket(Bucket='test-bucket')
+        yield s3
+{% endif %}
+
+
+@pytest.fixture(autouse=True)
+def cleanup_spark_files(tmp_path):
+    """Clean up Spark temporary files after each test."""
+    yield
+    # Clean up any temporary files created by Spark
+    import shutil
+    temp_dirs = [
+        "/tmp/spark-*",
+        "/tmp/blockmgr-*",
+        "/tmp/temporary-*"
+    ]
+    for pattern in temp_dirs:
+        import glob
+        for path in glob.glob(pattern):
+            try:
+                if os.path.isdir(path):
+                    shutil.rmtree(path)
+                else:
+                    os.remove(path)
+            except Exception:
+                pass
+
+
+# Test data fixtures
+@pytest.fixture
+def sample_schema():
+    """Sample schema for testing."""
+    from pyspark.sql.types import StructType, StructField, StringType, DoubleType, IntegerType
+    
+    return StructType([
+        {% for item in test_schema %}
+        StructField("{{ item[0] }}", {{ item[1] }}(), True),
+        {% endfor %}
+    ])
+
+
+@pytest.fixture
+def expected_output_schema():
+    """Expected output schema after transformations."""
+    from pyspark.sql.types import StructType, StructField, StringType, DoubleType, IntegerType, TimestampType
+    
+    return StructType([
+        {% for item in expected_output_schema %}
+        StructField("{{ item[0] }}", {{ item[1] }}(), True),
+        {% endfor %}
+    ])
+
+
+# Custom fixtures
+{% for fixture in custom_fixtures %}
+@pytest.fixture
+def {{ fixture.name }}({% for dep in fixture.dependencies %}{{ dep }}{% if not loop.last %}, {% endif %}{% endfor %}):
+    """{{ fixture.description }}"""
+    {{ fixture.body | indent(width=4) }}
+{% endfor %}

@@ -10,21 +10,23 @@ License
 
 <picture width="500">
   <img
-    src="static/images/firestream_banner.png"
+    src="assets/images/firestream_banner.png"
     alt="Firestream Logo"
   />
 </picture>
 
-[Firestream](https://example.com/firestream/stable/) is a serverless data warehouse designed to fill the gaps left by the abundance of use-case-specific "point" solutions. Think of it as the "create-react-app" for data warehousing, evolving into a comprehensive stack tailored for Data Scientists by Data Engineers.
+Firestream is a serverless data warehouse designed to fill the gaps left by the use-case-specific point solutions that make up the average data engineer's toolbelt.
 
-Even modern solutions like Bytewax require kubernetes to run their own workflows. But what if you need kuber too? Setups differ widely among machines and environments. Local development is sometimes community driven in the case of local stack but not nearly enough community spirit to go around.
+Inspired by OpenStack, Firestream is a easy to deploy fully local K3S cluster than can easily be shipped to production in GCP or AWS. Think of it as the "create-react-app" for data warehousing, evolving into a comprehensive stack tailored for Data Scientists by Data Engineers.
 
-Firestream adopts the Dataflow paradigm, ensuring data is touched minimally throughout its lifecycle. Acknowledging that data has gravity and prefers to stay in place, Firestream emphasizes the necessity of highly specific ETL processes required for modern data meshes.
+Setups differ widely among machines and environments. Even modern solutions like Bytewax require an external kubernetes setup to run their own workflows. But what if you need to deploy a new API to intake data? Need to setup Airflow? Spark Cluster? Minio? A new internal microtool with that one library? In a secure environment that is accessible based on RBAC? What about the Kitchen Sink? Firestream will generated kubernetes deployments for you! (provided you adopt the config, RBAC TBD)
+
+Firestream adopts the Dataflow paradigm, ensuring data is touched minimally throughout its lifecycle. Acknowledging that data has gravity and prefers to stay in place, Firestream emphasizes the necessity of highly specific ETL processes required for modern data meshes, namely receiving streaming data and processing it.
+
+The name "Firestream" combines the idea of "firing up" an instant data solution with "stream" representing the continuous data flow, mirroring how the tool provides quick deployment of data streaming infrastructure.
 
 ## Key Features
-* Declarative Code: Define data transformations using Python, SQL, and natural language specifications.
-
-* ETL Configuration: Customize your ETL jobs in Python with an easy-to-use DSL (Domain Specific Language).
+* ETL Configuration: Customize your ETL jobs in Python using classes to represent whole apps.
 
 * Reverse Compatibility: Seamlessly integrates with Apache Airflow as the orchestrator, ensuring compatibility with existing workflows.
 
@@ -52,15 +54,15 @@ The best way to understand Firestream is to compare it to the landscape of Data 
 
 
 
-# Table of Contents  
+# Table of Contents
 
-[Tech Stack](#tech-stack)  
-[Getting Started](#getting-started)  
-[Development Container](#development-container)  
-[Apache Spark Structured Streaming](#apache-spark-structured-streaming)  
-[Python Stateful Streaming](#python-stateful-streaming)  
-[Node.js Middleware](#node-middleware)  
-[Plotly.js Dashboard](#plotly-dashboard)  
+[Tech Stack](#tech-stack)
+[Getting Started](#getting-started)
+[Development Container](#development-container)
+[Apache Spark Structured Streaming](#apache-spark-structured-streaming)
+[Python Stateful Streaming](#python-stateful-streaming)
+[Node.js Middleware](#node-middleware)
+[Plotly.js Dashboard](#plotly-dashboard)
 
 # Tech Stack
 
@@ -69,28 +71,94 @@ Firestream is powered by these core technologies.
 
 * [Development Container](https://github.com/devcontainers)
 * ["Docker-From-Docker"](https://github.com/devcontainers/features/tree/main/src/docker-outside-of-docker)
-* [k3s](https://k3s.io/) 
+* [k3s](https://k3s.io/)
 * [k3d](https://github.com/k3d-io/k3d)
-* Helm
-* [Kafka (Bitnami)](https://github.com/bitnami/charts/tree/main/bitnami/kafka)
+* [Helm](https://helm.sh/)
+* [Bitnami Charts](https://github.com/bitnami/charts)
+  * [Minio](https://github.com/bitnami/charts/tree/main/bitnami/minio)
+  * [Kafka](https://github.com/bitnami/charts/tree/main/bitnami/kafka)
+  * [Postgres](https://github.com/bitnami/charts/tree/main/bitnami/postgresql)
+  * [Contour (Envoy)](https://github.com/bitnami/charts/tree/main/bitnami/contour)
 * [Spark via Spark Operator](https://github.com/kubeflow/spark-operator)
-* [Minio (Bitnami)](https://github.com/bitnami/charts/tree/main/bitnami/minio)
 
 
 
 # Getting Started
 
-This project requires Docker and a x86/AMD64 Debian/Ubuntu environment. This project has been tested on Windows WSL Ubuntu 20.04 and Ubuntu 20.04 on bare metal.
+This project requires `containerd` and a x86 / AMD64 / Arm64 linux host.
+
+It has been tested on MacOS with Docker Desktop and Ubuntu using Podman.
 
 This project implements **Infrustructure as Code** via a Devcontainer (Development Container) defined in a Dockerfile. The project can be run using the following command:
 
 ```
 
-git clone https://github.com/datawizz/firestream.git && cd firestream && sh bootstrap.sh
+git clone https://github.com/datawizz/firestream.git && cd firestream && python bootstrap.py
 
 ```
 
-This will use the Docker Engine of the host and bind to the var/run/docker.sock to create the Devcontainer, open it via a terminal, and bootstrap the project. Once everything is built it will then expose the dashboard on localhost:3000.
+This will use the Docker Engine of the host and bind to the var/run/docker.sock to create the Devcontainer, open it via a terminal, and bootstrap the project. You will be guided through configuration of the environment.
+
+Alternatively you can pass a JSON file describing the desired deployment like so.
+
+
+```
+python bootstrap.py path/to/json/config.json
+```
+
+Example minimal config
+
+```json
+{
+  "services": [
+    {
+      "service_name": "airflow",
+      "resources": {
+        "requests": {
+          "cpu": "200m",
+          "memory": "128Mi"
+        },
+      },
+
+    {
+      "service_name": "kafka",
+      "resources": {
+        "requests": {
+          "cpu": "200m",
+          "memory": "128Mi"
+        },
+      },
+    },
+    "service_name": "bigquery",
+      "resources": {
+        "requests": {
+          "cpu": "200m",
+          "memory": "128Mi"
+        },
+      },
+  ],
+  "image": {
+    "repository": "python:",
+    "tag": "3.9-slim",
+    "pullPolicy": "IfNotPresent"
+  },
+  "service": {
+    "ports": [80,443]
+  },
+  "replicaCount": 1,
+  "resources": {
+    "requests": {
+      "cpu": "200m",
+      "memory": "128Mi"
+    },
+  },
+  "ingress": {
+    "enabled": false,
+    "external": false
+  }
+}
+
+```
 
 # Development Container
 
@@ -110,7 +178,7 @@ This is basically a blanket kubectl proxy command but since it is run within the
 
 The **Kubernetes** cluster is run using KinD (Kubernetes in Docker).
 
-![Screenshot](static/images/stack.png)
+![Screenshot](assets/images/stack.png)
 
 
 ### Apache Spark Structured Streaming

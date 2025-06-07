@@ -1,0 +1,131 @@
+import { DOMScrapingImplementation, LoginSelectors, NavigationStep } from '../lib/workflows/workflow-types';
+import { Page } from 'puppeteer';
+
+// TODO: Define your data structure
+interface {{ site_name | capitalize }}Data {
+  // TODO: Define the structure of data you're extracting
+  // Example fields:
+  // id: string;
+  // name: string;
+  // price: number;
+  // description?: string;
+  // url?: string;
+  // Add your fields here...
+}
+
+export class {{ site_name | capitalize }}DataExtractor implements DOMScrapingImplementation<{{ site_name | capitalize }}Data> {
+  
+  // TODO: Implement - Return selectors for your login form
+  getLoginSelectors(): LoginSelectors {
+    return {
+      // TODO: Update these selectors to match your site's login form
+      usernameField: '{{ login_username_selector | default(value="#username") }}',
+      passwordField: '{{ login_password_selector | default(value="#password") }}',
+      submitButton: '{{ login_submit_selector | default(value="#login-button") }}',
+      successIndicator: '{{ login_success_selector | default(value=".dashboard") }}', // Element that appears after successful login
+      errorIndicator: '{{ login_error_selector | default(value=".error-message") }}' // Element that indicates login failure
+    };
+  }
+  
+  // TODO: Implement - Define pages to visit for data extraction
+  getNavigationSteps(): NavigationStep[] {
+    return [
+      {% for step in navigation_steps -%}
+      {
+        url: '{{ step.url }}',
+        waitFor: { type: '{{ step.wait_type | default(value="selector") }}', value: '{{ step.wait_value | default(value=".content-loaded") }}' },
+        name: '{{ step.name }}',
+        screenshot: {{ step.screenshot | default(value=false) }}
+      },
+      {% endfor -%}
+      // TODO: Add or modify navigation steps as needed
+      // Example:
+      // {
+      //   url: '/products',
+      //   waitFor: { type: 'selector', value: '.product-list' },
+      //   name: 'products-page',
+      //   screenshot: true
+      // },
+    ];
+  }
+  
+  // TODO: Implement - Extract data from each page
+  async extractData(page: Page, step: NavigationStep): Promise<{{ site_name | capitalize }}Data[]> {
+    console.log(`Extracting data from ${step.name}`);
+    
+    // TODO: Implement your extraction logic based on the page/step
+    const data = await page.evaluate(() => {
+      const items: any[] = [];
+      
+      // TODO: Replace with your actual extraction logic
+      // Example for extracting product data:
+      /*
+      document.querySelectorAll('.product-item').forEach(element => {
+        const nameEl = element.querySelector('.product-name');
+        const priceEl = element.querySelector('.product-price');
+        const linkEl = element.querySelector('a');
+        
+        if (nameEl && priceEl) {
+          items.push({
+            id: element.getAttribute('data-id') || '',
+            name: nameEl.textContent?.trim() || '',
+            price: parseFloat(priceEl.textContent?.replace(/[^0-9.]/g, '') || '0'),
+            url: linkEl?.getAttribute('href') || ''
+          });
+        }
+      });
+      */
+      
+      // Placeholder - remove this and implement above
+      console.warn('DATA EXTRACTION NOT IMPLEMENTED');
+      
+      return items;
+    });
+    
+    return data;
+  }
+  
+  // TODO: Implement - Transform data to final format
+  async transformData(raw: {{ site_name | capitalize }}Data[]): Promise<any> {
+    // TODO: Add any data transformations, cleaning, or enrichment
+    return {
+      recordCount: raw.length,
+      extractedAt: new Date().toISOString(),
+      source: '{{ site_name }}',
+      data: raw.map(item => ({
+        ...item,
+        // TODO: Add any transformations
+        // Example: Convert prices to cents, normalize strings, etc.
+        // priceInCents: Math.round((item.price || 0) * 100),
+        // normalizedName: item.name?.toLowerCase().trim()
+      }))
+    };
+  }
+  
+  // Optional: Implement data validation
+  validateData?(data: {{ site_name | capitalize }}Data[]): { valid: boolean; errors?: string[] } {
+    const errors: string[] = [];
+    
+    // TODO: Add validation logic
+    // Example:
+    /*
+    if (data.length === 0) {
+      errors.push('No data extracted');
+    }
+    
+    data.forEach((item, index) => {
+      if (!item.id) {
+        errors.push(`Item at index ${index} missing ID`);
+      }
+      if (!item.name) {
+        errors.push(`Item at index ${index} missing name`);
+      }
+    });
+    */
+    
+    return {
+      valid: errors.length === 0,
+      errors: errors.length > 0 ? errors : undefined
+    };
+  }
+}

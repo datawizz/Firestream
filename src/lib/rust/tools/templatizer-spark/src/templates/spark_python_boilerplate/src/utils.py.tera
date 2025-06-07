@@ -1,0 +1,298 @@
+"""
+Utility functions for {{ app_name }}.
+"""
+
+import logging
+from typing import Optional, Dict, Any, List, Union
+from datetime import datetime, timedelta
+
+from pyspark.sql import DataFrame, SparkSession
+from pyspark.sql import functions as F
+from pyspark.sql.types import *
+{% if delta_enabled %}from delta import *{% endif %}
+
+logger = logging.getLogger(__name__)
+
+
+{% if include_utils %}
+def optimize_join(
+    large_df: DataFrame,
+    small_df: DataFrame,
+    join_key: Union[str, List[str]],
+    join_type: str = "inner"
+) -> DataFrame:
+    """
+    Optimize join operation based on DataFrame sizes.
+    
+    Args:
+        large_df: Larger DataFrame
+        small_df: Smaller DataFrame
+        join_key: Join column(s)
+        join_type: Type of join (inner, left, right, etc.)
+    
+    Returns:
+        Joined DataFrame
+    """
+    spark = large_df.sql_ctx.sparkSession
+    
+    # Get broadcast threshold
+    broadcast_threshold = int(spark.conf.get("spark.sql.autoBroadcastJoinThreshold", "10485760"))
+    
+    # Estimate small DataFrame size (rough approximation)
+    small_count = small_df.count()
+    
+    if small_count * 1000 < broadcast_threshold:  # Rough estimate
+        logger.info(f"Using broadcast join for {small_count} rows")
+        return large_df.join(F.broadcast(small_df), join_key, join_type)
+    else:
+        logger.info("Using standard join")
+        num_partitions = spark.sparkContext.defaultParallelism * 2
+        
+        if isinstance(join_key, str):
+            join_key = [join_key]
+        
+        return (
+            large_df.repartition(num_partitions, *join_key)
+            .join(
+                small_df.repartition(num_partitions, *join_key),
+                join_key,
+                join_type
+            )
+        )
+
+
+def write_with_retry(
+    df: DataFrame,
+    path: str,
+    format: str = "parquet",
+    mode: str = "overwrite",
+    max_retries: int = 3,
+    **options
+) -> None:
+    """
+    Write DataFrame with retry logic.
+    
+    Args:
+        df: DataFrame to write
+        path: Output path
+        format: Output format
+        mode: Write mode
+        max_retries: Maximum number of retries
+        **options: Additional write options
+    """
+    import time
+    
+    retries = 0
+    while retries < max_retries:
+        try:
+            writer = df.write.mode(mode)
+            
+            # Apply options
+            for key, value in options.items():
+                writer = writer.option(key, value)
+            
+            # Write based on format
+            if format == "parquet":
+                writer.parquet(path)
+            elif format == "json":
+                writer.json(path)
+            elif format == "csv":
+                writer.csv(path)
+            elif format == "delta":
+                writer.format("delta").save(path)
+            else:
+                writer.format(format).save(path)
+            
+            logger.info(f"Successfully wrote to {path}")
+            return
+            
+        except Exception as e:
+            retries += 1
+            if retries >= max_retries:
+                logger.error(f"Failed to write after {max_retries} attempts")
+                raise
+            
+            wait_time = 2 ** retries  # Exponential backoff
+            logger.warning(f"Write failed, retrying in {wait_time} seconds: {str(e)}")
+            time.sleep(wait_time)
+
+
+def add_metadata_columns(df: DataFrame) -> DataFrame:
+    """
+    Add metadata columns to DataFrame.
+    
+    Args:
+        df: Input DataFrame
+    
+    Returns:
+        DataFrame with metadata columns
+    """
+    return df \
+        .withColumn("processing_timestamp", F.current_timestamp()) \
+        .withColumn("processing_date", F.current_date()) \
+        .withColumn("record_hash", F.hash(*df.columns))
+
+
+def validate_schema(df: DataFrame, expected_schema: StructType) -> bool:
+    """
+    Validate DataFrame schema against expected schema.
+    
+    Args:
+        df: DataFrame to validate
+        expected_schema: Expected schema
+    
+    Returns:
+        True if schema matches, False otherwise
+    """
+    actual_fields = {field.name: field.dataType for field in df.schema.fields}
+    expected_fields = {field.name: field.dataType for field in expected_schema.fields}
+    
+    if actual_fields != expected_fields:
+        logger.error(f"Schema mismatch. Expected: {expected_fields}, Actual: {actual_fields}")
+        return False
+    
+    return True
+
+
+def calculate_statistics(df: DataFrame, numeric_columns: List[str]) -> DataFrame:
+    """
+    Calculate statistics for numeric columns.
+    
+    Args:
+        df: Input DataFrame
+        numeric_columns: List of numeric column names
+    
+    Returns:
+        DataFrame with statistics
+    """
+    stats = []
+    
+    for col in numeric_columns:
+        col_stats = df.select(
+            F.lit(col).alias("column_name"),
+            F.count(col).alias("count"),
+            F.count_distinct(col).alias("distinct_count"),
+            F.min(col).alias("min"),
+            F.max(col).alias("max"),
+            F.mean(col).alias("mean"),
+            F.stddev(col).alias("stddev"),
+            F.expr(f"percentile_approx({col}, 0.5)").alias("median"),
+            F.expr(f"percentile_approx({col}, 0.25)").alias("q1"),
+            F.expr(f"percentile_approx({col}, 0.75)").alias("q3")
+        ).collect()[0]
+        
+        stats.append(col_stats)
+    
+    spark = df.sql_ctx.sparkSession
+    return spark.createDataFrame(stats)
+
+
+{% if s3_enabled %}
+def get_s3_file_list(spark: SparkSession, s3_path: str, pattern: str = "*") -> List[str]:
+    """
+    Get list of files from S3 path.
+    
+    Args:
+        spark: SparkSession
+        s3_path: S3 path
+        pattern: File pattern
+    
+    Returns:
+        List of file paths
+    """
+    import fnmatch
+    
+    hadoop_conf = spark._jsc.hadoopConfiguration()
+    fs = spark._jvm.org.apache.hadoop.fs.FileSystem.get(
+        spark._jvm.java.net.URI.create(s3_path),
+        hadoop_conf
+    )
+    
+    path = spark._jvm.org.apache.hadoop.fs.Path(s3_path)
+    file_list = []
+    
+    if fs.exists(path):
+        if fs.isDirectory(path):
+            status_list = fs.listStatus(path)
+            for status in status_list:
+                file_path = status.getPath().toString()
+                if fnmatch.fnmatch(file_path, pattern):
+                    file_list.append(file_path)
+        else:
+            file_list.append(s3_path)
+    
+    return file_list
+{% endif %}
+
+
+{% if delta_enabled %}
+def optimize_delta_table(spark: SparkSession, table_path: str, vacuum_hours: int = 168) -> None:
+    """
+    Optimize and vacuum Delta table.
+    
+    Args:
+        spark: SparkSession
+        table_path: Delta table path
+        vacuum_hours: Hours of history to retain
+    """
+    logger.info(f"Optimizing Delta table at {table_path}")
+    
+    # Optimize
+    spark.sql(f"OPTIMIZE delta.`{table_path}`")
+    
+    # Vacuum
+    spark.conf.set("spark.databricks.delta.retentionDurationCheck.enabled", "false")
+    spark.sql(f"VACUUM delta.`{table_path}` RETAIN {vacuum_hours} HOURS")
+    spark.conf.set("spark.databricks.delta.retentionDurationCheck.enabled", "true")
+    
+    logger.info("Delta table optimization complete")
+
+
+def get_delta_history(spark: SparkSession, table_path: str, limit: int = 10) -> DataFrame:
+    """
+    Get Delta table history.
+    
+    Args:
+        spark: SparkSession
+        table_path: Delta table path
+        limit: Number of history entries to retrieve
+    
+    Returns:
+        DataFrame with table history
+    """
+    delta_table = DeltaTable.forPath(spark, table_path)
+    return delta_table.history(limit)
+{% endif %}
+
+
+def create_sample_data(spark: SparkSession, num_rows: int = 1000) -> DataFrame:
+    """
+    Create sample data for testing.
+    
+    Args:
+        spark: SparkSession
+        num_rows: Number of rows to generate
+    
+    Returns:
+        Sample DataFrame
+    """
+    from pyspark.sql.functions import rand, randn, when
+    
+    return spark.range(num_rows) \
+        .withColumn("id", F.col("id").cast("string")) \
+        .withColumn("value", randn() * 100) \
+        .withColumn("category", 
+            when(rand() < 0.33, "A")
+            .when(rand() < 0.66, "B")
+            .otherwise("C")
+        ) \
+        .withColumn("timestamp", F.current_timestamp()) \
+        .withColumn("date", F.current_date()) \
+        .withColumn("is_active", rand() > 0.5)
+
+
+# Custom utility functions
+{% for util in utility_functions %}
+{{ util }}
+{% endfor %}
+{% endif %}

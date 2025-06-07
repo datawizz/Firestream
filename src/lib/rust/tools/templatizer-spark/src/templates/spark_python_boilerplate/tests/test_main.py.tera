@@ -1,0 +1,263 @@
+"""
+Tests for {{ app_name }}.
+"""
+
+import os
+import sys
+import pytest
+from typing import Generator
+from unittest.mock import Mock, patch, MagicMock
+
+from pyspark.sql import SparkSession, DataFrame
+from pyspark.sql.types import *
+import pyspark.sql.functions as F
+
+# Add src to path
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
+
+from src.main import {% if main_class_name %}{{ main_class_name }}{% else %}SparkApp{% endif %}
+{% if config_enabled %}
+from src.config import AppConfig, load_config
+{% endif %}
+{% if include_utils %}
+from src.utils import *
+{% endif %}
+
+
+@pytest.fixture(scope="session")
+def spark() -> Generator[SparkSession, None, None]:
+    """Create a SparkSession for testing."""
+    spark = SparkSession.builder \
+        .appName("{{ app_name }}-test") \
+        .master("local[*]") \
+        .config("spark.driver.bindAddress", "127.0.0.1") \
+        .config("spark.ui.enabled", "false") \
+        .config("spark.sql.shuffle.partitions", "1") \
+        .config("spark.sql.adaptive.enabled", "false") \
+        .getOrCreate()
+    
+    yield spark
+    spark.stop()
+
+
+{% if config_enabled %}
+@pytest.fixture
+def test_config() -> AppConfig:
+    """Create test configuration."""
+    return AppConfig(
+        app_name="{{ app_name }}-test",
+        {% for field in config_fields %}
+        {{ field.name }}={% if field.test_value %}{{ field.test_value }}{% elif field.python_default %}{{ field.python_default }}{% else %}"test-{{ field.default_value }}"{% endif %},
+        {% endfor %}
+    )
+
+
+@pytest.fixture
+def app(spark: SparkSession, test_config: AppConfig) -> {% if main_class_name %}{{ main_class_name }}{% else %}SparkApp{% endif %}:
+    """Create application instance for testing."""
+    with patch.object({% if main_class_name %}{{ main_class_name }}{% else %}SparkApp{% endif %}, '_create_spark_session', return_value=spark):
+        return {% if main_class_name %}{{ main_class_name }}{% else %}SparkApp{% endif %}(test_config)
+{% else %}
+@pytest.fixture
+def app(spark: SparkSession) -> {% if main_class_name %}{{ main_class_name }}{% else %}SparkApp{% endif %}:
+    """Create application instance for testing."""
+    with patch.object({% if main_class_name %}{{ main_class_name }}{% else %}SparkApp{% endif %}, '_create_spark_session', return_value=spark):
+        return {% if main_class_name %}{{ main_class_name }}{% else %}SparkApp{% endif %}()
+{% endif %}
+
+
+@pytest.fixture
+def sample_data(spark: SparkSession) -> DataFrame:
+    """Create sample data for testing."""
+    data = [
+        {% for record in test_sample_data %}
+        {{ record }},
+        {% endfor %}
+    ]
+    columns = [{% for col in test_columns %}"{{ col }}"{% if not loop.last %}, {% endif %}{% endfor %}]
+    return spark.createDataFrame(data, columns)
+
+
+class Test{% if main_class_name %}{{ main_class_name }}{% else %}SparkApp{% endif %}:
+    """Tests for {% if main_class_name %}{{ main_class_name }}{% else %}SparkApp{% endif %} class."""
+    
+    def test_initialization(self, app: {% if main_class_name %}{{ main_class_name }}{% else %}SparkApp{% endif %}):
+        """Test application initialization."""
+        assert app is not None
+        assert app.spark is not None
+        {% if config_enabled %}
+        assert app.config is not None
+        {% endif %}
+    
+    def test_process_data_empty(self, app: {% if main_class_name %}{{ main_class_name }}{% else %}SparkApp{% endif %}, spark: SparkSession):
+        """Test processing empty DataFrame."""
+        # Create empty DataFrame with expected schema
+        schema = StructType([
+            {% for item in test_schema %}
+            StructField("{{ item[0] }}", {{ item[1] }}(), True),
+            {% endfor %}
+        ])
+        empty_df = spark.createDataFrame([], schema)
+        
+        # Mock the read operation
+        with patch.object(app.spark.read, '{% if input_format %}{{ input_format }}{% else %}parquet{% endif %}', return_value=empty_df):
+            result = app.process_data()
+            assert result.count() == 0
+    
+    def test_process_data_with_sample(self, app: {% if main_class_name %}{{ main_class_name }}{% else %}SparkApp{% endif %}, sample_data: DataFrame):
+        """Test processing sample data."""
+        # Mock the read operation
+        with patch.object(app.spark.read, '{% if input_format %}{{ input_format }}{% else %}parquet{% endif %}', return_value=sample_data):
+            result = app.process_data()
+            
+            # Verify result
+            assert result is not None
+            assert result.count() > 0
+            
+            {% if aggregations %}
+            # Check aggregation columns exist
+            result_columns = result.columns
+            {% for agg in aggregations %}
+            assert "{{ agg.alias }}" in result_columns
+            {% endfor %}
+            {% endif %}
+    
+    def test_write_output(self, app: {% if main_class_name %}{{ main_class_name }}{% else %}SparkApp{% endif %}, sample_data: DataFrame, tmp_path):
+        """Test writing output."""
+        output_path = str(tmp_path / "output")
+        
+        # Mock config to use temp path
+        {% if config_enabled %}
+        app.config.output_path = output_path
+        {% endif %}
+        
+        # Test write
+        with patch('sys.argv', ['test', 'input', output_path]):
+            app.write_output(sample_data)
+        
+        # Verify output exists
+        assert os.path.exists(output_path)
+    
+    {% for test in additional_tests %}
+    def test_{{ test.name }}(self, app: {% if main_class_name %}{{ main_class_name }}{% else %}SparkApp{% endif %}, spark: SparkSession):
+        """{{ test.description }}"""
+        {{ test.body | indent(width=8) }}
+    {% endfor %}
+
+
+{% if config_enabled %}
+class TestConfig:
+    """Tests for configuration management."""
+    
+    def test_load_config_from_env(self):
+        """Test loading configuration from environment variables."""
+        env_vars = {
+            {% for field in config_fields %}
+            '{% if field.env_var %}{{ field.env_var }}{% else %}{{ field.name | upper }}{% endif %}': '{% if field.test_env_value %}{{ field.test_env_value }}{% else %}test-value{% endif %}',
+            {% endfor %}
+        }
+        
+        with patch.dict(os.environ, env_vars):
+            config = AppConfig.from_env()
+            {% for field in config_fields %}
+            {% if field.python_type == "str" %}
+            assert config.{{ field.name }} == '{% if field.test_env_value %}{{ field.test_env_value }}{% else %}test-value{% endif %}'
+            {% endif %}
+            {% endfor %}
+    
+    def test_load_config_from_args(self):
+        """Test loading configuration from command line arguments."""
+        args = [
+            {% for field in config_fields %}
+            {% if field.arg_index is defined and field.arg_index >= 0 %}
+            '{% if field.test_arg_value %}{{ field.test_arg_value }}{% else %}arg-value-{{ field.arg_index }}{% endif %}',
+            {% endif %}
+            {% endfor %}
+        ]
+        
+        config = load_config(args)
+        assert config is not None
+        # Verify args override defaults
+{% endif %}
+
+
+{% if include_utils %}
+class TestUtils:
+    """Tests for utility functions."""
+    
+    def test_optimize_join(self, spark: SparkSession):
+        """Test optimize_join function."""
+        # Create test DataFrames
+        large_df = spark.range(1000).withColumn("key", F.col("id") % 10)
+        small_df = spark.range(10).withColumnRenamed("id", "key").withColumn("value", F.lit("test"))
+        
+        # Test join
+        result = optimize_join(large_df, small_df, "key")
+        assert result.count() == 1000
+    
+    def test_add_metadata_columns(self, sample_data: DataFrame):
+        """Test add_metadata_columns function."""
+        result = add_metadata_columns(sample_data)
+        
+        # Check metadata columns exist
+        assert "processing_timestamp" in result.columns
+        assert "processing_date" in result.columns
+        assert "record_hash" in result.columns
+    
+    def test_calculate_statistics(self, spark: SparkSession):
+        """Test calculate_statistics function."""
+        # Create numeric data
+        df = spark.range(100).withColumn("value", F.randn())
+        
+        # Calculate stats
+        stats = calculate_statistics(df, ["id", "value"])
+        
+        # Verify stats DataFrame
+        assert stats.count() == 2
+        assert "mean" in stats.columns
+        assert "stddev" in stats.columns
+{% endif %}
+
+
+{% if include_integration_test %}
+class TestIntegration:
+    """Integration tests."""
+    
+    @pytest.mark.integration
+    def test_end_to_end(self, spark: SparkSession, tmp_path):
+        """Test end-to-end processing."""
+        # Setup paths
+        input_path = str(tmp_path / "input")
+        output_path = str(tmp_path / "output")
+        
+        # Create test input data
+        test_data = spark.range(100) \
+            .withColumn("value", F.randn() * 100) \
+            .withColumn("category", F.when(F.rand() > 0.5, "A").otherwise("B"))
+        
+        test_data.write.mode("overwrite").{% if input_format %}{{ input_format }}{% else %}parquet{% endif %}(input_path)
+        
+        # Create config
+        {% if config_enabled %}
+        config = AppConfig(
+            app_name="{{ app_name }}-integration-test",
+            input_path=input_path,
+            output_path=output_path,
+            num_partitions=1
+        )
+        
+        # Run application
+        with patch.object({% if main_class_name %}{{ main_class_name }}{% else %}SparkApp{% endif %}, '_create_spark_session', return_value=spark):
+            app = {% if main_class_name %}{{ main_class_name }}{% else %}SparkApp{% endif %}(config)
+            app.run()
+        {% else %}
+        # Run with command line args
+        with patch('sys.argv', ['test', input_path, output_path]):
+            from src.main import main
+            main()
+        {% endif %}
+        
+        # Verify output
+        output_df = spark.read.{% if output_format %}{{ output_format }}{% else %}parquet{% endif %}(output_path)
+        assert output_df.count() > 0
+{% endif %}

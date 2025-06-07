@@ -1,0 +1,709 @@
+//! Advanced K3D cluster management
+//!
+//! This module provides comprehensive K3D cluster management with state integration,
+//! matching the functionality of the shell scripts with additional features.
+
+use crate::core::{FirestreamError, Result};
+use crate::state::schema::{K3dClusterConfig, K3dDevModeConfig, CertificateConfig};
+use std::path::PathBuf;
+use tokio::process::Command;
+use tokio::fs;
+use tracing::{info, debug, warn};
+use std::collections::HashMap;
+
+/// K3D cluster manager with advanced features
+pub struct K3dClusterManager {
+    config: K3dClusterConfig,
+    project_root: PathBuf,
+}
+
+impl K3dClusterManager {
+    /// Create a new K3D cluster manager
+    pub fn new(config: K3dClusterConfig) -> Self {
+        Self {
+            config,
+            project_root: std::env::current_dir().unwrap_or_default(),
+        }
+    }
+    
+    /// Full cluster setup matching bootstrap.sh functionality
+    pub async fn setup_cluster(&self) -> Result<()> {
+        info!("Setting up K3D cluster '{}'", self.config.name);
+        
+        // Ensure .kube directory exists
+        self.ensure_kube_directory().await?;
+        
+        // IMPORTANT: Patch /etc/hosts FIRST to avoid DNS resolution issues with sudo
+        if self.config.network.patch_etc_hosts {
+            self.patch_etc_hosts().await?;
+        }
+        
+        // Create registry if enabled
+        if self.config.registry.enabled {
+            self.setup_registry().await?;
+        }
+        
+        // Create or reconnect cluster
+        if self.cluster_exists().await? {
+            info!("Cluster '{}' already exists, reconnecting...", self.config.name);
+            self.reconnect_cluster().await?;
+        } else {
+            info!("Creating new cluster '{}'", self.config.name);
+            self.create_cluster().await?;
+            self.wait_for_cluster().await?;
+        }
+        
+        // Configure TLS if enabled
+        if self.config.tls.enabled {
+            self.configure_tls().await?;
+        }
+        
+        // Configure network - Routes before DNS
+        if self.config.network.configure_routes {
+            self.setup_ip_routes().await?;
+        }
+        
+        if self.config.network.configure_dns {
+            self.configure_dns().await?;
+        }
+        
+        // Test DNS resolution with retries
+        self.test_dns_resolution().await?;
+        
+        // Setup dev mode if enabled
+        if let Some(dev_config) = &self.config.dev_mode {
+            if dev_config.port_forward_all {
+                self.setup_port_forwarding(dev_config).await?;
+            }
+        }
+        
+        info!("K3D cluster '{}' setup complete", self.config.name);
+        Ok(())
+    }
+    
+    /// Ensure .kube directory exists
+    async fn ensure_kube_directory(&self) -> Result<()> {
+        let kube_dir = dirs::home_dir()
+            .ok_or_else(|| FirestreamError::GeneralError("Cannot find home directory".into()))?
+            .join(".kube");
+        
+        fs::create_dir_all(&kube_dir).await
+            .map_err(|e| FirestreamError::IoError(format!("Failed to create .kube directory: {}", e)))?;
+        
+        Ok(())
+    }
+    
+    /// Check if cluster exists
+    async fn cluster_exists(&self) -> Result<bool> {
+        let output = Command::new("k3d")
+            .args(&["cluster", "list"])
+            .output()
+            .await
+            .map_err(|e| FirestreamError::GeneralError(format!("Failed to list clusters: {}", e)))?;
+        
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        Ok(stdout.contains(&self.config.name))
+    }
+    
+    /// Setup container registry
+    async fn setup_registry(&self) -> Result<()> {
+        let registry_name = format!("{}.{}", self.config.name, self.config.registry.name);
+        
+        // Check if registry exists
+        let output = Command::new("k3d")
+            .args(&["registry", "list"])
+            .output()
+            .await?;
+        
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        if stdout.contains(&registry_name) {
+            info!("Registry '{}' already exists", registry_name);
+            return Ok(());
+        }
+        
+        info!("Creating registry '{}'", registry_name);
+        
+        // Create registry without --cluster flag first
+        let status = Command::new("k3d")
+            .args(&[
+                "registry",
+                "create",
+                &format!("{}.{}", self.config.name, self.config.registry.name),
+                "--port",
+                &self.config.registry.port.to_string(),
+            ])
+            .status()
+            .await
+            .map_err(|e| FirestreamError::GeneralError(format!("Failed to create registry: {}", e)))?;
+        
+        if !status.success() {
+            return Err(FirestreamError::GeneralError("Failed to create registry".to_string()));
+        }
+        
+        Ok(())
+    }
+    
+    /// Reconnect to existing cluster
+    async fn reconnect_cluster(&self) -> Result<()> {
+        info!("Reconnecting to cluster '{}'", self.config.name);
+        
+        // Write kubeconfig
+        let output = Command::new("k3d")
+            .args(&[
+                "kubeconfig",
+                "write",
+                &self.config.name,
+            ])
+            .output()
+            .await?;
+        
+        if !output.status.success() {
+            return Err(FirestreamError::GeneralError("Failed to write kubeconfig".to_string()));
+        }
+        
+        // The kubeconfig path is printed to stdout
+        let kubeconfig_path = String::from_utf8_lossy(&output.stdout).trim().to_string();
+        info!("Kubeconfig written to: {}", kubeconfig_path);
+        
+        // Set context using the kubeconfig path
+        let status = Command::new("kubectl")
+            .args(&[
+                "config",
+                "use-context",
+                &format!("k3d-{}", self.config.name),
+            ])
+            .env("KUBECONFIG", &kubeconfig_path)
+            .status()
+            .await?;
+        
+        if !status.success() {
+            warn!("Failed to set kubectl context");
+        }
+        
+        // Test kubectl connection
+        self.test_kubectl().await?;
+        
+        Ok(())
+    }
+    
+    /// Create new cluster
+    async fn create_cluster(&self) -> Result<()> {
+        let registry_name = format!("{}.{}", self.config.name, self.config.registry.name);
+        
+        let mut cmd = Command::new("k3d");
+        cmd.args(&[
+            "cluster",
+            "create",
+            &self.config.name,
+            "--api-port",
+            &self.config.api_port.to_string(),
+            "-p",
+            &format!("{}:{}@loadbalancer", self.config.http_port, self.config.http_port),
+            "-p",
+            &format!("{}:{}@loadbalancer", self.config.https_port, self.config.https_port),
+            "--registry-use",
+            &format!("k3d-{}:{}", registry_name, self.config.registry.port),
+            "--image",
+            &format!("rancher/k3s:{}", self.config.k3s_version),
+            "--servers",
+            &self.config.servers.to_string(),
+            "--agents",
+            &self.config.agents.to_string(),
+        ]);
+        
+        let status = cmd.status().await
+            .map_err(|e| FirestreamError::GeneralError(format!("Failed to create cluster: {}", e)))?;
+        
+        if !status.success() {
+            return Err(FirestreamError::GeneralError("Failed to create cluster".to_string()));
+        }
+        
+        // Set kubectl context
+        let _ = Command::new("kubectl")
+            .args(&[
+                "config",
+                "use-context",
+                &format!("k3d-{}", self.config.name),
+            ])
+            .status()
+            .await;
+        
+        Ok(())
+    }
+    
+    /// Wait for cluster to be ready
+    async fn wait_for_cluster(&self) -> Result<()> {
+        info!("Waiting for CoreDNS to be ready...");
+        
+        let status = Command::new("kubectl")
+            .args(&[
+                "wait",
+                "--namespace=kube-system",
+                "--for=condition=available",
+                "--timeout=300s",
+                "--all",
+                "deployments",
+            ])
+            .status()
+            .await?;
+        
+        if !status.success() {
+            return Err(FirestreamError::GeneralError("Timeout waiting for cluster".to_string()));
+        }
+        
+        Ok(())
+    }
+    
+    /// Test kubectl connection
+    async fn test_kubectl(&self) -> Result<()> {
+        let output = Command::new("kubectl")
+            .args(&["version", "--output=json"])
+            .output()
+            .await?;
+        
+        if !output.status.success() {
+            return Err(FirestreamError::GeneralError("kubectl connection failed".to_string()));
+        }
+        
+        let version_json = String::from_utf8_lossy(&output.stdout);
+        let version: serde_json::Value = serde_json::from_str(&version_json)
+            .map_err(|e| FirestreamError::GeneralError(format!("Failed to parse kubectl version: {}", e)))?;
+        
+        if version["clientVersion"]["gitVersion"].is_null() || 
+           version["serverVersion"]["gitVersion"].is_null() {
+            return Err(FirestreamError::GeneralError("kubectl version check failed".to_string()));
+        }
+        
+        info!("kubectl connection verified");
+        Ok(())
+    }
+    
+    /// Configure TLS certificates
+    async fn configure_tls(&self) -> Result<()> {
+        // Check if secret already exists
+        let output = Command::new("kubectl")
+            .args(&["get", "secret", &self.config.tls.secret_name])
+            .output()
+            .await?;
+        
+        if output.status.success() {
+            info!("TLS secret '{}' already exists", self.config.tls.secret_name);
+            return Ok(());
+        }
+        
+        info!("Configuring TLS certificates");
+        
+        // Generate certificate
+        self.generate_tls_certificate(&self.config.tls.certificate_config).await?;
+        
+        // Create secret
+        let cert_dir = dirs::home_dir()
+            .ok_or_else(|| FirestreamError::GeneralError("Cannot find home directory".into()))?
+            .join("certs");
+        
+        let status = Command::new("kubectl")
+            .args(&[
+                "create",
+                "secret",
+                "tls",
+                &self.config.tls.secret_name,
+                &format!("--cert={}", cert_dir.join("server.crt").display()),
+                &format!("--key={}", cert_dir.join("server.key").display()),
+            ])
+            .status()
+            .await?;
+        
+        if !status.success() {
+            return Err(FirestreamError::GeneralError("Failed to create TLS secret".to_string()));
+        }
+        
+        info!("TLS secret '{}' created", self.config.tls.secret_name);
+        Ok(())
+    }
+    
+    /// Generate TLS certificate
+    async fn generate_tls_certificate(&self, config: &CertificateConfig) -> Result<()> {
+        let cert_dir = dirs::home_dir()
+            .ok_or_else(|| FirestreamError::GeneralError("Cannot find home directory".into()))?
+            .join("certs");
+        
+        fs::create_dir_all(&cert_dir).await?;
+        
+        let subject = format!(
+            "/emailAddress={}/C={}/ST={}/L={}/O={}/OU={}/CN={}",
+            config.email,
+            config.country,
+            config.state,
+            config.locality,
+            config.organization,
+            config.organizational_unit,
+            config.common_name
+        );
+        
+        let output = Command::new("openssl")
+            .args(&[
+                "req",
+                "-new",
+                "-newkey", "rsa:4096",
+                "-days", "365",
+                "-nodes",
+                "-x509",
+                "-subj", &subject,
+                "-keyout", cert_dir.join("server.key").to_str().unwrap(),
+                "-out", cert_dir.join("server.crt").to_str().unwrap(),
+            ])
+            .output()
+            .await?;
+            
+        if !output.status.success() {
+            return Err(FirestreamError::GeneralError(
+                format!("Failed to generate certificate: {}", 
+                    String::from_utf8_lossy(&output.stderr))
+            ));
+        }
+        
+        debug!("Generated TLS certificate");
+        Ok(())
+    }
+    
+    /// Setup IP routes for pod and service CIDRs
+    async fn setup_ip_routes(&self) -> Result<()> {
+        info!("Setting up IP routes");
+        
+        // Get k3d server IP
+        let output = Command::new("docker")
+            .args(&[
+                "container",
+                "inspect",
+                &format!("k3d-{}-server-0", self.config.name),
+                "--format",
+                "{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}",
+            ])
+            .output()
+            .await?;
+            
+        if !output.status.success() {
+            return Err(FirestreamError::GeneralError("Failed to get server IP".to_string()));
+        }
+        
+        let server_ip = String::from_utf8_lossy(&output.stdout).trim().to_string();
+        info!("K3D server IP: {}", server_ip);
+        
+        // Check and add routes
+        for cidr in [&self.config.network.pod_cidr, &self.config.network.service_cidr] {
+            // Check if route exists
+            let check = Command::new("sudo")
+                .args(&["ip", "route", "show", cidr])
+                .output()
+                .await?;
+            
+            if check.stdout.is_empty() {
+                // Add route
+                let status = Command::new("sudo")
+                    .args(&["ip", "route", "add", cidr, "via", &server_ip])
+                    .status()
+                    .await?;
+                
+                if status.success() {
+                    info!("Added route for {}", cidr);
+                } else {
+                    warn!("Failed to add route for {}", cidr);
+                }
+            } else {
+                debug!("Route for {} already exists", cidr);
+            }
+        }
+        
+        Ok(())
+    }
+    
+    /// Configure DNS to use Kubernetes DNS
+    async fn configure_dns(&self) -> Result<()> {
+        info!("Configuring DNS");
+        
+        // Save original resolv.conf first
+        let resolv_backup = "/etc/resolv.conf.backup";
+        let _ = Command::new("sudo")
+            .args(&["cp", "/etc/resolv.conf", resolv_backup])
+            .status()
+            .await;
+        
+        // Read current resolv.conf
+        let original_resolv = fs::read_to_string("/etc/resolv.conf").await
+            .unwrap_or_else(|_| "nameserver 8.8.8.8\nnameserver 8.8.4.4".to_string());
+        
+        // Extract existing nameservers (skip local/k8s ones)
+        let mut external_nameservers = Vec::new();
+        for line in original_resolv.lines() {
+            if line.starts_with("nameserver") {
+                if let Some(ns) = line.split_whitespace().nth(1) {
+                    if !ns.starts_with("127.") && !ns.starts_with("10.43.") && !ns.starts_with("10.42.") {
+                        external_nameservers.push(ns.to_string());
+                    }
+                }
+            }
+        }
+        
+        // Ensure we have at least one external nameserver
+        if external_nameservers.is_empty() {
+            external_nameservers.push("8.8.8.8".to_string());
+            external_nameservers.push("8.8.4.4".to_string());
+        }
+        
+        // Get Kubernetes DNS IP
+        let output = Command::new("kubectl")
+            .args(&[
+                "get", "svc",
+                "-n", "kube-system",
+                "kube-dns",
+                "-o", "jsonpath={.spec.clusterIP}",
+            ])
+            .output()
+            .await?;
+        
+        if !output.status.success() {
+            return Err(FirestreamError::GeneralError("Failed to get Kubernetes DNS IP".to_string()));
+        }
+        
+        let dns_ip = String::from_utf8_lossy(&output.stdout).trim().to_string();
+        info!("Kubernetes DNS IP: {}", dns_ip);
+        
+        // Build new resolv.conf with external DNS first for better performance
+        let mut resolv_content = String::new();
+        resolv_content.push_str("search svc.cluster.local cluster.local\n");
+        
+        // Put external DNS first to avoid timeouts
+        for ns in &external_nameservers {
+            resolv_content.push_str(&format!("nameserver {}\n", ns));
+        }
+        
+        // Then Kubernetes DNS for cluster resolution
+        resolv_content.push_str(&format!("nameserver {}\n", dns_ip));
+        
+        resolv_content.push_str("options edns0 trust-ad\n");
+        
+        info!("Updating resolv.conf with Kubernetes DNS ({}) and external DNS: {:?}", dns_ip, external_nameservers);
+        
+        // Write new resolv.conf using cp instead of mv (for bind-mounted files)
+        let temp_file = "/tmp/resolv.conf.new";
+        fs::write(temp_file, &resolv_content).await?;
+        
+        let status = Command::new("sudo")
+            .args(&["cp", temp_file, "/etc/resolv.conf"])
+            .status()
+            .await?;
+        
+        if !status.success() {
+            warn!("Failed to update resolv.conf");
+            return Err(FirestreamError::GeneralError("Failed to update DNS configuration".to_string()));
+        }
+        
+        info!("DNS configuration updated successfully");
+        Ok(())
+    }
+    
+    /// Patch /etc/hosts with hostname
+    async fn patch_etc_hosts(&self) -> Result<()> {
+        let hostname_output = Command::new("hostname")
+            .output()
+            .await?;
+        
+        let hostname = String::from_utf8_lossy(&hostname_output.stdout).trim().to_string();
+        info!("Patching /etc/hosts for hostname: {}", hostname);
+        
+        // Read current /etc/hosts
+        let hosts_content = fs::read_to_string("/etc/hosts").await
+            .unwrap_or_default();
+        
+        // Check if hostname already exists
+        if !hosts_content.contains(&hostname) {
+            // Add hostname
+            let entry = format!("127.0.0.1 {}", hostname);
+            
+            // Use echo with sudo to append
+            let status = Command::new("sudo")
+                .args(&["sh", "-c", &format!("echo '{}' >> /etc/hosts", entry)])
+                .status()
+                .await?;
+            
+            if status.success() {
+                info!("Added hostname {} to /etc/hosts", hostname);
+            } else {
+                warn!("Failed to add hostname to /etc/hosts");
+            }
+        } else {
+            debug!("Hostname {} already exists in /etc/hosts", hostname);
+        }
+        
+        Ok(())
+    }
+    
+    /// Test DNS resolution with retries
+    async fn test_dns_resolution(&self) -> Result<()> {
+        info!("Testing DNS resolution");
+        
+        // Test external DNS with curl (more reliable than nslookup)
+        let external_test = Command::new("timeout")
+            .args(&["2", "curl", "-s", "-I", "-m", "2", "http://google.com"])
+            .output()
+            .await;
+        
+        let external_ok = external_test.map(|o| o.status.success()).unwrap_or(false);
+        
+        // Test Kubernetes DNS by checking if kube-dns service exists
+        let k8s_test = Command::new("kubectl")
+            .args(&["get", "svc", "-n", "kube-system", "kube-dns"])
+            .output()
+            .await;
+        
+        let k8s_ok = k8s_test.map(|o| o.status.success()).unwrap_or(false);
+        
+        if external_ok {
+            info!("External DNS resolution working");
+        } else {
+            return Err(FirestreamError::GeneralError(
+                "External DNS resolution test failed. Check your network connection.".to_string()
+            ));
+        }
+        
+        if k8s_ok {
+            info!("Kubernetes DNS service is available");
+        } else {
+            warn!("Kubernetes DNS service check failed");
+        }
+        
+        Ok(())
+    }
+    
+    /// Setup port forwarding for development
+    pub async fn setup_port_forwarding(&self, dev_config: &K3dDevModeConfig) -> Result<()> {
+        info!("Setting up port forwarding for development");
+        
+        // Create logs directory
+        let log_dir = self.project_root.join("logs");
+        fs::create_dir_all(&log_dir).await?;
+        
+        // Get all services
+        let output = Command::new("kubectl")
+            .args(&[
+                "get", "svc",
+                "-n", "default",
+                "-o", "jsonpath={range .items[*]}{.metadata.name},{.spec.ports[*].port}{\"\\n\"}{end}",
+            ])
+            .output()
+            .await?;
+        
+        if !output.status.success() {
+            return Err(FirestreamError::GeneralError("Failed to get services".to_string()));
+        }
+        
+        let services_str = String::from_utf8_lossy(&output.stdout);
+        let mut port_forwards = Vec::new();
+        
+        for line in services_str.lines() {
+            if line.is_empty() {
+                continue;
+            }
+            
+            let parts: Vec<&str> = line.split(',').collect();
+            if parts.len() != 2 {
+                continue;
+            }
+            
+            let service_name = parts[0];
+            let ports = parts[1];
+            
+            for port_str in ports.split_whitespace() {
+                if let Ok(internal_port) = port_str.parse::<u16>() {
+                    let external_port = dev_config.port_offset + internal_port;
+                    
+                    info!("Forwarding service {} port {} to {}", 
+                        service_name, internal_port, external_port);
+                    
+                    // Start port forwarding in background
+                    let mut cmd = Command::new("kubectl");
+                    cmd.args(&[
+                        "port-forward",
+                        "--namespace", "default",
+                        &format!("svc/{}", service_name),
+                        &format!("{}:{}", external_port, internal_port),
+                    ]);
+                    
+                    cmd.stdout(std::process::Stdio::piped());
+                    cmd.stderr(std::process::Stdio::piped());
+                    
+                    let _child = cmd.spawn()
+                        .map_err(|e| FirestreamError::GeneralError(
+                            format!("Failed to start port forward: {}", e)
+                        ))?;
+                    
+                    port_forwards.push((service_name.to_string(), internal_port, external_port));
+                }
+            }
+        }
+        
+        // Save port forward info
+        let forwards_file = log_dir.join("port_forwards.json");
+        let forwards_json = serde_json::to_string_pretty(&port_forwards)?;
+        fs::write(&forwards_file, forwards_json).await?;
+        
+        info!("Port forwarding setup complete. {} ports forwarded", port_forwards.len());
+        Ok(())
+    }
+    
+    /// Delete cluster
+    pub async fn delete_cluster(&self) -> Result<()> {
+        info!("Deleting K3D cluster '{}'", self.config.name);
+        
+        let status = Command::new("k3d")
+            .args(&["cluster", "delete", &self.config.name])
+            .status()
+            .await?;
+        
+        if !status.success() {
+            return Err(FirestreamError::GeneralError("Failed to delete cluster".to_string()));
+        }
+        
+        Ok(())
+    }
+    
+    /// Get cluster info
+    pub async fn get_cluster_info(&self) -> Result<HashMap<String, String>> {
+        let mut info = HashMap::new();
+        
+        // Get cluster status
+        let output = Command::new("k3d")
+            .args(&["cluster", "list", "-o", "json"])
+            .output()
+            .await?;
+        
+        if output.status.success() {
+            let clusters_json = String::from_utf8_lossy(&output.stdout);
+            if let Ok(clusters) = serde_json::from_str::<serde_json::Value>(&clusters_json) {
+                if let Some(cluster_array) = clusters.as_array() {
+                    for cluster in cluster_array {
+                        if cluster["name"] == self.config.name {
+                            info.insert("name".to_string(), self.config.name.clone());
+                            info.insert("servers".to_string(), 
+                                cluster["serversCount"].as_u64().unwrap_or(0).to_string());
+                            info.insert("agents".to_string(), 
+                                cluster["agentsCount"].as_u64().unwrap_or(0).to_string());
+                        }
+                    }
+                }
+            }
+        }
+        
+        // Get node info
+        let output = Command::new("kubectl")
+            .args(&["get", "nodes", "-o", "wide"])
+            .output()
+            .await?;
+        
+        if output.status.success() {
+            info.insert("nodes".to_string(), String::from_utf8_lossy(&output.stdout).to_string());
+        }
+        
+        Ok(info)
+    }
+}

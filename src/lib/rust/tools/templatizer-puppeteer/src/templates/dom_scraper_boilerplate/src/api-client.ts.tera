@@ -1,0 +1,184 @@
+import { APIScrapingImplementation, LoginSelectors, APIRequest, AuthData } from '../lib/workflows/workflow-types';
+import { Page } from 'puppeteer';
+import { AxiosInstance } from 'axios';
+
+// TODO: Define your data structure from API responses
+interface {{ site_name | capitalize }}APIData {
+  // TODO: Define the structure matching your API responses
+  // Example fields:
+  // id: string;
+  // name: string;
+  // data: any;
+  // Add your fields here...
+}
+
+export class {{ site_name | capitalize }}APIClient implements APIScrapingImplementation<{{ site_name | capitalize }}APIData> {
+  
+  // TODO: Implement - Return selectors for your login form
+  getLoginSelectors(): LoginSelectors {
+    return {
+      // TODO: Update these selectors to match your site's login form
+      usernameField: '{{ login_username_selector | default(value="#username") }}',
+      passwordField: '{{ login_password_selector | default(value="#password") }}',
+      submitButton: '{{ login_submit_selector | default(value="#login-button") }}',
+      successIndicator: '{{ login_success_selector | default(value=".dashboard") }}',
+      errorIndicator: '{{ login_error_selector | default(value=".error-message") }}'
+    };
+  }
+  
+  // TODO: Implement - Extract authentication data after login
+  async extractAuth(page: Page): Promise<AuthData> {
+    console.log('Extracting authentication data...');
+    
+    // TODO: Implement based on how your site handles authentication
+    
+    {% if auth_storage == "localStorage" -%}
+    // Extract from localStorage
+    const token = await page.evaluate(() => {
+      // TODO: Update with actual localStorage key(s)
+      return localStorage.getItem('{{ auth_token_key | default(value="auth_token") }}') || 
+             localStorage.getItem('access_token') ||
+             localStorage.getItem('jwt');
+    });
+    {%- elif auth_storage == "cookie" -%}
+    // Extract from cookies
+    const cookies = await page.cookies();
+    const authCookie = cookies.find(c => 
+      c.name === '{{ auth_cookie_name | default(value="session") }}' ||
+      c.name.includes('auth') ||
+      c.name.includes('token')
+    );
+    const token = authCookie?.value;
+    {%- else -%}
+    // TODO: Implement auth extraction for your site
+    // Options: localStorage, cookies, or from network requests
+    let token: string | undefined;
+    
+    // Example: Try localStorage first
+    token = await page.evaluate(() => {
+      return localStorage.getItem('auth_token');
+    });
+    
+    // Example: Try cookies if no localStorage token
+    if (!token) {
+      const cookies = await page.cookies();
+      const authCookie = cookies.find(c => c.name.includes('session'));
+      token = authCookie?.value;
+    }
+    {%- endif %}
+    
+    // TODO: Extract any additional auth data needed
+    const authData: AuthData = {
+      token,
+      cookies: await page.cookies(),
+      headers: token ? {
+        'Authorization': `{{ auth_header_format | default(value="Bearer {token}") }}`.replace('{token}', token),
+      } : {}
+    };
+    
+    if (!authData.token) {
+      console.warn('No auth token found - API calls may fail');
+    }
+    
+    return authData;
+  }
+  
+  // TODO: Implement - Configure axios client with auth
+  configureClient(client: AxiosInstance, auth: AuthData): void {
+    // Set authentication headers
+    if (auth.token) {
+      client.defaults.headers.common['Authorization'] = 
+        `{{ auth_header_format | default(value="Bearer {token}") }}`.replace('{token}', auth.token);
+    }
+    
+    // TODO: Add any other headers or configuration your API requires
+    {% for header in api_headers -%}
+    client.defaults.headers.common['{{ header.name }}'] = '{{ header.value }}';
+    {% endfor -%}
+    
+    // Example additional headers:
+    // client.defaults.headers.common['X-API-Version'] = 'v1';
+    // client.defaults.headers.common['Accept'] = 'application/json';
+  }
+  
+  // TODO: Implement - Define API calls to make
+  getAPIRequests(): APIRequest[] {
+    return [
+      {% for endpoint in api_endpoints -%}
+      {
+        method: '{{ endpoint.method | default(value="GET") }}',
+        endpoint: '{{ endpoint.path }}',
+        {% if endpoint.params -%}
+        params: {{ endpoint.params | json_encode }},
+        {% endif -%}
+        {% if endpoint.data -%}
+        data: {{ endpoint.data | json_encode }},
+        {% endif -%}
+        name: '{{ endpoint.name }}'
+      },
+      {% endfor -%}
+      // TODO: Add or modify API endpoints as needed
+      // Example:
+      // {
+      //   method: 'GET',
+      //   endpoint: '/api/v1/products',
+      //   params: { page: 1, limit: 100 },
+      //   name: 'products'
+      // },
+      // {
+      //   method: 'POST',
+      //   endpoint: '/api/v1/search',
+      //   data: { query: 'all', filters: {} },
+      //   name: 'search'
+      // }
+    ];
+  }
+  
+  // TODO: Implement - Process API responses into data
+  async processResponses(responses: any[]): Promise<{{ site_name | capitalize }}APIData[]> {
+    const allData: {{ site_name | capitalize }}APIData[] = [];
+    
+    // TODO: Process each API response and extract data
+    responses.forEach(response => {
+      if (!response.data) {
+        console.warn(`No data in response for ${response.name}`);
+        return;
+      }
+      
+      // TODO: Handle different response formats based on endpoint
+      // Example:
+      /*
+      if (response.name === 'products' && response.data.items) {
+        allData.push(...response.data.items);
+      } else if (response.name === 'search' && response.data.results) {
+        allData.push(...response.data.results);
+      } else if (Array.isArray(response.data)) {
+        allData.push(...response.data);
+      } else {
+        console.warn(`Unknown response format for ${response.name}`);
+      }
+      */
+      
+      // Placeholder - implement based on your API structure
+      console.warn(`RESPONSE PROCESSING NOT IMPLEMENTED for ${response.name}`);
+    });
+    
+    return allData;
+  }
+  
+  // TODO: Implement - Transform data to final format
+  async transformData(raw: {{ site_name | capitalize }}APIData[]): Promise<any> {
+    // TODO: Add any data transformations, cleaning, or enrichment
+    return {
+      recordCount: raw.length,
+      extractedAt: new Date().toISOString(),
+      source: '{{ site_name }}',
+      apiVersion: '{{ api_version | default(value="v1") }}',
+      data: raw.map(item => ({
+        ...item,
+        // TODO: Add any transformations
+        // Example: Flatten nested objects, convert types, etc.
+      }))
+    };
+  }
+}

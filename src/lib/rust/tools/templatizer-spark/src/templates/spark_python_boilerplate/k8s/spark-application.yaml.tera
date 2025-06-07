@@ -1,0 +1,233 @@
+apiVersion: sparkoperator.k8s.io/v1beta2
+kind: SparkApplication
+metadata:
+  name: {{ app_name | lower | replace(from=" ", to="-") }}
+  namespace: {{ namespace | default(value="spark-apps") }}
+  {% if labels %}
+  labels:
+    {% for key, value in labels %}
+    {{ key }}: "{{ value }}"
+    {% endfor %}
+  {% endif %}
+spec:
+  type: Python
+  pythonVersion: "{{ python_major_version | default(value="3") }}"
+  mode: cluster
+  image: "{{ docker_registry }}/{{ app_name | lower | replace(from=" ", to="-") }}:{{ version }}"
+  imagePullPolicy: {{ image_pull_policy | default(value="Always") }}
+  {% if image_pull_secrets %}
+  imagePullSecrets:
+    {% for secret in image_pull_secrets %}
+    - {{ secret }}
+    {% endfor %}
+  {% endif %}
+  mainApplicationFile: "local:///opt/spark/work-dir/{{ package_name | default(value="spark_app") }}/main.py"
+  {% if arguments %}
+  arguments:
+    {% for arg in arguments %}
+    - "{{ arg }}"
+    {% endfor %}
+  {% endif %}
+  sparkVersion: "{{ spark_version | default(value="3.5.1") }}"
+  restartPolicy:
+    type: {{ restart_policy_type | default(value="OnFailure") }}
+    {% if restart_policy_type == "OnFailure" or restart_policy_type == "Always" %}
+    onFailureRetries: {{ on_failure_retries | default(value=3) }}
+    onFailureRetryInterval: {{ on_failure_retry_interval | default(value=10) }}
+    onSubmissionFailureRetries: {{ on_submission_failure_retries | default(value=5) }}
+    onSubmissionFailureRetryInterval: {{ on_submission_failure_retry_interval | default(value=20) }}
+    {% endif %}
+  deps:
+    {% if py_files %}
+    pyFiles:
+      {% for file in py_files %}
+      - "{{ file }}"
+      {% endfor %}
+    {% endif %}
+    {% if packages %}
+    packages:
+      {% for package in packages %}
+      - "{{ package }}"
+      {% endfor %}
+    {% endif %}
+    {% if repositories %}
+    repositories:
+      {% for repo in repositories %}
+      - "{{ repo }}"
+      {% endfor %}
+    {% endif %}
+  driver:
+    cores: {{ driver_cores | default(value=1) }}
+    coreLimit: "{{ driver_core_limit | default(value="1200m") }}"
+    memory: "{{ driver_memory | default(value="2g") }}"
+    labels:
+      version: {{ spark_version | default(value="3.5.1") }}
+      app: {{ app_name | lower | replace(from=" ", to="-") }}
+      {% for key, value in driver_labels %}
+      {{ key }}: "{{ value }}"
+      {% endfor %}
+    serviceAccount: {{ service_account | default(value="spark") }}
+    {% if driver_env_vars %}
+    env:
+      - name: PYTHONPATH
+        value: "/opt/spark/work-dir:$PYTHONPATH"
+      {% for var in driver_env_vars %}
+      - name: {{ var.name }}
+        {% if var.value %}
+        value: "{{ var.value }}"
+        {% elif var.valueFrom %}
+        valueFrom:
+          {% if var.valueFrom.secretKeyRef %}
+          secretKeyRef:
+            name: {{ var.valueFrom.secretKeyRef.name }}
+            key: {{ var.valueFrom.secretKeyRef.key }}
+          {% elif var.valueFrom.configMapKeyRef %}
+          configMapKeyRef:
+            name: {{ var.valueFrom.configMapKeyRef.name }}
+            key: {{ var.valueFrom.configMapKeyRef.key }}
+          {% elif var.valueFrom.fieldRef %}
+          fieldRef:
+            fieldPath: {{ var.valueFrom.fieldRef.fieldPath }}
+          {% endif %}
+        {% endif %}
+      {% endfor %}
+    {% endif %}
+    {% if driver_volume_mounts %}
+    volumeMounts:
+      {% for mount in driver_volume_mounts %}
+      - name: {{ mount.name }}
+        mountPath: {{ mount.mountPath }}
+        {% if mount.readOnly %}readOnly: {{ mount.readOnly }}{% endif %}
+      {% endfor %}
+    {% endif %}
+    {% if driver_node_selector %}
+    nodeSelector:
+      {% for key, value in driver_node_selector %}
+      {{ key }}: "{{ value }}"
+      {% endfor %}
+    {% endif %}
+    {% if driver_tolerations %}
+    tolerations:
+      {% for toleration in driver_tolerations %}
+      - key: "{{ toleration.key }}"
+        {% if toleration.operator %}operator: "{{ toleration.operator }}"{% endif %}
+        {% if toleration.value %}value: "{{ toleration.value }}"{% endif %}
+        {% if toleration.effect %}effect: "{{ toleration.effect }}"{% endif %}
+      {% endfor %}
+    {% endif %}
+  executor:
+    cores: {{ executor_cores | default(value=1) }}
+    instances: {{ executor_instances | default(value=2) }}
+    memory: "{{ executor_memory | default(value="2g") }}"
+    labels:
+      version: {{ spark_version | default(value="3.5.1") }}
+      app: {{ app_name | lower | replace(from=" ", to="-") }}
+      {% for key, value in executor_labels %}
+      {{ key }}: "{{ value }}"
+      {% endfor %}
+    {% if executor_env_vars %}
+    env:
+      - name: PYTHONPATH
+        value: "/opt/spark/work-dir:$PYTHONPATH"
+      {% for var in executor_env_vars %}
+      - name: {{ var.name }}
+        {% if var.value %}
+        value: "{{ var.value }}"
+        {% elif var.valueFrom %}
+        valueFrom:
+          {% if var.valueFrom.secretKeyRef %}
+          secretKeyRef:
+            name: {{ var.valueFrom.secretKeyRef.name }}
+            key: {{ var.valueFrom.secretKeyRef.key }}
+          {% elif var.valueFrom.configMapKeyRef %}
+          configMapKeyRef:
+            name: {{ var.valueFrom.configMapKeyRef.name }}
+            key: {{ var.valueFrom.configMapKeyRef.key }}
+          {% elif var.valueFrom.fieldRef %}
+          fieldRef:
+            fieldPath: {{ var.valueFrom.fieldRef.fieldPath }}
+          {% endif %}
+        {% endif %}
+      {% endfor %}
+    {% endif %}
+    {% if executor_volume_mounts %}
+    volumeMounts:
+      {% for mount in executor_volume_mounts %}
+      - name: {{ mount.name }}
+        mountPath: {{ mount.mountPath }}
+        {% if mount.readOnly %}readOnly: {{ mount.readOnly }}{% endif %}
+      {% endfor %}
+    {% endif %}
+    {% if executor_node_selector %}
+    nodeSelector:
+      {% for key, value in executor_node_selector %}
+      {{ key }}: "{{ value }}"
+      {% endfor %}
+    {% endif %}
+    {% if executor_tolerations %}
+    tolerations:
+      {% for toleration in executor_tolerations %}
+      - key: "{{ toleration.key }}"
+        {% if toleration.operator %}operator: "{{ toleration.operator }}"{% endif %}
+        {% if toleration.value %}value: "{{ toleration.value }}"{% endif %}
+        {% if toleration.effect %}effect: "{{ toleration.effect }}"{% endif %}
+      {% endfor %}
+    {% endif %}
+  {% if dynamic_allocation %}
+  dynamicAllocation:
+    enabled: true
+    initialExecutors: {{ dynamic_allocation.initial_executors | default(value=1) }}
+    minExecutors: {{ dynamic_allocation.min_executors | default(value=1) }}
+    maxExecutors: {{ dynamic_allocation.max_executors | default(value=5) }}
+  {% endif %}
+  # Spark configuration
+  sparkConf:
+    "spark.ui.port": "{{ spark_ui_port | default(value="4040") }}"
+    "spark.pyspark.python": "/usr/bin/python{{ python_major_version | default(value="3") }}"
+    "spark.pyspark.driver.python": "/usr/bin/python{{ python_major_version | default(value="3") }}"
+    {% if spark_event_log_enabled %}
+    "spark.eventLog.enabled": "true"
+    "spark.eventLog.dir": "{{ spark_event_log_dir }}"
+    {% endif %}
+    {% for key, value in spark_conf %}
+    "{{ key }}": "{{ value }}"
+    {% endfor %}
+  {% if hadoop_conf %}
+  hadoopConf:
+    {% for key, value in hadoop_conf %}
+    "{{ key }}": "{{ value }}"
+    {% endfor %}
+  {% endif %}
+  {% if volumes %}
+  volumes:
+    {% for volume in volumes %}
+    - name: {{ volume.name }}
+      {% if volume.configMap %}
+      configMap:
+        name: {{ volume.configMap.name }}
+        {% if volume.configMap.items %}
+        items:
+          {% for item in volume.configMap.items %}
+          - key: {{ item.key }}
+            path: {{ item.path }}
+          {% endfor %}
+        {% endif %}
+      {% elif volume.secret %}
+      secret:
+        secretName: {{ volume.secret.secretName }}
+      {% elif volume.persistentVolumeClaim %}
+      persistentVolumeClaim:
+        claimName: {{ volume.persistentVolumeClaim.claimName }}
+      {% elif volume.emptyDir %}
+      emptyDir: {}
+      {% endif %}
+    {% endfor %}
+  {% endif %}
+  {% if monitoring_enabled %}
+  monitoring:
+    exposeDriverMetrics: true
+    exposeExecutorMetrics: true
+    prometheus:
+      jmxExporterJar: "/prometheus/jmx_prometheus_javaagent-{{ jmx_exporter_version | default(value="0.11.0") }}.jar"
+      port: {{ prometheus_port | default(value=8090) }}
+  {% endif %}

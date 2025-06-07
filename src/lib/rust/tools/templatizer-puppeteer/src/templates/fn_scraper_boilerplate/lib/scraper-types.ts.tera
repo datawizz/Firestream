@@ -1,0 +1,80 @@
+import { Schema } from '@effect/schema';
+import { Effect } from 'effect';
+import { ScraperAction } from './dsl';
+
+// Error types
+export class ProcessingError extends Error {
+  readonly _tag = 'ProcessingError';
+  constructor(message: string, public cause?: unknown) {
+    super(message);
+  }
+}
+
+// Core scraper definition interface
+export interface ScraperDefinition<TConfig, TData> {
+  // Schema validation for config
+  configSchema: Schema.Schema<TConfig>;
+  
+  // Pure functions that return programs
+  buildLoginProgram: (config: TConfig) => ScraperAction<void>;
+  buildExtractionProgram: (config: TConfig) => ScraperAction<TData[]>;
+  
+  // Pure data processing
+  processData: (raw: unknown) => Effect.Effect<TData[], ProcessingError>;
+  transformData: (data: TData[]) => TransformedData;
+}
+
+// Extended interface for API scraping
+export interface APIScraperDefinition<TConfig, TData> extends ScraperDefinition<TConfig, TData> {
+  // API-specific methods
+  getAPIRequests: () => APIRequest[];
+  processAPIResponses: (responses: APIResponse[]) => Effect.Effect<TData[], ProcessingError>;
+}
+
+// Supporting types
+export interface TransformedData {
+  recordCount: number;
+  extractedAt: string;
+  source: string;
+  data: any[];
+  metadata?: Record<string, any>;
+}
+
+export interface APIRequest {
+  method: 'GET' | 'POST' | 'PUT' | 'DELETE';
+  endpoint: string;
+  params?: Record<string, any>;
+  data?: any;
+  name: string;
+}
+
+export interface APIResponse {
+  name: string;
+  data: any;
+  status: number;
+  headers: Record<string, string>;
+}
+
+// Common patterns as reusable functions
+export const validateData = <T>(
+  validator: (data: T[]) => { valid: boolean; errors?: string[] }
+) => (data: T[]): Effect.Effect<T[], ProcessingError> => {
+  const result = validator(data);
+  if (result.valid) {
+    return Effect.succeed(data);
+  } else {
+    return Effect.fail(new ProcessingError(
+      `Validation failed: ${result.errors?.join(', ')}`
+    ));
+  }
+};
+
+export const transformToParquet = <T>(
+  source: string,
+  transformer?: (item: T) => any
+) => (data: T[]): TransformedData => ({
+  recordCount: data.length,
+  extractedAt: new Date().toISOString(),
+  source,
+  data: transformer ? data.map(transformer) : data
+});

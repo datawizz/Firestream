@@ -1,0 +1,6 @@
+apiVersion: v2
+name: {{ project_name }}
+description: {{ chart.description }}
+type: application
+version: {{ chart.version }}
+appVersion: "1.0.0"

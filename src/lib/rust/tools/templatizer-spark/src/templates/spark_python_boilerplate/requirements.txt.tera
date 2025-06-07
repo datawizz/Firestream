@@ -1,0 +1,47 @@
+# Core PySpark dependencies
+pyspark=={{ pyspark_version | default(value="3.5.1") }}
+
+# Configuration management
+{% if config_format == "yaml" %}
+pyyaml>=6.0
+{% endif %}
+{% if config_format == "toml" %}
+toml>=0.10.2
+{% endif %}
+
+# Data processing
+numpy>=1.24.0,<2.0.0
+pandas>=2.0.0,<3.0.0
+pyarrow>=10.0.0
+
+{% if s3_enabled %}
+# AWS dependencies
+boto3>=1.26.0
+{% endif %}
+
+{% if delta_enabled %}
+# Delta Lake
+delta-spark=={{ delta_spark_version | default(value="2.4.0") }}
+{% endif %}
+
+# Utilities
+python-dateutil>=2.8.2
+{% if additional_requirements %}
+# Additional dependencies
+{% for req in additional_requirements %}
+{{ req }}
+{% endfor %}
+{% endif %}
+
+# Development dependencies
+{% if include_dev_dependencies %}
+pytest>=7.4.0
+pytest-cov>=4.1.0
+pytest-mock>=3.11.0
+black>=23.0.0
+flake8>=6.0.0
+mypy>=1.4.0
+{% if use_pre_commit %}
+pre-commit>=3.3.0
+{% endif %}
+{% endif %}

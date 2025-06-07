@@ -1,0 +1,196 @@
+package {{ package_name }}
+
+import org.apache.spark.sql.{SparkSession, DataFrame}
+import org.apache.spark.sql.functions._
+import org.apache.spark.sql.types._
+{% if config_enabled %}import com.typesafe.config.{Config, ConfigFactory}{% endif %}
+import org.slf4j.LoggerFactory
+{% if additional_imports %}{% for import in additional_imports %}
+import {{ import }}
+{% endfor %}{% endif %}
+
+object {{ main_class_name | default(value="SparkApp") }} {
+  
+  private val logger = LoggerFactory.getLogger(getClass)
+  
+  {% if config_enabled and config_fields %}
+  case class AppConfig(
+    appName: String,
+    {% for field in config_fields %}
+    {% if field.name == "input_path" %}inputPath{% elif field.name == "output_path" %}outputPath{% elif field.name == "num_partitions" %}numPartitions{% else %}{{ field.name }}{% endif %}: {% if field.type %}{{ field.type }}{% elif field.python_type %}{% if field.python_type == "str" %}String{% elif field.python_type == "int" %}Int{% elif field.python_type == "float" %}Double{% elif field.python_type == "bool" %}Boolean{% else %}String{% endif %}{% else %}String{% endif %}{% if not loop.last %},{% endif %}
+    {% endfor %}
+  )
+  {% endif %}
+  
+  def main(args: Array[String]): Unit = {
+    
+    {% if config_enabled %}
+    // Load configuration
+    val config = loadConfig(args)
+    logger.info(s"Starting ${config.appName}")
+    
+    // Create Spark session with configuration
+    val spark = createSparkSession(config)
+    {% else %}
+    // Create Spark session
+    val spark = SparkSession.builder()
+      .appName("{{ app_name }}")
+      .getOrCreate()
+    
+    logger.info("Starting {{ app_name }}")
+    {% endif %}
+    
+    try {
+      
+      // Run the main processing logic
+      val result = processData(spark{% if config_enabled %}, config{% endif %})
+      
+      // Write output
+      {% if config_enabled %}
+      writeOutput(result, config.outputPath, config.numPartitions)
+      {% else %}
+      writeOutput(result, args(1))
+      {% endif %}
+      
+      logger.info("Application completed successfully!")
+      
+    } catch {
+      case e: Exception =>
+        logger.error("Application failed", e)
+        throw e
+    } finally {
+      spark.stop()
+    }
+  }
+  
+  {% if config_enabled %}
+  private def loadConfig(args: Array[String]): AppConfig = {
+    val conf = ConfigFactory.load()
+    
+    AppConfig(
+      appName = "{{ app_name }}",
+      {% for field in config_fields %}
+      {% if field.name == "input_path" %}inputPath{% elif field.name == "output_path" %}outputPath{% elif field.name == "num_partitions" %}numPartitions{% else %}{{ field.name }}{% endif %} = {% if field.arg_index is defined and field.arg_index >= 0 %}
+        if (args.length > {{ field.arg_index }}) {% if field.name == "num_partitions" or (field.python_type and field.python_type == "int") or (field.type and field.type == "Int") %}args({{ field.arg_index }}).toInt{% else %}args({{ field.arg_index }}){% endif %} else {% endif %}{% if field.config_type and field.config_path %}conf.get{{ field.config_type | capitalize }}("{{ app_name | lower | replace(from=" ", to=".") }}.app.{{ field.config_path }}"){% elif field.name == "num_partitions" or (field.python_type and field.python_type == "int") %}{{ field.default_value | default(value="10") }}{% else %}"{{ field.default_value | default(value="") }}"{% endif %}{% if not loop.last %},{% endif %}
+      {% endfor %}
+    )
+  }
+  
+  private def createSparkSession(config: AppConfig): SparkSession = {
+    val builder = SparkSession.builder()
+      .appName(config.appName)
+      .config("spark.serializer", "org.apache.spark.serializer.KryoSerializer")
+      .config("spark.sql.adaptive.enabled", "true")
+      .config("spark.sql.adaptive.coalescePartitions.enabled", "true")
+    
+    {% if s3_enabled %}
+    // Add S3 configuration if needed
+    if (config.inputPath.startsWith("s3") || config.outputPath.startsWith("s3")) {
+      builder
+        .config("spark.hadoop.fs.s3a.impl", "org.apache.hadoop.fs.s3a.S3AFileSystem")
+        .config("spark.hadoop.fs.s3a.fast.upload", "true")
+    }
+    {% endif %}
+    
+    {% for conf in spark_configs %}
+    builder.config("{{ conf.key }}", "{{ conf.value }}")
+    {% endfor %}
+    
+    builder.getOrCreate()
+  }
+  {% endif %}
+  
+  private def processData(spark: SparkSession{% if config_enabled %}, config: AppConfig{% endif %}): DataFrame = {
+    import spark.implicits._
+    
+    {% if config_enabled %}
+    logger.info(s"Reading data from ${config.inputPath}")
+    {% else %}
+    logger.info(s"Reading data from ${args(0)}")
+    {% endif %}
+    
+    // Read input data
+    val inputData = {% if input_format == "json" %}
+      spark.read.json({% if config_enabled %}config.inputPath{% else %}args(0){% endif %})
+    {% elif input_format == "parquet" %}
+      spark.read.parquet({% if config_enabled %}config.inputPath{% else %}args(0){% endif %})
+    {% elif input_format == "csv" %}
+      spark.read
+        .option("header", "true")
+        .option("inferSchema", "true")
+        .csv({% if config_enabled %}config.inputPath{% else %}args(0){% endif %})
+    {% elif input_format == "delta" %}
+      spark.read.format("delta").load({% if config_enabled %}config.inputPath{% else %}args(0){% endif %})
+    {% else %}
+      spark.read.load({% if config_enabled %}config.inputPath{% else %}args(0){% endif %})
+    {% endif %}
+    
+    // Cache if needed
+    {% if cache_input %}inputData.cache(){% endif %}
+    
+    logger.info(s"Input data count: ${inputData.count()}")
+    
+    // Perform transformations
+    val processed = inputData
+      {% for transform in transformations %}
+      .{{ transform.method }}({{ transform.args | join(sep=", ") }})
+      {% endfor %}
+    
+    {% if aggregations %}
+    // Perform aggregations
+    val aggregated = processed
+      .groupBy({% for col in group_by_columns %}"{{ col }}"{% if not loop.last %}, {% endif %}{% endfor %})
+      .agg(
+        {% for agg in aggregations %}
+        {{ agg.function }}("{{ agg.column }}").as("{{ agg.alias }}"){% if not loop.last %},{% endif %}
+        {% endfor %}
+      )
+    
+    {% if cache_input %}inputData.unpersist(){% endif %}
+    
+    aggregated
+    {% else %}
+    {% if cache_input %}inputData.unpersist(){% endif %}
+    
+    processed
+    {% endif %}
+  }
+  
+  private def writeOutput(df: DataFrame, outputPath: String{% if config_enabled %}, numPartitions: Int{% endif %}): Unit = {
+    logger.info(s"Writing output to $outputPath")
+    
+    df{% if config_enabled %}.repartition(numPartitions){% endif %}
+      .write
+      .mode("{{ output_mode | default(value="overwrite") }}")
+      {% if output_format == "json" %}
+      .json(outputPath)
+    {% elif output_format == "parquet" %}
+      .option("compression", "{{ compression | default(value="snappy") }}")
+      .parquet(outputPath)
+    {% elif output_format == "csv" %}
+      .option("header", "true")
+      .csv(outputPath)
+    {% elif output_format == "delta" %}
+      .format("delta")
+      .save(outputPath)
+    {% else %}
+      .save(outputPath)
+    {% endif %}
+    
+    logger.info("Output written successfully")
+  }
+}
+
+{% if include_utils %}
+// Utility object for common operations
+object {{ main_class_name | default(value="SparkApp") }}Utils {
+  
+  def readConfig(path: String): Config = {
+    ConfigFactory.parseFile(new java.io.File(path))
+  }
+  
+  {% if utility_functions %}{% for util in utility_functions %}
+  {{ util }}
+  {% endfor %}{% endif %}
+}
+{% endif %}
