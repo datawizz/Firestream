@@ -6,7 +6,7 @@ use ratatui::{
     widgets::{Block, Borders, Paragraph, Widget},
 };
 
-use crate::app::{App, Pane};
+use crate::app::App;
 use crate::views::{
     ResourcesPane, DetailsPane, LogsPane, HelpView, CommandPalette, SearchView, View
 };

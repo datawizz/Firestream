@@ -6,7 +6,6 @@ pub mod mock_client;
 pub use api_client::ApiClient;
 pub use mock_client::MockClient;
 
-use crate::models::ErrorResponse;
 use std::future::Future;
 use std::pin::Pin;
 

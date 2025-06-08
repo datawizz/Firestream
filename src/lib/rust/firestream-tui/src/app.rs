@@ -1,13 +1,12 @@
 use crate::backend::{FirestreamBackend, MockClient};
 use crate::event::{AppEvent, Event, EventHandler};
-use crate::models::{Deployment, Template, Node, DeltaTable, BuildStatus, SecretInfo, ResourceType};
-use crate::views::{ResourcesPane, DetailsPane, LogsPane, View};
+use crate::models::{Template, DeltaTable, BuildStatus, SecretInfo, ResourceType};
+use crate::views::View;
 use ratatui::{
     DefaultTerminal,
     crossterm::event::{KeyCode, KeyEvent, KeyModifiers},
 };
 use std::sync::Arc;
-use tokio::sync::RwLock;
 
 /// Main application state
 pub struct App {

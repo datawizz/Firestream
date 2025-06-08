@@ -293,6 +293,7 @@ impl Default for Chart {
 /// Chart configuration details
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct ChartConfig {
+    #[serde(default)]
     pub metrics: Vec<String>,
     #[serde(default)]
     pub dimensions: Vec<String>,

@@ -243,5 +243,17 @@
   "jmx_exporter_version": "0.11.0",
   "prometheus_port": 8090,
   
-  "additional_pre_commit_hooks": []
+  "additional_pre_commit_hooks": [],
+  "additional_tests": [],
+  "utility_functions": [],
+  "additional_arguments": [],
+  "additional_config_files": [],
+  "spark_uid": "185",
+  "spark_base_image": "apache/spark-py:v3.5.1",
+  "apt_packages": [],
+  "config_files": [],
+  "additional_files": [],
+  "environment_vars": [],
+  "custom_make_targets": [],
+  "additional_gitignore_patterns": []
 }

@@ -90,6 +90,15 @@ fn test_config_builder() {
         .description("Test dashboard")
         .database("PostgreSQL", "localhost", 5432, "testdb")
         .credentials("user", "pass")
+        .add_dataset(
+            DatasetBuilder::new("test_dataset", "test_table")
+                .add_column(Column {
+                    name: "id".to_string(),
+                    column_type: "INTEGER".to_string(),
+                    ..Default::default()
+                })
+                .build()
+        )
         .build();
 
     assert!(config.is_ok());
@@ -438,6 +447,7 @@ fn test_virtual_dataset_validation() {
         "datasets": [
             {
                 "name": "bad_sql",
+                "table_name": "bad_sql",
                 "type": "virtual",
                 "sql": "DROP TABLE users; SELECT * FROM users",
                 "columns": []

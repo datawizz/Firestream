@@ -178,6 +178,7 @@ notebook: ## Start Jupyter notebook
 # Custom targets
 {% for target in custom_make_targets %}
 .PHONY: {{ target.name }}
-{{ target.name }}: {{ target.dependencies | join(sep=" ") }} ## {{ target.description }}
-	{{ target.commands | join(sep="\n\t") }}
+{{ target.name }}: {% if target.dependencies %}{{ target.dependencies | join(sep=" ") }}{% endif %} ## {{ target.description }}
+	{% for cmd in target.commands %}{% if not loop.first %}
+	{% endif %}{{ cmd }}{% endfor %}
 {% endfor %}

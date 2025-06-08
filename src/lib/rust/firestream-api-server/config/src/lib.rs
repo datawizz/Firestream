@@ -1,7 +1,6 @@
 //! The firestream-api-server-config crate contains functionality for parsing as well as accessing the project's documentation.
 
 use anyhow::{anyhow, Context};
-use dotenvy::dotenv;
 use figment::{
     providers::{Env, Format, Serialized, Toml},
     Figment,
@@ -90,53 +89,61 @@ impl ServerConfig {
 ///     // add your config settings here…
 /// }
 /// ```
-#[derive(Deserialize, Clone, Debug)]
+#[derive(Deserialize, Serialize, Clone, Debug)]
 #[cfg_attr(test, derive(PartialEq))]
 pub struct DatabaseConfig {
     /// The URL to use to connect to the database, e.g. "postgresql://user:password@localhost:5432/database"
     pub url: String,
 }
 
+impl DatabaseConfig {
+    /// Create a database URL from environment variables with fallback support
+    pub fn from_env() -> Result<Self, anyhow::Error> {
+        // First, check if DATABASE_URL is set (takes precedence)
+        if let Ok(database_url) = env::var("DATABASE_URL") {
+            return Ok(DatabaseConfig { url: database_url });
+        }
+        
+        // Check if PG* environment variables are set (prefer these over APP_DATABASE__URL)
+        if env::var("PGHOST").is_ok() || env::var("PGUSER").is_ok() {
+            let host = env::var("PGHOST").unwrap_or_else(|_| "localhost".to_string());
+            let port = env::var("PGPORT").unwrap_or_else(|_| "5432".to_string());
+            let user = env::var("PGUSER").unwrap_or_else(|_| "postgres".to_string());
+            let password = env::var("PGPASSWORD").unwrap_or_else(|_| "".to_string());
+            let database = env::var("PGDATABASE").unwrap_or_else(|_| "postgres".to_string());
+            
+            let url = if password.is_empty() {
+                format!("postgres://{}@{}:{}/{}", user, host, port, database)
+            } else {
+                format!("postgres://{}:{}@{}:{}/{}", user, password, host, port, database)
+            };
+            
+            return Ok(DatabaseConfig { url });
+        }
+        
+        // Finally, check if APP_DATABASE__URL is set
+        if let Ok(database_url) = env::var("APP_DATABASE__URL") {
+            return Ok(DatabaseConfig { url: database_url });
+        }
+        
+        // If nothing is set, return an error
+        Err(anyhow!("No database configuration found. Please set DATABASE_URL, PG* environment variables, or APP_DATABASE__URL"))
+    }
+}
+
 /// Loads the application configuration for a particular environment.
 ///
-/// Depending on the environment, this function will behave differently:
-/// * for [`Environment::Development`], the function will load env vars from a `.env` file at the project root if that is present
-/// * for [`Environment::Test`], the function will load env vars from a `.env.test` file at the project root if that is present
-/// * for [`Environment::Production`], the function will only use the process env vars, and not load a `.env` file
-///
-/// In case the .env or .env.test files live in another directory,
-/// you can set that location using the APP_DOTENV_CONFIG_DIR environment variable.
-/// This is useful when they are mounted at separate locations in a Docker container, for example.
-///
-/// Configuration settings are loaded from these sources (in that order so that latter soruces override former):
+/// Configuration settings are loaded from these sources (in that order so that latter sources override former):
 /// * the `config/app.toml` file
 /// * the `config/environments/<development|production|test>.toml` files depending on the environment
-/// * environment variables
+/// * environment variables prefixed with `APP_`
+///
+/// Note: This function does NOT load .env files. Environment variables should be set
+/// by the deployment system (Docker, systemd, shell, etc.) before the application runs.
 pub fn load_config<'a, T>(env: &Environment) -> Result<T, anyhow::Error>
 where
     T: Deserialize<'a>,
 {
-    let dotenv_config_dir = env::var("APP_DOTENV_CONFIG_DIR")
-        .ok()
-        .map(std::path::PathBuf::from);
-
-    match (env, dotenv_config_dir) {
-        (Environment::Development, None) => {
-            dotenv().ok();
-        }
-        (Environment::Test, None) => {
-            dotenvy::from_filename(".env.test").ok();
-        }
-        (Environment::Development, Some(mut dotenv_config_dir)) => {
-            dotenv_config_dir.push(".env");
-            dotenvy::from_filename(dotenv_config_dir).ok();
-        }
-        (Environment::Test, Some(mut dotenv_config_dir)) => {
-            dotenv_config_dir.push(".env.test");
-            dotenvy::from_filename(dotenv_config_dir).ok();
-        }
-        _ => { /* don't use any .env file for production */ }
-    }
 
     let env_config_file = match env {
         Environment::Development => "development.toml",

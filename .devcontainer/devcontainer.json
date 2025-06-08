@@ -46,6 +46,10 @@
 			],
 			// Set *default* container specific settings.json values on container create.
 			"settings": {
+				// Force rust-analyzer to only run in the workspace (container), not on host
+				"remote.extensionKind": {
+					"rust-lang.rust-analyzer": ["workspace"]
+				},
 				"python.defaultInterpreterPath": "/home/firestream/.python",
 				"jupyter.defaultKernelPath": "/home/firestream/.python",
 				"python.pythonPath": "/home/firestream/.python",
@@ -93,6 +97,15 @@
 					"**/node_modules/*/**": true,
 					"**/target": true
 				},
+				// Rust analyzer configuration - only runs in container
+				"rust-analyzer.enable": true,
+				"rust-analyzer.checkOnSave.enable": true,
+				"rust-analyzer.diagnostics.enable": true,
+				"rust-analyzer.cargo.autoreload": true,
+				"rust-analyzer.server.path": "rust-analyzer",
+				"rust-analyzer.cargo.buildScripts.enable": true,
+				"rust-analyzer.rustfmt.extraArgs": ["--edition", "2021"],
+				"rust-analyzer.check.command": "clippy",
 				"rust-analyzer.checkOnSave.extraArgs": [
 					"--target-dir=target-ra"
 				]

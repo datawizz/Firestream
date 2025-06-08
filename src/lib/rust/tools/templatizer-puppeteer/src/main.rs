@@ -1,11 +1,10 @@
 use clap::{Parser, Subcommand};
 use tera::Context;
 use serde_json::Value;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::fs;
 
-mod example;
-mod generator;
+use templatizer_puppeteer::{example, generator};
 
 #[derive(Parser)]
 #[command(name = "fn-scraper-gen")]

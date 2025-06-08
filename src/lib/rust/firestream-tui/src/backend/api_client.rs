@@ -3,14 +3,14 @@ use crate::models::*;
 use std::collections::HashMap;
 
 pub struct ApiClient {
-    base_url: String,
+    _base_url: String,
     api_key: Option<String>,
 }
 
 impl ApiClient {
     pub fn new(base_url: String) -> Self {
         Self {
-            base_url,
+            _base_url: base_url,
             api_key: None,
         }
     }

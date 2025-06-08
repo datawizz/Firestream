@@ -1178,7 +1178,6 @@ name = "firestream-api-server-config"
 version = "0.0.1"
 dependencies = [
  "anyhow",
- "dotenvy",
  "figment",
  "googletest",
  "serde",

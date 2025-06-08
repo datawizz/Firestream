@@ -14,8 +14,7 @@ PROJECT_ROOT="$(dirname "$(dirname "$SCRIPT_DIR")")"
 echo "SCRIPT_DIR: $SCRIPT_DIR"
 echo "PROJECT_ROOT: $PROJECT_ROOT"
 echo "Looking for files at:"
-echo " - ${PROJECT_ROOT}/etc/.env.secrets"
-echo " - ${PROJECT_ROOT}/etc/.env.secrets.example"
+echo " - ${PROJECT_ROOT}/etc/.env.example"
 
 # Determine OS platform
 OS_PLATFORM="$(uname -s)"
@@ -174,15 +173,15 @@ fi
 
 # Function to set variable based on file existence
 set_env_variable() {
-    local example_file_path="${PROJECT_ROOT}/etc/.env.secrets.example"
-    local expected_file_path="${PROJECT_ROOT}/etc/.env.secrets"
+    local example_file_path="${PROJECT_ROOT}/etc/.env.example"
+    local expected_file_path="${PROJECT_ROOT}/etc/.env"
 
     if [ -e "$expected_file_path" ]; then
         ENV_SECRETS_PATH="$expected_file_path"
     elif [ -e "$example_file_path" ]; then
         ENV_SECRETS_PATH="$example_file_path"
     else
-        echo "Error: Neither .env.secrets nor .env.secrets.example found"
+        echo "Error: Neither .env nor .env.example found"
         exit 1
     fi
 

@@ -12,6 +12,39 @@ development:
 	@bash -c 'cd $(BASEDIR) && bash bootstrap.sh development'
 
 
+install:
+
+	# splx command line tool
+	cargo install sqlx-cli
+
+
+cargo-reset:
+	rm -rf ~/.cargo/registry/cache
+	rm -rf ~/.cargo/registry/index
+
+	# Set stable as default
+	# Remove only the problematic toolchain
+	rustup toolchain uninstall 1.85.0-x86_64-unknown-linux-gnu
+
+	# Reinstall it
+	rustup toolchain install 1.85.0
+
+	# Set it as default again
+	rustup default 1.85.0
+
+reset-db:
+	# Delete postgresql volume?
+	docker-compose -f docker/firestream/docker-compose.devcontainer.yml down -v
+
+db-migrations: install
+	cd /workspace/src/lib/rust/firestream-api-server/db && \
+	sqlx migrate run && \
+	cargo sqlx prepare && \
+	cargo build --package firestream-api-server-cli && \
+	cargo run --package firestream-api-server-cli --bin db -- reset -e test && \
+	cd /workspace/src/lib/rust/firestream-api-server && \
+	cargo run --package firestream-api-server-cli --bin db -- seed -e test
+
 devcontainer:
 	bash docker/firestream/docker_preinit.sh
 	docker compose -f docker/firestream/docker-compose.devcontainer.yml build devcontainer

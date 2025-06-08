@@ -141,7 +141,7 @@ class Test{% if main_class_name %}{{ main_class_name }}{% else %}SparkApp{% endi
     {% for test in additional_tests %}
     def test_{{ test.name }}(self, app: {% if main_class_name %}{{ main_class_name }}{% else %}SparkApp{% endif %}, spark: SparkSession):
         """{{ test.description }}"""
-        {{ test.body | indent(width=8) }}
+        {{ test.body | indent(first=false, prefix="        ") }}
     {% endfor %}
 
 

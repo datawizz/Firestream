@@ -200,5 +200,4 @@ mod tests {
     }
 }
 
-#[cfg(test)]
-mod tera_syntax_tests;
+

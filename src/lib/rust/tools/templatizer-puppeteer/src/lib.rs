@@ -120,7 +120,7 @@ impl FunctionalScraperTemplatizer {
         let scraper_code = generator::generate_scraper_definition(&config)?;
 
         // Create context with generated code
-        let mut context = Context::from_serialize(&config)?;
+        let context = Context::from_serialize(&config)?;
 
         // Instead of inserting into context, write directly to files
         let src_dir = output_dir.join("src");

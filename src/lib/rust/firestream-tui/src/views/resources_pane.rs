@@ -5,7 +5,7 @@ use ratatui::{
     text::{Line, Span},
     widgets::{Block, Borders, List, ListItem, Widget},
 };
-use crate::app::{App, Pane, ResourceItem};
+use crate::app::{App, Pane};
 
 pub struct ResourcesPane<'a> {
     app: &'a App,

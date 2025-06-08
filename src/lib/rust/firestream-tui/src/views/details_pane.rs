@@ -7,7 +7,6 @@ use ratatui::{
 };
 use crate::app::{App, Pane, ResourceDetails};
 use crate::models::{DeploymentStatus, PodStatus, NodeStatus};
-use std::collections::HashMap;
 
 pub struct DetailsPane<'a> {
     app: &'a App,

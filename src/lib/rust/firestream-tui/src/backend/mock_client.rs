@@ -283,7 +283,7 @@ impl FirestreamBackend for MockClient {
     fn scale_deployment(&self, id: &str, replicas: u32) -> BoxFuture<'_, ApiResult<Deployment>> {
         let id = id.to_string();
         Box::pin(async move {
-            let mut deployments = vec![
+            let deployments = vec![
                 Deployment {
                     id: "dep-1".to_string(),
                     name: "etl-pipeline".to_string(),
@@ -362,7 +362,7 @@ impl FirestreamBackend for MockClient {
                     ready: 4,
                     gpu: 2,
                 },
-                resources: cluster::ResourceUtilization {
+                resources: ClusterResourceUtilization {
                     cpu_usage: 42.0,
                     memory_usage: 71.0,
                     gpu_usage: Some(87.0),

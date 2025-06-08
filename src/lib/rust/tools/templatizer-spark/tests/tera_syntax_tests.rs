@@ -63,7 +63,7 @@ Field: {{ item[0] }}, Type: {{ item[1] }}
         let mut tera = Tera::default();
         
         tera.add_raw_template("join.tera", r#"
-Args: {{ args | join(", ") }}
+Args: {{ args | join(sep=", ") }}
 "#).unwrap();
         
         let context = Context::from_serialize(json!({

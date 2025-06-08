@@ -376,7 +376,15 @@ impl FilesystemOps {
         
         // Add exclude patterns
         for exclude in exclude_patterns {
-            cmd.arg("--glob").arg(format!("!{}", exclude));
+            // If the pattern looks like a directory name (no glob chars), 
+            // convert it to exclude the directory and its contents
+            if !exclude.contains('*') && !exclude.contains('?') && !exclude.contains('[') {
+                // Exclude both the directory itself and its contents
+                cmd.arg("--glob").arg(format!("!{}", exclude));
+                cmd.arg("--glob").arg(format!("!{}/**", exclude));
+            } else {
+                cmd.arg("--glob").arg(format!("!{}", exclude));
+            }
         }
         
         let output = cmd.output()
@@ -431,10 +439,24 @@ impl FilesystemOps {
             // Check exclude patterns
             let relative_path = entry_path.strip_prefix(path).unwrap_or(entry_path);
             let should_exclude = exclude_patterns.iter().any(|pattern| {
-                glob::Pattern::new(pattern)
-                    .ok()
-                    .map(|p| p.matches_path(relative_path))
-                    .unwrap_or(false)
+                // If the pattern looks like a directory name (no glob chars),
+                // check if the path contains that directory
+                if !pattern.contains('*') && !pattern.contains('?') && !pattern.contains('[') {
+                    // Check if any component of the path matches the pattern
+                    relative_path.components().any(|component| {
+                        if let std::path::Component::Normal(name) = component {
+                            name.to_string_lossy() == *pattern
+                        } else {
+                            false
+                        }
+                    })
+                } else {
+                    // Use glob pattern matching for patterns with wildcards
+                    glob::Pattern::new(pattern)
+                        .ok()
+                        .map(|p| p.matches_path(relative_path))
+                        .unwrap_or(false)
+                }
             });
             
             if should_exclude {
