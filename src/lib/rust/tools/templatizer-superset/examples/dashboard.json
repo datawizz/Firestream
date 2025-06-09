@@ -134,6 +134,7 @@
     },
     {
       "name": "revenue_by_segment_sql",
+      "table_name": "revenue_by_segment_sql",
       "type": "virtual",
       "sql": "SELECT \n  c.segment,\n  DATE_TRUNC('month', o.created_at) as month,\n  COUNT(DISTINCT o.order_id) as order_count,\n  SUM(o.total_amount) as revenue,\n  AVG(o.total_amount) as avg_order_value\nFROM fact_orders o\nJOIN dim_customers c ON o.customer_id = c.customer_id\nWHERE o.created_at >= CURRENT_DATE - INTERVAL '6 months'\nGROUP BY 1, 2\nORDER BY 1, 2",
       "description": "Monthly revenue metrics by customer segment (SQL virtual dataset)",
@@ -188,6 +189,7 @@
     },
     {
       "name": "top_products_last_30d",
+      "table_name": "top_products_last_30d",
       "type": "virtual",
       "sql": "WITH product_sales AS (\n  SELECT \n    p.product_name,\n    p.category,\n    SUM(oi.quantity) as units_sold,\n    SUM(oi.quantity * oi.unit_price) as revenue\n  FROM order_items oi\n  JOIN products p ON oi.product_id = p.product_id\n  WHERE oi.order_date >= CURRENT_DATE - INTERVAL '30 days'\n  GROUP BY 1, 2\n)\nSELECT \n  *,\n  RANK() OVER (ORDER BY revenue DESC) as revenue_rank\nFROM product_sales\nWHERE revenue > 0\nORDER BY revenue DESC\nLIMIT 100",
       "description": "Top selling products in the last 30 days",

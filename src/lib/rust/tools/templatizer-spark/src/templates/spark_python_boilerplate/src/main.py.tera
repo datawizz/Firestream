@@ -115,7 +115,7 @@ class {% if main_class_name %}{{ main_class_name }}{% else %}SparkApp{% endif %}
         
         # Perform transformations
         {% for transform in transformations %}
-        df = df.{{ transform.method }}({{ transform.args | join(", ") }})
+        df = df.{{ transform.method }}({{ transform.args | join(sep=", ") }})
         {% endfor %}
         
         {% if custom_transformation_code %}

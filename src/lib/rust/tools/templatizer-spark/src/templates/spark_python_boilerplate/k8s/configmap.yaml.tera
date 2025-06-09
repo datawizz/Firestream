@@ -25,23 +25,23 @@ data:
     {% if config_format == "yaml" %}
     app_name: "{{ app_name }}"
     {% for field in config_fields %}
-    {{ field.name }}: {{ field.runtime_value | default(value=field.default_value) }}
+    {{ field.name }}: {{ field.default_value }}
     {% endfor %}
     {% elif config_format == "toml" %}
     app_name = "{{ app_name }}"
     {% for field in config_fields %}
-    {{ field.name }} = {{ field.runtime_value | default(value=field.default_value) | json_encode }}
+    {{ field.name }} = {{ field.default_value | json_encode }}
     {% endfor %}
     {% else %}
     {
       "app_name": "{{ app_name }}",
       {% for field in config_fields %}
-      "{{ field.name }}": {{ field.runtime_value | default(value=field.default_value) | json_encode }}{% if not loop.last %},{% endif %}
+      "{{ field.name }}": {{ field.default_value | json_encode }}{% if not loop.last %},{% endif %}
       {% endfor %}
     }
     {% endif %}
   {% endif %}
   {% for file in additional_config_files %}
   {{ file.name }}: |
-{{ file.content | indent(width=4) }}
+{{ file.content | indent(first=false, prefix="    ") }}
   {% endfor %}

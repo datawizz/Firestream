@@ -5,7 +5,7 @@ use ratatui::{
     text::{Line, Span},
     widgets::{Block, Borders, List, ListItem, Widget},
 };
-use crate::app::{App, Pane, ResourceItem};
+use crate::app::{App, Pane};
 
 pub struct ResourcesPane<'a> {
     app: &'a App,
@@ -104,21 +104,5 @@ impl<'a> Widget for ResourcesPane<'a> {
             .highlight_style(Style::default());
 
         list.render(area, buf);
-
-        // Render action hints at the bottom
-        if is_focused && area.height > 4 {
-            let actions_y = area.y + area.height - 2;
-            let actions = Line::from(vec![
-                Span::styled("[n]", Style::default().fg(Color::Yellow)),
-                Span::raw(" new "),
-                Span::styled("[d]", Style::default().fg(Color::Yellow)),
-                Span::raw(" deploy "),
-                Span::styled("[b]", Style::default().fg(Color::Yellow)),
-                Span::raw(" build "),
-                Span::styled("[/]", Style::default().fg(Color::Yellow)),
-                Span::raw(" search"),
-            ]);
-            buf.set_line(area.x + 1, actions_y, &actions, area.width - 2);
-        }
     }
 }

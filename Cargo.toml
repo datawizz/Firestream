@@ -16,6 +16,10 @@ members = [
 ]
 
 [workspace.dependencies]
+# Internal Crates
+templatizer-spark = { path = "src/lib/rust/tools/templatizer-spark" }
+filesystem-manager = { path = "src/lib/rust/tools/filesystem-manager" }
+
 # Standard Library
 tokio = { version = "1", features = ["full"] }
 serde = { version = "1", features = ["derive"] }
@@ -39,7 +43,7 @@ whoami = "1.5"
 dirs = "6.0.0"
 async-trait = "0.1"
 tempfile = "3.8"
-tera = "1"
+tera = "1.20"
 dialoguer = "0.11"
 once_cell = "1.19"
 serde_yaml = "0.9"
@@ -48,8 +52,10 @@ regex = "1.10"
 
 # Terminal User Interface (TUI) / Command Line Interface (CLI)
 clap = { version = "4", features = ["derive"] }
-ratatui = "0.28"
+ratatui = "0.29"
 crossterm = { version = "0.28", features = ["event-stream"] }
+color-eyre = "0.6.3"
+thiserror = "1.0"
 
 # Kubernetes
 kube = { version = "1.1.0", features = ["runtime", "derive"] }

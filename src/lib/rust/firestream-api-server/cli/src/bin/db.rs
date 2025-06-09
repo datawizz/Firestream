@@ -70,7 +70,11 @@ enum Commands {
 async fn cli(ui: &mut UI<'_>, cli: Cli) -> Result<(), anyhow::Error> {
     let config: Result<Config, anyhow::Error> = load_config(&cli.env);
     match config {
-        Ok(config) => {
+        Ok(mut config) => {
+            // Override database config with environment variables if available
+            if let Ok(env_db_config) = DatabaseConfig::from_env() {
+                config.database = env_db_config;
+            }
             match cli.command {
                 Commands::Drop => {
                     ui.info(&format!("Dropping {} database…", &cli.env));
@@ -160,16 +164,31 @@ async fn drop(config: &DatabaseConfig) -> Result<String, anyhow::Error> {
     let db_config = get_db_config(config);
     let db_name = db_config
         .get_database()
-        .context("Failed to get database name!")?;
+        .context("Failed to get database name!")?
+        .to_string();
+    
+    // First, terminate all connections to the target database
     let mut root_connection = get_root_db_client(config).await;
-
-    let query = format!("DROP DATABASE {}", db_name);
+    
+    // Kill all existing connections to the database we want to drop
+    let kill_query = format!(
+        "SELECT pg_terminate_backend(pg_stat_activity.pid) \
+         FROM pg_stat_activity \
+         WHERE pg_stat_activity.datname = '{}' \
+         AND pid <> pg_backend_pid()",
+        db_name
+    );
+    
+    let _ = root_connection.execute(kill_query.as_str()).await; // Ignore errors
+    
+    // Now drop the database (quote the database name)
+    let query = format!("DROP DATABASE IF EXISTS \"{}\"", db_name);
     root_connection
         .execute(query.as_str())
         .await
         .context("Failed to drop database!")?;
 
-    Ok(String::from(db_name))
+    Ok(db_name)
 }
 
 async fn create(config: &DatabaseConfig) -> Result<String, anyhow::Error> {
@@ -179,7 +198,7 @@ async fn create(config: &DatabaseConfig) -> Result<String, anyhow::Error> {
         .context("Failed to get database name!")?;
     let mut root_connection = get_root_db_client(config).await;
 
-    let query = format!("CREATE DATABASE {}", db_name);
+    let query = format!("CREATE DATABASE \"{}\"", db_name);
     root_connection
         .execute(query.as_str())
         .await
@@ -278,9 +297,34 @@ async fn get_db_client(config: &DatabaseConfig) -> PgConnection {
 }
 
 async fn get_root_db_client(config: &DatabaseConfig) -> PgConnection {
-    let db_config = get_db_config(config);
-    let root_db_config = db_config.clone().database("postgres");
-    let connection: PgConnection = Connection::connect_with(&root_db_config).await.unwrap();
+    // Parse the original database URL
+    let original_url = Url::parse(&config.url).expect("Invalid DATABASE_URL!");
+    
+    // Extract connection components
+    let scheme = original_url.scheme();
+    let host = original_url.host_str().unwrap_or("localhost");
+    let port = original_url.port().unwrap_or(5432);
+    let username = original_url.username();
+    let password = original_url.password();
+    
+    // Build a new URL for the postgres database
+    let postgres_url = if let Some(pwd) = password {
+        format!("{}://{}:{}@{}:{}/postgres", scheme, username, pwd, host, port)
+    } else if !username.is_empty() {
+        format!("{}://{}@{}:{}/postgres", scheme, username, host, port)
+    } else {
+        format!("{}://{}:{}/postgres", scheme, host, port)
+    };
+    
+    // Parse the new URL and create connection options
+    let postgres_url_parsed = Url::parse(&postgres_url).expect("Invalid postgres URL!");
+    let db_config: PgConnectOptions = ConnectOptions::from_url(&postgres_url_parsed)
+        .expect("Failed to create connection options for postgres database!");
+    
+    // Connect to postgres database
+    let connection: PgConnection = Connection::connect_with(&db_config)
+        .await
+        .expect("Failed to connect to postgres database!");
 
     connection
 }

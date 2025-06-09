@@ -67,10 +67,10 @@ ENV {{ var.name }}="{{ var.value }}"
 RUN mkdir -p /opt/spark/logs /opt/spark/tmp
 
 # Set permissions
-RUN chown -R ${spark_uid}:${spark_uid} /opt/spark/work-dir /opt/spark/logs /opt/spark/tmp
+RUN chown -R {{ spark_uid }}:{{ spark_uid }} /opt/spark/work-dir /opt/spark/logs /opt/spark/tmp
 
 # Switch back to spark user
-USER ${spark_uid}
+USER {{ spark_uid }}
 
 # Set the entrypoint
 ENTRYPOINT ["/opt/entrypoint.sh"]

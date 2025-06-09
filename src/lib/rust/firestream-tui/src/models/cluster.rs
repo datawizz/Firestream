@@ -8,7 +8,7 @@ pub struct ClusterStatus {
     pub provider: ClusterProvider,
     pub status: HealthStatus,
     pub nodes: NodeSummary,
-    pub resources: ResourceUtilization,
+    pub resources: ClusterResourceUtilization,
     pub services: HashMap<String, ServiceStatus>,
 }
 
@@ -36,7 +36,7 @@ pub struct NodeSummary {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ResourceUtilization {
+pub struct ClusterResourceUtilization {
     #[serde(rename = "cpuUsage")]
     pub cpu_usage: f64,
     #[serde(rename = "memoryUsage")]

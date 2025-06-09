@@ -2,14 +2,14 @@
 
 use tera::Context;
 use std::path::Path;
-use crate::{PooScraperTemplatizer, FunctionalScraperTemplatizer};
+use crate::{DomScraperTemplatizer, FunctionalScraperTemplatizer};
 
 /// Render legacy templates to directory
 pub fn render_templates_to_directory(
     context: Context,
     output_dir: &Path
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let mut templatizer = PooScraperTemplatizer::new()?;
+    let mut templatizer = DomScraperTemplatizer::new()?;
     templatizer.render_to_directory(context, output_dir)
 }
 

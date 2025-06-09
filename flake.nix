@@ -76,16 +76,14 @@
       # Extract Python packages from the module
       pythonPackages = pythonModule.environment.systemPackages;
 
+      # Import Rust packages from rust.nix
+      rustModule = import ./bin/nix/rust.nix {
+        inherit pkgs;
+        lib = nixpkgs.lib;
+      };
+
       # Define the shell packages
       shellPackages = with pkgs; [
-
-        # Rust toolchain
-        # rustc
-        # cargo
-        # rust-analyzer
-        # rustfmt
-        rustup
-        # TODO rustup makes things non-deterministic. Normal Nix install doesn't include linked C libraries and struggles with rust-src required for linting
 
         # kubernetes
         k3d
@@ -127,20 +125,9 @@
         curl
         btop
 
-        # LLVM/Clang tools
-        llvmPackages_latest.libclang.lib
-        llvmPackages.bintools
-        clang
-        libclang
-        llvm
-        gcc
-        xz
-        zlib
-        openssl
-
-        # Build Tools
-        pkg-config
-      ] ++ pythonPackages ++ dockerInDocker.packages;
+        # Additional build tools not included in rust.nix
+        # (rust.nix already includes: gcc, clang, llvm, pkg-config, openssl, xz, zlib)
+      ] ++ pythonPackages ++ dockerInDocker.packages ++ rustModule.packages;
 
       # Create a profile script that sets up the environment
       profileScript = pkgs.writeText "nix-env.sh" ''
@@ -206,14 +193,8 @@
         # Try to use system lzma if available
         export LZMA_API_STATIC=1
 
-        # rustup environment
-        export PATH="$HOME/.cargo/bin:$PATH"
-
-        # Set up Rust source path
-        export RUST_SRC_PATH="${pkgs.rust.packages.stable.rustPlatform.rustLibSrc}"
-
-        # Bindgen configuration
-        export LIBCLANG_PATH="${pkgs.lib.makeLibraryPath [ pkgs.llvmPackages_latest.libclang.lib ]}"
+        # Rust environment from rust.nix
+        ${rustModule.envVars}
 
         # Docker-from-Docker configuration
         ${dockerInDocker.profileScript}
@@ -268,6 +249,10 @@
             echo "Warning: Docker-from-Docker setup failed, but continuing..."
           }
         fi
+
+        # Run Rust setup
+        echo "Running Rust environment setup..."
+        ${rustModule.setupScript}
         EOF
 
         chmod +x $out/bin/setup-container

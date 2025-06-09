@@ -3,14 +3,14 @@ use crate::models::*;
 use std::collections::HashMap;
 
 pub struct ApiClient {
-    base_url: String,
+    _base_url: String,
     api_key: Option<String>,
 }
 
 impl ApiClient {
     pub fn new(base_url: String) -> Self {
         Self {
-            base_url,
+            _base_url: base_url,
             api_key: None,
         }
     }
@@ -166,6 +166,13 @@ impl FirestreamBackend for ApiClient {
     fn list_secrets(&self) -> BoxFuture<'_, ApiResult<Vec<SecretInfo>>> {
         Box::pin(async move {
             // TODO: Implement HTTP request to GET /secrets
+            Err(ApiError::Unknown("Not implemented".to_string()))
+        })
+    }
+    
+    fn get_secret(&self, _id: &str) -> BoxFuture<'_, ApiResult<SecretInfo>> {
+        Box::pin(async move {
+            // TODO: Implement HTTP request to GET /secrets/{id}
             Err(ApiError::Unknown("Not implemented".to_string()))
         })
     }

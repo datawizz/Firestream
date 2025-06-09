@@ -1,0 +1,11 @@
+{
+    // rust-analyzer is now provided by Nix in the devcontainer
+    "rust-analyzer.enable": true,
+    
+    "[rust]": {
+        "editor.formatOnSave": true
+    },
+    
+    // Use the rust-analyzer from the Nix environment
+    "rust-analyzer.server.path": "rust-analyzer"
+}

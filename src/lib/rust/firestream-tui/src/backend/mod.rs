@@ -6,7 +6,6 @@ pub mod mock_client;
 pub use api_client::ApiClient;
 pub use mock_client::MockClient;
 
-use crate::models::ErrorResponse;
 use std::future::Future;
 use std::pin::Pin;
 
@@ -70,6 +69,7 @@ pub trait FirestreamBackend: Send + Sync {
     
     // Secret operations
     fn list_secrets(&self) -> BoxFuture<'_, ApiResult<Vec<crate::models::SecretInfo>>>;
+    fn get_secret(&self, id: &str) -> BoxFuture<'_, ApiResult<crate::models::SecretInfo>>;
     fn create_secret(&self, name: &str, data: std::collections::HashMap<String, String>) -> BoxFuture<'_, ApiResult<crate::models::SecretInfo>>;
     fn delete_secret(&self, name: &str) -> BoxFuture<'_, ApiResult<()>>;
 }

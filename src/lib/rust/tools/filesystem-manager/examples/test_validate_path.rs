@@ -1,5 +1,4 @@
 use anyhow::Result;
-use std::path::PathBuf;
 use tempfile::TempDir;
 
 #[tokio::main]

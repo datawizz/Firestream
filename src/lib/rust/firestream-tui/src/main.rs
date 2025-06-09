@@ -5,6 +5,7 @@ pub mod event;
 pub mod ui;
 pub mod models;
 pub mod backend;
+pub mod services;
 pub mod views;
 
 #[tokio::main]
