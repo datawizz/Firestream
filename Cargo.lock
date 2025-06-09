@@ -1241,6 +1241,7 @@ dependencies = [
  "chrono",
  "color-eyre",
  "crossterm",
+ "dirs",
  "futures",
  "ratatui",
  "serde",

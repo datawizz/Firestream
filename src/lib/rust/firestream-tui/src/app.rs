@@ -47,6 +47,24 @@ pub struct App {
     
     /// Loading states
     pub loading: LoadingState,
+    
+    /// Secret editing state
+    pub secret_editing: Option<SecretEditingState>,
+}
+
+#[derive(Debug, Clone)]
+pub struct SecretEditingState {
+    pub secret_name: String,
+    pub fields: Vec<SecretField>,
+    pub selected_field: usize,
+    pub is_editing: bool,
+}
+
+#[derive(Debug, Clone)]
+pub struct SecretField {
+    pub key: String,
+    pub value: String,
+    pub is_password: bool,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -100,15 +118,12 @@ impl App {
             running: true,
             events: EventHandler::new(),
             backend,
-            current_view: View::Main,
+            current_view: View::Splash,
             focused_pane: Pane::Resources,
             resources: ResourceTree {
                 items: vec![],
                 selected: 0,
-                expanded: vec![
-                    "deployments".to_string(),
-                    "templates".to_string(),
-                ],
+                expanded: vec![], // Start with everything collapsed
             },
             selected_details: None,
             logs: vec![],
@@ -118,13 +133,13 @@ impl App {
             search_mode: false,
             status_message: None,
             loading: LoadingState::default(),
+            secret_editing: None,
         }
     }
 
     /// Run the application's main loop
     pub async fn run(mut self, mut terminal: DefaultTerminal) -> color_eyre::Result<()> {
-        // Load initial data
-        self.load_resources().await;
+        // Don't load resources on splash screen
         
         // Main event loop
         while self.running {
@@ -144,46 +159,75 @@ impl App {
 
     /// Handle key events
     pub async fn handle_key_events(&mut self, key: KeyEvent) -> color_eyre::Result<()> {
+        // Clear old expand/collapse status messages on navigation keys
+        match key.code {
+            KeyCode::Up | KeyCode::Down | KeyCode::Left | KeyCode::Right | 
+            KeyCode::Tab | KeyCode::BackTab => {
+                if let Some(msg) = &self.status_message {
+                    if msg.contains("Collapsed") || msg.contains("Expanding") || msg.contains("Expanded") {
+                        self.status_message = None;
+                    }
+                }
+            }
+            _ => {}
+        }
+        
         // Global shortcuts
         if self.command_mode {
             self.handle_command_mode_keys(key).await?;
         } else if self.search_mode {
             self.handle_search_mode_keys(key).await?;
+        } else if self.current_view == View::Splash {
+            // Any key on splash screen advances to main view
+            self.current_view = View::Main;
+            self.load_resources().await;
         } else {
             match key.code {
-                // Quit
-                KeyCode::Char('q') => self.events.send(AppEvent::Quit),
+                // Quit - only Ctrl+C
                 KeyCode::Char('c' | 'C') if key.modifiers == KeyModifiers::CONTROL => {
                     self.events.send(AppEvent::Quit)
                 }
                 
-                // Command palette
-                KeyCode::Char(':') => {
-                    self.command_mode = true;
-                    self.command_input.clear();
-                }
+                // Remove command palette and search shortcuts
                 
-                // Search
-                KeyCode::Char('/') => {
-                    self.search_mode = true;
-                    self.search_input.clear();
-                }
-                
-                // Navigation between panes
-                KeyCode::Left | KeyCode::Char('h') => self.focus_previous_pane(),
-                KeyCode::Right | KeyCode::Char('l') => self.focus_next_pane(),
-                KeyCode::Tab => self.focus_next_pane(),
-                KeyCode::BackTab => self.focus_previous_pane(),
-                
-                // Help
-                KeyCode::Char('?') => self.current_view = View::Help,
-                KeyCode::Esc if self.current_view == View::Help => self.current_view = View::Main,
-                
-                // Pane-specific navigation
+                // Navigation and actions based on current pane
                 _ => match self.focused_pane {
-                    Pane::Resources => self.handle_resources_keys(key).await?,
-                    Pane::Details => self.handle_details_keys(key).await?,
-                    Pane::Logs => self.handle_logs_keys(key).await?,
+                    Pane::Resources => {
+                        // In resources pane, Left/Right handle expand/collapse
+                        match key.code {
+                            KeyCode::Left => {
+                                if let Some(item) = self.resources.items.get(self.resources.selected) {
+                                    if item.expandable && self.resources.expanded.contains(&item.id) {
+                                        self.toggle_expand_resource();
+                                    }
+                                }
+                            }
+                            KeyCode::Right => {
+                                if let Some(item) = self.resources.items.get(self.resources.selected) {
+                                    if item.expandable && !self.resources.expanded.contains(&item.id) {
+                                        self.toggle_expand_resource();
+                                    }
+                                }
+                            }
+                            KeyCode::Tab => self.focus_next_pane(),
+                            KeyCode::BackTab => self.focus_previous_pane(),
+                            _ => self.handle_resources_keys(key).await?,
+                        }
+                    }
+                    _ => {
+                        // In other panes, Left/Right can navigate panes
+                        match key.code {
+                            KeyCode::Left => self.focus_previous_pane(),
+                            KeyCode::Right => self.focus_next_pane(),
+                            KeyCode::Tab => self.focus_next_pane(),
+                            KeyCode::BackTab => self.focus_previous_pane(),
+                            _ => match self.focused_pane {
+                                Pane::Details => self.handle_details_keys(key).await?,
+                                Pane::Logs => self.handle_logs_keys(key).await?,
+                                _ => {}
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -238,16 +282,16 @@ impl App {
     /// Handle resources pane navigation
     async fn handle_resources_keys(&mut self, key: KeyEvent) -> color_eyre::Result<()> {
         match key.code {
-            KeyCode::Up | KeyCode::Char('k') => self.select_previous_resource(),
-            KeyCode::Down | KeyCode::Char('j') => self.select_next_resource(),
-            KeyCode::Enter => self.load_selected_details().await,
-            KeyCode::Char(' ') => self.toggle_expand_resource(),
-            
-            // Quick actions
-            KeyCode::Char('n') => self.new_resource().await,
-            KeyCode::Char('d') => self.deploy_or_delete().await,
-            KeyCode::Char('r') => self.refresh_resources().await,
-            KeyCode::Char('b') => self.build_resource().await,
+            KeyCode::Up => self.select_previous_resource(),
+            KeyCode::Down => self.select_next_resource(),
+            KeyCode::Enter => {
+                if let Some(item) = self.resources.items.get(self.resources.selected) {
+                    if !item.expandable {
+                        // Only load details for non-expandable items
+                        self.load_selected_details().await;
+                    }
+                }
+            }
             _ => {}
         }
         Ok(())
@@ -255,12 +299,49 @@ impl App {
 
     /// Handle details pane navigation
     async fn handle_details_keys(&mut self, key: KeyEvent) -> color_eyre::Result<()> {
-        match key.code {
-            KeyCode::Char('s') => self.scale_deployment().await,
-            KeyCode::Char('r') => self.restart_deployment().await,
-            KeyCode::Char('l') => self.view_logs().await,
-            KeyCode::Char('e') => self.edit_resource().await,
-            _ => {}
+        // If we're editing a secret, handle text input
+        if let Some(ref mut secret_state) = self.secret_editing {
+            if secret_state.is_editing {
+                match key.code {
+                    KeyCode::Esc => {
+                        secret_state.is_editing = false;
+                    }
+                    KeyCode::Enter => {
+                        secret_state.is_editing = false;
+                        // TODO: Save the secret value
+                        self.status_message = Some("Secret saved".to_string());
+                    }
+                    KeyCode::Backspace => {
+                        if let Some(field) = secret_state.fields.get_mut(secret_state.selected_field) {
+                            field.value.pop();
+                        }
+                    }
+                    KeyCode::Char(c) => {
+                        if let Some(field) = secret_state.fields.get_mut(secret_state.selected_field) {
+                            field.value.push(c);
+                        }
+                    }
+                    _ => {}
+                }
+            } else {
+                // Navigate between fields when not editing
+                match key.code {
+                    KeyCode::Up => {
+                        if secret_state.selected_field > 0 {
+                            secret_state.selected_field -= 1;
+                        }
+                    }
+                    KeyCode::Down => {
+                        if secret_state.selected_field < secret_state.fields.len() - 1 {
+                            secret_state.selected_field += 1;
+                        }
+                    }
+                    KeyCode::Enter => {
+                        secret_state.is_editing = true;
+                    }
+                    _ => {}
+                }
+            }
         }
         Ok(())
     }
@@ -268,8 +349,6 @@ impl App {
     /// Handle logs pane navigation
     async fn handle_logs_keys(&mut self, key: KeyEvent) -> color_eyre::Result<()> {
         match key.code {
-            KeyCode::Char('f') => self.follow_logs().await,
-            KeyCode::Char('c') if key.modifiers == KeyModifiers::CONTROL => self.stop_logs(),
             _ => {}
         }
         Ok(())
@@ -331,20 +410,111 @@ impl App {
         if let Some(item) = self.resources.items.get(self.resources.selected) {
             if item.expandable {
                 let id = item.id.clone();
-                if let Some(pos) = self.resources.expanded.iter().position(|x| x == &id) {
-                    self.resources.expanded.remove(pos);
+                let name = item.name.clone();
+                
+                // Log the action
+                self.logs.push(format!("[{}] Toggle expand/collapse for '{}' (id: {})", 
+                    chrono::Local::now().format("%H:%M:%S"), name, id));
+                
+                // Check current state and toggle
+                let is_expanded = self.resources.expanded.contains(&id);
+                self.logs.push(format!("[{}] Current state: {} (expanded list has {} items)", 
+                    chrono::Local::now().format("%H:%M:%S"), 
+                    if is_expanded { "EXPANDED" } else { "COLLAPSED" },
+                    self.resources.expanded.len()));
+                
+                if is_expanded {
+                    // Collapsing
+                    self.resources.expanded.retain(|x| x != &id);
+                    self.status_message = Some(format!("Collapsed {}", name));
+                    self.logs.push(format!("[{}] Collapsing '{}' - removed from expanded list", 
+                        chrono::Local::now().format("%H:%M:%S"), name));
+                    // Collapse: Remove children from the tree immediately
+                    self.collapse_resource(&id);
                 } else {
-                    self.resources.expanded.push(id);
+                    // Expanding
+                    self.resources.expanded.push(id.clone());
+                    self.status_message = Some(format!("Expanding {}", name));
+                    self.logs.push(format!("[{}] Expanding '{}' - added to expanded list", 
+                        chrono::Local::now().format("%H:%M:%S"), name));
+                    self.logs.push(format!("[{}] Expanded list now contains: {:?}", 
+                        chrono::Local::now().format("%H:%M:%S"), self.resources.expanded));
+                    // Expand: Trigger a refresh to load children
+                    self.logs.push(format!("[{}] Sending RefreshData event", 
+                        chrono::Local::now().format("%H:%M:%S")));
+                    self.events.send(AppEvent::RefreshData);
                 }
-                // Mark for refresh
-                self.events.send(AppEvent::RefreshData);
+                
+                // Keep only the last 100 log entries
+                if self.logs.len() > 100 {
+                    self.logs.drain(0..self.logs.len() - 100);
+                }
+            } else {
+                self.logs.push(format!("[{}] Item '{}' is not expandable", 
+                    chrono::Local::now().format("%H:%M:%S"), item.name));
             }
+        } else {
+            self.logs.push(format!("[{}] No item selected", 
+                chrono::Local::now().format("%H:%M:%S")));
         }
     }
+
+    /// Collapse a resource by removing its children from the tree
+    fn collapse_resource(&mut self, parent_id: &str) {
+        self.logs.push(format!("[{}] collapse_resource called for '{}'", 
+            chrono::Local::now().format("%H:%M:%S"), parent_id));
+            
+        // Find the parent index
+        if let Some(parent_idx) = self.resources.items.iter().position(|item| item.id == parent_id) {
+            let parent_depth = self.resources.items[parent_idx].depth;
+            self.logs.push(format!("[{}] Found parent at index {} with depth {}", 
+                chrono::Local::now().format("%H:%M:%S"), parent_idx, parent_depth));
+            
+            // Count how many items to remove
+            let mut remove_count = 0;
+            let mut i = parent_idx + 1;
+            
+            // Find all items that should be removed (children at any depth)
+            while i < self.resources.items.len() {
+                let item = &self.resources.items[i];
+                
+                // If we hit an item at the same or lower depth as parent, we're done
+                if item.depth <= parent_depth {
+                    break;
+                }
+                
+                remove_count += 1;
+                i += 1;
+            }
+            
+            self.logs.push(format!("[{}] Will remove {} children", 
+                chrono::Local::now().format("%H:%M:%S"), remove_count));
+            
+            // Remove the items
+            for _ in 0..remove_count {
+                let removed = self.resources.items.remove(parent_idx + 1);
+                self.logs.push(format!("[{}] Removed item: '{}'", 
+                    chrono::Local::now().format("%H:%M:%S"), removed.name));
+                
+                // Adjust selection if needed
+                if self.resources.selected > parent_idx {
+                    self.resources.selected = self.resources.selected.saturating_sub(1);
+                }
+            }
+        } else {
+            self.logs.push(format!("[{}] Could not find parent '{}' in tree", 
+                chrono::Local::now().format("%H:%M:%S"), parent_id));
+        }
+    }
+
 
     /// Load resources from backend
     async fn load_resources(&mut self) {
         self.loading.resources = true;
+        
+        // Save current selection ID to restore after refresh
+        let selected_id = self.resources.items.get(self.resources.selected)
+            .map(|item| item.id.clone());
         
         // Build resource tree
         let mut items = vec![];
@@ -520,19 +690,40 @@ impl App {
             status: None,
         });
         
+        if self.resources.expanded.contains(&"secrets".to_string()) {
+            if let Ok(secrets) = self.backend.list_secrets().await {
+                for secret in secrets {
+                    items.push(ResourceItem {
+                        id: format!("secret:{}", secret.name),
+                        name: secret.name.clone(),
+                        resource_type: ResourceType::Secret,
+                        parent: Some("secrets".to_string()),
+                        expandable: false,
+                        depth: 1,
+                        status: None,
+                    });
+                }
+            }
+        }
+        
         self.resources.items = items;
+        
+        // Restore selection if possible
+        if let Some(id) = selected_id {
+            if let Some(pos) = self.resources.items.iter().position(|item| item.id == id) {
+                self.resources.selected = pos;
+            }
+        }
+        
         self.loading.resources = false;
     }
 
     /// Load details for selected resource
     async fn load_selected_details(&mut self) {
         if let Some(item) = self.resources.items.get(self.resources.selected) {
-            if item.expandable {
-                self.toggle_expand_resource();
-                return;
-            }
-            
-            self.loading.details = true;
+            // Only process non-expandable items
+            if !item.expandable {
+                self.loading.details = true;
             
             // Parse resource ID
             if let Some((resource_type, id)) = item.id.split_once(':') {
@@ -555,11 +746,32 @@ impl App {
                             self.focused_pane = Pane::Details;
                         }
                     }
-                    _ => {}
+                    "secret" => {
+                        if let Ok(secret) = self.backend.get_secret(id).await {
+                            // Initialize secret editing state
+                            self.secret_editing = Some(SecretEditingState {
+                                secret_name: secret.name.clone(),
+                                fields: secret.keys.iter().map(|key| SecretField {
+                                    key: key.clone(),
+                                    value: String::new(),
+                                    is_password: key.contains("password") || key.contains("secret") || key.contains("key"),
+                                }).collect(),
+                                selected_field: 0,
+                                is_editing: false,
+                            });
+                            self.selected_details = Some(ResourceDetails::Secret(secret));
+                            self.focused_pane = Pane::Details;
+                        }
+                    }
+                    _ => {
+                        // Clear secret editing state if we're not selecting a secret
+                        self.secret_editing = None;
+                    }
                 }
             }
             
-            self.loading.details = false;
+                self.loading.details = false;
+            }
         }
     }
 
@@ -656,6 +868,16 @@ impl App {
     }
 
     async fn refresh_all(&mut self) {
+        // Clear any stale status messages before refresh
+        if let Some(msg) = &self.status_message {
+            if msg.starts_with("Expanding") {
+                // Update to show expansion completed
+                if let Some(name) = msg.strip_prefix("Expanding ") {
+                    self.status_message = Some(format!("Expanded {}", name));
+                }
+            }
+        }
+        
         self.load_resources().await;
         if self.selected_details.is_some() {
             self.load_selected_details().await;
@@ -680,6 +902,8 @@ impl App {
         // TODO: Load logs for specific resource
         self.status_message = Some(format!("Loading logs for {}", resource_name));
     }
+
+
 }
 
 // Helper trait for shared event sender

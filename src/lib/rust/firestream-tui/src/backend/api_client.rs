@@ -169,6 +169,13 @@ impl FirestreamBackend for ApiClient {
             Err(ApiError::Unknown("Not implemented".to_string()))
         })
     }
+    
+    fn get_secret(&self, _id: &str) -> BoxFuture<'_, ApiResult<SecretInfo>> {
+        Box::pin(async move {
+            // TODO: Implement HTTP request to GET /secrets/{id}
+            Err(ApiError::Unknown("Not implemented".to_string()))
+        })
+    }
 
     fn create_secret(&self, _name: &str, _data: HashMap<String, String>) -> BoxFuture<'_, ApiResult<SecretInfo>> {
         Box::pin(async move {

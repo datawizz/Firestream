@@ -647,7 +647,51 @@ impl FirestreamBackend for MockClient {
                     created_at: Utc::now() - chrono::Duration::days(30),
                     updated_at: Utc::now() - chrono::Duration::days(30),
                 },
+                SecretInfo {
+                    name: "db-credentials".to_string(),
+                    namespace: "default".to_string(),
+                    secret_type: SecretType::Opaque,
+                    keys: vec!["username".to_string(), "password".to_string(), "host".to_string(), "port".to_string()],
+                    created_at: Utc::now() - chrono::Duration::days(5),
+                    updated_at: Utc::now() - chrono::Duration::days(1),
+                },
             ])
+        })
+    }
+    
+    fn get_secret(&self, id: &str) -> BoxFuture<'_, ApiResult<SecretInfo>> {
+        let id = id.to_string();
+        Box::pin(async move {
+            let secrets = vec![
+                SecretInfo {
+                    name: "api-keys".to_string(),
+                    namespace: "default".to_string(),
+                    secret_type: SecretType::Opaque,
+                    keys: vec!["api_key".to_string(), "api_secret".to_string()],
+                    created_at: Utc::now() - chrono::Duration::days(10),
+                    updated_at: Utc::now() - chrono::Duration::days(2),
+                },
+                SecretInfo {
+                    name: "tls-cert".to_string(),
+                    namespace: "default".to_string(),
+                    secret_type: SecretType::TLS,
+                    keys: vec!["tls.crt".to_string(), "tls.key".to_string()],
+                    created_at: Utc::now() - chrono::Duration::days(30),
+                    updated_at: Utc::now() - chrono::Duration::days(30),
+                },
+                SecretInfo {
+                    name: "db-credentials".to_string(),
+                    namespace: "default".to_string(),
+                    secret_type: SecretType::Opaque,
+                    keys: vec!["username".to_string(), "password".to_string(), "host".to_string(), "port".to_string()],
+                    created_at: Utc::now() - chrono::Duration::days(5),
+                    updated_at: Utc::now() - chrono::Duration::days(1),
+                },
+            ];
+            
+            secrets.into_iter()
+                .find(|s| s.name == id)
+                .ok_or(ApiError::NotFound)
         })
     }
 

@@ -8,7 +8,7 @@ use ratatui::{
 
 use crate::app::App;
 use crate::views::{
-    ResourcesPane, DetailsPane, LogsPane, HelpView, CommandPalette, SearchView, View
+    ResourcesPane, DetailsPane, LogsPane, HelpView, CommandPalette, SearchView, SplashView, View
 };
 
 impl Widget for &App {
@@ -17,33 +17,38 @@ impl Widget for &App {
         let chunks = Layout::default()
             .direction(Direction::Vertical)
             .constraints([
+                Constraint::Length(3),  // Status bar at top
                 Constraint::Min(0),     // Main content
-                Constraint::Length(1),  // Status bar
             ])
             .split(area);
 
         // Draw main content based on current view
         match &self.current_view {
-            View::Main => self.render_main_view(chunks[0], buf),
-            View::Help => HelpView.render(chunks[0], buf),
-            View::NewDeployment => self.render_new_deployment_view(chunks[0], buf),
-            View::Search(_) => SearchView::new(self).render(chunks[0], buf),
+            View::Splash => {
+                // Splash view takes full area, no status bar
+                SplashView::new().render(area, buf);
+                return; // Skip status bar for splash
+            }
+            View::Main => self.render_main_view(chunks[1], buf),
+            View::Help => HelpView.render(chunks[1], buf),
+            View::NewDeployment => self.render_new_deployment_view(chunks[1], buf),
+            View::Search(_) => SearchView::new(self).render(chunks[1], buf),
             View::CommandPalette => {
                 // Render main view underneath
-                self.render_main_view(chunks[0], buf);
+                self.render_main_view(chunks[1], buf);
                 // Then render command palette on top
-                CommandPalette::new(self).render(chunks[0], buf);
+                CommandPalette::new(self).render(chunks[1], buf);
             }
         }
 
-        // Always draw status bar
-        self.render_status_bar(chunks[1], buf);
+        // Always draw status bar at top
+        self.render_status_bar(chunks[0], buf);
 
         // Draw overlays
         if self.command_mode {
-            CommandPalette::new(self).render(chunks[0], buf);
+            CommandPalette::new(self).render(chunks[1], buf);
         } else if self.search_mode {
-            SearchView::new(self).render(chunks[0], buf);
+            SearchView::new(self).render(chunks[1], buf);
         }
     }
 }
@@ -166,21 +171,6 @@ impl App {
         Paragraph::new(actions)
             .alignment(Alignment::Center)
             .render(chunks[15], buf);
-
-        // Navigation hints
-        let nav_hints = vec![Line::from(vec![
-            Span::styled("[tab]", Style::default().fg(Color::DarkGray)),
-            Span::raw(" next field  "),
-            Span::styled("[shift+tab]", Style::default().fg(Color::DarkGray)),
-            Span::raw(" previous  "),
-            Span::styled("[ctrl+d]", Style::default().fg(Color::DarkGray)),
-            Span::raw(" deploy  "),
-            Span::styled("[esc]", Style::default().fg(Color::DarkGray)),
-            Span::raw(" cancel"),
-        ])];
-        Paragraph::new(nav_hints)
-            .alignment(Alignment::Center)
-            .render(chunks[16], buf);
     }
 
     fn render_field(&self, label: &str, value: &str, area: Rect, buf: &mut Buffer) {
@@ -202,24 +192,39 @@ impl App {
     }
 
     fn render_status_bar(&self, area: Rect, buf: &mut Buffer) {
+        // Create block with borders
+        let block = Block::default()
+            .borders(Borders::ALL)
+            .border_style(Style::default().fg(Color::Rgb(60, 60, 80)))
+            .title(" Firestream ")
+            .title_alignment(Alignment::Left)
+            .title_style(Style::default()
+                .fg(Color::Rgb(239, 200, 131))
+                .add_modifier(Modifier::BOLD));
+            
+        // Calculate inner area before rendering
+        let inner = block.inner(area);
+        
+        // Render the block
+        block.render(area, buf);
+        
         let chunks = Layout::default()
             .direction(Direction::Horizontal)
             .constraints([
-                Constraint::Length(20),  // App info
+                Constraint::Length(10),  // Version
                 Constraint::Length(15),  // Environment
                 Constraint::Length(15),  // Status
                 Constraint::Length(15),  // Uptime
                 Constraint::Min(0),      // Resource usage
                 Constraint::Length(30),  // Key hints
             ])
-            .split(area);
+            .split(inner);
 
-        // App info
-        let app_info = Line::from(vec![
-            Span::styled("firestream", Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD)),
-            Span::raw(" 1.0.0"),
+        // Version info
+        let version_info = Line::from(vec![
+            Span::styled(format!("v{}", env!("CARGO_PKG_VERSION")), Style::default().fg(Color::Rgb(150, 150, 170))),
         ]);
-        buf.set_line(chunks[0].x, chunks[0].y, &app_info, chunks[0].width);
+        buf.set_line(chunks[0].x, chunks[0].y, &version_info, chunks[0].width);
 
         // Environment
         let env_info = Line::from(vec![
@@ -251,23 +256,13 @@ impl App {
         ]);
         buf.set_line(chunks[4].x, chunks[4].y, &resource_info, chunks[4].width);
 
-        // Key hints or status message
-        let hints = if let Some(msg) = &self.status_message {
-            Line::from(vec![
+        // Status message (if any)
+        if let Some(msg) = &self.status_message {
+            let status = Line::from(vec![
                 Span::raw("| "),
-                Span::styled(msg, Style::default().fg(Color::Cyan)),
-            ])
-        } else {
-            Line::from(vec![
-                Span::raw("| "),
-                Span::styled("[j/k ▲▼]", Style::default().fg(Color::DarkGray)),
-                Span::raw(" navigate "),
-                Span::styled("[h/l ◀▶]", Style::default().fg(Color::DarkGray)),
-                Span::raw(" pane "),
-                Span::styled("[?]", Style::default().fg(Color::DarkGray)),
-                Span::raw(" help"),
-            ])
-        };
-        buf.set_line(chunks[5].x, chunks[5].y, &hints, chunks[5].width);
+                Span::styled(msg, Style::default().fg(Color::Rgb(239, 200, 131))),
+            ]);
+            buf.set_line(chunks[5].x, chunks[5].y, &status, chunks[5].width);
+        }
     }
 }
