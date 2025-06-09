@@ -15,15 +15,16 @@ impl FirestreamBackend for MockClient {
     fn list_templates(&self) -> BoxFuture<'_, ApiResult<Vec<Template>>> {
         Box::pin(async move {
             Ok(vec![
+                // PySpark Template
                 Template {
-                    id: "1".to_string(),
-                    name: "stream-processor".to_string(),
+                    id: "pyspark-base".to_string(),
+                    name: "PySpark Application".to_string(),
                     template_type: TemplateType::PySpark,
                     version: "1.0.0".to_string(),
-                    description: Some("Basic stream processing template".to_string()),
+                    description: Some("Full-featured PySpark application template with Kubernetes support".to_string()),
                     config: FirestreamConfig {
                         app: AppConfig {
-                            name: "stream-processor".to_string(),
+                            name: "pyspark-app".to_string(),
                             version: "1.0.0".to_string(),
                             app_type: "pyspark".to_string(),
                         },
@@ -42,21 +43,22 @@ impl FirestreamBackend for MockClient {
                     created_at: Utc::now(),
                     updated_at: Utc::now(),
                 },
+                // Spark Scala Template
                 Template {
-                    id: "2".to_string(),
-                    name: "batch-analytics".to_string(),
-                    template_type: TemplateType::PySpark,
+                    id: "spark-scala-base".to_string(),
+                    name: "Spark Scala Application".to_string(),
+                    template_type: TemplateType::PySparkScala,
                     version: "1.0.0".to_string(),
-                    description: Some("Batch analytics processing".to_string()),
+                    description: Some("Full-featured Spark Scala application template with SBT build and Kubernetes support".to_string()),
                     config: FirestreamConfig {
                         app: AppConfig {
-                            name: "batch-analytics".to_string(),
+                            name: "spark-scala-app".to_string(),
                             version: "1.0.0".to_string(),
-                            app_type: "pyspark".to_string(),
+                            app_type: "spark-scala".to_string(),
                         },
                         resources: ResourceConfig {
-                            cpu: "8".to_string(),
-                            memory: "16Gi".to_string(),
+                            cpu: "4".to_string(),
+                            memory: "8Gi".to_string(),
                             gpu: Some(false),
                             gpu_type: None,
                         },
@@ -75,15 +77,16 @@ impl FirestreamBackend for MockClient {
         let id = id.to_string();
         Box::pin(async move {
             let templates = vec![
+                // PySpark Template
                 Template {
-                    id: "1".to_string(),
-                    name: "stream-processor".to_string(),
+                    id: "pyspark-base".to_string(),
+                    name: "PySpark Application".to_string(),
                     template_type: TemplateType::PySpark,
                     version: "1.0.0".to_string(),
-                    description: Some("Basic stream processing template".to_string()),
+                    description: Some("Full-featured PySpark application template with Kubernetes support".to_string()),
                     config: FirestreamConfig {
                         app: AppConfig {
-                            name: "stream-processor".to_string(),
+                            name: "pyspark-app".to_string(),
                             version: "1.0.0".to_string(),
                             app_type: "pyspark".to_string(),
                         },
@@ -102,21 +105,22 @@ impl FirestreamBackend for MockClient {
                     created_at: Utc::now(),
                     updated_at: Utc::now(),
                 },
+                // Spark Scala Template
                 Template {
-                    id: "2".to_string(),
-                    name: "batch-analytics".to_string(),
-                    template_type: TemplateType::PySpark,
+                    id: "spark-scala-base".to_string(),
+                    name: "Spark Scala Application".to_string(),
+                    template_type: TemplateType::PySparkScala,
                     version: "1.0.0".to_string(),
-                    description: Some("Batch analytics processing".to_string()),
+                    description: Some("Full-featured Spark Scala application template with SBT build and Kubernetes support".to_string()),
                     config: FirestreamConfig {
                         app: AppConfig {
-                            name: "batch-analytics".to_string(),
+                            name: "spark-scala-app".to_string(),
                             version: "1.0.0".to_string(),
-                            app_type: "pyspark".to_string(),
+                            app_type: "spark-scala".to_string(),
                         },
                         resources: ResourceConfig {
-                            cpu: "8".to_string(),
-                            memory: "16Gi".to_string(),
+                            cpu: "4".to_string(),
+                            memory: "8Gi".to_string(),
                             gpu: Some(false),
                             gpu_type: None,
                         },
@@ -141,7 +145,7 @@ impl FirestreamBackend for MockClient {
                 Deployment {
                     id: "dep-1".to_string(),
                     name: "etl-pipeline".to_string(),
-                    template_id: "1".to_string(),
+                    template_id: "pyspark-base".to_string(),
                     namespace: "default".to_string(),
                     status: DeploymentStatus::Running,
                     replicas: ReplicaStatus {
@@ -155,7 +159,7 @@ impl FirestreamBackend for MockClient {
                 Deployment {
                     id: "dep-2".to_string(),
                     name: "api-service".to_string(),
-                    template_id: "2".to_string(),
+                    template_id: "spark-scala-base".to_string(),
                     namespace: "default".to_string(),
                     status: DeploymentStatus::Running,
                     replicas: ReplicaStatus {
@@ -169,7 +173,7 @@ impl FirestreamBackend for MockClient {
                 Deployment {
                     id: "dep-3".to_string(),
                     name: "ml-trainer".to_string(),
-                    template_id: "1".to_string(),
+                    template_id: "pyspark-base".to_string(),
                     namespace: "default".to_string(),
                     status: DeploymentStatus::Pending,
                     replicas: ReplicaStatus {

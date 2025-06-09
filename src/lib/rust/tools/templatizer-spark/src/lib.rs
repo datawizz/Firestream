@@ -6,9 +6,25 @@
 
 pub mod example;
 
+use rust_embed::RustEmbed;
 use tera::{Tera, Context};
 use std::path::Path;
 use std::fs;
+use std::collections::HashMap;
+
+/// Embedded Python templates
+#[derive(RustEmbed)]
+#[folder = "src/templates/spark_python_boilerplate/"]
+#[include = "*.tera"]
+#[include = "**/*.tera"]
+struct PythonTemplates;
+
+/// Embedded Scala templates
+#[derive(RustEmbed)]
+#[folder = "src/templates/spark_scala_boilerplate/"]
+#[include = "*.tera"]
+#[include = "**/*.tera"]
+struct ScalaTemplates;
 
 /// Template type for generation
 #[derive(Debug, Clone, Copy)]
@@ -18,23 +34,6 @@ pub enum TemplateType {
 }
 
 impl TemplateType {
-    /// Get the template directory path
-    pub fn template_path(&self) -> String {
-        let manifest_dir = std::env::var("CARGO_MANIFEST_DIR")
-            .unwrap_or_else(|_| ".".to_string());
-        let base_path = Path::new(&manifest_dir);
-        
-        let relative_path = match self {
-            TemplateType::Scala => "src/templates/spark_scala_boilerplate/**/*.tera",
-            TemplateType::Python => "src/templates/spark_python_boilerplate/**/*.tera",
-        };
-        
-        base_path.join(relative_path)
-            .to_str()
-            .unwrap_or(relative_path)
-            .to_string()
-    }
-    
     /// Get the template type as string
     pub fn as_str(&self) -> &'static str {
         match self {
@@ -58,18 +57,68 @@ impl std::str::FromStr for TemplateType {
 
 /// Main template generator
 pub struct SparkTemplatizer {
-    #[allow(dead_code)]
     template_type: TemplateType,
     tera: Tera,
+    /// Map of template names to their content for direct file writing
+    templates: HashMap<String, String>,
 }
 
 impl SparkTemplatizer {
     /// Create a new templatizer for the specified template type
     pub fn new(template_type: TemplateType) -> Result<Self, tera::Error> {
-        let tera = Tera::new(&template_type.template_path())?;
+        let mut tera = Tera::default();
+        let mut templates = HashMap::new();
+        let mut template_count = 0;
+        
+        match template_type {
+            TemplateType::Python => {
+                for file in PythonTemplates::iter() {
+                    let file_path = file.as_ref();
+                    if file_path.ends_with(".tera") {
+                        template_count += 1;
+                        if let Some(content) = PythonTemplates::get(file_path) {
+                            let content_str = std::str::from_utf8(content.data.as_ref())
+                                .map_err(|e| tera::Error::msg(format!("Invalid UTF-8 in template {}: {}", file_path, e)))?;
+                            
+                            // Add to Tera for rendering
+                            tera.add_raw_template(file_path, content_str)?;
+                            
+                            // Store for later use
+                            templates.insert(file_path.to_string(), content_str.to_string());
+                        }
+                    }
+                }
+            }
+            TemplateType::Scala => {
+                for file in ScalaTemplates::iter() {
+                    let file_path = file.as_ref();
+                    if file_path.ends_with(".tera") {
+                        if let Some(content) = ScalaTemplates::get(file_path) {
+                            let content_str = std::str::from_utf8(content.data.as_ref())
+                                .map_err(|e| tera::Error::msg(format!("Invalid UTF-8 in template {}: {}", file_path, e)))?;
+                            
+                            // Add to Tera for rendering
+                            tera.add_raw_template(file_path, content_str)?;
+                            
+                            // Store for later use
+                            templates.insert(file_path.to_string(), content_str.to_string());
+                        }
+                    }
+                }
+            }
+        }
+        
+        if templates.is_empty() {
+            return Err(tera::Error::msg(format!(
+                "No templates found for {:?}. Make sure templates are in the correct directory and the crate was built correctly.",
+                template_type
+            )));
+        }
+        
         Ok(Self {
             template_type,
             tera,
+            templates,
         })
     }
     
@@ -83,17 +132,17 @@ impl SparkTemplatizer {
         fs::create_dir_all(output_dir)?;
         
         // Render each template
-        for template_name in self.tera.get_template_names() {
-            // Skip non-.tera files
-            if !template_name.ends_with(".tera") {
-                continue;
-            }
+        for (template_name, _) in &self.templates {
             
             // Render template
             let rendered = self.tera.render(template_name, &context)?;
             
-            // Determine output path (remove .tera extension)
-            let output_file = template_name.trim_end_matches(".tera");
+            // Determine output path (remove .tera extension and any directory prefixes)
+            let output_file = template_name
+                .trim_end_matches(".tera")
+                .trim_start_matches("src/templates/spark_python_boilerplate/")
+                .trim_start_matches("src/templates/spark_scala_boilerplate/");
+            
             let output_path = output_dir.join(output_file);
             
             // Create parent directories if needed
@@ -108,9 +157,30 @@ impl SparkTemplatizer {
         Ok(())
     }
     
+    /// Check if templates are properly loaded
+    pub fn verify_templates(&self) -> Result<(), String> {
+        if self.templates.is_empty() {
+            return Err("No templates loaded".to_string());
+        }
+        
+        // Check Python templates
+        let python_count = PythonTemplates::iter().filter(|f| f.ends_with(".tera")).count();
+        let scala_count = ScalaTemplates::iter().filter(|f| f.ends_with(".tera")).count();
+        
+        if python_count == 0 && matches!(self.template_type, TemplateType::Python) {
+            return Err("No Python templates found in embedded resources".to_string());
+        }
+        
+        if scala_count == 0 && matches!(self.template_type, TemplateType::Scala) {
+            return Err("No Scala templates found in embedded resources".to_string());
+        }
+        
+        Ok(())
+    }
+    
     /// Get a list of all template files
     pub fn list_templates(&self) -> Vec<&str> {
-        self.tera.get_template_names().collect()
+        self.templates.keys().map(|s| s.as_str()).collect()
     }
     
     /// Render a single template
@@ -198,6 +268,15 @@ mod tests {
         assert_eq!(config.get("app_name").unwrap().as_str().unwrap(), "Test App");
         assert_eq!(config.get("s3_enabled").unwrap().as_bool().unwrap(), true);
     }
+    
+    #[test]
+    fn test_template_loading() {
+        // Test Python templates load correctly
+        let python_templatizer = SparkTemplatizer::new(TemplateType::Python).unwrap();
+        assert!(!python_templatizer.list_templates().is_empty());
+        
+        // Test Scala templates load correctly
+        let scala_templatizer = SparkTemplatizer::new(TemplateType::Scala).unwrap();
+        assert!(!scala_templatizer.list_templates().is_empty());
+    }
 }
-
-

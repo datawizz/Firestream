@@ -1,5 +1,6 @@
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Template {
@@ -87,4 +88,60 @@ pub struct GeneratedFile {
     pub path: String,
     pub content: String,
     pub size: u64,
+}
+
+// Template configuration structures
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TemplateConfiguration {
+    pub variables: HashMap<String, TemplateVariable>,
+    pub variable_groups: Vec<VariableGroup>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TemplateVariable {
+    pub name: String,
+    pub var_type: VariableType,
+    pub default_value: Option<serde_json::Value>,
+    pub description: String,
+    pub required: bool,
+    pub group: String,
+    pub display_order: u32,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum VariableType {
+    String,
+    Boolean,
+    Integer,
+    Float,
+    Array(Box<VariableType>),
+    Object,
+    Choice(Vec<String>),
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct VariableGroup {
+    pub name: String,
+    pub display_name: String,
+    pub description: String,
+    pub collapsed: bool,
+    pub order: u32,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TemplateGenerationRequest {
+    pub template_id: String,
+    pub template_type: String,
+    pub name: String,
+    pub output_path: String,
+    pub variables: HashMap<String, serde_json::Value>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TemplateGenerationResult {
+    pub success: bool,
+    pub generated_files: Vec<GeneratedFile>,
+    pub output_path: String,
+    pub errors: Vec<String>,
 }

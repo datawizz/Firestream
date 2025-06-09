@@ -45,7 +45,16 @@ impl<'a> Widget for LogsPane<'a> {
                 ListItem::new(Line::from(log.as_str()))
             }).collect();
             
-            let list = List::new(items).block(block);
+            // Always show the most recent logs (scroll to bottom)
+            let visible_height = area.height.saturating_sub(2) as usize; // Account for borders
+            let skip = if items.len() > visible_height {
+                items.len() - visible_height
+            } else {
+                0
+            };
+            
+            let visible_items: Vec<ListItem> = items.into_iter().skip(skip).collect();
+            let list = List::new(visible_items).block(block);
             list.render(area, buf);
         }
         

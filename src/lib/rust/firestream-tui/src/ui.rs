@@ -215,8 +215,8 @@ impl App {
                 Constraint::Length(15),  // Environment
                 Constraint::Length(15),  // Status
                 Constraint::Length(15),  // Uptime
-                Constraint::Min(0),      // Resource usage
-                Constraint::Length(30),  // Key hints
+                Constraint::Length(25),  // Resource usage
+                Constraint::Min(0),      // Status message (flexible width)
             ])
             .split(inner);
 
@@ -256,7 +256,7 @@ impl App {
         ]);
         buf.set_line(chunks[4].x, chunks[4].y, &resource_info, chunks[4].width);
 
-        // Status message (if any)
+        // Status message (if any) - now in the last flexible-width chunk
         if let Some(msg) = &self.status_message {
             let status = Line::from(vec![
                 Span::raw("| "),

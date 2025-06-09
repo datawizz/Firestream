@@ -162,6 +162,276 @@ impl<'a> DetailsPane<'a> {
         let instructions_y = area.y + area.height - 2;
         buf.set_line(chunks[10].x, instructions_y, &instructions, chunks[10].width);
     }
+    
+    fn render_template_config(&self, template: &crate::models::Template, config_state: &crate::app::TemplateConfigState, area: Rect, buf: &mut Buffer, block: Block) {
+        let inner_area = block.inner(area);
+        block.render(area, buf);
+        
+        let chunks = Layout::default()
+            .constraints([
+                Constraint::Length(1),   // Template name
+                Constraint::Length(1),   // Separator
+                Constraint::Length(1),   // Type
+                Constraint::Length(1),   // Version
+                Constraint::Length(2),   // Description
+                Constraint::Length(1),   // Separator
+                Constraint::Length(1),   // Configuration header
+                Constraint::Length(1),   // Separator
+                Constraint::Min(0),      // Variable groups
+                Constraint::Length(1),   // Separator
+                Constraint::Length(1),   // Actions
+            ])
+            .split(inner_area);
+        
+        // Template header
+        let name = Line::from(vec![
+            Span::styled(&template.name, Style::default().add_modifier(Modifier::BOLD)),
+        ]);
+        buf.set_line(chunks[0].x, chunks[0].y, &name, chunks[0].width);
+        
+        let separator = Line::from("─".repeat(chunks[1].width as usize));
+        buf.set_line(chunks[1].x, chunks[1].y, &separator, chunks[1].width);
+        
+        let template_type = Line::from(format!("Type:        {:?}", template.template_type));
+        buf.set_line(chunks[2].x, chunks[2].y, &template_type, chunks[2].width);
+        
+        let version = Line::from(format!("Version:     {}", template.version));
+        buf.set_line(chunks[3].x, chunks[3].y, &version, chunks[3].width);
+        
+        if let Some(desc) = &template.description {
+            let desc_line = Line::from(format!("Description: {}", desc));
+            buf.set_line(chunks[4].x, chunks[4].y, &desc_line, chunks[4].width);
+        }
+        
+        let separator2 = Line::from("─".repeat(chunks[5].width as usize));
+        buf.set_line(chunks[5].x, chunks[5].y, &separator2, chunks[5].width);
+        
+        let config_header = Line::from(vec![
+            Span::styled("Configuration", Style::default().add_modifier(Modifier::BOLD)),
+        ]);
+        buf.set_line(chunks[6].x, chunks[6].y, &config_header, chunks[6].width);
+        
+        let separator3 = Line::from("─".repeat(chunks[7].width as usize));
+        buf.set_line(chunks[7].x, chunks[7].y, &separator3, chunks[7].width);
+        
+        // Render variable groups
+        let groups_area = chunks[8];
+        let mut current_y = groups_area.y;
+        
+        for (group_idx, group) in config_state.configuration.variable_groups.iter().enumerate() {
+            if current_y >= groups_area.y + groups_area.height {
+                break;
+            }
+            
+            // Group header
+            let is_expanded = config_state.expanded_groups.contains(&group.name);
+            let group_icon = if is_expanded { "▼" } else { "▶" };
+            let group_style = Style::default().add_modifier(Modifier::BOLD);
+            
+            let group_line = Line::from(vec![
+                Span::raw(group_icon),
+                Span::raw(" "),
+                Span::styled(&group.display_name, group_style),
+            ]);
+            buf.set_line(groups_area.x, current_y, &group_line, groups_area.width);
+            current_y += 1;
+            
+            // Show variables if expanded
+            if is_expanded {
+                let vars_in_group: Vec<_> = config_state.configuration.variables.iter()
+                    .filter(|(_, v)| v.group == group.name)
+                    .collect();
+                
+                for (var_name, var) in vars_in_group {
+                    if current_y >= groups_area.y + groups_area.height {
+                        break;
+                    }
+                    
+                    let value_string = config_state.user_values.get(var_name)
+                        .map(|v| match v {
+                            serde_json::Value::String(s) => s.clone(),
+                            serde_json::Value::Bool(b) => if *b { "true".to_string() } else { "false".to_string() },
+                            serde_json::Value::Number(n) => n.to_string(),
+                            _ => String::new(),
+                        })
+                        .unwrap_or_else(|| match &var.var_type {
+                            crate::models::VariableType::Integer => "0".to_string(),
+                            _ => String::new(),
+                        });
+                    
+                    // Calculate the actual field index for this variable
+                    let mut current_field_index = 0;
+                    let mut is_selected = false;
+                    
+                    for group in &config_state.configuration.variable_groups {
+                        if config_state.expanded_groups.contains(&group.name) {
+                            let vars: Vec<_> = config_state.configuration.variables.iter()
+                                .filter(|(_, v)| v.group == group.name)
+                                .collect();
+                            
+                            for (vn, _) in vars {
+                                if vn == var_name {
+                                    is_selected = current_field_index == config_state.selected_field;
+                                    break;
+                                }
+                                current_field_index += 1;
+                            }
+                        }
+                        if is_selected {
+                            break;
+                        }
+                    }
+                    
+                    let is_editing = config_state.editing_field.as_ref() == Some(var_name);
+                    
+                    let var_area = Rect {
+                        x: groups_area.x + 2,
+                        y: current_y,
+                        width: groups_area.width.saturating_sub(2),
+                        height: 1,
+                    };
+                    
+                    self.render_variable_input(
+                        &var.name,
+                        &var.var_type,
+                        &value_string,
+                        is_selected,
+                        is_editing,
+                        var_area,
+                        buf
+                    );
+                    
+                    current_y += 2; // Space between variables
+                    
+                    // Show validation error if any
+                    if let Some(error) = config_state.validation_errors.get(var_name) {
+                        let error_line = Line::from(vec![
+                            Span::styled(format!("    ⚠ {}", error), Style::default().fg(Color::Red)),
+                        ]);
+                        buf.set_line(groups_area.x, current_y, &error_line, groups_area.width);
+                        current_y += 1;
+                    }
+                }
+                
+                current_y += 1; // Extra space after group
+            }
+        }
+        
+        // Actions
+        let actions = if config_state.editing_field.is_some() {
+            Line::from(vec![
+                Span::styled("Enter", Style::default().fg(Color::Yellow)),
+                Span::raw(" to save  "),
+                Span::styled("Esc", Style::default().fg(Color::Yellow)),
+                Span::raw(" to cancel"),
+            ])
+        } else {
+            Line::from(vec![
+                Span::styled("↑↓", Style::default().fg(Color::DarkGray)),
+                Span::raw(" Navigate  "),
+                Span::styled("[G]", Style::default().fg(Color::Green)),
+                Span::raw("enerate  "),
+                Span::styled("[R]", Style::default().fg(Color::Yellow)),
+                Span::raw("eset  "),
+                Span::styled("[V]", Style::default().fg(Color::Magenta)),
+                Span::raw("alidate"),
+            ])
+        };
+        buf.set_line(chunks[10].x, chunks[10].y, &actions, chunks[10].width);
+    }
+    
+    fn render_variable_input(&self, var_name: &str, var_type: &crate::models::VariableType, value: &str, is_selected: bool, is_editing: bool, area: Rect, buf: &mut Buffer) {
+        use crate::models::VariableType;
+        
+        match var_type {
+            VariableType::Boolean => {
+                let checkbox = if value == "true" { "[✓]" } else { "[ ]" };
+                let style = if is_selected {
+                    Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD)
+                } else {
+                    Style::default()
+                };
+                let line = Line::from(vec![
+                    Span::styled(checkbox, style),
+                    Span::raw(" "),
+                    Span::raw(var_name),
+                ]);
+                buf.set_line(area.x, area.y, &line, area.width);
+            }
+            VariableType::String | VariableType::Integer | VariableType::Float => {
+                // Draw label and input box
+                let label_width = 20;
+                let label = format!("{}: ", var_name);
+                let label_style = if is_selected && !is_editing {
+                    Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD)
+                } else {
+                    Style::default()
+                };
+                
+                // Label
+                let label_line = Line::from(vec![
+                    Span::styled(label, label_style),
+                ]);
+                buf.set_line(area.x, area.y, &label_line, label_width);
+                
+                // Input box
+                let input_area = Rect {
+                    x: area.x + label_width as u16,
+                    y: area.y,
+                    width: area.width.saturating_sub(label_width as u16).min(30),
+                    height: 1,
+                };
+                
+                let input_style = if is_editing {
+                    Style::default().bg(Color::DarkGray)
+                } else if is_selected {
+                    Style::default().fg(Color::Cyan)
+                } else {
+                    Style::default()
+                };
+                
+                let input_block = Block::default()
+                    .borders(Borders::ALL)
+                    .border_style(input_style);
+                
+                let inner = input_block.inner(input_area);
+                input_block.render(input_area, buf);
+                
+                // Value with cursor if editing
+                let value_line = if is_editing {
+                    Line::from(vec![
+                        Span::raw(value),
+                        Span::styled("█", Style::default().add_modifier(Modifier::SLOW_BLINK)),
+                    ])
+                } else {
+                    Line::from(value)
+                };
+                buf.set_line(inner.x, inner.y, &value_line, inner.width);
+            }
+            VariableType::Choice(_options) => {
+                // Dropdown-style display
+                let label = format!("{}: ", var_name);
+                let label_style = if is_selected {
+                    Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD)
+                } else {
+                    Style::default()
+                };
+                
+                let line = Line::from(vec![
+                    Span::styled(label, label_style),
+                    Span::raw("["),
+                    Span::raw(value),
+                    Span::raw(" ▼]"),
+                ]);
+                buf.set_line(area.x, area.y, &line, area.width);
+            }
+            _ => {
+                // Complex types - just show as text for now
+                let line = Line::from(format!("{}: {}", var_name, value));
+                buf.set_line(area.x, area.y, &line, area.width);
+            }
+        }
+    }
 }
 
 impl<'a> Widget for DetailsPane<'a> {
@@ -183,7 +453,16 @@ impl<'a> Widget for DetailsPane<'a> {
                     render_deployment_details(deployment, area, buf, block);
                 }
                 ResourceDetails::Template(template) => {
-                    render_template_details(template, area, buf, block);
+                    // Check if we have template configuration loaded
+                    if let Some(ref config_state) = self.app.template_config {
+                        if config_state.template_id == template.id {
+                            self.render_template_config(template, config_state, area, buf, block);
+                        } else {
+                            render_template_details(template, area, buf, block);
+                        }
+                    } else {
+                        render_template_details(template, area, buf, block);
+                    }
                 }
                 ResourceDetails::Node(node) => {
                     render_node_details(node, area, buf, block);
@@ -300,6 +579,7 @@ fn render_deployment_details(deployment: &crate::models::DeploymentDetail, area:
 }
 
 fn render_template_details(template: &crate::models::Template, area: Rect, buf: &mut Buffer, block: Block) {
+    // This function is now only used as a fallback when template config is not available
     let lines = vec![
         Line::from(vec![
             Span::styled(&template.name, Style::default().add_modifier(Modifier::BOLD)),

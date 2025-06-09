@@ -1,12 +1,14 @@
 use crate::backend::{FirestreamBackend, MockClient};
 use crate::event::{AppEvent, Event, EventHandler};
-use crate::models::{Template, DeltaTable, BuildStatus, SecretInfo, ResourceType};
+use crate::models::{Template, DeltaTable, BuildStatus, SecretInfo, ResourceType, TemplateConfiguration, TemplateVariable};
+use crate::services::TemplateService;
 use crate::views::View;
 use ratatui::{
     DefaultTerminal,
     crossterm::event::{KeyCode, KeyEvent, KeyModifiers},
 };
 use std::sync::Arc;
+use std::collections::HashMap;
 
 /// Main application state
 pub struct App {
@@ -50,6 +52,15 @@ pub struct App {
     
     /// Secret editing state
     pub secret_editing: Option<SecretEditingState>,
+    
+    /// Template configuration state
+    pub template_config: Option<TemplateConfigState>,
+    
+    /// Template generation state
+    pub template_generation: Option<TemplateGenerationState>,
+    
+    /// Template service
+    template_service: Option<TemplateService>,
 }
 
 #[derive(Debug, Clone)]
@@ -109,6 +120,35 @@ pub struct LoadingState {
     pub logs: bool,
 }
 
+#[derive(Debug, Clone)]
+pub struct TemplateConfigState {
+    pub template_id: String,
+    pub template_type: String,
+    pub configuration: TemplateConfiguration,
+    pub user_values: HashMap<String, serde_json::Value>,
+    pub validation_errors: HashMap<String, String>,
+    pub expanded_groups: Vec<String>,
+    pub selected_group: usize,
+    pub selected_field: usize,
+    pub editing_field: Option<String>,
+}
+
+#[derive(Debug, Clone)]
+pub struct TemplateGenerationState {
+    pub request: crate::models::TemplateGenerationRequest,
+    pub status: GenerationStatus,
+    pub output_files: Vec<String>,
+    pub error: Option<String>,
+}
+
+#[derive(Debug, Clone)]
+pub enum GenerationStatus {
+    Idle,
+    Generating,
+    Success,
+    Failed,
+}
+
 impl App {
     /// Create a new application instance
     pub fn new() -> Self {
@@ -134,6 +174,15 @@ impl App {
             status_message: None,
             loading: LoadingState::default(),
             secret_editing: None,
+            template_config: None,
+            template_generation: None,
+            template_service: match TemplateService::new() {
+                Ok(service) => Some(service),
+                Err(e) => {
+                    eprintln!("[App] Failed to initialize template service: {}", e);
+                    None
+                }
+            },
         }
     }
 
@@ -299,6 +348,269 @@ impl App {
 
     /// Handle details pane navigation
     async fn handle_details_keys(&mut self, key: KeyEvent) -> color_eyre::Result<()> {
+        // If we're configuring a template, handle template configuration input
+        if let Some(ref mut config_state) = self.template_config {
+            if let Some(ref editing_field) = config_state.editing_field {
+                // We're editing a field
+                match key.code {
+                    KeyCode::Esc => {
+                        config_state.editing_field = None;
+                    }
+                    KeyCode::Enter => {
+                        config_state.editing_field = None;
+                        // TODO: Validate the field
+                    }
+                    KeyCode::Backspace => {
+                        // Find the variable being edited and its type
+                        let var_type = config_state.configuration.variables
+                            .get(editing_field)
+                            .map(|v| &v.var_type);
+                        
+                        if let Some(value) = config_state.user_values.get_mut(editing_field) {
+                            match var_type {
+                                Some(crate::models::VariableType::Integer) => {
+                                    // For integers, convert to string, modify, then back to number
+                                    let mut str_val = value.as_i64().unwrap_or(0).to_string();
+                                    str_val.pop();
+                                    if let Ok(num) = str_val.parse::<i64>() {
+                                        *value = serde_json::json!(num);
+                                    } else if str_val.is_empty() {
+                                        *value = serde_json::json!(0);
+                                    }
+                                }
+                                _ => {
+                                    // For strings and other types
+                                    if let Some(s) = value.as_str() {
+                                        let mut new_str = s.to_string();
+                                        new_str.pop();
+                                        *value = serde_json::json!(new_str);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    KeyCode::Char(c) => {
+                        // Find the variable being edited and its type
+                        let var_type = config_state.configuration.variables
+                            .get(editing_field)
+                            .map(|v| &v.var_type);
+                        
+                        if let Some(value) = config_state.user_values.get_mut(editing_field) {
+                            match var_type {
+                                Some(crate::models::VariableType::Integer) => {
+                                    // For integers, only allow digits
+                                    if c.is_ascii_digit() {
+                                        let mut str_val = value.as_i64().unwrap_or(0).to_string();
+                                        str_val.push(c);
+                                        if let Ok(num) = str_val.parse::<i64>() {
+                                            *value = serde_json::json!(num);
+                                        }
+                                    }
+                                }
+                                _ => {
+                                    // For strings and other types
+                                    if let Some(s) = value.as_str() {
+                                        let mut new_str = s.to_string();
+                                        new_str.push(c);
+                                        *value = serde_json::json!(new_str);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    _ => {}
+                }
+            } else {
+                // Navigation mode
+                match key.code {
+                    KeyCode::Up => {
+                        // Find current position in groups
+                        let mut current_group_idx = None;
+                        let mut field_in_group = 0;
+                        let mut absolute_field_idx = 0;
+                        
+                        for (group_idx, group) in config_state.configuration.variable_groups.iter().enumerate() {
+                            if config_state.expanded_groups.contains(&group.name) {
+                                let vars_in_group = config_state.configuration.variables.iter()
+                                    .filter(|(_, v)| v.group == group.name)
+                                    .count();
+                                
+                                if absolute_field_idx <= config_state.selected_field && 
+                                   config_state.selected_field < absolute_field_idx + vars_in_group {
+                                    current_group_idx = Some(group_idx);
+                                    field_in_group = config_state.selected_field - absolute_field_idx;
+                                    break;
+                                }
+                                absolute_field_idx += vars_in_group;
+                            }
+                        }
+                        
+                        if let Some(group_idx) = current_group_idx {
+                            if field_in_group == 0 && group_idx > 0 {
+                                // At first field of group, move to previous group
+                                let current_group = &config_state.configuration.variable_groups[group_idx];
+                                let current_group_name = current_group.display_name.clone();
+                                config_state.expanded_groups.retain(|g| g != &current_group.name);
+                                
+                                // Find and expand previous group
+                                let prev_group = &config_state.configuration.variable_groups[group_idx - 1];
+                                let prev_group_name = prev_group.display_name.clone();
+                                if !config_state.expanded_groups.contains(&prev_group.name) {
+                                    config_state.expanded_groups.push(prev_group.name.clone());
+                                }
+                                
+                                self.status_message = Some(format!("Navigated to {}", prev_group_name));
+                                
+                                // Recalculate selected_field for the last field of previous group
+                                let mut new_field_idx = 0;
+                                for (g_idx, g) in config_state.configuration.variable_groups.iter().enumerate() {
+                                    if g_idx < group_idx - 1 {
+                                        // Skip groups before the previous group
+                                        continue;
+                                    } else if g_idx == group_idx - 1 {
+                                        // Count fields in the previous group to find the last one
+                                        let vars_count = config_state.configuration.variables.iter()
+                                            .filter(|(_, v)| v.group == g.name)
+                                            .count();
+                                        new_field_idx = vars_count.saturating_sub(1);
+                                        break;
+                                    }
+                                }
+                                config_state.selected_field = new_field_idx;
+                            } else {
+                                // Normal navigation within group
+                                config_state.selected_field = config_state.selected_field.saturating_sub(1);
+                            }
+                        }
+                    }
+                    KeyCode::Down => {
+                        // Find current position in groups
+                        let mut current_group_idx = None;
+                        let mut field_in_group = 0;
+                        let mut absolute_field_idx = 0;
+                        
+                        for (group_idx, group) in config_state.configuration.variable_groups.iter().enumerate() {
+                            if config_state.expanded_groups.contains(&group.name) {
+                                let vars_in_group = config_state.configuration.variables.iter()
+                                    .filter(|(_, v)| v.group == group.name)
+                                    .count();
+                                
+                                if absolute_field_idx <= config_state.selected_field && 
+                                   config_state.selected_field < absolute_field_idx + vars_in_group {
+                                    current_group_idx = Some(group_idx);
+                                    field_in_group = config_state.selected_field - absolute_field_idx;
+                                    break;
+                                }
+                                absolute_field_idx += vars_in_group;
+                            }
+                        }
+                        
+                        if let Some(group_idx) = current_group_idx {
+                            let current_group = &config_state.configuration.variable_groups[group_idx];
+                            let vars_in_current_group = config_state.configuration.variables.iter()
+                                .filter(|(_, v)| v.group == current_group.name)
+                                .count();
+                            
+                            if field_in_group == vars_in_current_group - 1 && 
+                               group_idx < config_state.configuration.variable_groups.len() - 1 {
+                                // At last field of group, move to next group
+                                let current_group_name = current_group.display_name.clone();
+                                config_state.expanded_groups.retain(|g| g != &current_group.name);
+                                
+                                // Find and expand next group
+                                let next_group = &config_state.configuration.variable_groups[group_idx + 1];
+                                let next_group_name = next_group.display_name.clone();
+                                if !config_state.expanded_groups.contains(&next_group.name) {
+                                    config_state.expanded_groups.push(next_group.name.clone());
+                                }
+                                
+                                self.status_message = Some(format!("Navigated to {}", next_group_name));
+                                
+                                // Move to first field of next group
+                                config_state.selected_field = 0;
+                            } else {
+                                // Normal navigation within group or no more groups
+                                let total_visible_fields = config_state.configuration.variables.iter()
+                                    .filter(|(_, v)| config_state.expanded_groups.contains(&v.group))
+                                    .count();
+                                
+                                if config_state.selected_field < total_visible_fields.saturating_sub(1) {
+                                    config_state.selected_field += 1;
+                                }
+                            }
+                        } else {
+                            // No expanded groups, expand the first one
+                            if !config_state.configuration.variable_groups.is_empty() {
+                                let first_group = &config_state.configuration.variable_groups[0];
+                                config_state.expanded_groups.push(first_group.name.clone());
+                                config_state.selected_field = 0;
+                            }
+                        }
+                    }
+                    KeyCode::Enter | KeyCode::Char(' ') => {
+                        // Find the variable at the current selected field
+                        let mut field_index = 0;
+                        let mut found_var: Option<(&String, &TemplateVariable)> = None;
+                        
+                        // Find the variable by iterating through all variables in order
+                        for group in &config_state.configuration.variable_groups {
+                            if config_state.expanded_groups.contains(&group.name) {
+                                let vars_in_group: Vec<_> = config_state.configuration.variables.iter()
+                                    .filter(|(_, v)| v.group == group.name)
+                                    .collect();
+                                
+                                for (var_name, var) in vars_in_group {
+                                    if field_index == config_state.selected_field {
+                                        found_var = Some((var_name, var));
+                                        break;
+                                    }
+                                    field_index += 1;
+                                }
+                            }
+                            if found_var.is_some() {
+                                break;
+                            }
+                        }
+                        
+                        if let Some((var_name, var)) = found_var {
+                            match &var.var_type {
+                                crate::models::VariableType::Boolean => {
+                                    // Toggle boolean value
+                                    if let Some(value) = config_state.user_values.get_mut(var_name) {
+                                        if let Some(b) = value.as_bool() {
+                                            *value = serde_json::json!(!b);
+                                        }
+                                    }
+                                }
+                                crate::models::VariableType::String | 
+                                crate::models::VariableType::Integer | 
+                                crate::models::VariableType::Float => {
+                                    // Start editing text field
+                                    config_state.editing_field = Some(var_name.clone());
+                                }
+                                _ => {}
+                            }
+                        }
+                    }
+
+                    KeyCode::Char('g' | 'G') => {
+                        // Generate template
+                        self.generate_template();
+                    }
+                    KeyCode::Char('r' | 'R') => {
+                        // Reset to defaults
+                        self.reset_template_config();
+                    }
+                    KeyCode::Char('v' | 'V') => {
+                        // Validate configuration
+                        self.validate_template_config();
+                    }
+                    _ => {}
+                }
+            }
+            return Ok(());
+        }
+        
         // If we're editing a secret, handle text input
         if let Some(ref mut secret_state) = self.secret_editing {
             if secret_state.is_editing {
@@ -561,6 +873,7 @@ impl App {
             if let Ok(templates) = self.backend.list_templates().await {
                 // Group templates by type
                 let mut pyspark_items = vec![];
+                let mut scala_items = vec![];
                 let mut python_items = vec![];
                 let mut nodejs_items = vec![];
                 
@@ -569,14 +882,20 @@ impl App {
                         id: format!("template:{}", template.id),
                         name: template.name.clone(),
                         resource_type: ResourceType::Template,
-                        parent: Some(format!("templates.{:?}", template.template_type).to_lowercase()),
+                        parent: Some(match template.template_type {
+                            crate::models::TemplateType::PySpark => "templates.pyspark".to_string(),
+                            crate::models::TemplateType::PySparkScala => "templates.scala".to_string(),
+                            crate::models::TemplateType::Python => "templates.python".to_string(),
+                            crate::models::TemplateType::NodeJs => "templates.nodejs".to_string(),
+                        }),
                         expandable: false,
                         depth: 2,
                         status: None,
                     };
                     
                     match template.template_type {
-                        crate::models::TemplateType::PySpark | crate::models::TemplateType::PySparkScala => pyspark_items.push(item),
+                        crate::models::TemplateType::PySpark => pyspark_items.push(item),
+                        crate::models::TemplateType::PySparkScala => scala_items.push(item),
                         crate::models::TemplateType::Python => python_items.push(item),
                         crate::models::TemplateType::NodeJs => nodejs_items.push(item),
                     }
@@ -595,6 +914,21 @@ impl App {
                     });
                     if self.resources.expanded.contains(&"templates.pyspark".to_string()) {
                         items.extend(pyspark_items);
+                    }
+                }
+                
+                if !scala_items.is_empty() {
+                    items.push(ResourceItem {
+                        id: "templates.scala".to_string(),
+                        name: "scala".to_string(),
+                        resource_type: ResourceType::Template,
+                        parent: Some("templates".to_string()),
+                        expandable: true,
+                        depth: 1,
+                        status: None,
+                    });
+                    if self.resources.expanded.contains(&"templates.scala".to_string()) {
+                        items.extend(scala_items);
                     }
                 }
                 
@@ -736,6 +1070,40 @@ impl App {
                     }
                     "template" => {
                         if let Ok(template) = self.backend.get_template(id).await {
+                            // Load template configuration
+                            if let Some(ref service) = self.template_service {
+                                let template_type = match template.template_type {
+                                    crate::models::TemplateType::PySpark => "pyspark",
+                                    crate::models::TemplateType::PySparkScala => "spark-scala",
+                                    _ => "pyspark", // default
+                                };
+                                
+                                if let Ok(config) = service.get_configuration(template_type) {
+                                    // Initialize template config state
+                                    let mut user_values = HashMap::new();
+                                    let expanded_groups = vec!["core".to_string()]; // Start with core expanded
+                                    
+                                    // Add default values
+                                    for (var_name, var) in &config.variables {
+                                        if let Some(default) = &var.default_value {
+                                            user_values.insert(var_name.clone(), default.clone());
+                                        }
+                                    }
+                                    
+                                    self.template_config = Some(TemplateConfigState {
+                                        template_id: template.id.clone(),
+                                        template_type: template_type.to_string(),
+                                        configuration: config.clone(),
+                                        user_values,
+                                        validation_errors: HashMap::new(),
+                                        expanded_groups,
+                                        selected_group: 0,
+                                        selected_field: 0,
+                                        editing_field: None,
+                                    });
+                                }
+                            }
+                            
                             self.selected_details = Some(ResourceDetails::Template(template));
                             self.focused_pane = Pane::Details;
                         }
@@ -901,6 +1269,186 @@ impl App {
     async fn view_logs_for(&mut self, resource_name: &str) {
         // TODO: Load logs for specific resource
         self.status_message = Some(format!("Loading logs for {}", resource_name));
+    }
+    
+    /// Generate template with current configuration
+    fn generate_template(&mut self) {
+        // First check if template service is available
+        if self.template_service.is_none() {
+            let error_msg = "Template service not available - failed to initialize";
+            self.status_message = Some(format!("Generation failed: {}", error_msg));
+            self.logs.push(format!(
+                "[{}] ERROR: {}",
+                chrono::Local::now().format("%H:%M:%S"),
+                error_msg
+            ));
+            self.logs.push(format!(
+                "[{}] This usually means the template files could not be loaded",
+                chrono::Local::now().format("%H:%M:%S")
+            ));
+            self.focused_pane = Pane::Logs;
+            return;
+        }
+        
+        // Check if template config is available
+        if self.template_config.is_none() {
+            let error_msg = "No template configuration loaded";
+            self.status_message = Some(format!("Generation failed: {}", error_msg));
+            self.logs.push(format!(
+                "[{}] ERROR: {}",
+                chrono::Local::now().format("%H:%M:%S"),
+                error_msg
+            ));
+            self.focused_pane = Pane::Logs;
+            return;
+        }
+        
+        if let (Some(ref mut service), Some(ref config_state)) = (&mut self.template_service, &self.template_config) {
+            // Create generation request
+            let app_name = config_state.user_values.get("app_name")
+                .and_then(|v| v.as_str())
+                .unwrap_or("generated-app")
+                .to_string()
+                .to_lowercase()
+                .replace(' ', "-");
+            
+            // Create output path - use current directory if /workspace/out doesn't exist
+            let output_path = if std::path::Path::new("/workspace/out").exists() {
+                format!("/workspace/out/{}", app_name)
+            } else {
+                format!("./generated/{}", app_name)
+            };
+            
+            let request = crate::models::TemplateGenerationRequest {
+                template_id: config_state.template_id.clone(),
+                template_type: config_state.template_type.clone(),
+                name: app_name.clone(),
+                output_path,
+                variables: config_state.user_values.clone(),
+            };
+            
+            self.logs.push(format!(
+                "[{}] Generating template: type={}, app_name={}",
+                chrono::Local::now().format("%H:%M:%S"),
+                config_state.template_type,
+                app_name
+            ));
+            self.logs.push(format!(
+                "[{}] Output path: {}",
+                chrono::Local::now().format("%H:%M:%S"),
+                request.output_path
+            ));
+            
+            // Generate
+            match service.generate(&request) {
+                Ok(result) => {
+                    self.status_message = Some(format!(
+                        "Generated {} files in {}", 
+                        result.generated_files.len(),
+                        result.output_path
+                    ));
+                    self.logs.push(format!(
+                        "[{}] Template generated successfully: {} files",
+                        chrono::Local::now().format("%H:%M:%S"),
+                        result.generated_files.len()
+                    ));
+                    for file in &result.generated_files {
+                        self.logs.push(format!("  - {}", file.path));
+                    }
+                    
+                    // Keep only the last 100 log entries
+                    if self.logs.len() > 100 {
+                        self.logs.drain(0..self.logs.len() - 100);
+                    }
+                }
+                Err(e) => {
+                    // IMMEDIATE LOG TO ENSURE THIS PATH IS HIT
+                    self.logs.push("ERROR PATH HIT!".to_string());
+                    
+                    // Check if error already contains "Generation failed:"
+                    let error_str = e.to_string();
+                    let error_msg = if error_str.starts_with("Generation failed:") {
+                        error_str
+                    } else {
+                        format!("Generation failed: {}", e)
+                    };
+                    self.status_message = Some(error_msg.clone());
+                    
+                    // Log detailed error to logs
+                    self.logs.push(format!(
+                        "[{}] ERROR: Template generation failed",
+                        chrono::Local::now().format("%H:%M:%S")
+                    ));
+                    self.logs.push(format!("[{}] Error details: {}", 
+                        chrono::Local::now().format("%H:%M:%S"),
+                        e
+                    ));
+                    
+                    // Check if it's a directory creation issue
+                    if error_msg.contains("workspace") || error_msg.contains("directory") {
+                        self.logs.push(format!(
+                            "[{}] Note: Ensure /workspace/out directory exists and is writable",
+                            chrono::Local::now().format("%H:%M:%S")
+                        ));
+                    }
+                    
+                    // Keep only the last 100 log entries
+                    if self.logs.len() > 100 {
+                        self.logs.drain(0..self.logs.len() - 100);
+                    }
+                    
+                    // Focus on logs pane to show the error
+                    self.focused_pane = Pane::Logs;
+                }
+            }
+        } else {
+            // This should never happen given our checks above
+            self.logs.push(format!(
+                "[{}] ERROR: Unexpected state - template service or config is None after checks",
+                chrono::Local::now().format("%H:%M:%S")
+            ));
+        }
+    }
+    
+    /// Reset template configuration to defaults
+    fn reset_template_config(&mut self) {
+        if let Some(ref mut config_state) = self.template_config {
+            // Reset all values to defaults
+            config_state.user_values.clear();
+            for (var_name, var) in &config_state.configuration.variables {
+                if let Some(default) = &var.default_value {
+                    config_state.user_values.insert(var_name.clone(), default.clone());
+                }
+            }
+            config_state.validation_errors.clear();
+            self.status_message = Some("Reset to default values".to_string());
+        }
+    }
+    
+    /// Validate template configuration
+    fn validate_template_config(&mut self) {
+        if let (Some(ref service), Some(ref mut config_state)) = (&self.template_service, &mut self.template_config) {
+            match service.validate_configuration(&config_state.template_type, &config_state.user_values) {
+                Ok(errors) => {
+                    config_state.validation_errors.clear();
+                    for error in errors {
+                        config_state.validation_errors.insert(error.field, error.message);
+                    }
+                    
+                    if config_state.validation_errors.is_empty() {
+                        self.status_message = Some("Configuration is valid".to_string());
+                    } else {
+                        self.status_message = Some(format!(
+                            "Found {} validation errors",
+                            config_state.validation_errors.len()
+                        ));
+                    }
+                }
+                Err(e) => {
+                    self.status_message = Some(format!("Validation failed: {}", e));
+                }
+            }
+        }
     }
 
 
