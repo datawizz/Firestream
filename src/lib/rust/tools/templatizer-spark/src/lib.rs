@@ -68,14 +68,14 @@ impl SparkTemplatizer {
     pub fn new(template_type: TemplateType) -> Result<Self, tera::Error> {
         let mut tera = Tera::default();
         let mut templates = HashMap::new();
-        let mut template_count = 0;
+        let mut _template_count = 0;
         
         match template_type {
             TemplateType::Python => {
                 for file in PythonTemplates::iter() {
                     let file_path = file.as_ref();
                     if file_path.ends_with(".tera") {
-                        template_count += 1;
+                        _template_count += 1;
                         if let Some(content) = PythonTemplates::get(file_path) {
                             let content_str = std::str::from_utf8(content.data.as_ref())
                                 .map_err(|e| tera::Error::msg(format!("Invalid UTF-8 in template {}: {}", file_path, e)))?;

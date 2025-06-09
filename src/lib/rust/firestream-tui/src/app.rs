@@ -449,7 +449,7 @@ impl App {
                             if field_in_group == 0 && group_idx > 0 {
                                 // At first field of group, move to previous group
                                 let current_group = &config_state.configuration.variable_groups[group_idx];
-                                let current_group_name = current_group.display_name.clone();
+                                let _current_group_name = current_group.display_name.clone();
                                 config_state.expanded_groups.retain(|g| g != &current_group.name);
                                 
                                 // Find and expand previous group
@@ -514,7 +514,7 @@ impl App {
                             if field_in_group == vars_in_current_group - 1 && 
                                group_idx < config_state.configuration.variable_groups.len() - 1 {
                                 // At last field of group, move to next group
-                                let current_group_name = current_group.display_name.clone();
+                                let _current_group_name = current_group.display_name.clone();
                                 config_state.expanded_groups.retain(|g| g != &current_group.name);
                                 
                                 // Find and expand next group
@@ -1183,36 +1183,36 @@ impl App {
     }
 
     // Stub methods for various actions
-    async fn new_resource(&mut self) {
+    async fn _new_resource(&mut self) {
         // TODO: Show new resource dialog
         self.status_message = Some("New resource dialog not implemented".to_string());
     }
 
-    async fn deploy_or_delete(&mut self) {
+    async fn _deploy_or_delete(&mut self) {
         // TODO: Implement deploy/delete
         self.status_message = Some("Deploy/delete not implemented".to_string());
     }
 
-    async fn refresh_resources(&mut self) {
+    async fn _refresh_resources(&mut self) {
         self.load_resources().await;
     }
 
-    async fn build_resource(&mut self) {
+    async fn _build_resource(&mut self) {
         // TODO: Implement build
         self.status_message = Some("Build not implemented".to_string());
     }
 
-    async fn scale_deployment(&mut self) {
+    async fn _scale_deployment(&mut self) {
         // TODO: Show scale dialog
         self.status_message = Some("Scale dialog not implemented".to_string());
     }
 
-    async fn restart_deployment(&mut self) {
+    async fn _restart_deployment(&mut self) {
         // TODO: Implement restart
         self.status_message = Some("Restart not implemented".to_string());
     }
 
-    async fn view_logs(&mut self) {
+    async fn _view_logs(&mut self) {
         // TODO: Load logs for selected resource
         self.focused_pane = Pane::Logs;
         self.logs = vec![
@@ -1221,17 +1221,17 @@ impl App {
         ];
     }
 
-    async fn edit_resource(&mut self) {
+    async fn _edit_resource(&mut self) {
         // TODO: Show edit dialog
         self.status_message = Some("Edit not implemented".to_string());
     }
 
-    async fn follow_logs(&mut self) {
+    async fn _follow_logs(&mut self) {
         // TODO: Implement log following
         self.status_message = Some("Following logs...".to_string());
     }
 
-    fn stop_logs(&mut self) {
+    fn _stop_logs(&mut self) {
         self.status_message = Some("Stopped following logs".to_string());
     }
 

@@ -218,7 +218,7 @@ impl<'a> DetailsPane<'a> {
         let groups_area = chunks[8];
         let mut current_y = groups_area.y;
         
-        for (group_idx, group) in config_state.configuration.variable_groups.iter().enumerate() {
+        for (_group_idx, group) in config_state.configuration.variable_groups.iter().enumerate() {
             if current_y >= groups_area.y + groups_area.height {
                 break;
             }
