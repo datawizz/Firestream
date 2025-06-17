@@ -1,0 +1,42 @@
+[package]
+name = "docker-manager"
+version = "0.1.0"
+edition = "2021"
+authors = ["Firestream Team"]
+description = "Docker container and image management tool"
+license = "MIT"
+
+[dependencies]
+# Docker API client
+bollard = { workspace = true }
+
+# Async runtime
+tokio = { workspace = true, features = ["full"] }
+futures = { workspace = true }
+futures-util = { workspace = true }
+
+# CLI
+clap = { workspace = true, features = ["derive", "env"] }
+
+# Error handling
+thiserror = { workspace = true }
+anyhow = { workspace = true }
+
+# Logging
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+
+# Serialization
+serde = { workspace = true, features = ["derive"] }
+serde_json = { workspace = true }
+
+# Utilities
+chrono = { workspace = true, features = ["serde"] }
+directories = { workspace = true }
+comfy-table = { workspace = true }
+humansize = "2.1"
+indicatif = "0.17"
+tar = "0.4"
+
+[dev-dependencies]
+tempfile = { workspace = true }
