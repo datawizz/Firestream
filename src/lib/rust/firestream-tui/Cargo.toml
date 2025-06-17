@@ -6,6 +6,9 @@ authors = ["Datawizz <36938650+datawizz@users.noreply.github.com>"]
 license = ""
 edition = "2021"
 
+[lib]
+name = "firestream_tui"
+
 [dependencies]
 crossterm = { workspace = true }
 futures = { workspace = true }
@@ -22,3 +25,11 @@ tracing-subscriber = { workspace = true }
 dirs = { workspace = true }
 templatizer-spark = { workspace = true }
 tera = { workspace = true }
+iceberg-manager = { workspace = true }
+keyring = "2.0"
+arrow = { workspace = true }
+arrow-array = { workspace = true }
+
+[[example]]
+name = "iceberg_example"
+path = "examples/iceberg_example.rs"

@@ -48,7 +48,11 @@ firestream-tui/
 - **Deployments**: Running applications with status, replicas, and metrics
 - **Templates**: Pre-configured application templates (PySpark, Python, Node.js)
 - **Nodes**: Kubernetes nodes with GPU support
-- **Data**: Delta tables, LakeFS branches, S3 buckets
+- **Data**: 
+  - Delta tables
+  - Apache Iceberg tables with catalog management
+  - LakeFS branches
+  - S3 buckets
 - **Builds**: Container image builds with progress tracking
 - **Secrets**: Kubernetes secrets management
 
@@ -130,6 +134,40 @@ The `ApiClient` implementation is currently a placeholder. To implement:
 1. Add HTTP client dependency (e.g., `reqwest`)
 2. Implement actual HTTP calls in `src/backend/api_client.rs`
 3. Handle authentication, error mapping, etc.
+
+## Iceberg Integration
+
+The TUI includes comprehensive Apache Iceberg table management with support for real data:
+
+### Features
+- Browse real Iceberg catalogs, namespaces, and tables
+- View table schemas and partitioning
+- Preview actual table data with SQL queries
+- Support for multiple storage backends:
+  - Local filesystem (default) - **Now with real data support!**
+  - Amazon S3 (requires REST catalog)
+  - Google Cloud Storage (requires REST catalog)
+
+### Using Real Data
+To use real Iceberg data instead of mock data:
+1. Set `LOCAL_DATA_DIRECTORY` environment variable
+2. Run the setup script in `scripts/setup-iceberg-data.sh`
+3. Start the TUI - it will automatically use real data
+
+For detailed instructions, see [docs/REAL_ICEBERG_DATA.md](docs/REAL_ICEBERG_DATA.md).
+
+### Navigation
+Iceberg resources appear under `data` in the resource tree. With real data:
+- Expand `data` to see the `local` catalog
+- Expand catalogs to see actual namespaces from your warehouse
+- Expand namespaces to see real tables
+- Select tables to view their actual schemas and data
+
+### Table Operations
+When viewing an Iceberg table:
+- `P`: Preview table data (first 20 rows from actual data)
+- `Q`: Query with SQL (coming soon)
+- `D`: Drop table (coming soon)
 
 ## Status Bar
 

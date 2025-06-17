@@ -25,7 +25,7 @@ pub enum CatalogConfig {
 
 /// High-level table management operations with DataFusion integration
 pub struct TableManager {
-    catalog: Arc<dyn Catalog>,
+    pub(crate) catalog: Arc<dyn Catalog>,
     context: SessionContext,
     #[allow(dead_code)]
     catalog_name: String,
@@ -258,7 +258,7 @@ impl TableManager {
     }
     
     /// Parse namespace string into NamespaceIdent object
-    fn parse_namespace(&self, namespace: &str) -> Result<NamespaceIdent> {
+    pub(crate) fn parse_namespace(&self, namespace: &str) -> Result<NamespaceIdent> {
         NamespaceIdent::from_strs(namespace.split('.'))
             .map_err(|e| Error::InvalidOperation(format!("Invalid namespace: {}", e)))
     }

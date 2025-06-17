@@ -718,4 +718,366 @@ impl FirestreamBackend for MockClient {
             Ok(())
         })
     }
+    
+    // Iceberg operations
+    
+    fn list_iceberg_catalogs(&self) -> BoxFuture<'_, ApiResult<Vec<IcebergCatalog>>> {
+        Box::pin(async move {
+            Ok(vec![
+                IcebergCatalog {
+                    name: "local".to_string(),
+                    catalog_type: IcebergCatalogType::Memory,
+                    warehouse: "/tmp/iceberg-warehouse".to_string(),
+                    namespaces: vec!["default".to_string(), "analytics".to_string()],
+                },
+                IcebergCatalog {
+                    name: "s3_prod".to_string(),
+                    catalog_type: IcebergCatalogType::Rest,
+                    warehouse: "s3://data-lake/iceberg".to_string(),
+                    namespaces: vec!["prod".to_string(), "staging".to_string()],
+                },
+            ])
+        })
+    }
+    
+    fn get_iceberg_catalog(&self, name: &str) -> BoxFuture<'_, ApiResult<IcebergCatalog>> {
+        let name = name.to_string();
+        Box::pin(async move {
+            match name.as_str() {
+                "local" => Ok(IcebergCatalog {
+                    name: "local".to_string(),
+                    catalog_type: IcebergCatalogType::Memory,
+                    warehouse: "/tmp/iceberg-warehouse".to_string(),
+                    namespaces: vec!["default".to_string(), "analytics".to_string()],
+                }),
+                "s3_prod" => Ok(IcebergCatalog {
+                    name: "s3_prod".to_string(),
+                    catalog_type: IcebergCatalogType::Rest,
+                    warehouse: "s3://data-lake/iceberg".to_string(),
+                    namespaces: vec!["prod".to_string(), "staging".to_string()],
+                }),
+                _ => Err(ApiError::NotFound),
+            }
+        })
+    }
+    
+    fn create_iceberg_catalog(&self, config: &StorageConfig) -> BoxFuture<'_, ApiResult<IcebergCatalog>> {
+        let config = config.clone();
+        Box::pin(async move {
+            let catalog_name = match &config.storage_type {
+                StorageType::LocalFileSystem => "new_local",
+                StorageType::S3 => "new_s3",
+                StorageType::GoogleCloudStorage => "new_gcs",
+            };
+            
+            Ok(IcebergCatalog {
+                name: catalog_name.to_string(),
+                catalog_type: IcebergCatalogType::Memory,
+                warehouse: "/tmp/new-catalog".to_string(),
+                namespaces: vec![],
+            })
+        })
+    }
+    
+    fn list_iceberg_namespaces(&self, catalog: &str) -> BoxFuture<'_, ApiResult<Vec<IcebergNamespace>>> {
+        let catalog = catalog.to_string();
+        Box::pin(async move {
+            match catalog.as_str() {
+                "local" => Ok(vec![
+                    IcebergNamespace {
+                        name: "default".to_string(),
+                        catalog: "local".to_string(),
+                        tables: vec!["users".to_string(), "events".to_string()],
+                        properties: HashMap::new(),
+                    },
+                    IcebergNamespace {
+                        name: "analytics".to_string(),
+                        catalog: "local".to_string(),
+                        tables: vec!["pageviews".to_string(), "sessions".to_string()],
+                        properties: HashMap::new(),
+                    },
+                ]),
+                "s3_prod" => Ok(vec![
+                    IcebergNamespace {
+                        name: "prod".to_string(),
+                        catalog: "s3_prod".to_string(),
+                        tables: vec!["transactions".to_string(), "customers".to_string()],
+                        properties: HashMap::new(),
+                    },
+                ]),
+                _ => Ok(vec![]),
+            }
+        })
+    }
+    
+    fn create_iceberg_namespace(&self, catalog: &str, namespace: &str, properties: HashMap<String, String>) -> BoxFuture<'_, ApiResult<IcebergNamespace>> {
+        let catalog = catalog.to_string();
+        let namespace = namespace.to_string();
+        Box::pin(async move {
+            Ok(IcebergNamespace {
+                name: namespace,
+                catalog,
+                tables: vec![],
+                properties,
+            })
+        })
+    }
+    
+    fn list_iceberg_tables(&self, catalog: &str, namespace: &str) -> BoxFuture<'_, ApiResult<Vec<IcebergTable>>> {
+        let catalog = catalog.to_string();
+        let namespace = namespace.to_string();
+        Box::pin(async move {
+            match (catalog.as_str(), namespace.as_str()) {
+                ("local", "default") => Ok(vec![
+                    IcebergTable {
+                        id: "local.default.users".to_string(),
+                        name: "users".to_string(),
+                        namespace: "default".to_string(),
+                        catalog: "local".to_string(),
+                        location: "/tmp/iceberg-warehouse/default/users".to_string(),
+                        current_snapshot_id: Some(12345),
+                        schema: IcebergSchema {
+                            schema_id: 1,
+                            fields: vec![
+                                IcebergField {
+                                    id: 1,
+                                    name: "id".to_string(),
+                                    field_type: "long".to_string(),
+                                    required: true,
+                                    doc: None,
+                                },
+                                IcebergField {
+                                    id: 2,
+                                    name: "username".to_string(),
+                                    field_type: "string".to_string(),
+                                    required: true,
+                                    doc: None,
+                                },
+                                IcebergField {
+                                    id: 3,
+                                    name: "email".to_string(),
+                                    field_type: "string".to_string(),
+                                    required: false,
+                                    doc: None,
+                                },
+                                IcebergField {
+                                    id: 4,
+                                    name: "created_at".to_string(),
+                                    field_type: "timestamp".to_string(),
+                                    required: true,
+                                    doc: None,
+                                },
+                            ],
+                        },
+                        partition_spec: None,
+                        properties: HashMap::new(),
+                        last_modified: Utc::now() - chrono::Duration::hours(2),
+                    },
+                    IcebergTable {
+                        id: "local.default.events".to_string(),
+                        name: "events".to_string(),
+                        namespace: "default".to_string(),
+                        catalog: "local".to_string(),
+                        location: "/tmp/iceberg-warehouse/default/events".to_string(),
+                        current_snapshot_id: Some(54321),
+                        schema: IcebergSchema {
+                            schema_id: 1,
+                            fields: vec![
+                                IcebergField {
+                                    id: 1,
+                                    name: "event_id".to_string(),
+                                    field_type: "uuid".to_string(),
+                                    required: true,
+                                    doc: None,
+                                },
+                                IcebergField {
+                                    id: 2,
+                                    name: "user_id".to_string(),
+                                    field_type: "long".to_string(),
+                                    required: true,
+                                    doc: None,
+                                },
+                                IcebergField {
+                                    id: 3,
+                                    name: "event_type".to_string(),
+                                    field_type: "string".to_string(),
+                                    required: true,
+                                    doc: None,
+                                },
+                                IcebergField {
+                                    id: 4,
+                                    name: "timestamp".to_string(),
+                                    field_type: "timestamptz".to_string(),
+                                    required: true,
+                                    doc: None,
+                                },
+                            ],
+                        },
+                        partition_spec: Some(vec![
+                            PartitionField {
+                                source_id: 4,
+                                field_id: 1000,
+                                name: "timestamp_day".to_string(),
+                                transform: "day".to_string(),
+                            },
+                        ]),
+                        properties: HashMap::new(),
+                        last_modified: Utc::now() - chrono::Duration::minutes(30),
+                    },
+                ]),
+                _ => Ok(vec![]),
+            }
+        })
+    }
+    
+    fn get_iceberg_table(&self, catalog: &str, namespace: &str, table: &str) -> BoxFuture<'_, ApiResult<IcebergTable>> {
+        let catalog = catalog.to_string();
+        let namespace = namespace.to_string();
+        let table = table.to_string();
+        Box::pin(async move {
+            if catalog == "local" && namespace == "default" && table == "users" {
+                Ok(IcebergTable {
+                    id: "local.default.users".to_string(),
+                    name: "users".to_string(),
+                    namespace: "default".to_string(),
+                    catalog: "local".to_string(),
+                    location: "/tmp/iceberg-warehouse/default/users".to_string(),
+                    current_snapshot_id: Some(12345),
+                    schema: IcebergSchema {
+                        schema_id: 1,
+                        fields: vec![
+                            IcebergField {
+                                id: 1,
+                                name: "id".to_string(),
+                                field_type: "long".to_string(),
+                                required: true,
+                                doc: None,
+                            },
+                            IcebergField {
+                                id: 2,
+                                name: "username".to_string(),
+                                field_type: "string".to_string(),
+                                required: true,
+                                doc: None,
+                            },
+                            IcebergField {
+                                id: 3,
+                                name: "email".to_string(),
+                                field_type: "string".to_string(),
+                                required: false,
+                                doc: None,
+                            },
+                            IcebergField {
+                                id: 4,
+                                name: "created_at".to_string(),
+                                field_type: "timestamp".to_string(),
+                                required: true,
+                                doc: None,
+                            },
+                        ],
+                    },
+                    partition_spec: None,
+                    properties: HashMap::new(),
+                    last_modified: Utc::now() - chrono::Duration::hours(2),
+                })
+            } else {
+                Err(ApiError::NotFound)
+            }
+        })
+    }
+    
+    fn create_iceberg_table(&self, catalog: &str, namespace: &str, table: &str, schema: IcebergSchema, partition_spec: Option<Vec<PartitionField>>) -> BoxFuture<'_, ApiResult<IcebergTable>> {
+        let catalog = catalog.to_string();
+        let namespace = namespace.to_string();
+        let table = table.to_string();
+        Box::pin(async move {
+            Ok(IcebergTable {
+                id: format!("{}.{}.{}", catalog, namespace, table),
+                name: table.clone(),
+                namespace: namespace.clone(),
+                catalog: catalog.clone(),
+                location: format!("/tmp/iceberg-warehouse/{}/{}", namespace, table),
+                current_snapshot_id: None,
+                schema,
+                partition_spec,
+                properties: HashMap::new(),
+                last_modified: Utc::now(),
+            })
+        })
+    }
+    
+    fn drop_iceberg_table(&self, _catalog: &str, _namespace: &str, _table: &str) -> BoxFuture<'_, ApiResult<()>> {
+        Box::pin(async move {
+            Ok(())
+        })
+    }
+    
+    fn query_iceberg_table(&self, _catalog: &str, _namespace: &str, table: &str, sql: &str) -> BoxFuture<'_, ApiResult<IcebergQueryResult>> {
+        let table = table.to_string();
+        let _sql = sql.to_string();
+        Box::pin(async move {
+            // Mock query results
+            if table == "users" {
+                Ok(IcebergQueryResult {
+                    columns: vec!["id".to_string(), "username".to_string(), "email".to_string(), "created_at".to_string()],
+                    rows: vec![
+                        vec![
+                            serde_json::json!(1),
+                            serde_json::json!("alice"),
+                            serde_json::json!("alice@example.com"),
+                            serde_json::json!("2024-01-15T10:30:00Z"),
+                        ],
+                        vec![
+                            serde_json::json!(2),
+                            serde_json::json!("bob"),
+                            serde_json::json!("bob@example.com"),
+                            serde_json::json!("2024-01-16T14:20:00Z"),
+                        ],
+                    ],
+                    row_count: 2,
+                })
+            } else {
+                Ok(IcebergQueryResult {
+                    columns: vec![],
+                    rows: vec![],
+                    row_count: 0,
+                })
+            }
+        })
+    }
+    
+    fn preview_iceberg_table(&self, catalog: &str, namespace: &str, table: &str, limit: usize) -> BoxFuture<'_, ApiResult<IcebergQueryResult>> {
+        let _catalog = catalog.to_string();
+        let _namespace = namespace.to_string();
+        let table = table.to_string();
+        Box::pin(async move {
+            // Mock preview results
+            if table == "users" {
+                Ok(IcebergQueryResult {
+                    columns: vec!["id".to_string(), "username".to_string(), "email".to_string(), "created_at".to_string()],
+                    rows: vec![
+                        vec![
+                            serde_json::json!(1),
+                            serde_json::json!("alice"),
+                            serde_json::json!("alice@example.com"),
+                            serde_json::json!("2024-01-15T10:30:00Z"),
+                        ],
+                        vec![
+                            serde_json::json!(2),
+                            serde_json::json!("bob"),
+                            serde_json::json!("bob@example.com"),
+                            serde_json::json!("2024-01-16T14:20:00Z"),
+                        ],
+                    ].into_iter().take(limit).collect(),
+                    row_count: 2.min(limit),
+                })
+            } else {
+                Ok(IcebergQueryResult {
+                    columns: vec![],
+                    rows: vec![],
+                    row_count: 0,
+                })
+            }
+        })
+    }
 }

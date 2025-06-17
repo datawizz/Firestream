@@ -39,6 +39,10 @@ impl Widget for &App {
                 // Then render command palette on top
                 CommandPalette::new(self).render(chunks[1], buf);
             }
+            View::IcebergConfig => {
+                // Render Iceberg configuration view
+                crate::views::IcebergConfigView::new(self).render(chunks[1], buf);
+            }
         }
 
         // Always draw status bar at top
@@ -208,44 +212,53 @@ impl App {
         // Render the block
         block.render(area, buf);
         
-        let chunks = Layout::default()
+        // Create two sections: left for system info, right for context hints
+        let main_chunks = Layout::default()
+            .direction(Direction::Horizontal)
+            .constraints([
+                Constraint::Percentage(60),  // System info
+                Constraint::Percentage(40),  // Context hints
+            ])
+            .split(inner);
+        
+        // Left section - system info
+        let sys_chunks = Layout::default()
             .direction(Direction::Horizontal)
             .constraints([
                 Constraint::Length(10),  // Version
                 Constraint::Length(15),  // Environment
                 Constraint::Length(15),  // Status
                 Constraint::Length(15),  // Uptime
-                Constraint::Length(25),  // Resource usage
-                Constraint::Min(0),      // Status message (flexible width)
+                Constraint::Min(0),      // Resource usage
             ])
-            .split(inner);
+            .split(main_chunks[0]);
 
         // Version info
         let version_info = Line::from(vec![
             Span::styled(format!("v{}", env!("CARGO_PKG_VERSION")), Style::default().fg(Color::Rgb(150, 150, 170))),
         ]);
-        buf.set_line(chunks[0].x, chunks[0].y, &version_info, chunks[0].width);
+        buf.set_line(sys_chunks[0].x, sys_chunks[0].y, &version_info, sys_chunks[0].width);
 
         // Environment
         let env_info = Line::from(vec![
             Span::raw("| "),
             Span::raw("local-k3d"),
         ]);
-        buf.set_line(chunks[1].x, chunks[1].y, &env_info, chunks[1].width);
+        buf.set_line(sys_chunks[1].x, sys_chunks[1].y, &env_info, sys_chunks[1].width);
 
         // Connection status
         let status_info = Line::from(vec![
             Span::raw("| "),
             Span::styled("● connected", Style::default().fg(Color::Green)),
         ]);
-        buf.set_line(chunks[2].x, chunks[2].y, &status_info, chunks[2].width);
+        buf.set_line(sys_chunks[2].x, sys_chunks[2].y, &status_info, sys_chunks[2].width);
 
         // Uptime
         let uptime_info = Line::from(vec![
             Span::raw("| ↑ "),
             Span::raw("15d 3h"),
         ]);
-        buf.set_line(chunks[3].x, chunks[3].y, &uptime_info, chunks[3].width);
+        buf.set_line(sys_chunks[3].x, sys_chunks[3].y, &uptime_info, sys_chunks[3].width);
 
         // Resource usage
         let resource_info = Line::from(vec![
@@ -254,15 +267,52 @@ impl App {
             Span::raw(" mem: "),
             Span::styled("71%", Style::default().fg(Color::Yellow)),
         ]);
-        buf.set_line(chunks[4].x, chunks[4].y, &resource_info, chunks[4].width);
+        buf.set_line(sys_chunks[4].x, sys_chunks[4].y, &resource_info, sys_chunks[4].width);
 
-        // Status message (if any) - now in the last flexible-width chunk
+        // Right section - context hints or status message
         if let Some(msg) = &self.status_message {
             let status = Line::from(vec![
-                Span::raw("| "),
+                Span::raw("│ "),
                 Span::styled(msg, Style::default().fg(Color::Rgb(239, 200, 131))),
             ]);
-            buf.set_line(chunks[5].x, chunks[5].y, &status, chunks[5].width);
+            buf.set_line(main_chunks[1].x, main_chunks[1].y, &status, main_chunks[1].width);
+        } else {
+            // Show context-specific hints
+            let hints = match self.focused_pane {
+                crate::app::Pane::Resources => {
+                    vec![
+                        Span::raw("│ "),
+                        Span::styled("Spacebar", Style::default().fg(Color::Cyan)),
+                        Span::raw(": toggle │ "),
+                        Span::styled("*", Style::default().fg(Color::Cyan)),
+                        Span::raw(": expand all │ "),
+                        Span::styled("Tab", Style::default().fg(Color::Cyan)),
+                        Span::raw(": next pane │ "),
+                        Span::styled("^C", Style::default().fg(Color::Cyan)),
+                        Span::raw(": quit"),
+                    ]
+                }
+                crate::app::Pane::Details => {
+                    vec![
+                        Span::raw("│ "),
+                        Span::styled("Tab", Style::default().fg(Color::Cyan)),
+                        Span::raw(": next pane │ "),
+                        Span::styled("^C", Style::default().fg(Color::Cyan)),
+                        Span::raw(": quit"),
+                    ]
+                }
+                crate::app::Pane::Logs => {
+                    vec![
+                        Span::raw("│ "),
+                        Span::styled("Tab", Style::default().fg(Color::Cyan)),
+                        Span::raw(": next pane │ "),
+                        Span::styled("^C", Style::default().fg(Color::Cyan)),
+                        Span::raw(": quit"),
+                    ]
+                }
+            };
+            let hint_line = Line::from(hints);
+            buf.set_line(main_chunks[1].x, main_chunks[1].y, &hint_line, main_chunks[1].width);
         }
     }
 }

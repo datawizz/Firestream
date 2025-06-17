@@ -82,6 +82,12 @@
         lib = nixpkgs.lib;
       };
 
+      # Import Node.js configuration from node.nix
+      nodeModule = import ./bin/nix/node.nix {
+        inherit pkgs;
+        lib = nixpkgs.lib;
+      };
+
       # Define the shell packages
       shellPackages = with pkgs; [
 
@@ -90,9 +96,11 @@
         kubectl
         kubernetes-helm
 
+        # DuckDB
+        # Included for TCP-H and TCP-DS dataset generation
+        duckdb
 
-        # Node
-        nodejs_22
+        # Node is configured via nodeModule
 
         # Distribution of protoc and the gRPC Node protoc plugin for ease of installation with npm
         grpc-tools
@@ -127,7 +135,7 @@
 
         # Additional build tools not included in rust.nix
         # (rust.nix already includes: gcc, clang, llvm, pkg-config, openssl, xz, zlib)
-      ] ++ pythonPackages ++ dockerInDocker.packages ++ rustModule.packages;
+      ] ++ pythonPackages ++ dockerInDocker.packages ++ rustModule.packages ++ nodeModule.packages;
 
       # Create a profile script that sets up the environment
       profileScript = pkgs.writeText "nix-env.sh" ''
@@ -196,8 +204,14 @@
         # Rust environment from rust.nix
         ${rustModule.envVars}
 
+        # Node.js environment from node.nix
+        ${nodeModule.envVars}
+
         # Docker-from-Docker configuration
         ${dockerInDocker.profileScript}
+
+        # Node.js profile setup
+        ${nodeModule.profileScript}
       '';
 
     in pkgs.runCommand "container-env" {
@@ -253,6 +267,14 @@
         # Run Rust setup
         echo "Running Rust environment setup..."
         ${rustModule.setupScript}
+
+        # Run Node.js setup
+        if [ -f ${nodeModule.setupScript}/bin/setup-node ]; then
+          echo "Running Node.js environment setup..."
+          ${nodeModule.setupScript}/bin/setup-node || {
+            echo "Warning: Node.js setup failed, but continuing..."
+          }
+        fi
         EOF
 
         chmod +x $out/bin/setup-container

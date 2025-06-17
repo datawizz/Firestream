@@ -46,3 +46,4 @@ src/deploy/rendered/**
 **/.pulumi/**
 _build/**
 target-ra/**
+.sccache/**

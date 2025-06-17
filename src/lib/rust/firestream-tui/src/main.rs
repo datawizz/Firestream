@@ -1,12 +1,4 @@
-use crate::app::App;
-
-pub mod app;
-pub mod event;
-pub mod ui;
-pub mod models;
-pub mod backend;
-pub mod services;
-pub mod views;
+use firestream_tui::app::App;
 
 #[tokio::main]
 async fn main() -> color_eyre::Result<()> {
@@ -17,7 +9,7 @@ async fn main() -> color_eyre::Result<()> {
     let terminal = ratatui::init();
     
     // Create and run the application
-    let app = App::new();
+    let app = App::new().await;
     let result = app.run(terminal).await;
     
     // Restore terminal on exit

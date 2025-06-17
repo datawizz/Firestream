@@ -2,12 +2,15 @@
 
 pub mod api_client;
 pub mod mock_client;
+pub mod iceberg_backend;
 
 pub use api_client::ApiClient;
 pub use mock_client::MockClient;
+pub use iceberg_backend::IcebergBackend;
 
 use std::future::Future;
 use std::pin::Pin;
+use std::collections::HashMap;
 
 pub type ApiResult<T> = Result<T, ApiError>;
 
@@ -72,4 +75,23 @@ pub trait FirestreamBackend: Send + Sync {
     fn get_secret(&self, id: &str) -> BoxFuture<'_, ApiResult<crate::models::SecretInfo>>;
     fn create_secret(&self, name: &str, data: std::collections::HashMap<String, String>) -> BoxFuture<'_, ApiResult<crate::models::SecretInfo>>;
     fn delete_secret(&self, name: &str) -> BoxFuture<'_, ApiResult<()>>;
+    
+    // Iceberg catalog operations
+    fn list_iceberg_catalogs(&self) -> BoxFuture<'_, ApiResult<Vec<crate::models::IcebergCatalog>>>;
+    fn get_iceberg_catalog(&self, name: &str) -> BoxFuture<'_, ApiResult<crate::models::IcebergCatalog>>;
+    fn create_iceberg_catalog(&self, config: &crate::models::StorageConfig) -> BoxFuture<'_, ApiResult<crate::models::IcebergCatalog>>;
+    
+    // Iceberg namespace operations
+    fn list_iceberg_namespaces(&self, catalog: &str) -> BoxFuture<'_, ApiResult<Vec<crate::models::IcebergNamespace>>>;
+    fn create_iceberg_namespace(&self, catalog: &str, namespace: &str, properties: HashMap<String, String>) -> BoxFuture<'_, ApiResult<crate::models::IcebergNamespace>>;
+    
+    // Iceberg table operations
+    fn list_iceberg_tables(&self, catalog: &str, namespace: &str) -> BoxFuture<'_, ApiResult<Vec<crate::models::IcebergTable>>>;
+    fn get_iceberg_table(&self, catalog: &str, namespace: &str, table: &str) -> BoxFuture<'_, ApiResult<crate::models::IcebergTable>>;
+    fn create_iceberg_table(&self, catalog: &str, namespace: &str, table: &str, schema: crate::models::IcebergSchema, partition_spec: Option<Vec<crate::models::PartitionField>>) -> BoxFuture<'_, ApiResult<crate::models::IcebergTable>>;
+    fn drop_iceberg_table(&self, catalog: &str, namespace: &str, table: &str) -> BoxFuture<'_, ApiResult<()>>;
+    
+    // Query operations
+    fn query_iceberg_table(&self, catalog: &str, namespace: &str, table: &str, sql: &str) -> BoxFuture<'_, ApiResult<crate::models::IcebergQueryResult>>;
+    fn preview_iceberg_table(&self, catalog: &str, namespace: &str, table: &str, limit: usize) -> BoxFuture<'_, ApiResult<crate::models::IcebergQueryResult>>;
 }

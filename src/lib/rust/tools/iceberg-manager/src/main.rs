@@ -3,6 +3,7 @@ use clap::{Parser, Subcommand};
 use iceberg_manager::{
     CatalogConfig, TableManager, Schema, NestedField, Type, PrimitiveType,
     UnboundPartitionSpec, Transform,
+    TpcSeeder, TpcSeederConfig, TpcBenchmark,
 };
 use iceberg::spec::NestedFieldRef;
 use std::collections::HashMap;
@@ -43,6 +44,43 @@ enum Commands {
     Sql {
         /// SQL query to execute
         query: String,
+    },
+    /// Seed TPC benchmark data
+    Seed {
+        #[command(subcommand)]
+        action: SeedAction,
+    },
+}
+
+#[derive(Subcommand)]
+enum SeedAction {
+    /// Seed TPC-H data
+    TpcH {
+        /// Target namespace
+        namespace: String,
+        /// Scale factor (1, 10, 100, etc.)
+        #[arg(short, long, default_value = "1")]
+        scale_factor: f64,
+        /// Batch size for reading large tables
+        #[arg(short, long, default_value = "100000")]
+        batch_size: usize,
+        /// Preview what will be migrated without actually doing it
+        #[arg(long)]
+        dry_run: bool,
+    },
+    /// Seed TPC-DS data
+    TpcDs {
+        /// Target namespace
+        namespace: String,
+        /// Scale factor
+        #[arg(short, long, default_value = "1")]
+        scale_factor: f64,
+        /// Batch size for reading large tables
+        #[arg(short, long, default_value = "100000")]
+        batch_size: usize,
+        /// Preview what will be migrated without actually doing it
+        #[arg(long)]
+        dry_run: bool,
     },
 }
 
@@ -270,6 +308,49 @@ async fn main() -> Result<()> {
             } else {
                 let formatted = datafusion::arrow::util::pretty::pretty_format_batches(&batches)?;
                 println!("{}", formatted);
+            }
+        }
+        Commands::Seed { action } => {
+            let config = match &action {
+                SeedAction::TpcH { batch_size, .. } | SeedAction::TpcDs { batch_size, .. } => {
+                    TpcSeederConfig {
+                        batch_size: *batch_size,
+                        show_progress: true,
+                    }
+                }
+            };
+            
+            let seeder = TpcSeeder::new(std::sync::Arc::new(manager), config)?;
+            
+            match action {
+                SeedAction::TpcH { namespace, scale_factor, dry_run, .. } => {
+                    if dry_run {
+                        println!("Preview of TPC-H migration (scale factor: {})", scale_factor);
+                        let table_infos = seeder.preview_migration(TpcBenchmark::TpcH, scale_factor).await?;
+                        println!("Tables to be migrated:");
+                        for info in table_infos {
+                            println!("  - {}: {} rows, {} columns", info.name, info.row_count, info.column_count);
+                        }
+                    } else {
+                        println!("Seeding TPC-H data at scale factor {} into namespace '{}'", scale_factor, namespace);
+                        seeder.seed_tpch(&namespace, scale_factor).await?;
+                        println!("\nTPC-H data seeding completed successfully!");
+                    }
+                }
+                SeedAction::TpcDs { namespace, scale_factor, dry_run, .. } => {
+                    if dry_run {
+                        println!("Preview of TPC-DS migration (scale factor: {})", scale_factor);
+                        let table_infos = seeder.preview_migration(TpcBenchmark::TpcDs, scale_factor).await?;
+                        println!("Tables to be migrated:");
+                        for info in table_infos {
+                            println!("  - {}: {} rows, {} columns", info.name, info.row_count, info.column_count);
+                        }
+                    } else {
+                        println!("Seeding TPC-DS data at scale factor {} into namespace '{}'", scale_factor, namespace);
+                        seeder.seed_tpcds(&namespace, scale_factor).await?;
+                        println!("\nTPC-DS data seeding completed successfully!");
+                    }
+                }
             }
         }
     }

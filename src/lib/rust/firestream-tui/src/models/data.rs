@@ -1,5 +1,6 @@
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DeltaTable {
@@ -73,4 +74,100 @@ pub struct S3ObjectList {
     pub is_truncated: bool,
     #[serde(rename = "nextContinuationToken")]
     pub next_continuation_token: Option<String>,
+}
+
+// Iceberg-specific types
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct IcebergCatalog {
+    pub name: String,
+    pub catalog_type: IcebergCatalogType,
+    pub warehouse: String,
+    pub namespaces: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum IcebergCatalogType {
+    Memory,
+    Rest,
+    FileSystem,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct IcebergNamespace {
+    pub name: String,
+    pub catalog: String,
+    pub tables: Vec<String>,
+    pub properties: HashMap<String, String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct IcebergTable {
+    pub id: String,
+    pub name: String,
+    pub namespace: String,
+    pub catalog: String,
+    pub location: String,
+    pub current_snapshot_id: Option<i64>,
+    pub schema: IcebergSchema,
+    pub partition_spec: Option<Vec<PartitionField>>,
+    pub properties: HashMap<String, String>,
+    pub last_modified: DateTime<Utc>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct IcebergSchema {
+    pub schema_id: i32,
+    pub fields: Vec<IcebergField>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct IcebergField {
+    pub id: i32,
+    pub name: String,
+    pub field_type: String,
+    pub required: bool,
+    pub doc: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PartitionField {
+    pub source_id: i32,
+    pub field_id: i32,
+    pub name: String,
+    pub transform: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct StorageConfig {
+    pub storage_type: StorageType,
+    pub credentials: StorageCredentials,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum StorageType {
+    LocalFileSystem,
+    S3,
+    GoogleCloudStorage,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum StorageCredentials {
+    None, // For local filesystem
+    S3 {
+        access_key_id: String,
+        secret_access_key: String,
+        region: String,
+        endpoint: Option<String>, // For S3-compatible stores
+    },
+    Gcs {
+        service_account_key: String,
+        project_id: String,
+    },
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct IcebergQueryResult {
+    pub columns: Vec<String>,
+    pub rows: Vec<Vec<serde_json::Value>>,
+    pub row_count: usize,
 }

@@ -4,19 +4,19 @@ use std::collections::HashMap;
 
 pub struct ApiClient {
     _base_url: String,
-    api_key: Option<String>,
+    _api_key: Option<String>,
 }
 
 impl ApiClient {
     pub fn new(base_url: String) -> Self {
         Self {
             _base_url: base_url,
-            api_key: None,
+            _api_key: None,
         }
     }
 
     pub fn with_api_key(mut self, api_key: String) -> Self {
-        self.api_key = Some(api_key);
+        self._api_key = Some(api_key);
         self
     }
 }
@@ -187,6 +187,85 @@ impl FirestreamBackend for ApiClient {
     fn delete_secret(&self, _name: &str) -> BoxFuture<'_, ApiResult<()>> {
         Box::pin(async move {
             // TODO: Implement HTTP request to DELETE /secrets/{name}
+            Err(ApiError::Unknown("Not implemented".to_string()))
+        })
+    }
+    
+    // Iceberg operations
+    
+    fn list_iceberg_catalogs(&self) -> BoxFuture<'_, ApiResult<Vec<IcebergCatalog>>> {
+        Box::pin(async move {
+            // TODO: Implement HTTP request to GET /data/iceberg/catalogs
+            Err(ApiError::Unknown("Not implemented".to_string()))
+        })
+    }
+    
+    fn get_iceberg_catalog(&self, _name: &str) -> BoxFuture<'_, ApiResult<IcebergCatalog>> {
+        Box::pin(async move {
+            // TODO: Implement HTTP request to GET /data/iceberg/catalogs/{name}
+            Err(ApiError::Unknown("Not implemented".to_string()))
+        })
+    }
+    
+    fn create_iceberg_catalog(&self, _config: &StorageConfig) -> BoxFuture<'_, ApiResult<IcebergCatalog>> {
+        Box::pin(async move {
+            // TODO: Implement HTTP request to POST /data/iceberg/catalogs
+            Err(ApiError::Unknown("Not implemented".to_string()))
+        })
+    }
+    
+    fn list_iceberg_namespaces(&self, _catalog: &str) -> BoxFuture<'_, ApiResult<Vec<IcebergNamespace>>> {
+        Box::pin(async move {
+            // TODO: Implement HTTP request to GET /data/iceberg/catalogs/{catalog}/namespaces
+            Err(ApiError::Unknown("Not implemented".to_string()))
+        })
+    }
+    
+    fn create_iceberg_namespace(&self, _catalog: &str, _namespace: &str, _properties: HashMap<String, String>) -> BoxFuture<'_, ApiResult<IcebergNamespace>> {
+        Box::pin(async move {
+            // TODO: Implement HTTP request to POST /data/iceberg/catalogs/{catalog}/namespaces
+            Err(ApiError::Unknown("Not implemented".to_string()))
+        })
+    }
+    
+    fn list_iceberg_tables(&self, _catalog: &str, _namespace: &str) -> BoxFuture<'_, ApiResult<Vec<IcebergTable>>> {
+        Box::pin(async move {
+            // TODO: Implement HTTP request to GET /data/iceberg/catalogs/{catalog}/namespaces/{namespace}/tables
+            Err(ApiError::Unknown("Not implemented".to_string()))
+        })
+    }
+    
+    fn get_iceberg_table(&self, _catalog: &str, _namespace: &str, _table: &str) -> BoxFuture<'_, ApiResult<IcebergTable>> {
+        Box::pin(async move {
+            // TODO: Implement HTTP request to GET /data/iceberg/catalogs/{catalog}/namespaces/{namespace}/tables/{table}
+            Err(ApiError::Unknown("Not implemented".to_string()))
+        })
+    }
+    
+    fn create_iceberg_table(&self, _catalog: &str, _namespace: &str, _table: &str, _schema: IcebergSchema, _partition_spec: Option<Vec<PartitionField>>) -> BoxFuture<'_, ApiResult<IcebergTable>> {
+        Box::pin(async move {
+            // TODO: Implement HTTP request to POST /data/iceberg/catalogs/{catalog}/namespaces/{namespace}/tables
+            Err(ApiError::Unknown("Not implemented".to_string()))
+        })
+    }
+    
+    fn drop_iceberg_table(&self, _catalog: &str, _namespace: &str, _table: &str) -> BoxFuture<'_, ApiResult<()>> {
+        Box::pin(async move {
+            // TODO: Implement HTTP request to DELETE /data/iceberg/catalogs/{catalog}/namespaces/{namespace}/tables/{table}
+            Err(ApiError::Unknown("Not implemented".to_string()))
+        })
+    }
+    
+    fn query_iceberg_table(&self, _catalog: &str, _namespace: &str, _table: &str, _sql: &str) -> BoxFuture<'_, ApiResult<IcebergQueryResult>> {
+        Box::pin(async move {
+            // TODO: Implement HTTP request to POST /data/iceberg/query
+            Err(ApiError::Unknown("Not implemented".to_string()))
+        })
+    }
+    
+    fn preview_iceberg_table(&self, _catalog: &str, _namespace: &str, _table: &str, _limit: usize) -> BoxFuture<'_, ApiResult<IcebergQueryResult>> {
+        Box::pin(async move {
+            // TODO: Implement HTTP request to GET /data/iceberg/catalogs/{catalog}/namespaces/{namespace}/tables/{table}/preview
             Err(ApiError::Unknown("Not implemented".to_string()))
         })
     }

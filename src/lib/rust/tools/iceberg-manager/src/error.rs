@@ -40,6 +40,9 @@ pub enum Error {
     
     #[error("Arrow error")]
     Arrow(#[from] arrow::error::ArrowError),
+    
+    #[error("DuckDB error: {0}")]
+    DuckDB(#[from] duckdb::Error),
 }
 
 pub type Result<T> = std::result::Result<T, Error>;

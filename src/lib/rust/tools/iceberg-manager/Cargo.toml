@@ -10,6 +10,8 @@ iceberg-datafusion = { workspace = true }
 iceberg-catalog-rest = { workspace = true }
 iceberg-catalog-memory = { workspace = true }
 
+# DuckDB for TPC-H and TPC-DS generation
+duckdb = { version = "1.3.0", features = ["bundled"] }
 
 # DataFusion and Arrow
 datafusion = { workspace = true }

@@ -476,6 +476,15 @@ impl<'a> Widget for DetailsPane<'a> {
                 ResourceDetails::Secret(secret) => {
                     self.render_secret_details(secret, area, buf, block);
                 }
+                ResourceDetails::IcebergCatalog(catalog) => {
+                    render_iceberg_catalog_details(catalog, area, buf, block);
+                }
+                ResourceDetails::IcebergNamespace(namespace) => {
+                    render_iceberg_namespace_details(namespace, area, buf, block);
+                }
+                ResourceDetails::IcebergTable(table) => {
+                    render_iceberg_table_details(table, area, buf, block);
+                }
             }
         } else {
             let text = vec![
@@ -599,6 +608,170 @@ fn render_template_details(template: &crate::models::Template, area: Rect, buf: 
     ];
 
     let paragraph = Paragraph::new(lines)
+        .block(block)
+        .wrap(Wrap { trim: true });
+
+    paragraph.render(area, buf);
+}
+
+fn render_iceberg_catalog_details(catalog: &crate::models::IcebergCatalog, area: Rect, buf: &mut Buffer, block: Block) {
+    let lines = vec![
+        Line::from(vec![
+            Span::styled(&catalog.name, Style::default().add_modifier(Modifier::BOLD)),
+        ]),
+        Line::from("─".repeat(area.width as usize - 2)),
+        Line::from(format!("Type:        {:?}", catalog.catalog_type)),
+        Line::from(format!("Warehouse:   {}", catalog.warehouse)),
+        Line::from(format!("Namespaces:  {}", catalog.namespaces.len())),
+        Line::from(""),
+        Line::from(vec![
+            Span::styled("Namespaces", Style::default().add_modifier(Modifier::BOLD)),
+        ]),
+        Line::from("─".repeat(area.width as usize - 2)),
+    ];
+    
+    let mut all_lines = lines;
+    for namespace in &catalog.namespaces {
+        all_lines.push(Line::from(format!("  • {}", namespace)));
+    }
+    
+    all_lines.push(Line::from(""));
+    all_lines.push(Line::from(vec![
+        Span::styled("Storage Configuration", Style::default().add_modifier(Modifier::BOLD)),
+    ]));
+    all_lines.push(Line::from("─".repeat(area.width as usize - 2)));
+    
+    match catalog.catalog_type {
+        crate::models::IcebergCatalogType::Memory => {
+            all_lines.push(Line::from("Backend:     Local Filesystem"));
+            all_lines.push(Line::from(format!("Path:        {}", catalog.warehouse)));
+        }
+        crate::models::IcebergCatalogType::Rest => {
+            all_lines.push(Line::from("Backend:     REST Catalog"));
+            all_lines.push(Line::from("Storage:     S3 Compatible"));
+        }
+        crate::models::IcebergCatalogType::FileSystem => {
+            all_lines.push(Line::from("Backend:     File System"));
+            all_lines.push(Line::from(format!("Path:        {}", catalog.warehouse)));
+        }
+    }
+
+    let paragraph = Paragraph::new(all_lines)
+        .block(block)
+        .wrap(Wrap { trim: true });
+
+    paragraph.render(area, buf);
+}
+
+fn render_iceberg_namespace_details(namespace: &crate::models::IcebergNamespace, area: Rect, buf: &mut Buffer, block: Block) {
+    let lines = vec![
+        Line::from(vec![
+            Span::styled(&namespace.name, Style::default().add_modifier(Modifier::BOLD)),
+        ]),
+        Line::from("─".repeat(area.width as usize - 2)),
+        Line::from(format!("Catalog:     {}", namespace.catalog)),
+        Line::from(format!("Tables:      {}", namespace.tables.len())),
+        Line::from(""),
+        Line::from(vec![
+            Span::styled("Tables", Style::default().add_modifier(Modifier::BOLD)),
+        ]),
+        Line::from("─".repeat(area.width as usize - 2)),
+    ];
+    
+    let mut all_lines = lines;
+    for table in &namespace.tables {
+        all_lines.push(Line::from(format!("  • {}", table)));
+    }
+    
+    if !namespace.properties.is_empty() {
+        all_lines.push(Line::from(""));
+        all_lines.push(Line::from(vec![
+            Span::styled("Properties", Style::default().add_modifier(Modifier::BOLD)),
+        ]));
+        all_lines.push(Line::from("─".repeat(area.width as usize - 2)));
+        
+        for (key, value) in &namespace.properties {
+            all_lines.push(Line::from(format!("  {}: {}", key, value)));
+        }
+    }
+
+    let paragraph = Paragraph::new(all_lines)
+        .block(block)
+        .wrap(Wrap { trim: true });
+
+    paragraph.render(area, buf);
+}
+
+fn render_iceberg_table_details(table: &crate::models::IcebergTable, area: Rect, buf: &mut Buffer, block: Block) {
+    let lines = vec![
+        Line::from(vec![
+            Span::styled(&table.name, Style::default().add_modifier(Modifier::BOLD)),
+        ]),
+        Line::from("─".repeat(area.width as usize - 2)),
+        Line::from(format!("Catalog:     {}", table.catalog)),
+        Line::from(format!("Namespace:   {}", table.namespace)),
+        Line::from(format!("Location:    {}", table.location)),
+        Line::from(format!("Snapshot:    {}", table.current_snapshot_id.map(|id| id.to_string()).unwrap_or("None".to_string()))),
+        Line::from(format!("Modified:    {} ago", "30 minutes")), // TODO: format timestamp
+        Line::from(""),
+        Line::from(vec![
+            Span::styled("Schema", Style::default().add_modifier(Modifier::BOLD)),
+        ]),
+        Line::from("─".repeat(area.width as usize - 2)),
+    ];
+    
+    let mut all_lines = lines;
+    
+    // Add schema fields
+    for field in &table.schema.fields {
+        let required_marker = if field.required { "*" } else { "" };
+        all_lines.push(Line::from(format!(
+            "  {} {}{}: {}",
+            field.id,
+            field.name,
+            required_marker,
+            field.field_type
+        )));
+        if let Some(doc) = &field.doc {
+            all_lines.push(Line::from(vec![
+                Span::styled(format!("      {}", doc), Style::default().fg(Color::DarkGray)),
+            ]));
+        }
+    }
+    
+    // Add partition spec if present
+    if let Some(partition_spec) = &table.partition_spec {
+        if !partition_spec.is_empty() {
+            all_lines.push(Line::from(""));
+            all_lines.push(Line::from(vec![
+                Span::styled("Partitioning", Style::default().add_modifier(Modifier::BOLD)),
+            ]));
+            all_lines.push(Line::from("─".repeat(area.width as usize - 2)));
+            
+            for field in partition_spec {
+                all_lines.push(Line::from(format!(
+                    "  {} → {} ({})",
+                    field.source_id,
+                    field.name,
+                    field.transform
+                )));
+            }
+        }
+    }
+    
+    // Add actions hint
+    all_lines.push(Line::from(""));
+    all_lines.push(Line::from(vec![
+        Span::styled("Actions: ", Style::default().fg(Color::DarkGray)),
+        Span::styled("[P]", Style::default().fg(Color::Yellow)),
+        Span::raw("review  "),
+        Span::styled("[Q]", Style::default().fg(Color::Green)),
+        Span::raw("uery  "),
+        Span::styled("[D]", Style::default().fg(Color::Red)),
+        Span::raw("rop"),
+    ]));
+
+    let paragraph = Paragraph::new(all_lines)
         .block(block)
         .wrap(Wrap { trim: true });
 

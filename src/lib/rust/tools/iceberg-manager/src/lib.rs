@@ -13,11 +13,15 @@
 
 pub mod catalog_provider;
 pub mod error;
+pub mod schema_converter;
 pub mod table_manager;
+pub mod tpc_seeder;
 pub mod types;
 
 pub use error::{Error, Result};
 pub use table_manager::{CatalogConfig, TableManager, TableSchema, TableStats, TablePreview, TableField, create_test_schema};
+pub use tpc_seeder::{TpcSeeder, TpcSeederConfig, TpcBenchmark, TableInfo};
+pub use schema_converter::SchemaConverter;
 
 // Re-export commonly used types from official iceberg crate
 pub use iceberg::spec::{
