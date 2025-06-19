@@ -16,8 +16,10 @@ members = [
     "src/lib/rust/tools/templatizer-puppeteer",
     "src/lib/rust/tools/templatizer-spark",
     "src/lib/rust/tools/templatizer-superset",
-    "src/lib/rust/tools/iceberg-manager"
-, "src/lib/rust/tools/docker-manager"]
+    "src/lib/rust/tools/iceberg-manager",
+    "src/lib/rust/tools/docker-manager",
+    "src/lib/rust/tools/helm-manager"
+]
 
 [workspace.dependencies]
 # Internal Crates
@@ -75,6 +77,7 @@ futures-util = "0.3.31"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 uuid = { version = "1.10", features = ["v4"] }
+include_dir = { version = "0.7.4" }
 
 toml = "0.8"
 anyhow = "1"

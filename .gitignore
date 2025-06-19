@@ -47,3 +47,4 @@ src/deploy/rendered/**
 _build/**
 target-ra/**
 .sccache/**
+etc/.env
