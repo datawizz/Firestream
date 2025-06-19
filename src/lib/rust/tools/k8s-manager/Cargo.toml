@@ -46,8 +46,12 @@ base64 = "0.21"
 # Temporary files
 tempfile = "3.8"
 
+# Docker management
+docker-manager = { path = "../docker-manager" }
+
 [features]
 integration_tests = []
 bench = []
 
 [dev-dependencies]
+serial_test = "3.0"

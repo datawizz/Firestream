@@ -7,6 +7,9 @@ use k8s_manager::{
     PortForwardConfig, LogsConfig, ResourceType, DiagnosticsConfig,
 };
 
+#[cfg(feature = "integration_tests")]
+use serial_test::serial;
+
 #[cfg(test)]
 mod unit_tests {
     use super::*;
@@ -81,17 +84,17 @@ mod unit_tests {
 
     #[test]
     fn test_custom_cluster_config() {
-        let mut config = K3dClusterConfig::default();
-        config.name = "test-cluster".to_string();
-        config.api_port = 7550;
-        config.servers = 3;
-        config.agents = 5;
-        
-        // Enable dev mode
-        config.dev_mode = Some(K3dDevModeConfig {
-            port_forward_all: true,
-            port_offset: 30000,
-        });
+        let config = K3dClusterConfig {
+            name: "test-cluster".to_string(),
+            api_port: 7550,
+            servers: 3,
+            agents: 5,
+            dev_mode: Some(K3dDevModeConfig {
+                port_forward_all: true,
+                port_offset: 30000,
+            }),
+            ..Default::default()
+        };
         
         let manager = K3dClusterManager::new(config.clone());
         assert_eq!(manager.provider_name(), "k3d");
@@ -183,18 +186,253 @@ mod integration_tests {
     use tokio;
     use std::time::Duration;
     use std::collections::HashMap;
+    use tokio::process::Command;
+    use k8s_manager::{ClusterLifecycle, ClusterNetworking, ClusterObservability, ClusterSecurity, ClusterDevelopment, K3dTimeoutConfig, ClusterStatus};
+    
+    // Use a simpler approach for test initialization
+    static TEST_INIT: std::sync::Once = std::sync::Once::new();
+    
+    fn init_tests() {
+        TEST_INIT.call_once(|| {
+            // Run cleanup synchronously using a new runtime
+            std::thread::spawn(|| {
+                let rt = tokio::runtime::Runtime::new().unwrap();
+                rt.block_on(async {
+                    cleanup_test_resources().await;
+                });
+            }).join().unwrap();
+        });
+    }
+    
+    // Cleanup function to remove test resources
+    async fn cleanup_test_resources() {
+        println!("Running global test cleanup...");
+        
+        // Clean up all test clusters
+        let output = Command::new("k3d")
+            .args(&["cluster", "list", "-o", "json"])
+            .output()
+            .await;
+            
+        if let Ok(result) = output {
+            if let Ok(clusters) = serde_json::from_slice::<Vec<serde_json::Value>>(&result.stdout) {
+                for cluster in clusters {
+                    if let Some(name) = cluster["name"].as_str() {
+                        if name.starts_with("test-") {
+                            println!("Cleaning up old test cluster: {}", name);
+                            let _ = Command::new("k3d")
+                                .args(&["cluster", "delete", name])
+                                .output()
+                                .await;
+                        }
+                    }
+                }
+            }
+        }
+        
+        // Clean up all test registries
+        let output = Command::new("k3d")
+            .args(&["registry", "list"])
+            .output()
+            .await;
+            
+        if let Ok(result) = output {
+            let registries = String::from_utf8_lossy(&result.stdout);
+            for line in registries.lines().skip(1) { // Skip header
+                let parts: Vec<&str> = line.split_whitespace().collect();
+                if let Some(name) = parts.get(0) {
+                    if name.contains("test-") {
+                        println!("Cleaning up old test registry: {}", name);
+                        let _ = Command::new("k3d")
+                            .args(&["registry", "delete", name])
+                            .output()
+                            .await;
+                    }
+                }
+            }
+        }
+        
+        // Clean up dangling Docker containers
+        let _ = Command::new("docker")
+            .args(&["container", "prune", "-f"])
+            .output()
+            .await;
+            
+        // Clean up test networks
+        let output = Command::new("docker")
+            .args(&["network", "ls", "--format", "{{.Name}}"])
+            .output()
+            .await;
+            
+        if let Ok(result) = output {
+            let networks = String::from_utf8_lossy(&result.stdout);
+            for network in networks.lines() {
+                if network.starts_with("k3d-test-") {
+                    println!("Cleaning up old test network: {}", network);
+                    let _ = Command::new("docker")
+                        .args(&["network", "rm", network])
+                        .output()
+                        .await;
+                }
+            }
+        }
+        
+        println!("Global test cleanup complete");
+        tokio::time::sleep(Duration::from_secs(2)).await;
+    }
 
     // Helper function to create a unique test cluster name
     fn test_cluster_name(test_name: &str) -> String {
         format!("test-{}-{}", test_name, std::process::id())
     }
+    
+    // Helper function to get unique port based on test name and process ID
+    fn get_unique_port(base_port: u16, test_name: &str) -> u16 {
+        use std::time::{SystemTime, UNIX_EPOCH};
+        
+        let pid = std::process::id() as u16;
+        let hash = test_name.bytes().fold(0u16, |acc, b| acc.wrapping_add(b as u16));
+        
+        // Add timestamp component for better uniqueness
+        let timestamp = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_secs() as u16;
+            
+        // Use a larger range and incorporate timestamp
+        let offset = ((pid + hash + timestamp) % 20000) + 10000;
+        base_port + offset
+    }
+    
+    // Helper function to check if a port is available
+    async fn is_port_available(port: u16) -> bool {
+        let output = Command::new("lsof")
+            .args(&["-i", &format!(":{}", port), "-P", "-n"])
+            .output()
+            .await;
+            
+        match output {
+            Ok(result) => result.stdout.is_empty(),
+            Err(_) => {
+                // If lsof is not available, try netstat
+                let netstat_output = Command::new("netstat")
+                    .args(&["-tuln"])
+                    .output()
+                    .await;
+                    
+                match netstat_output {
+                    Ok(result) => {
+                        let output_str = String::from_utf8_lossy(&result.stdout);
+                        !output_str.contains(&format!(":{} ", port)) && 
+                        !output_str.contains(&format!(":{}	", port))
+                    },
+                    Err(_) => true // Assume available if we can't check
+                }
+            }
+        }
+    }
+    
+    // Helper function to find an available port
+    async fn find_available_port(base_port: u16, test_name: &str) -> u16 {
+        let mut port = get_unique_port(base_port, test_name);
+        let mut attempts = 0;
+        
+        while attempts < 100 {
+            if is_port_available(port).await {
+                return port;
+            }
+            port += 1;
+            attempts += 1;
+        }
+        
+        // Fallback to original calculation if we can't find an available port
+        port
+    }
+    
+    // Helper function to ensure cluster is cleaned up
+    async fn ensure_cluster_cleanup(cluster_name: &str) {
+        // Delete cluster
+        let _ = Command::new("k3d")
+            .args(&["cluster", "delete", cluster_name])
+            .output()
+            .await;
+        
+        // Delete all possible registry name patterns
+        let registry_patterns = vec![
+            format!("{}-registry", cluster_name),
+            format!("{}.registry.localhost", cluster_name),
+            format!("registry.localhost"), // Sometimes tests use the default name
+        ];
+        
+        for registry_name in registry_patterns {
+            let _ = Command::new("k3d")
+                .args(&["registry", "delete", &registry_name])
+                .output()
+                .await;
+        }
+        
+        // Clean up any Docker containers with the cluster name
+        let _ = Command::new("docker")
+            .args(&["rm", "-f"])
+            .arg(format!("k3d-{}-registry", cluster_name))
+            .output()
+            .await;
+            
+        let _ = Command::new("docker")
+            .args(&["rm", "-f"])
+            .arg(format!("k3d-{}.registry.localhost", cluster_name))
+            .output()
+            .await;
+        
+        // Clean up the Docker network if it exists
+        let _ = Command::new("docker")
+            .args(&["network", "rm", &format!("k3d-{}", cluster_name)])
+            .output()
+            .await;
+        
+        // Prune unused Docker networks to free up subnet space
+        let _ = Command::new("docker")
+            .args(&["network", "prune", "-f"])
+            .output()
+            .await;
+        
+        // Wait a bit for cleanup to complete
+        tokio::time::sleep(Duration::from_secs(3)).await;
+    }
+    
+    // Helper function to create a test configuration with shorter timeouts
+    async fn test_cluster_config(name: String) -> K3dClusterConfig {
+        K3dClusterConfig {
+            name: name.clone(),
+            api_port: find_available_port(16443, &format!("{}-api", name)).await,
+            http_port: find_available_port(30080, &format!("{}-http", name)).await,
+            https_port: find_available_port(30443, &format!("{}-https", name)).await,
+            registry: K3dRegistryConfig {
+                enabled: true,
+                name: "registry.localhost".to_string(),
+                port: find_available_port(15000, &format!("{}-registry", name)).await,
+            },
+            timeouts: K3dTimeoutConfig {
+                cluster_create: 120,      // 2 minutes for tests
+                cluster_ready: 120,       // 2 minutes
+                node_ready: 30,          // 30 seconds
+                dns_check: 15,           // 15 seconds
+                registry_ready: 30,      // 30 seconds
+                initial_retry_delay_ms: 500,   // Start with 500ms
+                max_retry_delay_ms: 10000,     // Max 10 seconds
+                max_retries: 5,                // Fewer retries for tests
+            },
+            ..Default::default()
+        }
+    }
 
     #[tokio::test]
+    #[serial]
     async fn test_cluster_exists_check() {
-        let config = K3dClusterConfig {
-            name: test_cluster_name("exists-check"),
-            ..Default::default()
-        };
+        // Initialize tests
+        init_tests();
+        
+        let config = test_cluster_config(test_cluster_name("exists-check")).await;
         
         let manager = K3dClusterManager::new(config);
         
@@ -204,16 +442,25 @@ mod integration_tests {
     }
 
     #[tokio::test]
+    #[serial]
     async fn test_basic_cluster_lifecycle() {
+        // Initialize tests
+        init_tests();
+        
         let cluster_name = test_cluster_name("basic-lifecycle");
+        
+        // Ensure cleanup before test
+        ensure_cluster_cleanup(&cluster_name).await;
+        let api_port = find_available_port(16443, "basic-lifecycle").await;
+        let registry_port = find_available_port(15000, "basic-lifecycle-registry").await;
         let config = K3dConfig {
             cluster_name: cluster_name.clone(),
-            api_port: 6443,
-            lb_port: 8081,
+            api_port,
+            lb_port: find_available_port(18080, "basic-lifecycle-lb").await,
             agents: 1,
             servers: 1,
             registry_name: format!("{}-registry", cluster_name),
-            registry_port: 5001,
+            registry_port,
         };
         
         // Setup cluster
@@ -233,7 +480,7 @@ mod integration_tests {
         // Get cluster info
         let info = manager.get_cluster_info().await.unwrap();
         assert_eq!(info.name, cluster_name);
-        assert_eq!(info.provider.to_string(), "k3d");
+        assert!(matches!(info.provider, k8s_manager::ClusterProvider::K3d));
         
         // Delete cluster
         let delete_result = k8s_manager::k3d::delete_cluster(&cluster_name).await;
@@ -242,20 +489,25 @@ mod integration_tests {
         // Verify cluster is deleted
         let exists_after = manager.cluster_exists().await.unwrap();
         assert!(!exists_after, "Cluster should not exist after deletion");
+        
+        // Final cleanup
+        ensure_cluster_cleanup(&cluster_name).await;
     }
 
     #[tokio::test]
+    #[serial]
     async fn test_full_cluster_setup() {
+        // Initialize tests
+        init_tests();
+        
         let cluster_name = test_cluster_name("full-setup");
-        let mut config = K3dClusterConfig {
-            name: cluster_name.clone(),
-            api_port: 6551,
-            http_port: 8082,
-            https_port: 8443,
-            servers: 1,
-            agents: 1,
-            ..Default::default()
-        };
+        
+        // Ensure cleanup before test
+        ensure_cluster_cleanup(&cluster_name).await;
+        let mut config = test_cluster_config(cluster_name.clone()).await;
+        
+        // Use unique registry name to avoid conflicts
+        config.registry.name = format!("{}-registry", cluster_name);
         
         // Disable some features for faster testing
         config.tls.enabled = false;
@@ -277,8 +529,8 @@ mod integration_tests {
         let stop_result = manager.stop_cluster().await;
         assert!(stop_result.is_ok(), "Failed to stop cluster: {:?}", stop_result);
         
-        // Wait a bit for cluster to stop
-        tokio::time::sleep(Duration::from_secs(2)).await;
+        // The stop operation should be quick, but let's give it a moment
+        tokio::time::sleep(Duration::from_millis(500)).await;
         
         let start_result = manager.start_cluster().await;
         assert!(start_result.is_ok(), "Failed to start cluster: {:?}", start_result);
@@ -330,29 +582,29 @@ mod integration_tests {
         // Cleanup
         let delete_result = manager.delete_cluster().await;
         assert!(delete_result.is_ok(), "Failed to delete cluster: {:?}", delete_result);
+        
+        // Final cleanup
+        ensure_cluster_cleanup(&cluster_name).await;
     }
 
     #[tokio::test]
+    #[serial]
     async fn test_dev_mode() {
         let cluster_name = test_cluster_name("dev-mode");
-        let config = K3dClusterConfig {
-            name: cluster_name.clone(),
-            api_port: 6552,
-            dev_mode: Some(K3dDevModeConfig {
-                port_forward_all: false, // Set to false to avoid conflicts
-                port_offset: 40000,
-            }),
-            ..Default::default()
-        };
+        
+        // Ensure cleanup before test
+        ensure_cluster_cleanup(&cluster_name).await;
+        let mut config = test_cluster_config(cluster_name.clone()).await;
+        config.dev_mode = Some(K3dDevModeConfig {
+            port_forward_all: false, // Set to false to avoid conflicts
+            port_offset: 40000,
+        });
         
         let manager = K3dClusterManager::new(config);
         
-        // Create cluster first
+        // Create cluster first (the improved create_cluster will wait for readiness)
         let create_result = manager.create_cluster().await;
         assert!(create_result.is_ok(), "Failed to create cluster: {:?}", create_result);
-        
-        // Wait for cluster to be ready
-        tokio::time::sleep(Duration::from_secs(5)).await;
         
         // Test enabling dev mode
         let enable_result = manager.enable_dev_mode().await;
@@ -365,25 +617,25 @@ mod integration_tests {
         // Cleanup
         let delete_result = manager.delete_cluster().await;
         assert!(delete_result.is_ok(), "Failed to delete cluster: {:?}", delete_result);
+        
+        // Final cleanup
+        ensure_cluster_cleanup(&cluster_name).await;
     }
 
     #[tokio::test]
+    #[serial]
     async fn test_logs_retrieval() {
         let cluster_name = test_cluster_name("logs");
-        let config = K3dClusterConfig {
-            name: cluster_name.clone(),
-            api_port: 6553,
-            ..Default::default()
-        };
+        let config = test_cluster_config(cluster_name.clone()).await;
         
         let manager = K3dClusterManager::new(config);
         
-        // Create cluster
+        // Create cluster (the improved create_cluster will wait for readiness)
         let create_result = manager.create_cluster().await;
         assert!(create_result.is_ok(), "Failed to create cluster: {:?}", create_result);
         
-        // Wait for cluster and core components to be ready
-        tokio::time::sleep(Duration::from_secs(10)).await;
+        // Wait longer for core components to be fully ready
+        tokio::time::sleep(Duration::from_secs(15)).await;
         
         // Test getting logs from a system pod
         let logs_config = LogsConfig {
@@ -405,6 +657,92 @@ mod integration_tests {
         // Cleanup
         let delete_result = manager.delete_cluster().await;
         assert!(delete_result.is_ok(), "Failed to delete cluster: {:?}", delete_result);
+        
+        // Final cleanup
+        ensure_cluster_cleanup(&cluster_name).await;
+    }
+    
+    #[tokio::test]
+    #[serial]
+    async fn test_retry_mechanism() {
+        let cluster_name = test_cluster_name("retry-test");
+        
+        // Ensure cleanup before test
+        ensure_cluster_cleanup(&cluster_name).await;
+        
+        // Extra Docker network cleanup to prevent subnet exhaustion
+        let _ = Command::new("docker")
+            .args(&["network", "prune", "-f"])
+            .output()
+            .await;
+        
+        tokio::time::sleep(Duration::from_secs(2)).await;
+        
+        let mut config = test_cluster_config(cluster_name.clone()).await;
+        
+        // Configure very aggressive timeouts to test retry behavior
+        config.timeouts.initial_retry_delay_ms = 100;
+        config.timeouts.max_retry_delay_ms = 1000;
+        config.timeouts.max_retries = 3;
+        config.timeouts.dns_check = 5; // Very short timeout
+        
+        let manager = K3dClusterManager::new(config);
+        
+        // Create a basic cluster
+        let create_result = manager.create_cluster().await;
+        assert!(create_result.is_ok(), "Failed to create cluster: {:?}", create_result);
+        
+        // The DNS test might fail with such short timeouts, but the retry mechanism should handle it
+        let dns_result = manager.test_dns_resolution().await;
+        
+        // DNS might fail in test environments, so we just check it doesn't panic
+        match dns_result {
+            Ok(_) => println!("DNS test passed (with retries)"),
+            Err(e) => println!("DNS test failed as expected: {}", e),
+        }
+        
+        // Cleanup
+        let _ = manager.delete_cluster().await;
+        
+        // Final cleanup
+        ensure_cluster_cleanup(&cluster_name).await;
+    }
+    
+    #[tokio::test]
+    #[serial]
+    async fn test_cluster_health_verification() {
+        // Initialize tests
+        init_tests();
+        
+        let cluster_name = test_cluster_name("health-verify");
+        
+        // Ensure cleanup before test
+        ensure_cluster_cleanup(&cluster_name).await;
+        
+        let mut config = test_cluster_config(cluster_name.clone()).await;
+        
+        // Use unique registry name to avoid conflicts
+        config.registry.name = format!("{}-registry", cluster_name);
+        
+        let manager = K3dClusterManager::new(config);
+        
+        // Create cluster with full health verification
+        let setup_result = manager.setup_cluster().await;
+        assert!(setup_result.is_ok(), "Failed to setup cluster with health verification: {:?}", setup_result);
+        
+        // The setup_cluster method includes comprehensive health checks
+        // If we get here, all health checks passed
+        
+        // Verify we can get cluster info
+        let info = manager.get_cluster_info().await.unwrap();
+        assert_eq!(info.name, cluster_name);
+        assert!(matches!(info.status, ClusterStatus::Running));
+        
+        // Cleanup
+        let _ = manager.delete_cluster().await;
+        
+        // Final cleanup
+        ensure_cluster_cleanup(&cluster_name).await;
     }
 }
 

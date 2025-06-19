@@ -90,6 +90,11 @@ k8s-manager cluster info my-cluster
 
 # Delete a cluster
 k8s-manager cluster delete my-cluster
+
+# Build and push Docker images
+k8s-manager image build --tag myapp:latest
+k8s-manager image push myapp:latest
+k8s-manager image build-and-push --tag myapp:latest
 ```
 
 See [CLI.md](CLI.md) for comprehensive CLI documentation.

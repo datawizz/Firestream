@@ -41,6 +41,11 @@ enum Commands {
         #[command(subcommand)]
         action: RegistryCommands,
     },
+    /// Manage images (build and push to k3d registry)
+    Image {
+        #[command(subcommand)]
+        action: ImageCommands,
+    },
     /// Port forwarding operations
     PortForward {
         /// Namespace
@@ -197,6 +202,57 @@ enum RegistryCommands {
     List,
 }
 
+#[derive(Subcommand)]
+enum ImageCommands {
+    /// Build a Docker image
+    Build {
+        /// Build context path
+        #[arg(short, long, default_value = ".")]
+        context: String,
+        /// Dockerfile path (relative to context)
+        #[arg(short, long, default_value = "Dockerfile")]
+        dockerfile: String,
+        /// Image tag (e.g., myapp:latest)
+        #[arg(short, long)]
+        tag: String,
+        /// Build arguments (can be used multiple times)
+        #[arg(long, value_name = "KEY=VALUE")]
+        build_arg: Vec<String>,
+        /// Don't use cache when building
+        #[arg(long)]
+        no_cache: bool,
+    },
+    /// Push an image to k3d registry
+    Push {
+        /// Image to push (will be retagged for k3d registry)
+        image: String,
+        /// Registry URL (auto-detected if not specified)
+        #[arg(short, long)]
+        registry: Option<String>,
+    },
+    /// Build and push an image to k3d registry
+    BuildAndPush {
+        /// Build context path
+        #[arg(short, long, default_value = ".")]
+        context: String,
+        /// Dockerfile path (relative to context)
+        #[arg(short, long, default_value = "Dockerfile")]
+        dockerfile: String,
+        /// Image tag (e.g., myapp:latest)
+        #[arg(short, long)]
+        tag: String,
+        /// Registry URL (auto-detected if not specified)
+        #[arg(short, long)]
+        registry: Option<String>,
+        /// Build arguments (can be used multiple times)
+        #[arg(long, value_name = "KEY=VALUE")]
+        build_arg: Vec<String>,
+        /// Don't use cache when building
+        #[arg(long)]
+        no_cache: bool,
+    },
+}
+
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let cli = Cli::parse();
@@ -225,6 +281,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     match cli.command {
         Commands::Cluster { action } => handle_cluster_command(action).await?,
         Commands::Registry { action } => handle_registry_command(action).await?,
+        Commands::Image { action } => handle_image_command(action).await?,
         Commands::PortForward {
             namespace,
             service,
@@ -345,7 +402,7 @@ async fn handle_cluster_command(command: ClusterCommands) -> Result<(), Box<dyn 
             info!("Listing clusters...");
             // Use k3d CLI directly for now
             let output = tokio::process::Command::new("k3d")
-                .args(&["cluster", "list"])
+                .args(["cluster", "list"])
                 .output()
                 .await?;
             println!("{}", String::from_utf8_lossy(&output.stdout));
@@ -430,7 +487,7 @@ async fn handle_registry_command(command: RegistryCommands) -> Result<(), Box<dy
         RegistryCommands::Create { name, port } => {
             info!("Creating registry '{}' on port {}...", name, port);
             let output = tokio::process::Command::new("k3d")
-                .args(&[
+                .args([
                     "registry",
                     "create",
                     &name,
@@ -449,7 +506,7 @@ async fn handle_registry_command(command: RegistryCommands) -> Result<(), Box<dy
         RegistryCommands::Delete { name } => {
             info!("Deleting registry '{}'...", name);
             let output = tokio::process::Command::new("k3d")
-                .args(&["registry", "delete", &name])
+                .args(["registry", "delete", &name])
                 .output()
                 .await?;
             
@@ -462,12 +519,167 @@ async fn handle_registry_command(command: RegistryCommands) -> Result<(), Box<dy
         RegistryCommands::List => {
             info!("Listing registries...");
             let output = tokio::process::Command::new("k3d")
-                .args(&["registry", "list"])
+                .args(["registry", "list"])
                 .output()
                 .await?;
             println!("{}", String::from_utf8_lossy(&output.stdout));
         }
     }
+    Ok(())
+}
+
+async fn handle_image_command(command: ImageCommands) -> Result<(), Box<dyn std::error::Error>> {
+    use docker_manager::DockerManager;
+    use std::path::Path;
+    use std::collections::HashMap;
+    
+    match command {
+        ImageCommands::Build {
+            context,
+            dockerfile,
+            tag,
+            build_arg,
+            no_cache,
+        } => {
+            info!("Building Docker image '{}' from context '{}'", tag, context);
+            
+            // Parse build arguments
+            let mut build_args = HashMap::new();
+            for arg in build_arg {
+                if let Some((key, value)) = arg.split_once('=') {
+                    build_args.insert(key.to_string(), value.to_string());
+                }
+            }
+            
+            // Create Docker manager
+            let docker = DockerManager::new().await?;
+            
+            // Build the image
+            let image_id = docker.build_image(
+                Path::new(&context),
+                Some(&dockerfile),
+                &tag,
+                if build_args.is_empty() { None } else { Some(build_args) },
+                no_cache,
+            ).await?;
+            
+            info!("Successfully built image '{}' with ID: {}", tag, image_id);
+        }
+        ImageCommands::Push { image, registry } => {
+            let registry_url = match registry {
+                Some(r) => r,
+                None => {
+                    // Try to auto-detect k3d registry
+                    let output = tokio::process::Command::new("k3d")
+                        .args(["registry", "list"])
+                        .output()
+                        .await?;
+                    
+                    if output.status.success() {
+                        let registry_list = String::from_utf8_lossy(&output.stdout);
+                        // Look for a running registry
+                        if registry_list.contains("registry.localhost") {
+                            "registry.localhost:5000".to_string()
+                        } else {
+                            return Err("No k3d registry found. Please create one with 'k8s-manager registry create' or specify --registry".into());
+                        }
+                    } else {
+                        return Err("Failed to detect k3d registry".into());
+                    }
+                }
+            };
+            
+            info!("Pushing image '{}' to registry '{}'", image, registry_url);
+            
+            // Create Docker manager
+            let docker = DockerManager::new().await?;
+            
+            // Parse image name and tag
+            let (image_name, tag) = if let Some((name, tag)) = image.split_once(':') {
+                (name, tag)
+            } else {
+                (image.as_str(), "latest")
+            };
+            
+            // Tag image for registry
+            let registry_image = format!("{}/{}", registry_url, image_name);
+            docker.tag_image(&image, &registry_image, tag).await?;
+            
+            // Push to registry
+            docker.push_image(&registry_image, Some(tag), None).await?;
+            
+            info!("Successfully pushed image to {}:{}", registry_image, tag);
+        }
+        ImageCommands::BuildAndPush {
+            context,
+            dockerfile,
+            tag,
+            registry,
+            build_arg,
+            no_cache,
+        } => {
+            info!("Building and pushing Docker image '{}'", tag);
+            
+            // First build the image
+            let mut build_args = HashMap::new();
+            for arg in build_arg {
+                if let Some((key, value)) = arg.split_once('=') {
+                    build_args.insert(key.to_string(), value.to_string());
+                }
+            }
+            
+            let docker = DockerManager::new().await?;
+            
+            let image_id = docker.build_image(
+                Path::new(&context),
+                Some(&dockerfile),
+                &tag,
+                if build_args.is_empty() { None } else { Some(build_args) },
+                no_cache,
+            ).await?;
+            
+            info!("Successfully built image '{}' with ID: {}", tag, image_id);
+            
+            // Then push it
+            let registry_url = match registry {
+                Some(r) => r,
+                None => {
+                    let output = tokio::process::Command::new("k3d")
+                        .args(["registry", "list"])
+                        .output()
+                        .await?;
+                    
+                    if output.status.success() {
+                        let registry_list = String::from_utf8_lossy(&output.stdout);
+                        if registry_list.contains("registry.localhost") {
+                            "registry.localhost:5000".to_string()
+                        } else {
+                            return Err("No k3d registry found. Please create one with 'k8s-manager registry create' or specify --registry".into());
+                        }
+                    } else {
+                        return Err("Failed to detect k3d registry".into());
+                    }
+                }
+            };
+            
+            // Parse image name and tag from the tag parameter
+            let (image_name, image_tag) = if let Some((name, tag)) = tag.split_once(':') {
+                (name, tag)
+            } else {
+                (tag.as_str(), "latest")
+            };
+            
+            // Tag image for registry
+            let registry_image = format!("{}/{}", registry_url, image_name);
+            docker.tag_image(&tag, &registry_image, image_tag).await?;
+            
+            // Push to registry
+            docker.push_image(&registry_image, Some(image_tag), None).await?;
+            
+            info!("Successfully pushed image to {}:{}", registry_image, image_tag);
+        }
+    }
+    
     Ok(())
 }
 

@@ -117,6 +117,50 @@ k8s-manager registry delete my-registry
 k8s-manager registry list
 ```
 
+### Image Management
+
+Build and push Docker images to the k3d registry:
+
+```bash
+# Build a Docker image
+k8s-manager image build --tag myapp:latest
+
+# Build from a specific context and Dockerfile
+k8s-manager image build \
+  --context ./my-app \
+  --dockerfile Dockerfile.prod \
+  --tag myapp:v1.0.0
+
+# Build with build arguments
+k8s-manager image build \
+  --tag myapp:latest \
+  --build-arg VERSION=1.0.0 \
+  --build-arg BUILD_DATE=$(date -u +'%Y-%m-%dT%H:%M:%SZ')
+
+# Build without cache
+k8s-manager image build --tag myapp:latest --no-cache
+
+# Push an existing image to k3d registry
+k8s-manager image push myapp:latest
+
+# Push to a specific registry
+k8s-manager image push myapp:latest --registry registry.localhost:5000
+
+# Build and push in one command
+k8s-manager image build-and-push \
+  --context . \
+  --tag myapp:latest
+
+# Build and push with all options
+k8s-manager image build-and-push \
+  --context ./my-app \
+  --dockerfile Dockerfile.prod \
+  --tag myapp:v1.0.0 \
+  --registry registry.localhost:5000 \
+  --build-arg VERSION=1.0.0 \
+  --no-cache
+```
+
 ### Port Forwarding
 
 ```bash
@@ -176,32 +220,38 @@ k8s-manager diagnostics --events
 ### Complete Workflow
 
 ```bash
-# 1. Create a development cluster
+# 1. Create a development cluster with registry
 k8s-manager cluster create dev-cluster \
   --dev-mode \
   --port-offset 20000
+k8s-manager registry create
 
 # 2. Check cluster status
 k8s-manager cluster info dev-cluster
 
-# 3. View cluster resources
+# 3. Build and push your application image
+k8s-manager image build-and-push \
+  --context . \
+  --tag myapp:latest
+
+# 4. Deploy your application (using k3d registry)
+kubectl create deployment myapp --image=registry.localhost:5000/myapp:latest
+
+# 5. View cluster resources
 k8s-manager diagnostics --all
 
-# 4. Deploy your application
-kubectl apply -f my-app.yaml
-
-# 5. Forward a service port
+# 6. Forward a service port
 k8s-manager port-forward my-app-service \
   --local-port 8080 \
   --remote-port 80
 
-# 6. View application logs
+# 7. View application logs
 k8s-manager logs my-app --follow
 
-# 7. Stop the cluster when done
+# 8. Stop the cluster when done
 k8s-manager cluster stop dev-cluster
 
-# 8. Delete the cluster
+# 9. Delete the cluster
 k8s-manager cluster delete dev-cluster
 ```
 

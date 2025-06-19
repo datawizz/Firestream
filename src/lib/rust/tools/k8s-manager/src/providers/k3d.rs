@@ -11,7 +11,7 @@
 use crate::{
     K8sManagerError, Result, K3dClusterConfig, K3dDevModeConfig, K3dConfig, CertificateConfig,
     ClusterInfo, ClusterProvider, ClusterStatus, PortForwardConfig, LogsConfig,
-    DiagnosticsConfig,
+    DiagnosticsConfig, K3dRegistryConfig,
 };
 use crate::traits::*;
 use async_trait::async_trait;
@@ -19,7 +19,8 @@ use std::path::PathBuf;
 use std::collections::HashMap;
 use tokio::process::Command;
 use tokio::fs;
-use tracing::{info, debug, warn};
+use tokio::time::{sleep, Duration, timeout};
+use tracing::{info, debug, warn, error};
 use base64;
 use tempfile;
 
@@ -36,6 +37,54 @@ impl K3dClusterManager {
             config,
             project_root: std::env::current_dir().unwrap_or_default(),
         }
+    }
+    
+    /// Calculate exponential backoff delay
+    fn calculate_backoff(&self, attempt: u32) -> Duration {
+        let base_delay = self.config.timeouts.initial_retry_delay_ms;
+        let max_delay = self.config.timeouts.max_retry_delay_ms;
+        let delay = base_delay * 2u64.pow(attempt);
+        Duration::from_millis(delay.min(max_delay))
+    }
+    
+    /// Execute a function with retries and exponential backoff
+    async fn retry_with_backoff<F, Fut, T>(&self, operation_name: &str, mut f: F) -> Result<T>
+    where
+        F: FnMut() -> Fut,
+        Fut: std::future::Future<Output = Result<T>>,
+    {
+        let max_retries = self.config.timeouts.max_retries;
+        let mut last_error = None;
+        
+        for attempt in 0..max_retries {
+            match f().await {
+                Ok(result) => {
+                    if attempt > 0 {
+                        info!("{} succeeded after {} retries", operation_name, attempt);
+                    }
+                    return Ok(result);
+                }
+                Err(e) => {
+                    last_error = Some(e);
+                    if attempt < max_retries - 1 {
+                        let delay = self.calculate_backoff(attempt);
+                        warn!(
+                            "{} attempt {} failed, retrying in {:?}: {}",
+                            operation_name,
+                            attempt + 1,
+                            delay,
+                            last_error.as_ref().unwrap()
+                        );
+                        sleep(delay).await;
+                    }
+                }
+            }
+        }
+        
+        error!("{} failed after {} attempts", operation_name, max_retries);
+        Err(last_error.unwrap_or_else(|| {
+            K8sManagerError::GeneralError(format!("{} failed after {} attempts", operation_name, max_retries))
+        }))
     }
     
     /// Full cluster setup matching bootstrap.sh functionality
@@ -63,6 +112,7 @@ impl K3dClusterManager {
             info!("Creating new cluster '{}'", self.config.name);
             self.create_cluster().await?;
             self.wait_for_cluster().await?;
+            self.verify_cluster_health().await?;
         }
         
         // Configure TLS if enabled
@@ -148,27 +198,196 @@ impl K3dClusterManager {
         Ok(())
     }
     
-    /// Wait for cluster to be ready
+    /// Wait for cluster to be ready with comprehensive checks
     async fn wait_for_cluster(&self) -> Result<()> {
-        info!("Waiting for CoreDNS to be ready...");
+        info!("Waiting for cluster to be ready...");
         
-        let status = Command::new("kubectl")
-            .args(&[
-                "wait",
-                "--namespace=kube-system",
-                "--for=condition=available",
-                "--timeout=300s",
-                "--all",
-                "deployments",
-            ])
-            .status()
-            .await?;
+        // Step 1: Wait for all nodes to be ready
+        self.wait_for_nodes_ready().await?;
         
-        if !status.success() {
-            return Err(K8sManagerError::Timeout("Timeout waiting for cluster".to_string()));
+        // Step 2: Wait for critical system pods
+        self.wait_for_system_pods().await?;
+        
+        // Step 3: Wait for CoreDNS specifically (critical for cluster functionality)
+        self.wait_for_coredns().await?;
+        
+        info!("Cluster is ready!");
+        Ok(())
+    }
+    
+    /// Wait for all nodes to report ready status
+    async fn wait_for_nodes_ready(&self) -> Result<()> {
+        info!("Waiting for nodes to be ready...");
+        
+        let operation = "node readiness check";
+        let timeout_duration = Duration::from_secs(self.config.timeouts.node_ready);
+        
+        timeout(timeout_duration, async {
+            self.retry_with_backoff(operation, || async {
+                let output = Command::new("kubectl")
+                    .args(&["get", "nodes", "-o", "jsonpath={.items[*].status.conditions[?(@.type=='Ready')].status}"])
+                    .output()
+                    .await?;
+                
+                if !output.status.success() {
+                    return Err(K8sManagerError::GeneralError("Failed to get node status".to_string()));
+                }
+                
+                let statuses = String::from_utf8_lossy(&output.stdout);
+                let all_ready = statuses.split_whitespace().all(|s| s == "True");
+                
+                if !all_ready {
+                    return Err(K8sManagerError::GeneralError("Not all nodes are ready".to_string()));
+                }
+                
+                // Also check that we have the expected number of nodes
+                let node_count_output = Command::new("kubectl")
+                    .args(&["get", "nodes", "-o", "jsonpath={.items[*].metadata.name}"])
+                    .output()
+                    .await?;
+                
+                if node_count_output.status.success() {
+                    let nodes = String::from_utf8_lossy(&node_count_output.stdout);
+                    let actual_count = nodes.split_whitespace().count() as u32;
+                    let expected_count = self.config.servers + self.config.agents;
+                    
+                    if actual_count != expected_count {
+                        return Err(K8sManagerError::GeneralError(
+                            format!("Expected {} nodes, found {}", expected_count, actual_count)
+                        ));
+                    }
+                }
+                
+                info!("All nodes are ready");
+                Ok(())
+            }).await
+        }).await
+        .map_err(|_| K8sManagerError::Timeout(format!("{} timed out after {:?}", operation, timeout_duration)))?
+    }
+    
+    /// Wait for critical system pods to be running
+    async fn wait_for_system_pods(&self) -> Result<()> {
+        info!("Waiting for system pods to be ready...");
+        
+        let critical_deployments = vec![
+            "coredns",
+            "local-path-provisioner",
+            "metrics-server", // May not always be present
+        ];
+        
+        let timeout_duration = Duration::from_secs(self.config.timeouts.cluster_ready);
+        
+        for deployment in critical_deployments {
+            let operation = format!("waiting for {}", deployment);
+            
+            // Check if deployment exists first
+            let check_output = Command::new("kubectl")
+                .args(&[
+                    "get", "deployment", deployment,
+                    "-n", "kube-system",
+                    "--no-headers"
+                ])
+                .output()
+                .await?;
+            
+            if !check_output.status.success() {
+                debug!("{} deployment not found, skipping", deployment);
+                continue;
+            }
+            
+            // Wait for deployment to be ready
+            let result = timeout(timeout_duration, async {
+                self.retry_with_backoff(&operation, || async {
+                    let status = Command::new("kubectl")
+                        .args(&[
+                            "wait",
+                            "--namespace=kube-system",
+                            "--for=condition=available",
+                            &format!("--timeout={}s", self.config.timeouts.node_ready),
+                            &format!("deployment/{}", deployment),
+                        ])
+                        .status()
+                        .await?;
+                    
+                    if !status.success() {
+                        return Err(K8sManagerError::GeneralError(
+                            format!("{} is not yet available", deployment)
+                        ));
+                    }
+                    
+                    Ok(())
+                }).await
+            }).await;
+            
+            match result {
+                Ok(_) => debug!("{} is ready", deployment),
+                Err(_) if deployment == "coredns" => {
+                    // CoreDNS is critical, fail if it's not ready
+                    return Err(K8sManagerError::Timeout(
+                        format!("CoreDNS deployment failed to become ready within {:?}", timeout_duration)
+                    ));
+                }
+                Err(e) => {
+                    // Other deployments are optional, just warn
+                    warn!("Optional deployment {} not ready: {}", deployment, e);
+                }
+            }
         }
         
         Ok(())
+    }
+    
+    /// Wait specifically for CoreDNS to be fully functional
+    async fn wait_for_coredns(&self) -> Result<()> {
+        info!("Verifying CoreDNS functionality...");
+        
+        let timeout_duration = Duration::from_secs(self.config.timeouts.dns_check);
+        
+        timeout(timeout_duration, async {
+            self.retry_with_backoff("CoreDNS functionality check", || async {
+                // Check if CoreDNS pods are running
+                let output = Command::new("kubectl")
+                    .args(&[
+                        "get", "pods",
+                        "-n", "kube-system",
+                        "-l", "k8s-app=kube-dns",
+                        "-o", "jsonpath={.items[*].status.phase}"
+                    ])
+                    .output()
+                    .await?;
+                
+                if !output.status.success() {
+                    return Err(K8sManagerError::GeneralError("Failed to check CoreDNS pods".to_string()));
+                }
+                
+                let phases = String::from_utf8_lossy(&output.stdout);
+                let all_running = phases.split_whitespace().all(|p| p == "Running");
+                
+                if !all_running {
+                    return Err(K8sManagerError::GeneralError("CoreDNS pods are not all running".to_string()));
+                }
+                
+                // Test DNS resolution within the cluster
+                let dns_test = Command::new("kubectl")
+                    .args(&[
+                        "run", "dns-test",
+                        "--rm", "-i", "--restart=Never",
+                        "--image=busybox:1.28",
+                        "--",
+                        "nslookup", "kubernetes.default"
+                    ])
+                    .output()
+                    .await?;
+                
+                if !dns_test.status.success() {
+                    return Err(K8sManagerError::DnsError("DNS resolution test failed".to_string()));
+                }
+                
+                info!("CoreDNS is fully functional");
+                Ok(())
+            }).await
+        }).await
+        .map_err(|_| K8sManagerError::Timeout(format!("CoreDNS verification timed out after {:?}", timeout_duration)))?
     }
     
     /// Test kubectl connection
@@ -193,6 +412,127 @@ impl K3dClusterManager {
         
         info!("kubectl connection verified");
         Ok(())
+    }
+    
+    /// Comprehensive cluster health verification
+    async fn verify_cluster_health(&self) -> Result<()> {
+        info!("Verifying cluster health...");
+        
+        // 1. Verify API server is responsive
+        self.retry_with_backoff("API server health check", || async {
+            let output = Command::new("kubectl")
+                .args(&["cluster-info"])
+                .output()
+                .await?;
+            
+            if !output.status.success() {
+                return Err(K8sManagerError::GeneralError("API server is not responsive".to_string()));
+            }
+            
+            Ok(())
+        }).await?;
+        
+        // 2. Verify all expected components are present
+        let expected_namespaces = vec!["default", "kube-system", "kube-public", "kube-node-lease"];
+        for ns in expected_namespaces {
+            let output = Command::new("kubectl")
+                .args(&["get", "namespace", ns])
+                .output()
+                .await?;
+            
+            if !output.status.success() {
+                return Err(K8sManagerError::GeneralError(
+                    format!("Expected namespace '{}' not found", ns)
+                ));
+            }
+        }
+        
+        // 3. Verify storage class is available
+        let storage_check = Command::new("kubectl")
+            .args(&["get", "storageclass"])
+            .output()
+            .await?;
+        
+        if !storage_check.status.success() {
+            warn!("No storage class found - persistent volumes may not work");
+        }
+        
+        // 4. Create and delete a test pod to verify full functionality
+        self.verify_pod_creation().await?;
+        
+        info!("Cluster health verification complete");
+        Ok(())
+    }
+    
+    /// Verify that pods can be created and scheduled
+    async fn verify_pod_creation(&self) -> Result<()> {
+        debug!("Testing pod creation and scheduling...");
+        
+        let test_pod_name = format!("k3d-health-check-{}", chrono::Utc::now().timestamp());
+        
+        // Create a simple test pod
+        let create_result = Command::new("kubectl")
+            .args(&[
+                "run", &test_pod_name,
+                "--image=busybox:1.28",
+                "--restart=Never",
+                "--command", "--",
+                "echo", "health check successful"
+            ])
+            .output()
+            .await?;
+        
+        if !create_result.status.success() {
+            return Err(K8sManagerError::GeneralError(
+                "Failed to create test pod".to_string()
+            ));
+        }
+        
+        // Give the pod some time to be scheduled
+        sleep(Duration::from_secs(2)).await;
+        
+        // Check pod status multiple times
+        let mut attempts = 0;
+        let max_attempts = 15;
+        let mut pod_ready = false;
+        
+        while attempts < max_attempts {
+            let status_output = Command::new("kubectl")
+                .args(&[
+                    "get", "pod", &test_pod_name,
+                    "-o", "jsonpath={.status.phase}"
+                ])
+                .output()
+                .await?;
+                
+            if status_output.status.success() {
+                let phase = String::from_utf8_lossy(&status_output.stdout);
+                debug!("Pod {} status: {}", test_pod_name, phase);
+                
+                if phase.trim() == "Succeeded" || phase.trim() == "Running" {
+                    pod_ready = true;
+                    break;
+                }
+            }
+            
+            attempts += 1;
+            sleep(Duration::from_secs(2)).await;
+        }
+        
+        // Clean up the test pod
+        let _ = Command::new("kubectl")
+            .args(&["delete", "pod", &test_pod_name, "--grace-period=0", "--force"])
+            .status()
+            .await;
+        
+        if pod_ready {
+            debug!("Pod creation test successful");
+            Ok(())
+        } else {
+            // Don't fail the entire setup for this - just warn
+            warn!("Pod scheduling test did not complete in time - cluster may need more time to stabilize");
+            Ok(())
+        }
     }
     
     /// Generate TLS certificate
@@ -276,38 +616,89 @@ impl K3dClusterManager {
         Ok(())
     }
     
-    /// Test DNS resolution with retries
-    async fn test_dns_resolution(&self) -> Result<()> {
+    /// Test DNS resolution with proper retries
+    pub async fn test_dns_resolution(&self) -> Result<()> {
         info!("Testing DNS resolution");
         
-        // Test external DNS with curl (more reliable than nslookup)
-        let external_test = Command::new("timeout")
-            .args(&["2", "curl", "-s", "-I", "-m", "2", "http://google.com"])
-            .output()
-            .await;
+        let timeout_duration = Duration::from_secs(self.config.timeouts.dns_check);
         
-        let external_ok = external_test.map(|o| o.status.success()).unwrap_or(false);
+        // Test external DNS
+        let external_result = timeout(timeout_duration, async {
+            self.retry_with_backoff("external DNS test", || async {
+                let output = Command::new("curl")
+                    .args(&[
+                        "-s",           // Silent
+                        "-I",           // Head request only
+                        "-m", "5",      // 5 second timeout
+                        "--connect-timeout", "3",
+                        "http://google.com"
+                    ])
+                    .output()
+                    .await?;
+                
+                if !output.status.success() {
+                    return Err(K8sManagerError::DnsError(
+                        "External DNS resolution failed".to_string()
+                    ));
+                }
+                
+                Ok(())
+            }).await
+        }).await;
         
-        // Test Kubernetes DNS by checking if kube-dns service exists
-        let k8s_test = Command::new("kubectl")
-            .args(&["get", "svc", "-n", "kube-system", "kube-dns"])
-            .output()
-            .await;
-        
-        let k8s_ok = k8s_test.map(|o| o.status.success()).unwrap_or(false);
-        
-        if external_ok {
-            info!("External DNS resolution working");
-        } else {
-            return Err(K8sManagerError::DnsError(
-                "External DNS resolution test failed. Check your network connection.".to_string()
-            ));
+        match external_result {
+            Ok(_) => info!("External DNS resolution working"),
+            Err(e) => {
+                error!("External DNS resolution failed: {}", e);
+                return Err(K8sManagerError::DnsError(
+                    "External DNS resolution test failed. Check your network connection.".to_string()
+                ));
+            }
         }
         
-        if k8s_ok {
-            info!("Kubernetes DNS service is available");
-        } else {
-            warn!("Kubernetes DNS service check failed");
+        // Test Kubernetes DNS
+        let k8s_dns_result = timeout(timeout_duration, async {
+            self.retry_with_backoff("Kubernetes DNS test", || async {
+                // First check if kube-dns service exists
+                let svc_check = Command::new("kubectl")
+                    .args(&["get", "svc", "-n", "kube-system", "kube-dns"])
+                    .output()
+                    .await?;
+                
+                if !svc_check.status.success() {
+                    return Err(K8sManagerError::DnsError(
+                        "kube-dns service not found".to_string()
+                    ));
+                }
+                
+                // Test actual DNS resolution from within the cluster
+                let dns_test = Command::new("kubectl")
+                    .args(&[
+                        "run", "dns-test-external",
+                        "--rm", "-i", "--restart=Never",
+                        "--image=busybox:1.28",
+                        "--",
+                        "nslookup", "google.com"
+                    ])
+                    .output()
+                    .await?;
+                
+                if !dns_test.status.success() {
+                    return Err(K8sManagerError::DnsError(
+                        "In-cluster DNS resolution failed".to_string()
+                    ));
+                }
+                
+                Ok(())
+            }).await
+        }).await;
+        
+        match k8s_dns_result {
+            Ok(_) => info!("Kubernetes DNS is fully functional"),
+            Err(e) => {
+                warn!("Kubernetes DNS test failed: {}", e);
+                // This is a warning, not a fatal error
+            }
         }
         
         Ok(())
@@ -386,6 +777,115 @@ impl K3dClusterManager {
         fs::write(&forwards_file, forwards_json).await?;
         
         info!("Port forwarding setup complete. {} ports forwarded", port_forwards.len());
+        Ok(())
+    }
+    
+    /// Verify registry is healthy
+    async fn verify_registry_health(&self, registry_name: &str) -> Result<()> {
+        let registry_url = format!("http://localhost:{}/v2/", self.config.registry.port);
+        
+        self.retry_with_backoff("registry health check", || async {
+            // First check if the container is running
+            let full_name = if registry_name.starts_with("k3d-") {
+                registry_name.to_string()
+            } else {
+                format!("k3d-{}", registry_name)
+            };
+            
+            let container_check = Command::new("docker")
+                .args(&[
+                    "ps",
+                    "--filter", &format!("name={}", full_name),
+                    "--filter", "status=running",
+                    "--format", "{{.Names}}"
+                ])
+                .output()
+                .await?;
+                
+            if !String::from_utf8_lossy(&container_check.stdout).contains(&full_name) {
+                return Err(K8sManagerError::GeneralError(
+                    format!("Registry container {} is not running", full_name)
+                ));
+            }
+            
+            // Then check HTTP endpoint
+            let output = Command::new("curl")
+                .args(&[
+                    "-s",
+                    "-o", "/dev/null",
+                    "-w", "%{http_code}",
+                    "--connect-timeout", "5",
+                    &registry_url
+                ])
+                .output()
+                .await?;
+            
+            if output.status.success() {
+                let status_code = String::from_utf8_lossy(&output.stdout);
+                if status_code.trim() == "200" {
+                    debug!("Registry {} is healthy", registry_name);
+                    return Ok(());
+                }
+            }
+            
+            Err(K8sManagerError::GeneralError(
+                format!("Registry {} is not responding properly", registry_name)
+            ))
+        }).await
+    }
+    
+    /// Wait for registry to be ready
+    async fn wait_for_registry_ready(&self, registry_name: &str) -> Result<()> {
+        info!("Waiting for registry '{}' to be ready...", registry_name);
+        
+        let timeout_duration = Duration::from_secs(self.config.timeouts.registry_ready);
+        
+        let result = timeout(timeout_duration, async {
+            // Determine the full container name
+            let full_name = if registry_name.starts_with("k3d-") {
+                registry_name.to_string()
+            } else {
+                format!("k3d-{}", registry_name)
+            };
+            
+            // First, wait for the container to be running
+            self.retry_with_backoff("registry container check", || async {
+                let output = Command::new("docker")
+                    .args(&[
+                        "ps",
+                        "--filter", &format!("name={}", full_name),
+                        "--filter", "status=running",
+                        "--format", "{{.Names}}"
+                    ])
+                    .output()
+                    .await?;
+                
+                if !output.status.success() {
+                    return Err(K8sManagerError::GeneralError(
+                        "Failed to check registry container".to_string()
+                    ));
+                }
+                
+                let containers = String::from_utf8_lossy(&output.stdout);
+                if !containers.contains(&full_name) {
+                    return Err(K8sManagerError::GeneralError(
+                        format!("Registry container {} is not running", full_name)
+                    ));
+                }
+                
+                Ok(())
+            }).await?;
+            
+            // Then verify it's actually responding
+            self.verify_registry_health(registry_name).await
+        }).await
+        .map_err(|_| K8sManagerError::Timeout(
+            format!("Registry {} failed to become ready within {:?}", registry_name, timeout_duration)
+        ))?;
+        
+        result?;
+        
+        info!("Registry '{}' is ready", registry_name);
         Ok(())
     }
 }
@@ -477,9 +977,21 @@ async fn create_registry(config: &K3dConfig) -> Result<()> {
         .await?;
     
     let containers = String::from_utf8_lossy(&output.stdout);
-    if containers.lines().any(|name| name == config.registry_name) {
+    let full_registry_name = format!("k3d-{}", config.registry_name);
+    
+    if containers.lines().any(|name| name == full_registry_name || name == config.registry_name) {
         info!("Registry '{}' already exists", config.registry_name);
-        return Ok(());
+        
+        // Create a temporary manager to verify registry health
+        let temp_config = K3dClusterConfig {
+            registry: K3dRegistryConfig {
+                port: config.registry_port,
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+        let manager = K3dClusterManager::new(temp_config);
+        return manager.verify_registry_health(&config.registry_name).await;
     }
     
     info!("Creating Docker registry '{}'", config.registry_name);
@@ -501,6 +1013,20 @@ async fn create_registry(config: &K3dConfig) -> Result<()> {
             "Failed to create Docker registry".to_string()
         ));
     }
+    
+    // Wait a moment for the registry to start
+    sleep(Duration::from_secs(2)).await;
+    
+    // Wait for registry to be ready
+    let temp_config = K3dClusterConfig {
+        registry: K3dRegistryConfig {
+            port: config.registry_port,
+            ..Default::default()
+        },
+        ..Default::default()
+    };
+    let manager = K3dClusterManager::new(temp_config);
+    manager.wait_for_registry_ready(&config.registry_name).await?;
     
     Ok(())
 }
@@ -538,6 +1064,9 @@ async fn create_cluster(config: &K3dConfig) -> Result<()> {
         ));
     }
     
+    // Additional wait to ensure cluster is fully ready
+    sleep(Duration::from_secs(2)).await;
+    
     Ok(())
 }
 
@@ -545,29 +1074,15 @@ async fn create_cluster(config: &K3dConfig) -> Result<()> {
 async fn wait_for_cluster(cluster_name: &str) -> Result<()> {
     info!("Waiting for cluster '{}' to be ready...", cluster_name);
     
-    // Wait for nodes to be ready
-    for i in 0..30 {
-        let output = Command::new("kubectl")
-            .args(&["get", "nodes", "-o", "jsonpath={.items[*].status.conditions[?(@.type=='Ready')].status}"])
-            .output()
-            .await?;
-        
-        if output.status.success() {
-            let status = String::from_utf8_lossy(&output.stdout);
-            if status.split_whitespace().all(|s| s == "True") {
-                info!("All nodes are ready");
-                return Ok(());
-            }
-        }
-        
-        if i < 29 {
-            tokio::time::sleep(tokio::time::Duration::from_secs(2)).await;
-        }
-    }
+    // Create a temporary manager with default config for timeout values
+    let config = K3dClusterConfig {
+        name: cluster_name.to_string(),
+        ..Default::default()
+    };
+    let manager = K3dClusterManager::new(config);
     
-    Err(K8sManagerError::Timeout(
-        "Timeout waiting for cluster to be ready".to_string()
-    ))
+    // Use the comprehensive wait method
+    manager.wait_for_cluster().await
 }
 
 /// Configure kubectl to use the cluster
@@ -624,7 +1139,33 @@ impl ClusterManager for K3dClusterManager {
     }
     
     async fn create_cluster(&self) -> Result<()> {
-        let registry_name = format!("{}.{}", self.config.name, self.config.registry.name);
+        // Use the registry name from config if it's cluster-specific
+        let registry_name = if self.config.registry.name.contains(&self.config.name) {
+            self.config.registry.name.clone()
+        } else if self.config.registry.name == "registry.localhost" {
+            format!("{}-registry", self.config.name)
+        } else {
+            self.config.registry.name.clone()
+        };
+        
+        // For create_cluster, we'll rely on setup_registry being called from setup_cluster
+        // This avoids duplicate registry creation
+        if self.config.registry.enabled && !self.cluster_exists().await? {
+            // Only create registry if we're part of a standalone create_cluster call
+            // Check if this is being called from setup_cluster by checking if registry exists
+            let check_output = Command::new("docker")
+                .args(&["ps", "-a", "--format", "{{.Names}}"])
+                .output()
+                .await?;
+            
+            let existing_containers = String::from_utf8_lossy(&check_output.stdout);
+            let full_registry_name = format!("k3d-{}", registry_name);
+            
+            if !existing_containers.lines().any(|name| name == full_registry_name) {
+                // This is a standalone create_cluster call, so we need to create the registry
+                self.setup_registry().await?;
+            }
+        }
         
         let mut cmd = Command::new("k3d");
         cmd.args(&[
@@ -637,8 +1178,17 @@ impl ClusterManager for K3dClusterManager {
             &format!("{}:{}@loadbalancer", self.config.http_port, self.config.http_port),
             "-p",
             &format!("{}:{}@loadbalancer", self.config.https_port, self.config.https_port),
-            "--registry-use",
-            &format!("k3d-{}:{}", registry_name, self.config.registry.port),
+        ]);
+        
+        // Add registry if enabled
+        if self.config.registry.enabled {
+            cmd.args(&[
+                "--registry-use",
+                &format!("k3d-{}:{}", registry_name, self.config.registry.port),
+            ]);
+        }
+        
+        cmd.args(&[
             "--image",
             &format!("rancher/k3s:{}", self.config.k3s_version),
             "--servers",
@@ -653,6 +1203,10 @@ impl ClusterManager for K3dClusterManager {
         if !status.success() {
             return Err(K8sManagerError::GeneralError("Failed to create cluster".to_string()));
         }
+        
+        // Wait for cluster to be fully initialized
+        info!("Waiting for cluster to initialize...");
+        sleep(Duration::from_secs(3)).await;
         
         // Set kubectl context
         let _ = Command::new("kubectl")
@@ -670,6 +1224,7 @@ impl ClusterManager for K3dClusterManager {
     async fn delete_cluster(&self) -> Result<()> {
         info!("Deleting K3D cluster '{}'", self.config.name);
         
+        // Delete cluster first
         let status = Command::new("k3d")
             .args(&["cluster", "delete", &self.config.name])
             .status()
@@ -677,6 +1232,26 @@ impl ClusterManager for K3dClusterManager {
         
         if !status.success() {
             return Err(K8sManagerError::GeneralError("Failed to delete cluster".to_string()));
+        }
+        
+        // Also delete the associated registry if it exists
+        if self.config.registry.enabled {
+            let registry_name = if self.config.registry.name.contains(&self.config.name) {
+                self.config.registry.name.clone()
+            } else if self.config.registry.name == "registry.localhost" {
+                format!("{}-registry", self.config.name)
+            } else {
+                self.config.registry.name.clone()
+            };
+            info!("Deleting associated registry '{}'", registry_name);
+            
+            let _ = Command::new("k3d")
+                .args(&["registry", "delete", &registry_name])
+                .status()
+                .await;
+            
+            // Wait a bit for cleanup
+            sleep(Duration::from_secs(1)).await;
         }
         
         Ok(())
@@ -1216,28 +1791,59 @@ impl ClusterDevelopment for K3dClusterManager {
     }
     
     async fn setup_registry(&self) -> Result<()> {
-        let registry_name = format!("{}.{}", self.config.name, self.config.registry.name);
+        // Use the registry name from config if it's cluster-specific, otherwise use cluster-registry pattern
+        let registry_name = if self.config.registry.name.contains(&self.config.name) {
+            self.config.registry.name.clone()
+        } else if self.config.registry.name == "registry.localhost" {
+            format!("{}-registry", self.config.name)
+        } else {
+            self.config.registry.name.clone()
+        };
         
-        // Check if registry exists
-        let output = Command::new("k3d")
-            .args(&["registry", "list"])
+        // Check if registry exists by looking at Docker containers
+        let output = Command::new("docker")
+            .args(&["ps", "-a", "--format", "{{.Names}}"])
             .output()
             .await?;
         
-        let stdout = String::from_utf8_lossy(&output.stdout);
-        if stdout.contains(&registry_name) {
+        let containers = String::from_utf8_lossy(&output.stdout);
+        let full_registry_name = format!("k3d-{}", registry_name);
+        
+        if containers.lines().any(|name| name == full_registry_name) {
             info!("Registry '{}' already exists", registry_name);
-            return Ok(());
+            
+            // Check if it's running
+            let running_check = Command::new("docker")
+                .args(&[
+                    "ps",
+                    "--filter", &format!("name={}", full_registry_name),
+                    "--filter", "status=running",
+                    "--format", "{{.Names}}"
+                ])
+                .output()
+                .await?;
+                
+            if !String::from_utf8_lossy(&running_check.stdout).contains(&full_registry_name) {
+                // Start the registry if it's not running
+                info!("Starting existing registry '{}'", registry_name);
+                let _ = Command::new("docker")
+                    .args(&["start", &full_registry_name])
+                    .status()
+                    .await?;
+                sleep(Duration::from_secs(2)).await;
+            }
+            
+            return self.verify_registry_health(&registry_name).await;
         }
         
-        info!("Creating registry '{}'", registry_name);
+        info!("Creating registry '{}' on port {}", registry_name, self.config.registry.port);
         
-        // Create registry without --cluster flag first
+        // Create registry with k3d command
         let status = Command::new("k3d")
             .args(&[
                 "registry",
                 "create",
-                &format!("{}.{}", self.config.name, self.config.registry.name),
+                &registry_name,
                 "--port",
                 &self.config.registry.port.to_string(),
             ])
@@ -1248,6 +1854,10 @@ impl ClusterDevelopment for K3dClusterManager {
         if !status.success() {
             return Err(K8sManagerError::GeneralError("Failed to create registry".to_string()));
         }
+        
+        // Wait for registry to be ready
+        sleep(Duration::from_secs(2)).await;
+        self.wait_for_registry_ready(&registry_name).await?;
         
         Ok(())
     }

@@ -38,6 +38,9 @@ pub struct K3dClusterConfig {
     
     /// Development mode settings
     pub dev_mode: Option<K3dDevModeConfig>,
+    
+    /// Timeout configuration
+    pub timeouts: K3dTimeoutConfig,
 }
 
 impl Default for K3dClusterConfig {
@@ -54,6 +57,7 @@ impl Default for K3dClusterConfig {
             tls: K3dTlsConfig::default(),
             network: K3dNetworkConfig::default(),
             dev_mode: None,
+            timeouts: K3dTimeoutConfig::default(),
         }
     }
 }
@@ -147,6 +151,42 @@ impl Default for K3dNetworkConfig {
 pub struct K3dDevModeConfig {
     pub port_forward_all: bool,
     pub port_offset: u16,
+}
+
+/// K3D timeout configuration for various operations
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct K3dTimeoutConfig {
+    /// Timeout for cluster creation (seconds)
+    pub cluster_create: u64,
+    /// Timeout for waiting for cluster readiness (seconds)
+    pub cluster_ready: u64,
+    /// Timeout for individual node readiness checks (seconds)
+    pub node_ready: u64,
+    /// Timeout for DNS resolution tests (seconds)
+    pub dns_check: u64,
+    /// Timeout for registry operations (seconds)
+    pub registry_ready: u64,
+    /// Initial retry delay (milliseconds)
+    pub initial_retry_delay_ms: u64,
+    /// Maximum retry delay (milliseconds)
+    pub max_retry_delay_ms: u64,
+    /// Maximum number of retries for operations
+    pub max_retries: u32,
+}
+
+impl Default for K3dTimeoutConfig {
+    fn default() -> Self {
+        Self {
+            cluster_create: 300,      // 5 minutes
+            cluster_ready: 300,       // 5 minutes
+            node_ready: 60,          // 1 minute
+            dns_check: 30,           // 30 seconds
+            registry_ready: 60,      // 1 minute
+            initial_retry_delay_ms: 1000,  // 1 second
+            max_retry_delay_ms: 30000,     // 30 seconds
+            max_retries: 10,
+        }
+    }
 }
 
 /// Basic K3D configuration for simple setup

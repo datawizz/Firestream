@@ -87,10 +87,30 @@ impl DockerManager {
             match info {
                 Ok(output) => {
                     if let Some(status) = output.status {
-                        debug!("{}", status);
+                        debug!("Push status: {}", status);
+                    }
+                    if let Some(progress) = output.progress {
+                        debug!("Push progress: {}", progress);
+                    }
+                    // Check for errors in the output
+                    if let Some(error) = output.error {
+                        return Err(DockerManagerError::DockerApiError(
+                            format!("Push failed: {}", error)
+                        ));
                     }
                 }
-                Err(e) => return Err(e.into()),
+                Err(e) => {
+                    // Check if it's an auth error
+                    let error_str = e.to_string();
+                    if error_str.contains("authentication") || error_str.contains("unauthorized") {
+                        return Err(DockerManagerError::DockerApiError(
+                            format!("Authentication required for registry push: {}", e)
+                        ));
+                    }
+                    return Err(DockerManagerError::DockerApiError(
+                        format!("Docker push error: {}", e)
+                    ));
+                }
             }
         }
         
