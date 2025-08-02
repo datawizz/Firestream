@@ -1,11 +1,19 @@
 {
     // rust-analyzer is now provided by Nix in the devcontainer
     "rust-analyzer.enable": true,
-    
     "[rust]": {
         "editor.formatOnSave": true
     },
-    
     // Use the rust-analyzer from the Nix environment
-    "rust-analyzer.server.path": "rust-analyzer"
+    "rust-analyzer.server.path": "rust-analyzer",
+    // Set Firestream colors
+    "workbench.colorCustomizations": {
+        "titleBar.activeBackground": "#a00909",
+        "titleBar.activeForeground": "#000000",
+        "titleBar.inactiveBackground": "#a00909",
+        "titleBar.inactiveForeground": "#000000",
+        "activityBar.background": "#a00909",
+        "activityBar.foreground": "#000000",
+        "activityBar.inactiveForeground": "#000000"
+    }
 }
