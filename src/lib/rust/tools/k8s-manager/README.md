@@ -168,11 +168,31 @@ configure_dns = true
 patch_etc_hosts = true
 pod_cidr = "10.42.0.0/16"
 service_cidr = "10.43.0.0/16"
+api_bind_address = "0.0.0.0"  # Bind to all interfaces (default)
+disable_iptables_routing = false  # Enable automatic iptables routing (default)
 
 [cluster.k3d.dev_mode]
 port_forward_all = true
 port_offset = 10000
 ```
+
+### Network Configuration for DevContainers
+
+The k8s-manager now supports advanced networking for k3d clusters running inside devcontainers:
+
+- **0.0.0.0 API Binding**: By default, the API server binds to all interfaces (0.0.0.0)
+- **Automatic IPTables Routing**: Automatically sets up DNAT rules to route traffic from 0.0.0.0 to Docker internal IPs
+- **Multi-Cluster Support**: Each cluster gets unique routing rules based on cluster name
+- **Context-Aware Endpoints**: Automatically uses the correct endpoint (0.0.0.0 inside containers, localhost outside)
+
+To disable automatic iptables routing:
+```toml
+[cluster.k3d.network]
+disable_iptables_routing = true
+```
+
+Environment variable overrides:
+- `K3D_API_ENDPOINT`: Override the automatic endpoint detection
 
 ## Development
 

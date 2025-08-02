@@ -115,14 +115,14 @@ impl K3dClusterManager {
             self.verify_cluster_health().await?;
         }
         
-        // Configure TLS if enabled
-        if self.config.tls.enabled {
-            self.configure_tls().await?;
-        }
-        
-        // Configure network - Routes before DNS
+        // Configure network routes first (needed for kubectl commands in containers)
         if self.config.network.configure_routes {
             self.setup_routes().await?;
+        }
+        
+        // Configure TLS after routes are established
+        if self.config.tls.enabled {
+            self.configure_tls().await?;
         }
         
         if self.config.network.configure_dns {
@@ -176,6 +176,9 @@ impl K3dClusterManager {
         // The kubeconfig path is printed to stdout
         let kubeconfig_path = String::from_utf8_lossy(&output.stdout).trim().to_string();
         info!("Kubeconfig written to: {}", kubeconfig_path);
+        
+        // Fix the kubeconfig if we're in a container
+        self.fix_kubeconfig_for_container().await?;
         
         // Set context using the kubeconfig path
         let status = Command::new("kubectl")
@@ -704,6 +707,123 @@ impl K3dClusterManager {
         Ok(())
     }
     
+    
+    /// Fix kubeconfig for container environment
+    async fn fix_kubeconfig_for_container(&self) -> Result<()> {
+        if !Self::is_running_in_container() {
+            return Ok(());
+        }
+        
+        info!("Fixing kubeconfig for container environment");
+        
+        // First connect to the k3d network
+        self.connect_to_cluster_network().await?;
+        
+        // Use the k3d server's hostname on the k3d network
+        // k3d-<cluster>-server-0 is the server node hostname
+        let cluster_name = format!("k3d-{}", self.config.name);
+        let new_server = format!("https://k3d-{}-server-0:6443", self.config.name);
+        
+        info!("Updating kubeconfig to use internal k3d hostname: {}", new_server);
+        
+        let status = Command::new("kubectl")
+            .args(&[
+                "config", "set-cluster",
+                &cluster_name,
+                &format!("--server={}", new_server),
+            ])
+            .status()
+            .await?;
+        
+        if status.success() {
+            info!("Updated kubeconfig server to {}", new_server);
+        } else {
+            warn!("Failed to update kubeconfig server URL");
+            // Fallback to simple method if needed
+            return self.fix_kubeconfig_simple().await;
+        }
+        
+        Ok(())
+    }
+    
+    /// Simple fallback method to fix kubeconfig
+    async fn fix_kubeconfig_simple(&self) -> Result<()> {
+        info!("Using simple method to fix kubeconfig");
+        
+        // Ensure we're connected to the k3d network
+        self.connect_to_cluster_network().await?;
+        
+        // Use the internal hostname
+        let cluster_name = format!("k3d-{}", self.config.name);
+        let new_server = format!("https://k3d-{}-server-0:6443", self.config.name);
+        
+        let status = Command::new("kubectl")
+            .args(&[
+                "config", "set-cluster",
+                &cluster_name,
+                &format!("--server={}", new_server),
+            ])
+            .status()
+            .await?;
+            
+        if status.success() {
+            info!("Updated kubeconfig server to {}", new_server);
+        } else {
+            warn!("Failed to update kubeconfig server URL");
+        }
+        
+        Ok(())
+    }
+    
+    /// Connect the current container to the k3d network
+    async fn connect_to_cluster_network(&self) -> Result<()> {
+        info!("Connecting devcontainer to k3d network");
+        
+        // Get current container hostname
+        let hostname = std::fs::read_to_string("/etc/hostname")
+            .map_err(|e| K8sManagerError::GeneralError(format!("Failed to read hostname: {}", e)))?
+            .trim()
+            .to_string();
+        
+        let network_name = format!("k3d-{}", self.config.name);
+        
+        // Check if already connected
+        let check = Command::new("docker")
+            .args(&[
+                "inspect", &hostname,
+                "--format", &format!("{{{{.NetworkSettings.Networks.{}}}}}", network_name),
+            ])
+            .output()
+            .await?;
+        
+        let output = String::from_utf8_lossy(&check.stdout);
+        if !output.contains("<nil>") && !output.trim().is_empty() {
+            info!("Already connected to k3d network");
+            return Ok(());
+        }
+        
+        // Connect to k3d network
+        info!("Connecting container {} to network {}", hostname, network_name);
+        let status = Command::new("docker")
+            .args(&[
+                "network", "connect",
+                &network_name,
+                &hostname,
+            ])
+            .status()
+            .await?;
+        
+        if !status.success() {
+            warn!("Failed to connect to k3d network - this may affect DNS resolution");
+        } else {
+            info!("Successfully connected to k3d network");
+            // Give the network connection a moment to stabilize
+            sleep(Duration::from_secs(1)).await;
+        }
+        
+        Ok(())
+    }
+    
     /// Setup port forwarding for development
     pub async fn setup_port_forwarding(&self, dev_config: &K3dDevModeConfig) -> Result<()> {
         info!("Setting up port forwarding for development");
@@ -782,7 +902,10 @@ impl K3dClusterManager {
     
     /// Verify registry is healthy
     async fn verify_registry_health(&self, registry_name: &str) -> Result<()> {
-        let registry_url = format!("http://localhost:{}/v2/", self.config.registry.port);
+        // Always use localhost for registry health checks
+        // The registry container exposes its port on localhost even when running inside another container
+        let registry_host = "localhost";
+        let registry_url = format!("http://{}:{}/v2/", registry_host, self.config.registry.port);
         
         self.retry_with_backoff("registry health check", || async {
             // First check if the container is running
@@ -985,6 +1108,7 @@ async fn create_registry(config: &K3dConfig) -> Result<()> {
         // Create a temporary manager to verify registry health
         let temp_config = K3dClusterConfig {
             registry: K3dRegistryConfig {
+                name: config.registry_name.clone(),
                 port: config.registry_port,
                 ..Default::default()
             },
@@ -1173,7 +1297,7 @@ impl ClusterManager for K3dClusterManager {
             "create",
             &self.config.name,
             "--api-port",
-            &self.config.api_port.to_string(),
+            &format!("{}:{}", self.config.network.api_bind_address, self.config.api_port),
             "-p",
             &format!("{}:{}@loadbalancer", self.config.http_port, self.config.http_port),
             "-p",
@@ -1208,6 +1332,9 @@ impl ClusterManager for K3dClusterManager {
         info!("Waiting for cluster to initialize...");
         sleep(Duration::from_secs(3)).await;
         
+        // Fix the kubeconfig if we're in a container
+        self.fix_kubeconfig_for_container().await?;
+        
         // Set kubectl context
         let _ = Command::new("kubectl")
             .args(&[
@@ -1218,13 +1345,15 @@ impl ClusterManager for K3dClusterManager {
             .status()
             .await;
         
+        
         Ok(())
     }
     
     async fn delete_cluster(&self) -> Result<()> {
         info!("Deleting K3D cluster '{}'", self.config.name);
         
-        // Delete cluster first
+        
+        // Delete cluster
         let status = Command::new("k3d")
             .args(&["cluster", "delete", &self.config.name])
             .status()
@@ -1301,8 +1430,8 @@ impl ClusterManager for K3dClusterManager {
             }
         }
         
-        // Get endpoint
-        let endpoint = format!("https://localhost:{}", self.config.api_port);
+        // Get endpoint based on context
+        let endpoint = self.get_api_endpoint();
         
         Ok(ClusterInfo {
             name: self.config.name.clone(),
@@ -1479,7 +1608,13 @@ impl ClusterNetworking for K3dClusterManager {
     }
     
     async fn setup_routes(&self) -> Result<()> {
-        info!("Setting up IP routes");
+        // Only configure routes when running in a container
+        if !Self::is_running_in_container() {
+            debug!("Not running in container, skipping route setup");
+            return Ok(());
+        }
+        
+        info!("Setting up IP routes for container environment");
         
         // Get k3d server IP
         let output = Command::new("docker")
@@ -1500,7 +1635,7 @@ impl ClusterNetworking for K3dClusterManager {
         let server_ip = String::from_utf8_lossy(&output.stdout).trim().to_string();
         info!("K3D server IP: {}", server_ip);
         
-        // Check and add routes
+        // Add routes for pod and service networks
         for cidr in [&self.config.network.pod_cidr, &self.config.network.service_cidr] {
             // Check if route exists
             let check = Command::new("sudo")
@@ -1518,7 +1653,9 @@ impl ClusterNetworking for K3dClusterManager {
                 if status.success() {
                     info!("Added route for {}", cidr);
                 } else {
-                    warn!("Failed to add route for {}", cidr);
+                    return Err(K8sManagerError::NetworkError(
+                        format!("Failed to add route for {}. Ensure 'ip' command is available and you have sudo access", cidr)
+                    ));
                 }
             } else {
                 debug!("Route for {} already exists", cidr);
@@ -1526,6 +1663,89 @@ impl ClusterNetworking for K3dClusterManager {
         }
         
         Ok(())
+    }
+}
+
+impl K3dClusterManager {
+    /// Get Docker internal IP for the k3d cluster
+    async fn get_cluster_docker_ip(&self) -> Result<String> {
+        let output = Command::new("docker")
+            .args(&[
+                "container",
+                "inspect",
+                &format!("k3d-{}-server-0", self.config.name),
+                "--format",
+                "{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}",
+            ])
+            .output()
+            .await?;
+            
+        if !output.status.success() {
+            return Err(K8sManagerError::GeneralError(
+                format!("Failed to get Docker IP for cluster '{}'", self.config.name)
+            ));
+        }
+        
+        let docker_ip = String::from_utf8_lossy(&output.stdout).trim().to_string();
+        if docker_ip.is_empty() {
+            return Err(K8sManagerError::GeneralError(
+                format!("No Docker IP found for cluster '{}'", self.config.name)
+            ));
+        }
+        
+        Ok(docker_ip)
+    }
+    
+    
+    /// Detect if we're running inside a container
+    fn is_running_in_container() -> bool {
+        // Check multiple indicators for container environment
+        if std::path::Path::new("/.dockerenv").exists() {
+            return true;
+        }
+        
+        // Check if running in Kubernetes pod
+        if std::env::var("KUBERNETES_SERVICE_HOST").is_ok() {
+            return true;
+        }
+        
+        // Check common container environment variables
+        if std::env::var("CONTAINER_REGISTRY_URL").is_ok() || 
+           std::env::var("CONTAINER").is_ok() ||
+           std::env::var("container").is_ok() {
+            return true;
+        }
+        
+        // Check /proc/1/cgroup for container signatures
+        if let Ok(contents) = std::fs::read_to_string("/proc/1/cgroup") {
+            if contents.contains("docker") || 
+               contents.contains("containerd") || 
+               contents.contains("kubepods") ||
+               contents.contains("/lxc/") {
+                return true;
+            }
+        }
+        
+        false
+    }
+    
+    /// Get the appropriate API endpoint based on context
+    fn get_api_endpoint(&self) -> String {
+        // Check for environment variable override
+        if let Ok(override_endpoint) = std::env::var("K3D_API_ENDPOINT") {
+            return override_endpoint;
+        }
+        
+        // Check if we're inside a container
+        let in_container = Self::is_running_in_container();
+        
+        if in_container && self.config.network.api_bind_address == "0.0.0.0" {
+            // Inside container with 0.0.0.0 binding, use host.docker.internal
+            format!("https://host.docker.internal:{}", self.config.api_port)
+        } else {
+            // Outside container or non-0.0.0.0 binding, use localhost
+            format!("https://localhost:{}", self.config.api_port)
+        }
     }
 }
 

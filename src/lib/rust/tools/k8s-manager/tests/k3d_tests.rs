@@ -47,6 +47,18 @@ mod unit_tests {
     }
 
     #[test]
+    fn test_network_config_default() {
+        let config = K3dNetworkConfig::default();
+        assert!(config.configure_routes);
+        assert!(config.configure_dns);
+        assert!(config.patch_etc_hosts);
+        assert_eq!(config.pod_cidr, "10.42.0.0/16");
+        assert_eq!(config.service_cidr, "10.43.0.0/16");
+        assert_eq!(config.api_bind_address, "0.0.0.0");
+        assert!(!config.disable_iptables_routing); // Routing enabled by default
+    }
+
+    #[test]
     fn test_tls_config_default() {
         let config = K3dTlsConfig::default();
         assert!(config.enabled);
@@ -66,7 +78,7 @@ mod unit_tests {
     }
 
     #[test]
-    fn test_network_config_default() {
+    fn test_k3d_network_config_default() {
         let config = K3dNetworkConfig::default();
         assert!(config.configure_routes);
         assert!(config.configure_dns);

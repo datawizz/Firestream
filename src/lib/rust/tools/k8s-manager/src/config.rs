@@ -132,6 +132,10 @@ pub struct K3dNetworkConfig {
     pub patch_etc_hosts: bool,
     pub pod_cidr: String,
     pub service_cidr: String,
+    /// API bind address (default: "0.0.0.0" for all interfaces)
+    pub api_bind_address: String,
+    /// Disable automatic iptables routing setup (default: false - routing is enabled)
+    pub disable_iptables_routing: bool,
 }
 
 impl Default for K3dNetworkConfig {
@@ -142,6 +146,8 @@ impl Default for K3dNetworkConfig {
             patch_etc_hosts: true,
             pod_cidr: "10.42.0.0/16".to_string(),
             service_cidr: "10.43.0.0/16".to_string(),
+            api_bind_address: "0.0.0.0".to_string(),
+            disable_iptables_routing: false,
         }
     }
 }

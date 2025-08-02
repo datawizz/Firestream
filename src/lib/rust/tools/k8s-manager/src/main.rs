@@ -143,6 +143,9 @@ enum ClusterCommands {
         /// Use basic setup (minimal configuration)
         #[arg(long)]
         basic: bool,
+        /// Registry port
+        #[arg(long, default_value = "5000")]
+        registry_port: u16,
     },
     /// Delete a cluster
     Delete {
@@ -325,6 +328,46 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
+/// Helper function to detect registry URL with port
+async fn detect_registry_url() -> Result<String, Box<dyn std::error::Error>> {
+    // First, list k3d registries
+    let output = tokio::process::Command::new("k3d")
+        .args(["registry", "list"])
+        .output()
+        .await?;
+    
+    if !output.status.success() {
+        return Err("Failed to list k3d registries".into());
+    }
+    
+    let registry_list = String::from_utf8_lossy(&output.stdout);
+    
+    // Find the first registry name
+    let registry_name = registry_list
+        .lines()
+        .skip(1) // Skip header
+        .next()
+        .and_then(|line| line.split_whitespace().next())
+        .ok_or("No k3d registry found")?;
+    
+    // Get Docker container info to find the port mapping
+    let docker_output = tokio::process::Command::new("docker")
+        .args(["port", registry_name, "5000"])
+        .output()
+        .await?;
+    
+    if docker_output.status.success() {
+        let port_info = String::from_utf8_lossy(&docker_output.stdout);
+        // Extract the host port from output like "0.0.0.0:5001"
+        if let Some(port_mapping) = port_info.trim().split(':').last() {
+            return Ok(format!("{}:{}", registry_name.replace("k3d-", ""), port_mapping));
+        }
+    }
+    
+    // Fallback to default
+    Ok("registry.localhost:5000".to_string())
+}
+
 async fn handle_cluster_command(command: ClusterCommands) -> Result<(), Box<dyn std::error::Error>> {
     match command {
         ClusterCommands::Create {
@@ -339,6 +382,7 @@ async fn handle_cluster_command(command: ClusterCommands) -> Result<(), Box<dyn 
             no_tls,
             no_network,
             basic,
+            registry_port,
         } => {
             if basic {
                 // Use basic setup
@@ -348,6 +392,7 @@ async fn handle_cluster_command(command: ClusterCommands) -> Result<(), Box<dyn 
                     lb_port: http_port,
                     agents,
                     servers,
+                    registry_port,
                     ..Default::default()
                 };
                 info!("Creating cluster with basic configuration...");
@@ -375,21 +420,11 @@ async fn handle_cluster_command(command: ClusterCommands) -> Result<(), Box<dyn 
                 config.network.configure_routes = !no_network;
                 config.network.configure_dns = !no_network;
                 config.network.patch_etc_hosts = !no_network;
+                config.registry.port = registry_port;
 
                 let manager = K3dClusterManager::new(config);
                 info!("Creating cluster '{}'...", name);
-                manager.create_cluster().await?;
-
-                if !no_tls || !no_network {
-                    info!("Configuring additional features...");
-                    if !no_tls {
-                        manager.configure_tls().await?;
-                    }
-                    if !no_network {
-                        manager.setup_routes().await?;
-                        manager.configure_dns().await?;
-                    }
-                }
+                manager.setup_cluster().await?;
             }
             info!("Cluster created successfully!");
         }
@@ -569,23 +604,8 @@ async fn handle_image_command(command: ImageCommands) -> Result<(), Box<dyn std:
             let registry_url = match registry {
                 Some(r) => r,
                 None => {
-                    // Try to auto-detect k3d registry
-                    let output = tokio::process::Command::new("k3d")
-                        .args(["registry", "list"])
-                        .output()
-                        .await?;
-                    
-                    if output.status.success() {
-                        let registry_list = String::from_utf8_lossy(&output.stdout);
-                        // Look for a running registry
-                        if registry_list.contains("registry.localhost") {
-                            "registry.localhost:5000".to_string()
-                        } else {
-                            return Err("No k3d registry found. Please create one with 'k8s-manager registry create' or specify --registry".into());
-                        }
-                    } else {
-                        return Err("Failed to detect k3d registry".into());
-                    }
+                    // Try to auto-detect k3d registry with correct port
+                    detect_registry_url().await?
                 }
             };
             
@@ -644,21 +664,8 @@ async fn handle_image_command(command: ImageCommands) -> Result<(), Box<dyn std:
             let registry_url = match registry {
                 Some(r) => r,
                 None => {
-                    let output = tokio::process::Command::new("k3d")
-                        .args(["registry", "list"])
-                        .output()
-                        .await?;
-                    
-                    if output.status.success() {
-                        let registry_list = String::from_utf8_lossy(&output.stdout);
-                        if registry_list.contains("registry.localhost") {
-                            "registry.localhost:5000".to_string()
-                        } else {
-                            return Err("No k3d registry found. Please create one with 'k8s-manager registry create' or specify --registry".into());
-                        }
-                    } else {
-                        return Err("Failed to detect k3d registry".into());
-                    }
+                    // Try to auto-detect k3d registry with correct port
+                    detect_registry_url().await?
                 }
             };
             
