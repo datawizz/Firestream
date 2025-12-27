@@ -13,6 +13,7 @@ let
   serviceModule = import ./lib/service.nix { inherit pkgs lib logModule validationsModule; };
   fileModule = import ./lib/file.nix { inherit pkgs lib logModule; };
   persistenceModule = import ./lib/persistence.nix { inherit pkgs lib logModule fsModule; };
+  configModule = import ./lib/config.nix { inherit pkgs lib logModule; };
 
   # Aggregate core libraries into a single attribute set
   coreLibs = {
@@ -24,6 +25,7 @@ let
     service = serviceModule;
     file = fileModule;
     persistence = persistenceModule;
+    config = configModule;
   };
 
   # Import environment modules
@@ -38,6 +40,21 @@ let
   # Import application factory
   appBase = import ./apps/base.nix { inherit pkgs lib coreLibs envModules; };
 
+  # Import container factories
+  containerBase = import ./containers/base.nix {
+    inherit pkgs lib coreLibs;
+    mkAppModule = appBase.mkAppModule;
+  };
+  containerPython = import ./containers/python.nix {
+    inherit pkgs lib;
+    mkContainerModule = containerBase.mkContainerModule;
+  };
+
+  containerModules = {
+    mkContainerModule = containerBase.mkContainerModule;
+    mkPythonContainerModule = containerPython.mkPythonContainerModule;
+  };
+
 in {
   # Core library modules (for direct access)
   # Usage: firestream.lib.log.functions
@@ -50,6 +67,15 @@ in {
   # Application module factory
   # Usage: firestream.mkAppModule { name = "kafka"; ... }
   mkAppModule = appBase.mkAppModule;
+
+  # Container module factories
+  # Usage: firestream.containers.mkContainerModule { ... }
+  # Usage: firestream.containers.mkPythonContainerModule { ... }
+  containers = containerModules;
+
+  # Convenience: direct access to container factories
+  mkContainerModule = containerModules.mkContainerModule;
+  mkPythonContainerModule = containerModules.mkPythonContainerModule;
 
   # Convenience: combined functions from all core libs
   # Returns a single string containing all library functions
@@ -77,5 +103,6 @@ in {
     description = "Firestream Nix Shell Module System for container initialization";
     moduleCount = builtins.length (lib.attrNames coreLibs);
     modules = lib.attrNames coreLibs;
+    containerFactories = [ "mkContainerModule" "mkPythonContainerModule" ];
   };
 }

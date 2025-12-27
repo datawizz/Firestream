@@ -4,9 +4,15 @@
   inputs = {
     # Fixed nixpkgs version fixes system packages that float on the latest Debian
     nixpkgs.url = "github:NixOS/nixpkgs/release-24.11";
+
+    # Container flakes - each can be built independently or via root
+    airflow-container = {
+      url = "path:./src/containers/firestream/airflow";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
   };
 
-  outputs = { self, nixpkgs }: let
+  outputs = { self, nixpkgs, airflow-container }: let
     # Define supported systems
     supportedSystems = [
       "x86_64-linux"
@@ -212,6 +218,7 @@
   in {
     packages = forAllSystems (system: let
       pkgs = pkgsForSystem system;
+      isLinux = builtins.elem system [ "x86_64-linux" "aarch64-linux" ];
     in {
       container = mkContainerConfig system;
       default = mkContainerConfig system;
@@ -226,6 +233,17 @@
           pkgs.grype   # Vulnerability scanner for containers and filesystems
           pkgs.docker  # Docker CLI for container management
         ];
+      };
+
+      # Container images namespace
+      # Usage: nix build .#containers.airflow
+      containers = {
+        # Airflow container (Docker image only on Linux)
+        airflow = if isLinux
+          then airflow-container.packages.${system}.dockerImage
+          else pkgs.runCommand "airflow-not-available" {} ''
+            echo "Docker images only available on Linux systems" > $out
+          '';
       };
     });
 
@@ -261,6 +279,8 @@
       firestream-file-tests = tests.fileTests;
       firestream-persistence-tests = tests.persistenceTests;
       firestream-integration-tests = tests.integrationTests;
+      firestream-config-tests = tests.configTests;
+      firestream-container-tests = tests.containerTests;
     });
 
     # System-independent Firestream module system
@@ -274,5 +294,16 @@
     #     in { ... };
     # }
     firestreamModules = { pkgs }: import ./bin/nix/firestream { inherit pkgs; };
+
+    # Container modules - expose container flakes for external use
+    # Usage from other flakes:
+    #   inputs.firestream.url = "path:./path/to/Firestream";
+    #   airflowImage = firestream.containerModules.airflow.packages.x86_64-linux.dockerImage;
+    containerModules = {
+      airflow = airflow-container;
+      # Future containers can be added here:
+      # postgresql = postgresql-container;
+      # kafka = kafka-container;
+    };
   };
 }

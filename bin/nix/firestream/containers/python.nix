@@ -1,0 +1,176 @@
+# Python Container Module Factory
+# Copyright Firestream. Apache-2.0 License.
+#
+# This module provides mkPythonContainerModule - a specialized factory for
+# Python applications that integrates with uv2nix/pyproject-nix for dependency
+# management.
+#
+# Features:
+# - uv2nix/pyproject-nix integration for Python dependencies
+# - Automatic PYTHONPATH configuration
+# - pip requirements.txt support at runtime
+# - Virtual environment bundling
+#
+# Usage:
+#   let
+#     container = mkPythonContainerModule {
+#       name = "airflow";
+#       version = "3.0.3";
+#       pythonEnv = pythonSet.mkVirtualEnv "airflow-env" deps;
+#       python = pkgs.python312;
+#       systemDeps = [ pkgs.postgresql ];
+#       validateFn = "...";
+#       runCmd = "airflow webserver";
+#     };
+#   in container.dockerImage
+
+{ pkgs, lib, mkContainerModule }:
+
+{
+  # Factory function for Python container modules
+  mkPythonContainerModule = {
+    # Basic metadata
+    name,
+    version ? "1.0.0",
+
+    # Python configuration (required)
+    pythonEnv,               # The virtual environment from uv2nix/pyproject-nix
+    python ? pkgs.python312, # Python interpreter
+
+    # Environment configuration
+    envVars ? {},
+    envVarsWithSecrets ? [],
+
+    # Paths configuration
+    paths ? {
+      base = "/opt/firestream/${name}";
+      conf = "/opt/firestream/${name}/config";
+      data = "/firestream/${name}/data";
+      logs = "/opt/firestream/${name}/logs";
+    },
+
+    # User/group configuration
+    user ? {
+      name = name;
+      group = name;
+      uid = 1001;
+      gid = 1001;
+    },
+
+    # Application-specific shell functions
+    validateFn ? "",
+    configFn ? "",
+    initFn ? "",
+    runCmd ? "",
+
+    # Container dependencies
+    systemDeps ? [],
+    runtimeBinDeps ? [],
+    extraDeps ? [],
+
+    # Docker configuration
+    dockerConfig ? {},
+    exposedPorts ? [],
+    volumes ? [],
+
+    # Python-specific options
+    requirementsPath ? "/bitnami/python/requirements.txt",  # Runtime requirements
+    enablePip ? true,        # Allow pip install at runtime
+    sitePackagesPath ? null, # Override site-packages path
+
+    # Custom scripts and hooks
+    customScripts ? {},
+    devShellPackages ? [],
+    devShellHook ? "",
+  }:
+  let
+    # Compute site packages path
+    pythonSitePackages =
+      if sitePackagesPath != null
+      then sitePackagesPath
+      else "${pythonEnv}/${python.sitePackages}";
+
+    # Python-specific runtime bins
+    pythonRuntimeBins = runtimeBinDeps ++ [ pythonEnv ];
+
+    # Create wrapper for entrypoint that sets up Python environment
+    pythonEntrypointWrapper = entrypoint: pkgs.runCommand "${name}-python-entrypoint" {
+      nativeBuildInputs = [ pkgs.makeWrapper ];
+    } ''
+      mkdir -p $out/bin
+      makeWrapper ${entrypoint}/bin/${name}-entrypoint $out/bin/${name}-entrypoint \
+        --set PATH "${lib.makeBinPath (pythonRuntimeBins ++ systemDeps)}:$PATH" \
+        --set PYTHONPATH "${pythonSitePackages}" \
+        --set LD_LIBRARY_PATH "${lib.makeLibraryPath [ pkgs.stdenv.cc.cc.lib ]}:''${LD_LIBRARY_PATH:-}" \
+        --set SSL_CERT_FILE "${pkgs.cacert}/etc/ssl/certs/ca-bundle.crt" \
+        --set NIX_SSL_CERT_FILE "${pkgs.cacert}/etc/ssl/certs/ca-bundle.crt"
+    '';
+
+    # Enhanced init function that handles Python requirements
+    pythonInitFn = ''
+      ${initFn}
+
+      # Install custom Python requirements if present
+      ${lib.optionalString enablePip ''
+      if [[ -f "${requirementsPath}" ]]; then
+        info "Installing custom Python requirements from ${requirementsPath}..."
+        ${pythonEnv}/bin/pip install --quiet -r "${requirementsPath}" || warn "Failed to install some requirements"
+      fi
+      ''}
+    '';
+
+    # Enhanced Docker config with Python environment
+    pythonDockerConfig = lib.recursiveUpdate {
+      Env = [
+        "PATH=${pythonEnv}/bin:/bin:/usr/bin"
+        "PYTHONPATH=${pythonSitePackages}"
+        "PYTHONDONTWRITEBYTECODE=1"
+        "PYTHONUNBUFFERED=1"
+      ];
+    } dockerConfig;
+
+    # Create the container module
+    containerModule = mkContainerModule {
+      inherit name version envVars envVarsWithSecrets paths user;
+      inherit validateFn configFn runCmd;
+      initFn = pythonInitFn;
+
+      systemDeps = systemDeps ++ [
+        pkgs.cacert
+        pkgs.stdenv.cc.cc.lib
+      ];
+
+      runtimeBinDeps = pythonRuntimeBins;
+      extraDeps = extraDeps;
+
+      dockerConfig = pythonDockerConfig;
+      inherit exposedPorts;
+      volumes = volumes ++ [
+        (builtins.dirOf requirementsPath)  # Allow mounting requirements
+      ];
+
+      entrypointWrapper = pythonEntrypointWrapper;
+
+      inherit customScripts;
+      devShellPackages = devShellPackages ++ [
+        pythonEnv
+        pkgs.uv
+      ];
+      devShellHook = ''
+        export PYTHONPATH="${pythonSitePackages}"
+        echo "Python: ${python}/bin/python"
+        echo "Virtual environment: ${pythonEnv}"
+        ${devShellHook}
+      '';
+    };
+
+  in containerModule // {
+    # Add Python-specific attributes
+    inherit pythonEnv python pythonSitePackages;
+
+    # Override meta with Python info
+    meta = containerModule.meta // {
+      pythonVersion = python.version;
+    };
+  };
+}

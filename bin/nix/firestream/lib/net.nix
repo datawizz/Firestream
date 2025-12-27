@@ -326,6 +326,127 @@ let
     }
 
     ########################
+    # Retry a command until it succeeds or max attempts reached
+    # Arguments:
+    #   $1 - command to execute (as string)
+    # Flags:
+    #   --tries - Number of retry attempts (default: 30)
+    #   --sleep - Seconds to sleep between retries (default: 5)
+    # Returns:
+    #   Boolean
+    #########################
+    retry_while() {
+        local cmd=""
+        local tries=30
+        local sleep_time=5
+
+        # Parse arguments
+        while [[ "$#" -gt 0 ]]; do
+            case "$1" in
+                --tries)
+                    shift
+                    tries="''${1:?missing tries value}"
+                    ;;
+                --sleep)
+                    shift
+                    sleep_time="''${1:?missing sleep value}"
+                    ;;
+                --)
+                    shift
+                    break
+                    ;;
+                -*)
+                    stderr_print "unrecognized flag $1"
+                    return 1
+                    ;;
+                *)
+                    cmd="$1"
+                    ;;
+            esac
+            shift
+        done
+
+        if [[ -z "$cmd" ]]; then
+            stderr_print "command is required"
+            return 1
+        fi
+
+        local attempt=0
+        while ! eval "$cmd"; do
+            ((attempt++))
+            if [[ $attempt -ge $tries ]]; then
+                error "Command failed after $tries attempts: $cmd"
+                return 1
+            fi
+            debug "Retry attempt $attempt/$tries for: $cmd"
+            ${pkgs.coreutils}/bin/sleep "$sleep_time"
+        done
+        return 0
+    }
+
+    ########################
+    # Retry a command with timeout
+    # Arguments:
+    #   $1 - command to execute (as string)
+    # Flags:
+    #   --timeout - Total timeout in seconds (default: 120)
+    #   --sleep - Seconds to sleep between retries (default: 5)
+    # Returns:
+    #   Boolean
+    #########################
+    retry_with_timeout() {
+        local cmd=""
+        local timeout=120
+        local sleep_time=5
+
+        # Parse arguments
+        while [[ "$#" -gt 0 ]]; do
+            case "$1" in
+                --timeout)
+                    shift
+                    timeout="''${1:?missing timeout value}"
+                    ;;
+                --sleep)
+                    shift
+                    sleep_time="''${1:?missing sleep value}"
+                    ;;
+                --)
+                    shift
+                    break
+                    ;;
+                -*)
+                    stderr_print "unrecognized flag $1"
+                    return 1
+                    ;;
+                *)
+                    cmd="$1"
+                    ;;
+            esac
+            shift
+        done
+
+        if [[ -z "$cmd" ]]; then
+            stderr_print "command is required"
+            return 1
+        fi
+
+        local start_time
+        start_time=$(${pkgs.coreutils}/bin/date +%s)
+        local elapsed=0
+
+        while ! eval "$cmd"; do
+            elapsed=$(($(${pkgs.coreutils}/bin/date +%s) - start_time))
+            if [[ $elapsed -ge $timeout ]]; then
+                error "Command timed out after ''${timeout}s: $cmd"
+                return 1
+            fi
+            debug "Retry (elapsed: ''${elapsed}s/''${timeout}s) for: $cmd"
+            ${pkgs.coreutils}/bin/sleep "$sleep_time"
+        done
+        return 0
+    }
+
+    ########################
     # Wait for TCP port to be available
     # Arguments:
     #   $1 - host
@@ -424,6 +545,8 @@ in
     "is_hostname_resolved"
     "parse_uri"
     "wait_for_http_connection"
+    "retry_while"
+    "retry_with_timeout"
     "wait_for_port"
   ];
 
