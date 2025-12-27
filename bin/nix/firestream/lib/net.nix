@@ -1,0 +1,436 @@
+# net.nix - Network utilities and connectivity functions
+{ pkgs, lib, logModule, validationsModule }:
+
+let
+  functions = ''
+    # Import dependencies
+    ${logModule.functions}
+    ${validationsModule.functions}
+
+    ########################
+    # Perform DNS lookup
+    # Arguments:
+    #   $1 - hostname
+    # Returns:
+    #   First IP address or empty string
+    #########################
+    dns_lookup() {
+        local host="''${1:?hostname is missing}"
+        ${pkgs.glibc.bin}/bin/getent ahosts "$host" | ${pkgs.gawk}/bin/awk 'NR==1 {print $1}'
+    }
+
+    ########################
+    # Wait for DNS lookup to succeed
+    # Arguments:
+    #   $1 - hostname
+    # Flags:
+    #   --tries - Number of retry attempts (default: 12)
+    #   --sleep - Seconds to sleep between retries (default: 5)
+    # Returns:
+    #   Boolean
+    #########################
+    wait_for_dns_lookup() {
+        local host=""
+        local tries=12
+        local sleep_time=5
+
+        # Parse arguments
+        while [[ "$#" -gt 0 ]]; do
+            case "$1" in
+                --tries)
+                    shift
+                    tries="''${1:?missing tries value}"
+                    ;;
+                --sleep)
+                    shift
+                    sleep_time="''${1:?missing sleep value}"
+                    ;;
+                --)
+                    shift
+                    break
+                    ;;
+                -*)
+                    stderr_print "unrecognized flag $1"
+                    return 1
+                    ;;
+                *)
+                    host="$1"
+                    ;;
+            esac
+            shift
+        done
+
+        if [[ -z "$host" ]]; then
+            stderr_print "hostname is required"
+            return 1
+        fi
+
+        for ((i = 1; i <= tries; i++)); do
+            debug "DNS lookup attempt $i/$tries for $host"
+            local result
+            result=$(dns_lookup "$host")
+            if [[ -n "$result" ]]; then
+                debug "DNS lookup succeeded: $host -> $result"
+                return 0
+            fi
+            ${pkgs.coreutils}/bin/sleep "$sleep_time"
+        done
+
+        error "DNS lookup failed for $host after $tries attempts"
+        return 1
+    }
+
+    ########################
+    # Get machine's IP address
+    # Arguments:
+    #   None
+    # Returns:
+    #   Machine's IP address
+    #########################
+    get_machine_ip() {
+        local hostname
+        hostname=$(${pkgs.coreutils}/bin/hostname)
+        dns_lookup "$hostname"
+    }
+
+    ########################
+    # Check if hostname resolves
+    # Arguments:
+    #   $1 - hostname
+    # Returns:
+    #   Boolean
+    #########################
+    is_hostname_resolved() {
+        local host="''${1:?hostname is missing}"
+        local result
+        result=$(dns_lookup "$host")
+        [[ -n "$result" ]]
+    }
+
+    ########################
+    # Parse URI into components
+    # Arguments:
+    #   $1 - URI string
+    # Flags:
+    #   --scheme - Extract scheme
+    #   --authority - Extract authority
+    #   --userinfo - Extract userinfo
+    #   --host - Extract host
+    #   --port - Extract port
+    #   --path - Extract path
+    #   --query - Extract query
+    #   --fragment - Extract fragment
+    # Returns:
+    #   Requested URI component
+    #########################
+    parse_uri() {
+        local uri=""
+        local component="all"
+
+        # Parse arguments
+        while [[ "$#" -gt 0 ]]; do
+            case "$1" in
+                --scheme)
+                    component="scheme"
+                    ;;
+                --authority)
+                    component="authority"
+                    ;;
+                --userinfo)
+                    component="userinfo"
+                    ;;
+                --host)
+                    component="host"
+                    ;;
+                --port)
+                    component="port"
+                    ;;
+                --path)
+                    component="path"
+                    ;;
+                --query)
+                    component="query"
+                    ;;
+                --fragment)
+                    component="fragment"
+                    ;;
+                -*)
+                    stderr_print "unrecognized flag $1"
+                    return 1
+                    ;;
+                *)
+                    uri="$1"
+                    ;;
+            esac
+            shift
+        done
+
+        if [[ -z "$uri" ]]; then
+            stderr_print "URI is required"
+            return 1
+        fi
+
+        # URI regex pattern: scheme://[userinfo@]host[:port][/path][?query][#fragment]
+        local scheme=""
+        local authority=""
+        local userinfo=""
+        local host=""
+        local port=""
+        local path=""
+        local query=""
+        local fragment=""
+
+        # Extract fragment first
+        if [[ "$uri" =~ ^([^#]*)#(.*)$ ]]; then
+            uri="''${BASH_REMATCH[1]}"
+            fragment="''${BASH_REMATCH[2]}"
+        fi
+
+        # Extract query
+        if [[ "$uri" =~ ^([^?]*)\?(.*)$ ]]; then
+            uri="''${BASH_REMATCH[1]}"
+            query="''${BASH_REMATCH[2]}"
+        fi
+
+        # Extract scheme
+        if [[ "$uri" =~ ^([a-zA-Z][a-zA-Z0-9+.-]*):// ]]; then
+            scheme="''${BASH_REMATCH[1]}"
+            uri="''${uri#*://}"
+        fi
+
+        # Extract path
+        if [[ "$uri" =~ ^([^/]*)(/.*)$ ]]; then
+            authority="''${BASH_REMATCH[1]}"
+            path="''${BASH_REMATCH[2]}"
+        else
+            authority="$uri"
+        fi
+
+        # Extract userinfo
+        if [[ "$authority" =~ ^(.*)@(.*)$ ]]; then
+            userinfo="''${BASH_REMATCH[1]}"
+            authority="''${BASH_REMATCH[2]}"
+        fi
+
+        # Extract port
+        if [[ "$authority" =~ ^(.*):([0-9]+)$ ]]; then
+            host="''${BASH_REMATCH[1]}"
+            port="''${BASH_REMATCH[2]}"
+        else
+            host="$authority"
+        fi
+
+        case "$component" in
+            scheme)
+                ${pkgs.coreutils}/bin/echo "$scheme"
+                ;;
+            authority)
+                ${pkgs.coreutils}/bin/echo "$authority"
+                ;;
+            userinfo)
+                ${pkgs.coreutils}/bin/echo "$userinfo"
+                ;;
+            host)
+                ${pkgs.coreutils}/bin/echo "$host"
+                ;;
+            port)
+                ${pkgs.coreutils}/bin/echo "$port"
+                ;;
+            path)
+                ${pkgs.coreutils}/bin/echo "$path"
+                ;;
+            query)
+                ${pkgs.coreutils}/bin/echo "$query"
+                ;;
+            fragment)
+                ${pkgs.coreutils}/bin/echo "$fragment"
+                ;;
+            all)
+                ${pkgs.coreutils}/bin/echo "scheme=$scheme"
+                ${pkgs.coreutils}/bin/echo "authority=$authority"
+                ${pkgs.coreutils}/bin/echo "userinfo=$userinfo"
+                ${pkgs.coreutils}/bin/echo "host=$host"
+                ${pkgs.coreutils}/bin/echo "port=$port"
+                ${pkgs.coreutils}/bin/echo "path=$path"
+                ${pkgs.coreutils}/bin/echo "query=$query"
+                ${pkgs.coreutils}/bin/echo "fragment=$fragment"
+                ;;
+        esac
+    }
+
+    ########################
+    # Wait for HTTP endpoint to respond
+    # Arguments:
+    #   $1 - URL
+    # Flags:
+    #   --tries - Number of retry attempts (default: 12)
+    #   --sleep - Seconds to sleep between retries (default: 5)
+    #   --status - Expected HTTP status code (default: 200)
+    # Returns:
+    #   Boolean
+    #########################
+    wait_for_http_connection() {
+        local url=""
+        local tries=12
+        local sleep_time=5
+        local expected_status=200
+
+        # Parse arguments
+        while [[ "$#" -gt 0 ]]; do
+            case "$1" in
+                --tries)
+                    shift
+                    tries="''${1:?missing tries value}"
+                    ;;
+                --sleep)
+                    shift
+                    sleep_time="''${1:?missing sleep value}"
+                    ;;
+                --status)
+                    shift
+                    expected_status="''${1:?missing status value}"
+                    ;;
+                --)
+                    shift
+                    break
+                    ;;
+                -*)
+                    stderr_print "unrecognized flag $1"
+                    return 1
+                    ;;
+                *)
+                    url="$1"
+                    ;;
+            esac
+            shift
+        done
+
+        if [[ -z "$url" ]]; then
+            stderr_print "URL is required"
+            return 1
+        fi
+
+        for ((i = 1; i <= tries; i++)); do
+            debug "HTTP connection attempt $i/$tries for $url"
+            local status
+            status=$(${pkgs.curl}/bin/curl -s -o /dev/null -w "%{http_code}" "$url" 2>/dev/null || ${pkgs.coreutils}/bin/echo "000")
+            if [[ "$status" -eq "$expected_status" ]]; then
+                debug "HTTP connection succeeded: $url (status: $status)"
+                return 0
+            fi
+            ${pkgs.coreutils}/bin/sleep "$sleep_time"
+        done
+
+        error "HTTP connection failed for $url after $tries attempts"
+        return 1
+    }
+
+    ########################
+    # Wait for TCP port to be available
+    # Arguments:
+    #   $1 - host
+    #   $2 - port
+    # Flags:
+    #   --tries - Number of retry attempts (default: 12)
+    #   --sleep - Seconds to sleep between retries (default: 5)
+    # Returns:
+    #   Boolean
+    #########################
+    wait_for_port() {
+        local host=""
+        local port=""
+        local tries=12
+        local sleep_time=5
+
+        # Parse arguments
+        while [[ "$#" -gt 0 ]]; do
+            case "$1" in
+                --tries)
+                    shift
+                    tries="''${1:?missing tries value}"
+                    ;;
+                --sleep)
+                    shift
+                    sleep_time="''${1:?missing sleep value}"
+                    ;;
+                --)
+                    shift
+                    break
+                    ;;
+                -*)
+                    stderr_print "unrecognized flag $1"
+                    return 1
+                    ;;
+                *)
+                    if [[ -z "$host" ]]; then
+                        host="$1"
+                    elif [[ -z "$port" ]]; then
+                        port="$1"
+                    else
+                        stderr_print "too many arguments"
+                        return 1
+                    fi
+                    ;;
+            esac
+            shift
+        done
+
+        if [[ -z "$host" ]]; then
+            stderr_print "host is required"
+            return 1
+        fi
+
+        if [[ -z "$port" ]]; then
+            stderr_print "port is required"
+            return 1
+        fi
+
+        for ((i = 1; i <= tries; i++)); do
+            debug "Port check attempt $i/$tries for $host:$port"
+            if ${pkgs.netcat-gnu}/bin/nc -z "$host" "$port" 2>/dev/null; then
+                debug "Port $port is available on $host"
+                return 0
+            fi
+            ${pkgs.coreutils}/bin/sleep "$sleep_time"
+        done
+
+        error "Port $port on $host not available after $tries attempts"
+        return 1
+    }
+  '';
+in
+{
+  meta = {
+    name = "libnet";
+    description = "Network utilities and connectivity functions";
+    version = "1.0.0";
+  };
+
+  imports = [ logModule validationsModule ];
+  runtimeDeps = with pkgs; [
+    coreutils
+    glibc.bin
+    gawk
+    findutils
+    nettools
+    curl
+    netcat-gnu
+  ];
+  inherit functions;
+  exports = [
+    "dns_lookup"
+    "wait_for_dns_lookup"
+    "get_machine_ip"
+    "is_hostname_resolved"
+    "parse_uri"
+    "wait_for_http_connection"
+    "wait_for_port"
+  ];
+
+  script = pkgs.writeTextDir "opt/firestream/scripts/libnet.sh" ''
+    #!/bin/bash
+    # Copyright Firestream. Apache-2.0 License.
+    # Generated by Nix - do not edit directly.
+    ${functions}
+  '';
+}

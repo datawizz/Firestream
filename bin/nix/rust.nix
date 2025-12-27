@@ -176,40 +176,6 @@ opt-level = 3
 codegen-units = 16
 debug = false
 
-# Specific heavy dependencies
-[profile.dev.package.datafusion]
-opt-level = 3
-
-[profile.dev.package.duckdb]
-opt-level = 3
-
-[profile.dev.package.arrow]
-opt-level = 3
-
-[profile.dev.package.arrow-array]
-opt-level = 3
-
-[profile.dev.package.arrow-buffer]
-opt-level = 3
-
-[profile.dev.package.arrow-cast]
-opt-level = 3
-
-[profile.dev.package.arrow-schema]
-opt-level = 3
-
-[profile.dev.package.iceberg]
-opt-level = 3
-
-[profile.dev.package.iceberg-datafusion]
-opt-level = 3
-
-[profile.dev.package.polars]
-opt-level = 3
-
-[profile.dev.package.deltalake]
-opt-level = 3
-
 [net]
 git-fetch-with-cli = true
 EOF

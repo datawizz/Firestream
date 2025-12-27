@@ -3,7 +3,7 @@
 
   inputs = {
     # Fixed nixpkgs version fixes system packages that float on the latest Debian
-    nixpkgs.url = "github:NixOS/nixpkgs/release-25.05";
+    nixpkgs.url = "github:NixOS/nixpkgs/release-24.11";
   };
 
   outputs = { self, nixpkgs }: let
@@ -39,19 +39,8 @@
     getBitnamiCharts = pkgs: pkgs.fetchgit {
       name = "bitnami-charts";
       url = "https://github.com/bitnami/charts.git";  # Public repository
-      rev = "76c10cf217c5f37c4806bfc3b06683b849d8903f";  # Git commit hash
-      sha256 = "7kx42VCkuTMCSmJ3lHX48nwL1mri46Ss9R0sJNiWgro=";    # Hash of the files in the repository
-
-      # Optional configurations
-      fetchSubmodules = false;  # Set to true if you need submodules
-      deepClone = false;        # Keep this false for better performance
-    };
-
-    getSparkOperator = pkgs: pkgs.fetchgit {
-      name = "spark-operator-charts";
-      url = "https://github.com/kubeflow/spark-operator.git";  # Public repository
-      rev = "53dc38ef551a7b7ed2c933e14cd5550d74fcee26";  # Git commit hash
-      sha256 = "=";    # Hash of the files in the repository
+      rev = "9bc801b4caa0b2fff6ae3392f6b417877a056965";  # Git commit hash
+      sha256 = "8No+rUyEmugs26c7XYo1SAwlafG8sKrhsk6FnaJwL/U=";    # Hash of the files in the repository
 
       # Optional configurations
       fetchSubmodules = false;  # Set to true if you need submodules
@@ -63,44 +52,20 @@
       pkgs = pkgsForSystem system;
       charts = getBitnamiCharts pkgs;
 
-      # Import Docker-from-Docker module
-      dockerInDocker = import ./bin/nix/docker-from-docker.nix { inherit pkgs; };
-
-      # Import Python packages from python.nix
-      pythonModule = import ./bin/nix/python.nix {
-        inherit pkgs;
-        lib = nixpkgs.lib;
-        config = {};
-      };
-
-      # Extract Python packages from the module
-      pythonPackages = pythonModule.environment.systemPackages;
-
-      # Import Rust packages from rust.nix
-      rustModule = import ./bin/nix/rust.nix {
-        inherit pkgs;
-        lib = nixpkgs.lib;
-      };
-
-      # Import Node.js configuration from node.nix
-      nodeModule = import ./bin/nix/node.nix {
-        inherit pkgs;
-        lib = nixpkgs.lib;
-      };
-
       # Define the shell packages
       shellPackages = with pkgs; [
 
-        # kubernetes
-        k3d
-        kubectl
-        kubernetes-helm
+        # Rust toolchain
+        # rustc
+        # cargo
+        # rust-analyzer
+        # rustfmt
+        rustup
+        # TODO rustup makes things non-deterministic. Normal Nix install doesn't include linked C libraries and struggles with rust-src required for linting
 
-        # DuckDB
-        # Included for TCP-H and TCP-DS dataset generation
-        duckdb
 
-        # Node is configured via nodeModule
+        # Node
+        nodejs_18
 
         # Distribution of protoc and the gRPC Node protoc plugin for ease of installation with npm
         grpc-tools
@@ -109,6 +74,12 @@
         grpcurl
         grpcui
 
+        # Python 3.11
+        python311
+        python311Packages.pip
+        python311Packages.protobuf
+        python311Packages.types-protobuf
+
         # Kafka connector
         rdkafka
 
@@ -116,15 +87,11 @@
         maven
         jdk11
 
-        # Spark
-        # Version: 3.5.4 ships with Nix 25.05
-        spark
-
         # Scala
-        scala_2_13
+        scala_2_11
         scalafmt
         metals
-        (sbt.override { jre = jdk11; })
+        sbt-with-scala-native
 
         # RockDB
         rocksdb
@@ -133,35 +100,32 @@
         curl
         btop
 
-        # Additional build tools not included in rust.nix
-        # (rust.nix already includes: gcc, clang, llvm, pkg-config, openssl, xz, zlib)
-      ] ++ pythonPackages ++ dockerInDocker.packages ++ rustModule.packages ++ nodeModule.packages;
+        # LLVM/Clang tools
+        llvmPackages_latest.libclang.lib
+        llvmPackages.bintools
+        clang
+        libclang
+        llvm
+        gcc
+        xz
+        zlib
+        openssl
+
+        # Build Tools
+        pkg-config
+
+        # VIB (Validation, Inspection, Build) Tools
+        # These tools are used for container testing and vulnerability scanning
+        goss    # Server validation and testing
+        trivy   # Container vulnerability scanner
+        grype   # Vulnerability scanner for containers and filesystems
+        docker  # Docker CLI for container management
+      ];
 
       # Create a profile script that sets up the environment
       profileScript = pkgs.writeText "nix-env.sh" ''
         # Add packages to the path
         export PATH="${pkgs.lib.makeBinPath shellPackages}:$PATH"
-
-        # Ensure pkg-config can find system libraries
-        export PKG_CONFIG_PATH="${pkgs.xz}/lib/pkgconfig:${pkgs.openssl.dev}/lib/pkgconfig:$PKG_CONFIG_PATH"
-
-        # C library paths for building Python packages with C extensions
-        export C_INCLUDE_PATH="${pkgs.rdkafka.dev}/include:${pkgs.xz.dev}/include:${pkgs.zlib.dev}/include:${pkgs.openssl.dev}/include:$C_INCLUDE_PATH"
-        export LIBRARY_PATH="${pkgs.rdkafka}/lib:${pkgs.xz}/lib:${pkgs.zlib}/lib:${pkgs.openssl.out}/lib:$LIBRARY_PATH"
-        export PKG_CONFIG_PATH="${pkgs.rdkafka.dev}/lib/pkgconfig:$PKG_CONFIG_PATH"
-
-        # OpenSSL specific environment variables for Rust builds
-        export OPENSSL_DIR="${pkgs.openssl.dev}"
-        export OPENSSL_LIB_DIR="${pkgs.openssl.out}/lib"
-        export OPENSSL_INCLUDE_DIR="${pkgs.openssl.dev}/include"
-
-        # Additional build flags for packages that need explicit paths
-        export CFLAGS="-I${pkgs.rdkafka.dev}/include -I${pkgs.zlib.dev}/include -I${pkgs.openssl.dev}/include"
-        export LDFLAGS="-L${pkgs.rdkafka}/lib -L${pkgs.zlib}/lib -L${pkgs.openssl.out}/lib"
-
-        # Some Python packages look for these specific variables
-        export RDKAFKA_INCLUDE_DIR="${pkgs.rdkafka.dev}/include"
-        export RDKAFKA_LIB_DIR="${pkgs.rdkafka}/lib"
 
         # Create symlink to Python in home directory if it doesn't exist
         if [ ! -L "$HOME/.python" ]; then
@@ -172,16 +136,6 @@
         export PYTHONPATH="$HOME/.python"
         export JUPYTER_PATH="$HOME/.python/share/jupyter"
         export IPYTHONDIR="$HOME/.python"
-
-        # Force UV to use Nix Python
-        export UV_PYTHON_DOWNLOADS=never
-        export UV_PYTHON="${pkgs.python312}/bin/python"
-        export UV_LINK_MODE=copy
-
-        # Auto-detect and use UV when in a project
-        alias python='[[ -f pyproject.toml ]] && uv run python || ${pkgs.python312}/bin/python'
-        alias pip='[[ -f pyproject.toml ]] && uv pip || ${pkgs.python312}/bin/python -m pip'
-        alias jupyter='[[ -f pyproject.toml ]] && uv run jupyter || jupyter'
 
         # Set up Nix environment
         export NIX_PATH="nixpkgs=${pkgs.path}"
@@ -195,23 +149,20 @@
         fi
         export BITNAMI_CHARTS_HOME="$HOME/bitnami-charts/"
 
-        # Ensure pkg-config can find system libraries (already set above, removing duplicate)
-        # export PKG_CONFIG_PATH="${pkgs.xz}/lib/pkgconfig:$PKG_CONFIG_PATH"
+        # Ensure pkg-config can find system libraries
+        export PKG_CONFIG_PATH="${pkgs.xz}/lib/pkgconfig:$PKG_CONFIG_PATH"
 
         # Try to use system lzma if available
         export LZMA_API_STATIC=1
 
-        # Rust environment from rust.nix
-        ${rustModule.envVars}
+        # rustup environment
+        export PATH="$HOME/.cargo/bin:$PATH"
 
-        # Node.js environment from node.nix
-        ${nodeModule.envVars}
+        # Set up Rust source path
+        export RUST_SRC_PATH="${pkgs.rust.packages.stable.rustPlatform.rustLibSrc}"
 
-        # Docker-from-Docker configuration
-        ${dockerInDocker.profileScript}
-
-        # Node.js profile setup
-        ${nodeModule.profileScript}
+        # Bindgen configuration
+        export LIBCLANG_PATH="${pkgs.lib.makeLibraryPath [ pkgs.llvmPackages_latest.libclang.lib ]}"
       '';
 
     in pkgs.runCommand "container-env" {
@@ -247,34 +198,6 @@
         echo "Container environment setup complete!"
         echo "To activate in current shell, run:"
         echo "  source /etc/profile.d/nix-env.sh"
-
-        # Copy docker-init.sh to /usr/local/share if it exists in the output
-        if [ -f $out/bin/docker-init.sh ]; then
-          echo "Installing docker-init.sh..."
-          mkdir -p /usr/local/share
-          cp -pf $out/bin/docker-init.sh /usr/local/share/docker-init.sh
-          chmod 755 /usr/local/share/docker-init.sh 2>/dev/null || true
-        fi
-
-        # Run Docker-from-Docker setup if available
-        if [ -f ${dockerInDocker.setupDocker}/bin/setup-docker-from-docker ]; then
-          echo "Running Docker-from-Docker setup..."
-          ${dockerInDocker.setupDocker}/bin/setup-docker-from-docker || {
-            echo "Warning: Docker-from-Docker setup failed, but continuing..."
-          }
-        fi
-
-        # Run Rust setup
-        echo "Running Rust environment setup..."
-        ${rustModule.setupScript}
-
-        # Run Node.js setup
-        if [ -f ${nodeModule.setupScript}/bin/setup-node ]; then
-          echo "Running Node.js environment setup..."
-          ${nodeModule.setupScript}/bin/setup-node || {
-            echo "Warning: Node.js setup failed, but continuing..."
-          }
-        fi
         EOF
 
         chmod +x $out/bin/setup-container
@@ -284,17 +207,72 @@
         ${pkgs.lib.concatMapStrings (pkg: ''
           ln -s ${pkg} $out/packages/$(basename ${pkg})
         '') shellPackages}
-
-        # Add Docker-from-Docker scripts
-        mkdir -p $out/bin
-        ln -s ${dockerInDocker.dockerInit}/bin/* $out/bin/
-        ln -s ${dockerInDocker.setupDocker}/bin/* $out/bin/
       '';
 
   in {
-    packages = forAllSystems (system: {
+    packages = forAllSystems (system: let
+      pkgs = pkgsForSystem system;
+    in {
       container = mkContainerConfig system;
       default = mkContainerConfig system;
+
+      # VIB (Validation, Inspection, Build) Tools bundle
+      # Collection of tools for container testing and vulnerability scanning
+      vib-tools = pkgs.buildEnv {
+        name = "firestream-vib-tools";
+        paths = [
+          pkgs.goss    # Server validation and testing
+          pkgs.trivy   # Container vulnerability scanner
+          pkgs.grype   # Vulnerability scanner for containers and filesystems
+          pkgs.docker  # Docker CLI for container management
+        ];
+      };
     });
+
+    # Firestream module system library
+    # Provides core library functions, environment generation, and application factory
+    lib = forAllSystems (system: let
+      pkgs = pkgsForSystem system;
+      firestream = import ./bin/nix/firestream { inherit pkgs; };
+    in {
+      # Complete Firestream module system
+      firestream = firestream;
+
+      # Convenience: direct access to mkAppModule
+      mkAppModule = firestream.mkAppModule;
+    });
+
+    # Test suite for the Firestream module system
+    # Build with: nix build .#checks.x86_64-linux.firestream-tests
+    # Or run all checks: nix flake check
+    checks = forAllSystems (system: let
+      pkgs = pkgsForSystem system;
+      tests = import ./bin/nix/firestream/tests { inherit pkgs; };
+    in {
+      firestream-tests = tests.all;
+
+      # Individual test modules (for granular testing)
+      firestream-log-tests = tests.logTests;
+      firestream-validations-tests = tests.validationsTests;
+      firestream-fs-tests = tests.fsTests;
+      firestream-os-tests = tests.osTests;
+      firestream-net-tests = tests.netTests;
+      firestream-service-tests = tests.serviceTests;
+      firestream-file-tests = tests.fileTests;
+      firestream-persistence-tests = tests.persistenceTests;
+      firestream-integration-tests = tests.integrationTests;
+    });
+
+    # System-independent Firestream module system
+    # For importing from other flakes:
+    #
+    # {
+    #   inputs.firestream.url = "path:./path/to/Firestream";
+    #   outputs = { firestream, nixpkgs, ... }:
+    #     let
+    #       modules = firestream.firestreamModules { inherit pkgs; };
+    #     in { ... };
+    # }
+    firestreamModules = { pkgs }: import ./bin/nix/firestream { inherit pkgs; };
   };
 }
