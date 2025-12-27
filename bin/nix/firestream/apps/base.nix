@@ -37,6 +37,9 @@ let
       service.runtimeDeps
       file.runtimeDeps
       persistence.runtimeDeps
+      config.runtimeDeps
+      state.runtimeDeps
+      volumes.runtimeDeps
     ]);
 
   # Helper to concatenate all core library functions into one string
@@ -52,6 +55,9 @@ let
     ${service.functions}
     ${file.functions}
     ${persistence.functions}
+    ${config.functions}
+    ${state.functions}
+    ${volumes.functions}
   '';
 
 in
@@ -87,6 +93,16 @@ in
     configFn ? "",                 # Configuration generation logic
     initFn ? "",                   # Initialization logic (DB setup, first-run tasks, etc.)
 
+    # Build-time (prepopulate phase)
+    prepopulateFn ? "",            # Shell code to run at nix build (rarely used)
+    prepopulateFiles ? {},         # { "/path" = content; } static files to embed
+    prepopulateDirs ? [],          # Legacy: simple list of paths (backward compat)
+    runtimeDirs ? {},              # Declarative directory specifications (preferred)
+
+    # Runtime (activate phase)
+    activateFn ? "",               # Runs after validation, before configFn
+    enableStateTracking ? true,    # Track config changes via state module
+
     # Run command (what actually starts the service)
     runCmd ? "",                   # Command to start the service (e.g., "kafka-server-start.sh")
 
@@ -110,6 +126,47 @@ in
     allRuntimeDeps = lib.lists.unique (
       (collectRuntimeDeps coreLibs) ++ extraDeps
     );
+
+    # Merge legacy prepopulateDirs with new runtimeDirs schema
+    # If runtimeDirs is provided, use it; otherwise convert prepopulateDirs
+    allRuntimeDirs =
+      if runtimeDirs != {}
+      then runtimeDirs
+      else if prepopulateDirs != []
+      then coreLibs.volumes.fromPrepopulateDirs prepopulateDirs
+      else {};
+
+    # Note: Runtime directories are now created at Docker build time via fakeRootCommands
+    # The runtimeDirs schema is used by containers/base.nix for build-time creation
+
+    # Get all directory paths for prepopulation (build-time directory creation)
+    allDirPaths =
+      if allRuntimeDirs != {}
+      then coreLibs.volumes.getAllPaths allRuntimeDirs
+      else prepopulateDirs;
+
+    # Build-time prepopulated environment
+    prepopulatedEnv = pkgs.runCommand "${name}-prepopulate" {} ''
+      mkdir -p $out
+
+      # Create directory hierarchy
+      ${lib.concatMapStringsSep "\n" (d: "mkdir -p $out${d}") allDirPaths}
+
+      # Write static files
+      ${lib.concatStringsSep "\n" (lib.mapAttrsToList (path: content: ''
+        mkdir -p $out$(dirname ${path})
+        cat > $out${path} << 'PREPOPULATE_EOF'
+${content}
+PREPOPULATE_EOF
+      '') prepopulateFiles)}
+
+      # Create state directory and prepopulated marker
+      mkdir -p $out/firestream/${name}/.state
+      ${pkgs.coreutils}/bin/date -Iseconds > $out/firestream/${name}/.state/prepopulated
+
+      # Run custom prepopulate function if provided
+      ${prepopulateFn}
+    '';
 
     # Generate the application-specific library script
     # This combines all core functions with app-specific logic
@@ -180,6 +237,23 @@ in
         debug "No custom initialization needed for ${name}"
         ''}
       }
+
+      ########################
+      # Activate ${name} (runtime configuration from templates)
+      # This runs after validation but before initialization
+      # Globals:
+      #   ${lib.toUpper name}_* environment variables
+      # Arguments:
+      #   None
+      # Returns:
+      #   None
+      #########################
+      ${name}_activate() {
+        ${if activateFn != "" then activateFn else ''
+        # No custom activation defined
+        debug "No custom activation needed for ${name}"
+        ''}
+      }
     '';
 
     # Generate the main entrypoint script
@@ -211,6 +285,25 @@ in
         exit 1
       fi
 
+      # 3a. Check prepopulated marker exists (build-time verification)
+      if ! check_prepopulated "${name}"; then
+        warn "Prepopulated marker not found - image may not have been built correctly"
+      fi
+
+      # 3b. Runtime directories created at build time via fakeRootCommands
+      # No need to create them here - container boots with dirs already present
+      debug "Runtime directories should already exist from Docker build"
+
+      # Copy templates from Nix store to writable location
+      ${lib.concatStringsSep "\n" (lib.mapAttrsToList (path: content: ''
+      if [[ ! -f "${path}" ]]; then
+        mkdir -p "$(dirname "${path}")" 2>/dev/null || true
+        cat > "${path}" << 'TEMPLATE_EOF'
+${content}
+TEMPLATE_EOF
+      fi
+      '') prepopulateFiles)}
+
       # 4. Print welcome banner
       info "** Starting Firestream ${name} ${version} **"
       ${if (builtins.elem pkgs.coreutils allRuntimeDeps) then ''
@@ -223,6 +316,9 @@ in
         exit 1
       fi
 
+      # 5a. Run activation function (runtime configuration from templates)
+      ${name}_activate
+
       # 6. Check for first run and initialize if needed
       if ! is_app_initialized "${name}"; then
         info "First run detected - running initialization..."
@@ -232,6 +328,11 @@ in
       else
         debug "${name} already initialized, skipping initialization"
       fi
+
+      # 6a. Record activation state
+      ${lib.optionalString enableStateTracking ''
+      record_activation "${name}"
+      ''}
 
       # 7. Configure the application
       ${name}_configure
@@ -364,10 +465,24 @@ in
     # Complete runtime environment (for Docker image building)
     inherit runtimeEnv;
 
+    # Build-time prepopulated environment (for Docker image layer)
+    inherit prepopulatedEnv;
+
+    # State library for external state management
+    stateLib = coreLibs.state;
+
+    # Volume hints for orchestration layers (Docker, K8s)
+    volumeHints = {
+      persistent = if allRuntimeDirs != {} then coreLibs.volumes.extractVolumeHints allRuntimeDirs else [];
+      tmpfs = if allRuntimeDirs != {} then coreLibs.volumes.extractTmpfsHints allRuntimeDirs else [];
+    };
+
     # Configuration used (for introspection)
     config = {
       inherit name version envVars envVarsWithSecrets paths user;
       inherit validateFn configFn initFn runCmd;
+      inherit prepopulateFn prepopulateFiles prepopulateDirs runtimeDirs;
+      inherit activateFn enableStateTracking;
     };
   };
 }

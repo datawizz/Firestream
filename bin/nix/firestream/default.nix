@@ -14,6 +14,8 @@ let
   fileModule = import ./lib/file.nix { inherit pkgs lib logModule; };
   persistenceModule = import ./lib/persistence.nix { inherit pkgs lib logModule fsModule; };
   configModule = import ./lib/config.nix { inherit pkgs lib logModule; };
+  stateModule = import ./lib/state.nix { inherit pkgs lib logModule fsModule configModule; };
+  volumesModule = import ./lib/volumes.nix { inherit pkgs lib logModule fsModule; };
 
   # Aggregate core libraries into a single attribute set
   coreLibs = {
@@ -26,6 +28,8 @@ let
     file = fileModule;
     persistence = persistenceModule;
     config = configModule;
+    state = stateModule;
+    volumes = volumesModule;
   };
 
   # Import environment modules

@@ -5,14 +5,36 @@
     # Fixed nixpkgs version fixes system packages that float on the latest Debian
     nixpkgs.url = "github:NixOS/nixpkgs/release-24.11";
 
-    # Container flakes - each can be built independently or via root
-    airflow-container = {
-      url = "path:./src/containers/firestream/airflow";
+    # flake-utils for container flake imports
+    flake-utils.url = "github:numtide/flake-utils";
+
+    # Python packaging infrastructure for containers
+    pyproject-nix = {
+      url = "github:pyproject-nix/pyproject.nix";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
+
+    uv2nix = {
+      url = "github:pyproject-nix/uv2nix";
+      inputs.pyproject-nix.follows = "pyproject-nix";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
+
+    pyproject-build-systems = {
+      url = "github:pyproject-nix/build-system-pkgs";
+      inputs.pyproject-nix.follows = "pyproject-nix";
+      inputs.uv2nix.follows = "uv2nix";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
+
+    # gitignore.nix for faster source filtering (respects .gitignore)
+    gitignore = {
+      url = "github:hercules-ci/gitignore.nix";
       inputs.nixpkgs.follows = "nixpkgs";
     };
   };
 
-  outputs = { self, nixpkgs, airflow-container }: let
+  outputs = { self, nixpkgs, flake-utils, pyproject-nix, uv2nix, pyproject-build-systems, gitignore }: let
     # Define supported systems
     supportedSystems = [
       "x86_64-linux"
@@ -35,6 +57,31 @@
         inherit system;
         inherit (nixpkgsConfig) config;
       };
+
+    # Filter function to exclude large/unnecessary directories
+    # Uses nixpkgs.lib for string functions (available at top level)
+    sourceFilter = path: type:
+      let
+        baseName = baseNameOf (toString path);
+        hasSuffix = nixpkgs.lib.hasSuffix;
+      in !(
+        baseName == ".git" ||
+        baseName == "node_modules" ||
+        baseName == "result" ||
+        baseName == "target" ||
+        baseName == "__pycache__" ||
+        baseName == ".pytest_cache" ||
+        baseName == ".venv" ||
+        baseName == ".direnv" ||
+        baseName == ".devenv" ||
+        hasSuffix ".pyc" baseName ||
+        hasSuffix ".egg-info" baseName
+      );
+
+    # Filtered source of entire repo - preserves directory structure for relative imports
+    # This allows container flakes to use relative paths like ../../../../bin/nix/firestream
+    # Uses gitignore.nix for faster filtering (uses git index for clean trees)
+    filteredRepoSource = _pkgs: gitignore.lib.gitignoreSource self;
 
     #TODO include google protobufs as a library on a local path for build time
     # Pass "PROTO_HOME" to the proto build steps.
@@ -239,8 +286,20 @@
       # Usage: nix build .#containers.airflow
       containers = {
         # Airflow container (Docker image only on Linux)
+        # Uses filtered repo source to preserve relative paths for imports
         airflow = if isLinux
-          then airflow-container.packages.${system}.dockerImage
+          then let
+            # Filtered repo source - preserves directory structure
+            repoSrc = filteredRepoSource pkgs;
+
+            # Import the container's flake.nix from the filtered source
+            airflowFlake = import "${repoSrc}/src/containers/firestream/airflow/flake.nix";
+
+            # Call the flake's outputs function
+            airflowOutputs = airflowFlake.outputs {
+              inherit self nixpkgs flake-utils pyproject-nix uv2nix pyproject-build-systems;
+            };
+          in airflowOutputs.packages.${system}.dockerImage
           else pkgs.runCommand "airflow-not-available" {} ''
             echo "Docker images only available on Linux systems" > $out
           '';
@@ -295,15 +354,26 @@
     # }
     firestreamModules = { pkgs }: import ./bin/nix/firestream { inherit pkgs; };
 
-    # Container modules - expose container flakes for external use
+    # Container modules - expose container flake paths for external use
     # Usage from other flakes:
     #   inputs.firestream.url = "path:./path/to/Firestream";
-    #   airflowImage = firestream.containerModules.airflow.packages.x86_64-linux.dockerImage;
-    containerModules = {
-      airflow = airflow-container;
+    #   # Then import and call the flake outputs
+    containerModulePaths = {
+      airflow = "src/containers/firestream/airflow";
       # Future containers can be added here:
-      # postgresql = postgresql-container;
-      # kafka = kafka-container;
+      # postgresql = "src/containers/firestream/postgresql";
+      # kafka = "src/containers/firestream/kafka";
     };
+
+    # Helper to import container modules from this flake
+    # Usage: firestream.mkContainerFromPath { inherit pkgs system; path = firestream.containerModulePaths.airflow; }
+    mkContainerFromPath = { pkgs, system, path }:
+      let
+        repoSrc = filteredRepoSource pkgs;
+        containerFlake = import "${repoSrc}/${path}/flake.nix";
+        outputs = containerFlake.outputs {
+          inherit self nixpkgs flake-utils pyproject-nix uv2nix pyproject-build-systems;
+        };
+      in outputs.packages.${system} or {};
   };
 }

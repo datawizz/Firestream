@@ -28,15 +28,13 @@
     let
       inherit (nixpkgs) lib;
 
-      # Linux systems for Docker image builds
-      linuxSystems = [ "x86_64-linux" "aarch64-linux" ];
-      # All systems including macOS for development
-      allSystems = linuxSystems ++ [ "x86_64-darwin" "aarch64-darwin" ];
+      # All supported systems (Docker images built on Linux, dev shells on all)
+      supportedSystems = [ "x86_64-linux" "aarch64-linux" "x86_64-darwin" "aarch64-darwin" ];
     in
-    flake-utils.lib.eachSystem allSystems (system:
+    flake-utils.lib.eachSystem supportedSystems (system:
       let
         pkgs = nixpkgs.legacyPackages.${system};
-        isLinux = builtins.elem system linuxSystems;
+        isLinux = pkgs.stdenv.isLinux;
 
         # Python version to use (matching Bitnami's python-3.12.11-5)
         python = pkgs.python312;
@@ -238,39 +236,56 @@
         pythonEnv = pythonSet.mkVirtualEnv "airflow-env" workspace.deps.default;
 
         # ============================================================
-        # Import the Airflow module
+        # Import the Airflow module (Linux only - requires glibc for Docker image)
         # ============================================================
-        airflowModule = import ./module.nix {
+        airflowModule = if isLinux then import ./module.nix {
           inherit pkgs lib firestream pythonEnv airflowVersion python;
-        };
+        } else null;
 
       in {
-        # Packages available on all systems
+        # Packages - Docker image only on Linux
         packages = {
-          inherit pythonEnv;
-          inherit (airflowModule) runtimeEnv;
-          inherit (airflowModule.scripts) entrypoint;
+          pythonEnv = pythonEnv;
         } // lib.optionalAttrs isLinux {
-          # Docker images only available on Linux
           default = airflowModule.dockerImage;
           dockerImage = airflowModule.dockerImage;
+          runtimeEnv = airflowModule.runtimeEnv;
+          entrypoint = airflowModule.scripts.entrypoint;
         };
 
-        devShells.default = airflowModule.devShell;
+        # Dev shell - available on all platforms
+        devShells.default = if isLinux then airflowModule.devShell else pkgs.mkShell {
+          name = "airflow-dev-shell";
+          buildInputs = [
+            pythonEnv
+            pkgs.uv
+            pkgs.docker
+            pkgs.docker-compose
+          ];
+          shellHook = ''
+            echo "Airflow development shell (macOS)"
+            echo "Note: Docker image building requires Linux"
+            echo ""
+            echo "Available commands:"
+            echo "  uv sync         - Sync Python dependencies"
+            echo "  python          - Python interpreter with Airflow"
+          '';
+        };
 
-        # Apps only on Linux (Docker required)
+        # Apps for loading Docker image (Linux only)
         apps = lib.optionalAttrs isLinux {
-          load-docker = flake-utils.lib.mkApp {
-            drv = pkgs.writeShellScriptBin "load-docker" ''
-              echo "Building and loading Airflow Docker image..."
-              nix build .#dockerImage
-              docker load < result
+          load-docker = {
+            type = "app";
+            program = toString (pkgs.writeShellScript "load-docker" ''
+              echo "Loading Airflow Docker image..."
+              docker load < ${airflowModule.dockerImage}
               echo "Image loaded: firestream-airflow:${airflowVersion}-nix"
-            '';
+            '');
           };
         };
 
-        # Export the module for use by other flakes
+        # Export the module for use by other flakes (Linux only)
+      } // lib.optionalAttrs isLinux {
         airflowModule = airflowModule;
       });
 }

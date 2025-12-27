@@ -82,6 +82,20 @@
     customScripts ? {},
     devShellPackages ? [],
     devShellHook ? "",
+
+    # Build-time (prepopulate phase) - passed to mkContainerModule
+    prepopulateFn ? "",
+    prepopulateFiles ? {},
+    prepopulateDirs ? [],
+    runtimeDirs ? {},              # Declarative directory specifications (preferred)
+
+    # Runtime (activate phase) - passed to mkContainerModule
+    activateFn ? "",
+    enableStateTracking ? true,
+
+    # Python-specific build-time options
+    compileByteCode ? false,        # Pre-compile .pyc files at build time
+    pythonPrepopulateFn ? "",       # Python-specific build setup
   }:
   let
     # Compute site packages path
@@ -89,6 +103,20 @@
       if sitePackagesPath != null
       then sitePackagesPath
       else "${pythonEnv}/${python.sitePackages}";
+
+    # Combine base prepopulateFn with Python-specific setup
+    combinedPrepopulateFn = ''
+      ${prepopulateFn}
+
+      # Python-specific prepopulation
+      ${pythonPrepopulateFn}
+
+      ${lib.optionalString compileByteCode ''
+        # Pre-compile Python bytecode for faster startup
+        echo "Pre-compiling Python bytecode..."
+        ${python}/bin/python -m compileall -q ${pythonEnv}/lib/python*/site-packages/ 2>/dev/null || true
+      ''}
+    '';
 
     # Python-specific runtime bins
     pythonRuntimeBins = runtimeBinDeps ++ [ pythonEnv ];
@@ -135,6 +163,11 @@
       inherit validateFn configFn runCmd;
       initFn = pythonInitFn;
 
+      # Pass through two-phase lifecycle parameters
+      prepopulateFn = combinedPrepopulateFn;
+      inherit prepopulateFiles prepopulateDirs runtimeDirs;
+      inherit activateFn enableStateTracking;
+
       systemDeps = systemDeps ++ [
         pkgs.cacert
         pkgs.stdenv.cc.cc.lib
@@ -168,9 +201,15 @@
     # Add Python-specific attributes
     inherit pythonEnv python pythonSitePackages;
 
+    # Export Python-specific config
+    config = (containerModule.config or {}) // {
+      inherit compileByteCode pythonPrepopulateFn;
+    };
+
     # Override meta with Python info
     meta = containerModule.meta // {
       pythonVersion = python.version;
+      byteCodePrecompiled = compileByteCode;
     };
   };
 }

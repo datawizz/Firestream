@@ -16,17 +16,19 @@ let
   integrationTests = import ./test-integration.nix { inherit pkgs firestream; };
   configTests = import ./test-config.nix { inherit pkgs firestream; };
   containerTests = import ./test-containers.nix { inherit pkgs firestream; };
+  stateTests = import ./test-state.nix { inherit pkgs firestream; };
 
 in {
   # Individual test derivations
   inherit logTests validationsTests fsTests osTests netTests serviceTests fileTests persistenceTests integrationTests;
-  inherit configTests containerTests;
+  inherit configTests containerTests stateTests;
 
   # All tests combined
   all = pkgs.runCommand "firestream-all-tests" {
     buildInputs = [
       logTests validationsTests fsTests osTests netTests serviceTests
       fileTests persistenceTests integrationTests configTests containerTests
+      stateTests
     ];
   } ''
     echo "================================================"
@@ -43,6 +45,7 @@ in {
     echo "Integration tests:  PASSED"
     echo "Config tests:       PASSED"
     echo "Container tests:    PASSED"
+    echo "State tests:        PASSED"
     echo "================================================"
     touch $out
   '';
