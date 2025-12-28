@@ -189,24 +189,31 @@ ${user.name}:!:::::::
     # Docker image
     dockerImage = pkgs.dockerTools.buildLayeredImage {
       name = "firestream-${name}";
-      tag = "${version}-nix";
+      tag = version;
+      maxLayers = 100;  # Modern Docker supports 128, use 100 for fine-grained caching
 
-      contents = pkgs.buildEnv {
-        name = "${name}-root";
-        paths = [
-          passwdFile        # /etc/passwd as Nix derivation
-          groupFile         # /etc/group as Nix derivation
-          shadowFile        # /etc/shadow as Nix derivation
-          appModule.prepopulatedEnv
-          appModule.scripts.envDefaults
-          appModule.scripts.fileLoader
-          appModule.scripts.lib
-          finalEntrypoint
-          appModule.scripts.setup
-          appModule.scripts.run
-        ] ++ customScriptPackages ++ allRuntimeDeps;
-        pathsToLink = [ "/bin" "/lib" "/lib64" "/opt" "/firestream" "/share" "/etc" ];
-      };
+      # Pass as flat list for automatic layer optimization by buildLayeredImage
+      # Order: base system → runtime deps → app scripts → config (most to least stable)
+      contents = [
+        # Layer group 1: System fundamentals (rarely change)
+        passwdFile
+        groupFile
+        shadowFile
+        pkgs.bashInteractive
+        pkgs.cacert
+        pkgs.stdenv.cc.cc.lib
+      ] ++ systemDeps ++ runtimeBinDeps ++ [
+        # Layer group 2: App scripts (change with code updates)
+        appModule.scripts.envDefaults
+        appModule.scripts.fileLoader
+        appModule.scripts.lib
+        finalEntrypoint
+        appModule.scripts.setup
+        appModule.scripts.run
+      ] ++ customScriptPackages ++ [
+        # Layer group 3: Config templates (change frequently)
+        appModule.prepopulatedEnv
+      ];
 
       # Fix ownership for non-root user (runs as fakeroot during image build)
       # Create all runtime directories at build time so container can run as non-root
@@ -222,64 +229,39 @@ ${user.name}:!:::::::
           mode = spec.mode or "0755";
         }) (appModule.config.runtimeDirs or {}))}
 
-        # CRITICAL FIX: Replace symlink trees with real directory copies
-        # buildEnv creates symlinks to Nix store which are immutable.
-        # We must copy the entire tree to make it writable by the runtime user.
-        # This handles both:
-        # 1. Entire directories that are symlinks (e.g., ./opt/airflow -> /nix/store/...)
-        # 2. Individual files that are symlinks within real directories
+        # Helper function to resolve symlinks to real files/dirs
+        resolve_symlink() {
+          local path="$1"
+          if [ -L "$path" ]; then
+            local target=$(readlink -f "$path")
+            rm "$path"
+            cp -r "$target" "$path"
+            echo "Resolved symlink: $path"
+          fi
+        }
+
+        # OPTIMIZED: Only resolve app-specific directories (not system paths)
+        # Skip /bin, /lib, /etc which can remain as read-only symlinks
         for base_dir in ./opt ./firestream; do
           app_dir="$base_dir/${name}"
-          if [ -L "$app_dir" ]; then
-            # Directory is a symlink - resolve and copy entire tree
-            target=$(readlink -f "$app_dir")
-            rm "$app_dir"
-            cp -r "$target" "$app_dir"
-            echo "Copied symlink tree: $app_dir -> $target"
-          elif [ -d "$app_dir" ]; then
-            # Directory exists - recursively resolve any symlinks within
-            find "$app_dir" -type l 2>/dev/null | while read -r symlink; do
-              target=$(readlink -f "$symlink" 2>/dev/null || true)
-              if [ -e "$target" ]; then
-                rm "$symlink"
-                if [ -d "$target" ]; then
-                  cp -r "$target" "$symlink"
-                else
-                  cp "$target" "$symlink"
-                fi
-              fi
-            done
-          fi
+          resolve_symlink "$app_dir"
         done
-
-        # Handle /etc symlinks (passwd, group, shadow from Nix derivations)
-        # These need to be real files for proper permissions
-        if [ -d "./etc" ]; then
-          find ./etc -type l 2>/dev/null | while read -r symlink; do
-            target=$(readlink -f "$symlink" 2>/dev/null || true)
-            if [ -f "$target" ]; then
-              rm "$symlink"
-              cp "$target" "$symlink"
-              chmod 644 "$symlink"
-            fi
-          done
-        fi
 
         # Ensure home directory exists
         mkdir -p ./home/${user.name}
 
-        # Set ownership recursively (works now because everything is real files/dirs)
-        chown -R ${toString user.uid}:${toString user.gid} ./opt/${name} 2>/dev/null || true
-        chown -R ${toString user.uid}:${toString user.gid} ./firestream/${name} 2>/dev/null || true
-        chown -R ${toString user.uid}:${toString user.gid} ./home/${user.name} 2>/dev/null || true
+        # OPTIMIZED: Batch ownership with single chown -R call
+        chown -R ${toString user.uid}:${toString user.gid} \
+          ./opt/${name} \
+          ./firestream/${name} \
+          ./home/${user.name} \
+          2>/dev/null || true
 
-        # Set appropriate permissions
-        # Directories: 755 (owner can write, others can traverse)
-        # Files: 644 (owner can write, others can read)
-        find ./opt/${name} -type d -exec chmod 755 {} \; 2>/dev/null || true
-        find ./opt/${name} -type f -exec chmod 644 {} \; 2>/dev/null || true
-        find ./firestream/${name} -type d -exec chmod 755 {} \; 2>/dev/null || true
-        find ./firestream/${name} -type f -exec chmod 644 {} \; 2>/dev/null || true
+        # OPTIMIZED: Use xargs for batch chmod (10x faster than -exec per file)
+        find ./opt/${name} -type d -print0 2>/dev/null | xargs -0 -r chmod 755 2>/dev/null || true
+        find ./opt/${name} -type f -print0 2>/dev/null | xargs -0 -r chmod 644 2>/dev/null || true
+        find ./firestream/${name} -type d -print0 2>/dev/null | xargs -0 -r chmod 755 2>/dev/null || true
+        find ./firestream/${name} -type f -print0 2>/dev/null | xargs -0 -r chmod 644 2>/dev/null || true
       '';
 
       # Enable fakeroot for ownership changes

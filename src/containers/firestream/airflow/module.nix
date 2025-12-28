@@ -28,6 +28,153 @@ let
   initScript = builtins.readFile ./scripts/init.sh;
   secretsScript = builtins.readFile ./scripts/secrets.sh;
 
+  # Airflow-specific helper functions (needed by scripts)
+  # These are adapted from Bitnami's libairflow.sh and libversion.sh
+  airflowHelpers = ''
+    ########################
+    # Get semantic version component
+    # Arguments:
+    #   $1 - version string (e.g., "3.0.3")
+    #   $2 - section: 1=major, 2=minor, 3=patch
+    # Returns:
+    #   Version component
+    #########################
+    get_sematic_version() {
+        local version="''${1:?version is required}"
+        local section="''${2:?section is required}"
+        echo "$version" | cut -d. -f"$section"
+    }
+
+    ########################
+    # Get Airflow major version
+    # Arguments:
+    #   None
+    # Returns:
+    #   Airflow major version (e.g., 2 or 3)
+    #########################
+    airflow_major_version() {
+        local raw_version
+        raw_version=$(airflow version 2>/dev/null | grep -v "WARNING\|DEBUG" | head -1)
+        get_sematic_version "$raw_version" 1
+    }
+
+    ########################
+    # URL-encode a string for use in connection strings
+    # Arguments:
+    #   $1 - string to encode
+    # Returns:
+    #   URL-encoded string
+    #########################
+    airflow_encode_url() {
+        local string="''${1:-}"
+        printf '%s' "$string" | python3 -c "import sys, urllib.parse; print(urllib.parse.quote(sys.stdin.read(), safe=str()))"
+    }
+
+    ########################
+    # Generate Airflow configuration (wrapper for config generation)
+    # In the Nix module system, config is generated during activation phase
+    # This function is called during init for backwards compatibility
+    # Arguments:
+    #   None
+    # Returns:
+    #   None
+    #########################
+    airflow_configure() {
+        debug "airflow_configure called - config generation handled by activation phase"
+        # Config file generation is handled by activateFn
+        # This function exists for compatibility with init scripts
+        if [[ ! -f "$AIRFLOW_CONF_FILE" ]]; then
+            warn "Configuration file not found at $AIRFLOW_CONF_FILE - generating defaults"
+            airflow config list --defaults > "$AIRFLOW_CONF_FILE"
+        fi
+    }
+
+    ########################
+    # Generate a cryptographically secure secret key
+    # Matches Bitnami's airflow_generate_secret_key() pattern
+    # Arguments:
+    #   $1 - length (default: 32)
+    # Returns:
+    #   Base64-encoded random string suitable for Airflow secrets
+    #########################
+    generate_secret_key() {
+        local length="''${1:-32}"
+        # Generate random bytes, base64 encode, filter to alphanumeric, truncate
+        head -c 256 /dev/urandom | base64 | tr -dc 'a-zA-Z0-9' | head -c "$length" | base64
+    }
+
+    ########################
+    # Process and encode a secret key variable
+    # Auto-generates if empty, truncates to 32 chars, base64 encodes
+    # Matches Bitnami's secret handling pattern
+    # Arguments:
+    #   $1 - variable name
+    #########################
+    process_secret_key() {
+        local var_name="''${1:?variable name required}"
+        local value="''${!var_name:-}"
+
+        # Auto-generate if empty
+        if [[ -z "$value" ]]; then
+            value=$(generate_secret_key 32)
+            debug "Auto-generated $var_name"
+        fi
+
+        # Truncate to 32 chars if needed (Bitnami compatibility)
+        if [[ ''${#value} -gt 32 ]]; then
+            warn "$var_name has more than 32 characters, truncating"
+            value="''${value:0:32}"
+        fi
+
+        # Base64 encode for Airflow config (Bitnami encodes secrets)
+        export "$var_name"="$(echo -n "$value" | base64)"
+        debug "Processed $var_name (base64 encoded)"
+    }
+
+    ########################
+    # Process Fernet key (special handling)
+    # Converts raw key to proper Fernet format
+    # Supports AIRFLOW_RAW_FERNET_KEY for user-provided keys
+    #########################
+    process_fernet_key() {
+        local raw="''${AIRFLOW_RAW_FERNET_KEY:-}"
+
+        if [[ -n "$raw" && -z "''${AIRFLOW_FERNET_KEY:-}" ]]; then
+            # User provided raw key - validate and convert
+            if [[ ''${#raw} -lt 32 ]]; then
+                error "AIRFLOW_RAW_FERNET_KEY must have at least 32 characters"
+                return 1
+            fi
+            AIRFLOW_FERNET_KEY="$(echo -n "''${raw:0:32}" | base64)"
+            export AIRFLOW_FERNET_KEY
+            debug "Converted AIRFLOW_RAW_FERNET_KEY to AIRFLOW_FERNET_KEY"
+        elif [[ -z "''${AIRFLOW_FERNET_KEY:-}" ]]; then
+            # Auto-generate if not provided
+            AIRFLOW_FERNET_KEY="$(generate_secret_key 32)"
+            export AIRFLOW_FERNET_KEY
+            debug "Auto-generated AIRFLOW_FERNET_KEY"
+        fi
+    }
+
+    ########################
+    # Process all Airflow secret keys
+    # Called during validation phase to ensure all secrets are set
+    #########################
+    process_airflow_secrets() {
+        info "Processing Airflow secrets..."
+
+        # Process Fernet key first (special handling)
+        process_fernet_key || return 1
+
+        # Process other secret keys
+        process_secret_key "AIRFLOW_WEBSERVER_SECRET_KEY"
+        process_secret_key "AIRFLOW_APISERVER_SECRET_KEY"
+        process_secret_key "AIRFLOW_JWT_SECRET_KEY"
+
+        info "All secrets processed successfully"
+    }
+  '';
+
   # System dependencies (libs needed in the container)
   systemDeps = with pkgs; [
     # SSL/TLS and crypto
@@ -86,6 +233,9 @@ let
     host = {{AIRFLOW_APISERVER_HOST}}
     secret_key = {{AIRFLOW_APISERVER_SECRET_KEY}}
 
+    [api_auth]
+    jwt_secret = {{AIRFLOW_JWT_SECRET_KEY}}
+
     [scheduler]
     dag_dir_list_interval = 300
     standalone_dag_processor = {{AIRFLOW_STANDALONE_DAG_PROCESSOR}}
@@ -100,6 +250,9 @@ let
     [logging]
     base_log_folder = /opt/airflow/logs
     logging_level = {{AIRFLOW_LOGGING_LEVEL}}
+
+    [fab]
+    config_file = /opt/airflow/webserver_config.py
   '';
 
   # Default webserver_config.py template
@@ -110,6 +263,7 @@ let
     # from flask_appbuilder.security.manager import AUTH_LDAP
 
     AUTH_TYPE = AUTH_DB
+    FAB_PASSWORD_HASH_METHOD = 'pbkdf2:sha256'
   '';
 
 in firestream.mkPythonContainerModule {
@@ -158,6 +312,7 @@ in firestream.mkPythonContainerModule {
     AIRFLOW_APISERVER_PORT_NUMBER = "8080";
     AIRFLOW_WEBSERVER_SECRET_KEY = "airflow-web-server-key";
     AIRFLOW_APISERVER_SECRET_KEY = "airflow-api-server-key";
+    AIRFLOW_JWT_SECRET_KEY = "";  # Auto-generated if empty
     AIRFLOW_ENABLE_HTTPS = "no";
     AIRFLOW_EXTERNAL_APISERVER_PORT_NUMBER = "80";
 
@@ -170,11 +325,13 @@ in firestream.mkPythonContainerModule {
     AIRFLOW_DATABASE_NAME = "bitnami_airflow";
     AIRFLOW_DATABASE_USERNAME = "bn_airflow";
     AIRFLOW_DATABASE_USE_SSL = "no";
+    AIRFLOW_DATABASE_PASSWORD = "";
 
     # Redis (Celery) configuration
     REDIS_HOST = "redis";
     REDIS_PORT_NUMBER = "6379";
     REDIS_DATABASE = "1";
+    REDIS_PASSWORD = "";
     AIRFLOW_REDIS_USE_SSL = "no";
 
     # LDAP configuration
@@ -205,6 +362,7 @@ in firestream.mkPythonContainerModule {
     "AIRFLOW_FERNET_KEY"
     "AIRFLOW_WEBSERVER_SECRET_KEY"
     "AIRFLOW_APISERVER_SECRET_KEY"
+    "AIRFLOW_JWT_SECRET_KEY"
     "AIRFLOW_APISERVER_BASE_URL"
     "AIRFLOW_APISERVER_HOST"
     "AIRFLOW_APISERVER_PORT_NUMBER"
@@ -339,7 +497,8 @@ in firestream.mkPythonContainerModule {
   };
 
   # Validation function (from validate.sh)
-  validateFn = validateScript;
+  # Prepend airflow helpers so secret processing functions are available
+  validateFn = airflowHelpers + validateScript;
 
   # Activation: Replace {{PLACEHOLDERS}} with runtime values
   # This runs after validation but before init/config
@@ -400,6 +559,7 @@ in firestream.mkPythonContainerModule {
         -e "s|{{AIRFLOW_BASE_URL}}|''${base_url}|g" \
         -e "s|{{AIRFLOW_WEBSERVER_SECRET_KEY}}|''${AIRFLOW_WEBSERVER_SECRET_KEY:-}|g" \
         -e "s|{{AIRFLOW_APISERVER_SECRET_KEY}}|''${AIRFLOW_APISERVER_SECRET_KEY:-}|g" \
+        -e "s|{{AIRFLOW_JWT_SECRET_KEY}}|''${AIRFLOW_JWT_SECRET_KEY:-}|g" \
         -e "s|{{AIRFLOW_STANDALONE_DAG_PROCESSOR}}|''${standalone_dag_val}|g" \
         -e "s|{{AIRFLOW_CELERY_BROKER_URL}}|''${celery_broker_url}|g" \
         -e "s|{{AIRFLOW_CELERY_RESULT_BACKEND}}|''${celery_result_backend}|g" \
@@ -425,13 +585,16 @@ in firestream.mkPythonContainerModule {
   '';
 
   # Initialization (database, users, pools) - from init.sh
-  initFn = initScript;
+  # Prepend airflow helpers so functions are available
+  initFn = airflowHelpers + initScript;
 
   # Runtime config adjustments (crudini-based) - from config.sh
-  configFn = configScript;
+  # Prepend airflow helpers so functions are available
+  configFn = airflowHelpers + configScript;
 
   # Startup command based on component type
   runCmd = ''
+    ${airflowHelpers}
     # Determine Airflow major version
     major_version=$(airflow_major_version)
 

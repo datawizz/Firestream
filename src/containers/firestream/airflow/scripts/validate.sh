@@ -35,10 +35,12 @@ for var in AIRFLOW_STANDALONE_DAG_PROCESSOR AIRFLOW_SKIP_DB_SETUP AIRFLOW_LOAD_E
   fi
 done
 
-# Process cryptographic keys
+# Process cryptographic keys (auto-generate if missing, base64 encode)
+# This must happen before config generation to ensure secrets are available
 process_fernet_key || error_code=1
 process_secret_key "AIRFLOW_WEBSERVER_SECRET_KEY"
 process_secret_key "AIRFLOW_APISERVER_SECRET_KEY"
+process_secret_key "AIRFLOW_JWT_SECRET_KEY"
 
 # Database validation
 if is_empty_value "$AIRFLOW_DATABASE_HOST"; then

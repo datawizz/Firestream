@@ -373,7 +373,7 @@ let
 
         local attempt=0
         while ! eval "$cmd"; do
-            ((attempt++))
+            ((++attempt))  # Pre-increment to avoid set -e exit when attempt=0
             if [[ $attempt -ge $tries ]]; then
                 error "Command failed after $tries attempts: $cmd"
                 return 1

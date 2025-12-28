@@ -6,48 +6,30 @@
 BASEDIR=$(shell pwd)
 PROJECT_NAME=firestream
 
+# Devcontainer Development
+DEVCONTAINER_COMPOSE := docker/firestream/docker-compose.devcontainer.yml
+DEVCONTAINER_PREINIT := docker/firestream/docker_preinit.sh
+
 
 development:
 	# Deploy the development environment
 	@bash -c 'cd $(BASEDIR) && bash bootstrap.sh development'
 
 
-install:
+build-devcontainer:
+	bash $(DEVCONTAINER_PREINIT)
+	docker compose -f $(DEVCONTAINER_COMPOSE) build devcontainer
 
-	# splx command line tool
-	cargo install sqlx-cli
+devcontainer-build:
+	bash $(DEVCONTAINER_PREINIT)
+	docker compose -f $(DEVCONTAINER_COMPOSE) build devcontainer
 
+devcontainer-start:
+	bash $(DEVCONTAINER_PREINIT)
+	docker compose -f $(DEVCONTAINER_COMPOSE) up -d
 
-cargo-reset:
-	rm -rf ~/.cargo/registry/cache
-	rm -rf ~/.cargo/registry/index
-
-	# Set stable as default
-	# Remove only the problematic toolchain
-	rustup toolchain uninstall 1.85.0-x86_64-unknown-linux-gnu
-
-	# Reinstall it
-	rustup toolchain install 1.85.0
-
-	# Set it as default again
-	rustup default 1.85.0
-
-reset-db:
-	# Delete postgresql volume?
-	docker-compose -f docker/firestream/docker-compose.devcontainer.yml down -v
-
-db-migrations: install
-	cd /workspace/src/lib/rust/firestream-api-server/db && \
-	sqlx migrate run && \
-	cargo sqlx prepare && \
-	cargo build --package firestream-api-server-cli && \
-	cargo run --package firestream-api-server-cli --bin db -- reset -e test && \
-	cd /workspace/src/lib/rust/firestream-api-server && \
-	cargo run --package firestream-api-server-cli --bin db -- seed -e test
-
-devcontainer:
-	bash docker/firestream/docker_preinit.sh
-	docker compose -f docker/firestream/docker-compose.devcontainer.yml build devcontainer
+devcontainer-stop:
+	docker compose -f $(DEVCONTAINER_COMPOSE) down
 
 nix-up:
 	# Build the flake
@@ -64,8 +46,8 @@ nix-fix:
 
 
 build-devcontainer-clean:
-	bash docker/docker_preinit.sh
-	docker compose -f docker/docker-compose.devcontainer.yml build devcontainer --no-cache
+	bash $(DEVCONTAINER_PREINIT)
+	docker compose -f $(DEVCONTAINER_COMPOSE) build devcontainer --no-cache
 
 
 development_clean:
@@ -86,27 +68,122 @@ build:
 	# Establish local container registry through k3d
 	@bash -c 'cd $(BASEDIR) && bash bootstrap.sh build'
 
-airflow:
-	# create the development environment
-	# make development_clean
-	# make development
+# ==============================================================================
+# Container Build System (Cross-Platform)
+# ==============================================================================
+# Centralized build script handles platform detection and Nix-in-Docker on macOS
+BUILD_CONTAINER := bin/build-container.sh
 
-	# Configure DBT Profile
-	bash /workspace/src/plugins/airflow/config_dbt.sh
+# Generic container build targets
+container-build-%:
+	@$(BUILD_CONTAINER) $*
 
-	# Deploy airflow locally for CLI testing
-	bash /workspace/src/plugins/airflow/bootstrap_local.sh
+# ==============================================================================
+# Airflow Development (Nix-based container)
+# ==============================================================================
+AIRFLOW_DIR := src/containers/firestream/airflow
+AIRFLOW_COMPOSE := $(AIRFLOW_DIR)/docker-compose.yml
 
-	# Run a test
-	python /workspace/src/plugins/airflow/dags/_examples/_template_dag_runnable.py
+# Build the Airflow container (cross-platform)
+airflow-build:
+	@$(BUILD_CONTAINER) airflow
+
+# Start Airflow services (auto-builds if image missing)
+airflow-start:
+	@if ! docker image inspect firestream-airflow:3.0.3 >/dev/null 2>&1; then \
+		echo "Image not found, building..."; \
+		$(MAKE) airflow-build; \
+	fi
+	docker compose -f $(AIRFLOW_COMPOSE) up -d
+	@echo "Airflow is running at http://localhost:8090"
+
+# Alias for airflow-start (build if needed + start)
+airflow-up: airflow-start
+
+# Stop Airflow services
+airflow-stop:
+	docker compose -f $(AIRFLOW_COMPOSE) down
+
+# Restart Airflow services
+airflow-restart: airflow-stop airflow-start
+
+# View Airflow logs
+airflow-logs:
+	docker compose -f $(AIRFLOW_COMPOSE) logs -f
+
+# View logs for specific service (usage: make airflow-logs-SERVICE)
+airflow-logs-%:
+	docker compose -f $(AIRFLOW_COMPOSE) logs -f $*
+
+# Run Airflow CLI commands (usage: make airflow-cli CMD="dags list")
+airflow-cli:
+	docker compose -f $(AIRFLOW_COMPOSE) exec airflow airflow $(CMD)
+
+# Clean up Airflow containers and images
+airflow-clean: airflow-stop
+	docker rmi firestream-airflow:3.0.3 firestream-airflow:3.0.3-nix 2>/dev/null || true
+	docker compose -f $(AIRFLOW_COMPOSE) down -v
+
+# Show Airflow service status
+airflow-status:
+	docker compose -f $(AIRFLOW_COMPOSE) ps
+
+# ==============================================================================
+# Odoo Development (Nix-based container)
+# ==============================================================================
+ODOO_COMPOSE := src/containers/firestream/odoo/docker-compose.yml
+
+odoo-build:
+	@$(BUILD_CONTAINER) odoo
+
+odoo-start:
+	@if ! docker image inspect firestream-odoo:18.0 >/dev/null 2>&1; then \
+		echo "Image not found, building..."; \
+		$(MAKE) odoo-build; \
+	fi
+	docker compose -f $(ODOO_COMPOSE) up -d
+
+odoo-stop:
+	docker compose -f $(ODOO_COMPOSE) down
+
+# ==============================================================================
+# PostgreSQL Development (Nix-based container)
+# ==============================================================================
+POSTGRES_COMPOSE := src/containers/firestream/postgresql/docker-compose.yml
+
+postgres-build:
+	@$(BUILD_CONTAINER) postgresql
+
+postgres-build-%:
+	@$(BUILD_CONTAINER) postgresql --version $*
+
+postgres-16-start:
+	@if ! docker image inspect firestream-postgresql:16 >/dev/null 2>&1; then \
+		echo "Image not found, building..."; \
+		$(MAKE) postgres-build-16; \
+	fi
+	PG_VERSION=16 docker compose -f $(POSTGRES_COMPOSE) up -d
+
+postgres-16-stop:
+	PG_VERSION=16 docker compose -f $(POSTGRES_COMPOSE) down
+
+postgres-17-start:
+	@if ! docker image inspect firestream-postgresql:17 >/dev/null 2>&1; then \
+		echo "Image not found, building..."; \
+		$(MAKE) postgres-build-17; \
+	fi
+	PG_VERSION=17 docker compose -f $(POSTGRES_COMPOSE) up -d
+
+postgres-17-stop:
+	PG_VERSION=17 docker compose -f $(POSTGRES_COMPOSE) down
 
 build_devcontainer:
-	@bash -c 'cd $(BASEDIR) && bash docker/docker_preinit.sh'
-	@bash -c 'cd $(BASEDIR) && docker compose -f docker/docker-compose.devcontainer.yml build'
+	@bash -c 'cd $(BASEDIR) && bash $(DEVCONTAINER_PREINIT)'
+	@bash -c 'cd $(BASEDIR) && docker compose -f $(DEVCONTAINER_COMPOSE) build'
 
 build_devcontainer_no_cache:
-	@bash -c 'cd $(BASEDIR) && bash docker/docker_preinit.sh'
-	@bash -c 'cd $(BASEDIR) && docker compose -f docker/docker-compose.devcontainer.yml build --no-cache'
+	@bash -c 'cd $(BASEDIR) && bash $(DEVCONTAINER_PREINIT)'
+	@bash -c 'cd $(BASEDIR) && docker compose -f $(DEVCONTAINER_COMPOSE) build --no-cache'
 
 # Start services
 demo:

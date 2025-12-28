@@ -30,6 +30,9 @@ dependencies = [
     "pykerberos>=1.2.0",
     "requests-kerberos>=0.14.0",
 
+    # FAB auth manager (required for Airflow 3.x authentication)
+    "apache-airflow-providers-fab>=2.0.0",
+
     # Common providers that Bitnami included
     "apache-airflow-providers-celery>=3.3.0",
     "apache-airflow-providers-redis>=3.2.0",
