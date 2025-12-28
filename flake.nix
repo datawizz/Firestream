@@ -35,10 +35,12 @@
   };
 
   outputs = { self, nixpkgs, flake-utils, pyproject-nix, uv2nix, pyproject-build-systems, gitignore }: let
-    # Define supported systems
+    # Define supported systems (includes Darwin for package visibility)
     supportedSystems = [
       "x86_64-linux"
       "aarch64-linux"
+      "x86_64-darwin"
+      "aarch64-darwin"
     ];
 
     # Helper function to generate system-specific attributes
@@ -266,6 +268,57 @@
     packages = forAllSystems (system: let
       pkgs = pkgsForSystem system;
       isLinux = builtins.elem system [ "x86_64-linux" "aarch64-linux" ];
+
+      # Helper for unavailable packages on non-Linux
+      unavailable = name: pkgs.runCommand "${name}-not-available" {} ''
+        echo "Docker images only available on Linux systems" > $out
+      '';
+
+      # Import PostgreSQL module directly for top-level access
+      mkPostgresql = version: let
+        firestream = import ./bin/nix/firestream { inherit pkgs; };
+        mod = import ./src/containers/firestream/postgresql/module.nix {
+          inherit pkgs firestream version;
+          lib = pkgs.lib;
+        };
+      in mod.dockerImage;
+
+      # Import Airflow (requires Python packaging inputs)
+      mkAirflow = let
+        repoSrc = filteredRepoSource pkgs;
+        airflowFlake = import "${repoSrc}/src/containers/firestream/airflow/flake.nix";
+        airflowOutputs = airflowFlake.outputs {
+          inherit self nixpkgs flake-utils pyproject-nix uv2nix pyproject-build-systems;
+        };
+      in airflowOutputs.packages.${system}.dockerImage;
+
+      # Import Odoo (requires Python packaging inputs)
+      mkOdoo = let
+        repoSrc = filteredRepoSource pkgs;
+        odooFlake = import "${repoSrc}/src/containers/firestream/odoo/flake.nix";
+        odooOutputs = odooFlake.outputs {
+          inherit self nixpkgs flake-utils pyproject-nix uv2nix pyproject-build-systems;
+        };
+      in odooOutputs.packages.${system}.dockerImage;
+
+      # Import JupyterHub (requires Python packaging inputs)
+      mkJupyterhub = let
+        repoSrc = filteredRepoSource pkgs;
+        jupyterhubFlake = import "${repoSrc}/src/containers/firestream/jupyterhub/flake.nix";
+        jupyterhubOutputs = jupyterhubFlake.outputs {
+          inherit self nixpkgs flake-utils pyproject-nix uv2nix pyproject-build-systems;
+        };
+      in jupyterhubOutputs.packages.${system}.dockerImage;
+
+      # Import Redis module directly for top-level access
+      mkRedis = redisVersion: let
+        firestream = import ./bin/nix/firestream { inherit pkgs; };
+        mod = import ./src/containers/firestream/redis/module.nix {
+          inherit pkgs firestream redisVersion;
+          lib = pkgs.lib;
+        };
+      in mod.dockerImage;
+
     in {
       container = mkContainerConfig system;
       default = mkContainerConfig system;
@@ -282,27 +335,32 @@
         ];
       };
 
-      # Container images namespace
+      # ====================================================================
+      # TOP-LEVEL CONTAINER DERIVATIONS
+      # Usage: nix build .#postgresql-17
+      # ====================================================================
+      postgresql-16 = if isLinux then mkPostgresql "16" else unavailable "postgresql-16";
+      postgresql-17 = if isLinux then mkPostgresql "17" else unavailable "postgresql-17";
+      redis-7 = if isLinux then mkRedis "7" else unavailable "redis-7";
+      redis-8 = if isLinux then mkRedis "8" else unavailable "redis-8";
+      airflow = if isLinux then mkAirflow else unavailable "airflow";
+      odoo = if isLinux then mkOdoo else unavailable "odoo";
+      jupyterhub = if isLinux then mkJupyterhub else unavailable "jupyterhub";
+
+      # ====================================================================
+      # Container images namespace (backward compatible)
       # Usage: nix build .#containers.airflow
+      # ====================================================================
       containers = {
-        # Airflow container (Docker image only on Linux)
-        # Uses filtered repo source to preserve relative paths for imports
-        airflow = if isLinux
-          then let
-            # Filtered repo source - preserves directory structure
-            repoSrc = filteredRepoSource pkgs;
-
-            # Import the container's flake.nix from the filtered source
-            airflowFlake = import "${repoSrc}/src/containers/firestream/airflow/flake.nix";
-
-            # Call the flake's outputs function
-            airflowOutputs = airflowFlake.outputs {
-              inherit self nixpkgs flake-utils pyproject-nix uv2nix pyproject-build-systems;
-            };
-          in airflowOutputs.packages.${system}.dockerImage
-          else pkgs.runCommand "airflow-not-available" {} ''
-            echo "Docker images only available on Linux systems" > $out
-          '';
+        airflow = if isLinux then mkAirflow else unavailable "airflow";
+        odoo = if isLinux then mkOdoo else unavailable "odoo";
+        jupyterhub = if isLinux then mkJupyterhub else unavailable "jupyterhub";
+        postgresql = if isLinux then mkPostgresql "17" else unavailable "postgresql";
+        postgresql-16 = if isLinux then mkPostgresql "16" else unavailable "postgresql-16";
+        postgresql-17 = if isLinux then mkPostgresql "17" else unavailable "postgresql-17";
+        redis = if isLinux then mkRedis "7" else unavailable "redis";
+        redis-7 = if isLinux then mkRedis "7" else unavailable "redis-7";
+        redis-8 = if isLinux then mkRedis "8" else unavailable "redis-8";
       };
     });
 
@@ -315,8 +373,13 @@
       # Complete Firestream module system
       firestream = firestream;
 
-      # Convenience: direct access to mkAppModule
+      # Convenience: direct access to factory functions
       mkAppModule = firestream.mkAppModule;
+      mkContainerModule = firestream.mkContainerModule;
+      mkPythonContainerModule = firestream.mkPythonContainerModule;
+
+      # Core libraries for custom modules
+      coreLibs = firestream.coreLibs;
     });
 
     # Test suite for the Firestream module system
@@ -360,8 +423,10 @@
     #   # Then import and call the flake outputs
     containerModulePaths = {
       airflow = "src/containers/firestream/airflow";
+      odoo = "src/containers/firestream/odoo";
+      jupyterhub = "src/containers/firestream/jupyterhub";
+      postgresql = "src/containers/firestream/postgresql";
       # Future containers can be added here:
-      # postgresql = "src/containers/firestream/postgresql";
       # kafka = "src/containers/firestream/kafka";
     };
 

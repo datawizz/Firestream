@@ -1,0 +1,42 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "firestream-jupyterhub"
+version = "5.3.0"
+description = "Firestream JupyterHub container - multi-user Jupyter notebook server"
+requires-python = ">=3.11"
+dependencies = [
+    "jupyterhub==5.3.0",
+    "notebook>=7.0.0",
+    "jupyterlab>=4.0.0",
+    "oauthenticator>=16.0.0",
+    "dockerspawner>=13.0.0",
+    "psycopg2-binary>=2.9.0",
+    "sqlalchemy>=2.0.0",
+    "alembic>=1.13.0",
+    "tornado>=6.4.0",
+    "jinja2>=3.1.0",
+    "cryptography>=42.0.0",
+    "pamela>=1.0.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.4.0",
+    "pytest-cov>=4.1.0",
+    "black>=23.7.0",
+    "ruff>=0.0.285",
+    "mypy>=1.4.0",
+    "pre-commit>=3.3.0",
+]
+
+[tool.uv]
+dev-dependencies = []
+
+[tool.hatch.metadata]
+allow-direct-references = true
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/firestream_jupyterhub"]
