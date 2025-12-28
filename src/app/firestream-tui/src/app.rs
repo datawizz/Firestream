@@ -1,7 +1,7 @@
-use crate::backend::{FirestreamBackend, IcebergBackend};
+use crate::backend::FirestreamBackend;
 use crate::event::{AppEvent, Event, EventHandler};
 use crate::models::{Template, DeltaTable, BuildStatus, SecretInfo, ResourceType, TemplateConfiguration, TemplateVariable};
-use crate::services::{TemplateService, IcebergService};
+use crate::services::TemplateService;
 use crate::views::View;
 use ratatui::{
     DefaultTerminal,
@@ -61,9 +61,6 @@ pub struct App {
     
     /// Template service
     template_service: Option<TemplateService>,
-    
-    /// Iceberg service
-    _iceberg_service: Option<IcebergService>,
 }
 
 #[derive(Debug, Clone)]
@@ -114,9 +111,6 @@ pub enum ResourceDetails {
     Table(DeltaTable),
     Build(BuildStatus),
     Secret(SecretInfo),
-    IcebergCatalog(crate::models::IcebergCatalog),
-    IcebergNamespace(crate::models::IcebergNamespace),
-    IcebergTable(crate::models::IcebergTable),
 }
 
 #[derive(Debug, Default)]
@@ -158,15 +152,10 @@ pub enum GenerationStatus {
 impl App {
     /// Create a new application instance
     pub async fn new() -> Self {
-        // Use Iceberg backend if LOCAL_DATA_DIRECTORY is set, otherwise use mock
-        let backend: Arc<dyn FirestreamBackend> = if std::env::var("LOCAL_DATA_DIRECTORY").is_ok() {
-            Arc::new(IcebergBackend::new().await)
-        } else {
-            // Fall back to mock client for development
-            use crate::backend::MockClient;
-            Arc::new(MockClient::new())
-        };
-        
+        // Use mock client for development
+        use crate::backend::MockClient;
+        let backend: Arc<dyn FirestreamBackend> = Arc::new(MockClient::new());
+
         Self {
             running: true,
             events: EventHandler::new(),
@@ -196,7 +185,6 @@ impl App {
                     None
                 }
             },
-            _iceberg_service: Some(IcebergService::new()),
         }
     }
 
@@ -366,30 +354,6 @@ impl App {
 
     /// Handle details pane navigation
     async fn handle_details_keys(&mut self, key: KeyEvent) -> color_eyre::Result<()> {
-        // Check if we're viewing an Iceberg table
-        if let Some(ResourceDetails::IcebergTable(table)) = &self.selected_details {
-            // Extract the values we need before the mutable borrow
-            let catalog = table.catalog.clone();
-            let namespace = table.namespace.clone();
-            let table_name = table.name.clone();
-            
-            match key.code {
-                KeyCode::Char('p' | 'P') => {
-                    // Preview table data
-                    self.preview_iceberg_table(&catalog, &namespace, &table_name).await;
-                }
-                KeyCode::Char('q' | 'Q') => {
-                    // Open query interface
-                    self.status_message = Some("Query interface not yet implemented".to_string());
-                }
-                KeyCode::Char('d' | 'D') => {
-                    // Drop table (with confirmation)
-                    self.status_message = Some("Drop table not yet implemented".to_string());
-                }
-                _ => {}
-            }
-            return Ok(());
-        }
         // If we're configuring a template, handle template configuration input
         if let Some(ref mut config_state) = self.template_config {
             if let Some(ref editing_field) = config_state.editing_field {
@@ -1092,70 +1056,6 @@ impl App {
             }
         }
         
-        // Data section (Iceberg catalogs)
-        items.push(ResourceItem {
-            id: "data".to_string(),
-            name: "data".to_string(),
-            resource_type: ResourceType::Data,
-            parent: None,
-            expandable: true,
-            depth: 0,
-            status: None,
-        });
-        
-        if self.resources.expanded.contains(&"data".to_string()) {
-            // Load catalogs directly under data
-            if let Ok(catalogs) = self.backend.list_iceberg_catalogs().await {
-                for catalog in catalogs {
-                    let catalog_id = format!("data.catalog:{}", catalog.name);
-                    items.push(ResourceItem {
-                        id: catalog_id.clone(),
-                        name: catalog.name.clone(),
-                        resource_type: ResourceType::Data,
-                        parent: Some("data".to_string()),
-                        expandable: true,
-                        depth: 1,
-                        status: None,
-                    });
-                    
-                    // If catalog is expanded, load namespaces
-                    if self.resources.expanded.contains(&catalog_id) {
-                        if let Ok(namespaces) = self.backend.list_iceberg_namespaces(&catalog.name).await {
-                            for namespace in namespaces {
-                                let ns_id = format!("data.namespace:{}:{}", catalog.name, namespace.name);
-                                items.push(ResourceItem {
-                                    id: ns_id.clone(),
-                                    name: namespace.name.clone(),
-                                    resource_type: ResourceType::Data,
-                                    parent: Some(catalog_id.clone()),
-                                    expandable: true,
-                                    depth: 2,
-                                    status: None,
-                                });
-                                
-                                // If namespace is expanded, load tables
-                                if self.resources.expanded.contains(&ns_id) {
-                                    if let Ok(tables) = self.backend.list_iceberg_tables(&catalog.name, &namespace.name).await {
-                                        for table in tables {
-                                            items.push(ResourceItem {
-                                                id: format!("data.table:{}:{}:{}", catalog.name, namespace.name, table.name),
-                                                name: table.name.clone(),
-                                                resource_type: ResourceType::Data,
-                                                parent: Some(ns_id.clone()),
-                                                expandable: false,
-                                                depth: 3,
-                                                status: None,
-                                            });
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-        
         // Builds section
         items.push(ResourceItem {
             id: "builds".to_string(),
@@ -1215,41 +1115,9 @@ impl App {
             // Only process non-expandable items
             if !item.expandable {
                 self.loading.details = true;
-            
+
             // Parse resource ID
-            if item.id.starts_with("data.catalog:") {
-                // Handle Iceberg catalog
-                let catalog_name = item.id.strip_prefix("data.catalog:").unwrap();
-                if let Ok(catalog) = self.backend.get_iceberg_catalog(catalog_name).await {
-                    self.selected_details = Some(ResourceDetails::IcebergCatalog(catalog));
-                    self.focused_pane = Pane::Details;
-                }
-            } else if item.id.starts_with("data.namespace:") {
-                // Handle Iceberg namespace - format: data.namespace:catalog:namespace
-                let parts: Vec<&str> = item.id.strip_prefix("data.namespace:").unwrap().split(':').collect();
-                if parts.len() == 2 {
-                    let catalog = parts[0];
-                    let namespace = parts[1];
-                    if let Ok(namespaces) = self.backend.list_iceberg_namespaces(catalog).await {
-                        if let Some(ns) = namespaces.into_iter().find(|n| n.name == namespace) {
-                            self.selected_details = Some(ResourceDetails::IcebergNamespace(ns));
-                            self.focused_pane = Pane::Details;
-                        }
-                    }
-                }
-            } else if item.id.starts_with("data.table:") {
-                // Handle Iceberg table - format: data.table:catalog:namespace:table
-                let parts: Vec<&str> = item.id.strip_prefix("data.table:").unwrap().split(':').collect();
-                if parts.len() == 3 {
-                    let catalog = parts[0];
-                    let namespace = parts[1];
-                    let table = parts[2];
-                    if let Ok(table_detail) = self.backend.get_iceberg_table(catalog, namespace, table).await {
-                        self.selected_details = Some(ResourceDetails::IcebergTable(table_detail));
-                        self.focused_pane = Pane::Details;
-                    }
-                }
-            } else if let Some((resource_type, id)) = item.id.split_once(':') {
+            if let Some((resource_type, id)) = item.id.split_once(':') {
                 match resource_type {
                     "deployment" => {
                         if let Ok(details) = self.backend.get_deployment(id).await {
@@ -1459,62 +1327,6 @@ impl App {
         // TODO: Load logs for specific resource
         self.status_message = Some(format!("Loading logs for {}", resource_name));
     }
-    
-    /// Preview Iceberg table data
-    async fn preview_iceberg_table(&mut self, catalog: &str, namespace: &str, table: &str) {
-        self.focused_pane = Pane::Logs;
-        self.logs.clear();
-        self.logs.push(format!(
-            "[{}] Previewing table: {}.{}.{}",
-            chrono::Local::now().format("%H:%M:%S"),
-            catalog, namespace, table
-        ));
-        
-        // Use backend to preview table
-        match self.backend.preview_iceberg_table(catalog, namespace, table, 20).await {
-            Ok(result) => {
-                self.logs.push(format!(
-                    "[{}] Query returned {} rows",
-                    chrono::Local::now().format("%H:%M:%S"),
-                    result.row_count
-                ));
-                self.logs.push("".to_string());
-                
-                // Format column headers
-                let header = result.columns.join(" | ");
-                self.logs.push(header);
-                self.logs.push("-".repeat(80));
-                
-                // Format rows
-                for row in result.rows {
-                    let row_str = row.iter()
-                        .map(|v| match v {
-                            serde_json::Value::String(s) => s.clone(),
-                            serde_json::Value::Number(n) => n.to_string(),
-                            serde_json::Value::Bool(b) => b.to_string(),
-                            serde_json::Value::Null => "NULL".to_string(),
-                            _ => v.to_string(),
-                        })
-                        .collect::<Vec<_>>()
-                        .join(" | ");
-                    self.logs.push(row_str);
-                }
-            }
-            Err(e) => {
-                self.logs.push(format!(
-                    "[{}] ERROR: Failed to preview table: {}",
-                    chrono::Local::now().format("%H:%M:%S"),
-                    e
-                ));
-            }
-        }
-        
-        // Keep only the last 100 log entries to prevent memory issues
-        if self.logs.len() > 100 {
-            self.logs.drain(0..self.logs.len() - 100);
-        }
-    }
-    
     /// Generate template with current configuration
     fn generate_template(&mut self) {
         // First check if template service is available

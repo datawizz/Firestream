@@ -7,7 +7,6 @@ pub mod help_view;
 pub mod command_palette;
 pub mod search_view;
 pub mod splash_view;
-pub mod iceberg_config_view;
 
 pub use resources_pane::ResourcesPane;
 pub use details_pane::DetailsPane;
@@ -16,7 +15,6 @@ pub use help_view::HelpView;
 pub use command_palette::CommandPalette;
 pub use search_view::SearchView;
 pub use splash_view::SplashView;
-pub use iceberg_config_view::IcebergConfigView;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum View {
@@ -26,5 +24,4 @@ pub enum View {
     NewDeployment,
     Search(String),
     CommandPalette,
-    IcebergConfig,
 }
