@@ -1,12 +1,9 @@
-# Kafka Container Module - Using Firestream Factories
+# Kafka Container Module - Using Firestream Java Factory
 # Copyright Firestream. Apache-2.0 License.
 #
-# This module defines the Kafka container using mkContainerModule.
-# The factory handles:
-# - Entrypoint generation
-# - Docker image building
-# - Environment loading and secrets
-# - Development shell
+# This module defines the Kafka container using mkJavaContainerModule.
+# The Java factory provides automatic JDK configuration, JVM tuning options,
+# NSS wrapper support for Kubernetes, and classpath management.
 #
 # Note: This module is for Kafka 4.0+ (KRaft mode only, no ZooKeeper)
 #
@@ -37,25 +34,8 @@ let
 
   # Kafka-specific helper functions (needed by scripts)
   # These supplement the core library functions
+  # Note: NSS wrapper is provided by mkJavaContainerModule via java_enable_nss_wrapper()
   kafkaHelpers = ''
-    ########################
-    # Enable NSS wrapper for arbitrary UID support
-    # Arguments:
-    #   None
-    # Returns:
-    #   None
-    #########################
-    kafka_enable_nss_wrapper() {
-      if ! getent passwd "$(id -u)" &>/dev/null && [ -e "$NSS_WRAPPER_LIB" ]; then
-        debug "Configuring libnss_wrapper..."
-        export LD_PRELOAD="$NSS_WRAPPER_LIB"
-        export NSS_WRAPPER_PASSWD="$(mktemp)"
-        export NSS_WRAPPER_GROUP="$(mktemp)"
-        echo "kafka:x:$(id -u):$(id -g):Kafka:$KAFKA_DATA_DIR:/bin/false" >"$NSS_WRAPPER_PASSWD"
-        echo "kafka:x:$(id -g):" >"$NSS_WRAPPER_GROUP"
-      fi
-    }
-
     ########################
     # Print validation error
     # Arguments:
@@ -129,7 +109,7 @@ let
     }
 
     ########################
-    # Wait for TCP port
+    # Wait for TCP port (wrapper around wait-for-port binary)
     # Arguments:
     #   $1 - host
     #   $2 - port
@@ -139,18 +119,14 @@ let
       local host="$1"
       local port="$2"
       local timeout="''${3:-60}"
-      local elapsed=0
 
       info "Waiting for $host:$port to be available (timeout: $timeout seconds)..."
-      while ! ${pkgs.netcat-gnu}/bin/nc -z "$host" "$port" 2>/dev/null; do
-        if [[ $elapsed -ge $timeout ]]; then
-          error "Timeout waiting for $host:$port"
-          return 1
-        fi
-        sleep 1
-        ((elapsed++))
-      done
-      info "$host:$port is available!"
+      if wait-for-port --host "$host" --timeout "$timeout" "$port"; then
+        info "$host:$port is available!"
+      else
+        error "Timeout waiting for $host:$port"
+        return 1
+      fi
     }
 
     ########################
@@ -253,36 +229,39 @@ let
     }
   '';
 
-  # System dependencies (libs needed in the container)
+  # System dependencies (Kafka-specific extras)
+  # Note: Java deps (cacert, openssl, zlib, procps, nss_wrapper, etc.) are auto-included
+  # by mkJavaContainerModule
   systemDeps = with pkgs; [
-    # SSL/TLS
-    cacert openssl
-
     # Compression
-    zlib gzip bzip2
+    gzip bzip2
 
     # Utilities
     coreutils gnugrep gnused gawk findutils which curl netcat-gnu
-    procps util-linux
+    util-linux
 
     # Terminal
     ncurses readline
-
-    # NSS wrapper for random UID support
-    nss_wrapper
   ];
 
   # Runtime binary deps (need to be in PATH)
+  # Note: jdk is auto-included by mkJavaContainerModule
   runtimeBinDeps = with pkgs; [
     coreutils bash gnused gnugrep gawk findutils which
     kafka  # apacheKafka
-    javaRuntime
     gzip netcat-gnu
   ];
 
-in firestream.mkContainerModule {
+in firestream.mkJavaContainerModule {
   name = "kafka";
   inherit version;
+
+  # Java configuration - use javaRuntime (Temurin 17)
+  jdk = javaRuntime;
+
+  # JVM tuning for Kafka workloads
+  heapOpts = "-Xmx1g -Xms512m";
+  gcOpts = "-XX:+UseG1GC -XX:MaxGCPauseMillis=20 -XX:InitiatingHeapOccupancyPercent=35";
 
   # Paths configuration (Bitnami compatibility)
   paths = {
@@ -366,11 +345,7 @@ in firestream.mkContainerModule {
     KAFKA_CFG_MAX_REQUEST_SIZE = "";
     KAFKA_CFG_MAX_PARTITION_FETCH_BYTES = "";
 
-    # NSS wrapper
-    NSS_WRAPPER_LIB = "${pkgs.nss_wrapper}/lib/libnss_wrapper.so";
-
-    # Java settings
-    JAVA_HOME = "${javaRuntime}";
+    # Note: JAVA_HOME and NSS_WRAPPER_LIB are auto-set by mkJavaContainerModule
 
     # Debug mode
     BITNAMI_DEBUG = "false";
@@ -492,12 +467,10 @@ in firestream.mkContainerModule {
     [[ "$error_code" -eq 0 ]] || exit "$error_code"
   '';
 
-  # Activation: Load secrets and enable NSS wrapper
+  # Activation: Load secrets
+  # Note: NSS wrapper is automatically enabled by mkJavaContainerModule
   activateFn = kafkaHelpers + ''
     info "Activating Kafka configuration..."
-
-    # Enable NSS wrapper for arbitrary UID support
-    kafka_enable_nss_wrapper
 
     # Load secrets from _FILE variables
     ${secretsScript}
@@ -513,11 +486,9 @@ in firestream.mkContainerModule {
   initFn = kafkaHelpers + configScript + initScript;
 
   # Startup command
+  # Note: NSS wrapper is automatically enabled by mkJavaContainerModule before runCmd
   runCmd = ''
     ${kafkaHelpers}
-
-    # Enable NSS wrapper
-    kafka_enable_nss_wrapper
 
     info "Starting Kafka..."
     exec ${kafka}/bin/kafka-server-start.sh "$KAFKA_CONF_FILE"

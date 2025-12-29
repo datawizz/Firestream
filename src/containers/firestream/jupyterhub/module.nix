@@ -86,21 +86,16 @@ let
       local host="''${JUPYTERHUB_DATABASE_HOST:-postgresql}"
       local port="''${JUPYTERHUB_DATABASE_PORT_NUMBER:-5432}"
       local timeout="''${JUPYTERHUB_DB_WAIT_TIMEOUT:-120}"
-      local elapsed=0
 
       info "Waiting for PostgreSQL at $host:$port (timeout: $timeout seconds)..."
 
-      while ! ${pkgs.netcat-gnu}/bin/nc -z "$host" "$port" 2>/dev/null; do
-        if [[ $elapsed -ge $timeout ]]; then
-          error "Timeout waiting for PostgreSQL at $host:$port"
-          return 1
-        fi
-        sleep 1
-        ((elapsed++))
-      done
-
-      info "PostgreSQL is available at $host:$port"
-      return 0
+      if wait-for-port --host "$host" --timeout "$timeout" "$port"; then
+        info "PostgreSQL is available at $host:$port"
+        return 0
+      else
+        error "Timeout waiting for PostgreSQL at $host:$port"
+        return 1
+      fi
     }
 
     ########################

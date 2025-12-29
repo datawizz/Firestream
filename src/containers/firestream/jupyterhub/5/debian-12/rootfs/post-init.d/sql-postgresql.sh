@@ -14,7 +14,7 @@ fi
 if [[ -n "${JUPYTERHUB_DATABASE_HOST:-}" ]]; then
     debug "Verifying PostgreSQL connection to ${JUPYTERHUB_DATABASE_HOST}:${JUPYTERHUB_DATABASE_PORT_NUMBER:-5432}"
 
-    if nc -z "${JUPYTERHUB_DATABASE_HOST}" "${JUPYTERHUB_DATABASE_PORT_NUMBER:-5432}" 2>/dev/null; then
+    if wait-for-port --host "${JUPYTERHUB_DATABASE_HOST}" --timeout 5 "${JUPYTERHUB_DATABASE_PORT_NUMBER:-5432}" 2>/dev/null; then
         debug "PostgreSQL connection verified"
     else
         warn "PostgreSQL may not be reachable - service might fail to start"

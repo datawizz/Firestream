@@ -38,7 +38,7 @@ fi
 
 # Wait for database
 info "Waiting for database at ${AIRFLOW_DATABASE_HOST}:${AIRFLOW_DATABASE_PORT_NUMBER}..."
-wait_for_port "$AIRFLOW_DATABASE_HOST" "$AIRFLOW_DATABASE_PORT_NUMBER" --tries 24 --sleep 5
+wait-for-port --host "$AIRFLOW_DATABASE_HOST" --timeout 120 "$AIRFLOW_DATABASE_PORT_NUMBER"
 
 # Database operations
 major_version=$(airflow_major_version)
@@ -144,7 +144,7 @@ case "$AIRFLOW_COMPONENT_TYPE" in
     # Celery components wait for Redis
     if [[ "$AIRFLOW_EXECUTOR" == "CeleryExecutor" || "$AIRFLOW_EXECUTOR" == "CeleryKubernetesExecutor" ]]; then
       info "Waiting for Redis at ${REDIS_HOST}:${REDIS_PORT_NUMBER}..."
-      wait_for_port "$REDIS_HOST" "$REDIS_PORT_NUMBER" --tries 12 --sleep 5
+      wait-for-port --host "$REDIS_HOST" --timeout 60 "$REDIS_PORT_NUMBER"
     fi
     ;;
 esac

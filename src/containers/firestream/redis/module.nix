@@ -196,18 +196,14 @@ let
       local host="''${REDIS_MASTER_HOST:-localhost}"
       local port="''${REDIS_MASTER_PORT_NUMBER:-6379}"
       local timeout=60
-      local elapsed=0
 
       info "Waiting for Redis master at $host:$port..."
-      while ! ${pkgs.netcat-gnu}/bin/nc -z "$host" "$port" 2>/dev/null; do
-        if [[ $elapsed -ge $timeout ]]; then
-          error "Timeout waiting for Redis master at $host:$port"
-          return 1
-        fi
-        sleep 1
-        ((elapsed++))
-      done
-      info "Redis master is available"
+      if wait-for-port --host "$host" --timeout "$timeout" "$port"; then
+        info "Redis master is available"
+      else
+        error "Timeout waiting for Redis master at $host:$port"
+        return 1
+      fi
     }
 
     ########################

@@ -124,7 +124,7 @@ let
     }
 
     ########################
-    # Wait for TCP port
+    # Wait for TCP port (wrapper around wait-for-port binary)
     # Arguments:
     #   $1 - host
     #   $2 - port
@@ -134,18 +134,14 @@ let
       local host="$1"
       local port="$2"
       local timeout="''${3:-60}"
-      local elapsed=0
 
       info "Waiting for $host:$port to be available (timeout: $timeout seconds)..."
-      while ! ${pkgs.netcat-gnu}/bin/nc -z "$host" "$port" 2>/dev/null; do
-        if [[ $elapsed -ge $timeout ]]; then
-          error "Timeout waiting for $host:$port"
-          return 1
-        fi
-        sleep 1
-        ((elapsed++))
-      done
-      info "$host:$port is available!"
+      if wait-for-port --host "$host" --timeout "$timeout" "$port"; then
+        info "$host:$port is available!"
+      else
+        error "Timeout waiting for $host:$port"
+        return 1
+      fi
     }
   '';
 

@@ -18,7 +18,7 @@ if ! is_boolean_yes "${SUPERSET_SKIP_DATABASE_WAIT:-no}"; then
   local db_port="${SUPERSET_DATABASE_PORT_NUMBER:-5432}"
 
   info "Waiting for database at ${db_host}:${db_port}..."
-  if ! wait_for_port "$db_host" "$db_port" --tries 30 --sleep 5; then
+  if ! wait-for-port --host "$db_host" --timeout 150 "$db_port"; then
     error "Database at ${db_host}:${db_port} is not available"
     exit 1
   fi
@@ -60,7 +60,7 @@ case "${SUPERSET_ROLE:-webserver}" in
       local redis_port="${REDIS_PORT_NUMBER:-6379}"
 
       info "Waiting for Redis at ${redis_host}:${redis_port}..."
-      if ! wait_for_port "$redis_host" "$redis_port" --tries 12 --sleep 5; then
+      if ! wait-for-port --host "$redis_host" --timeout 60 "$redis_port"; then
         error "Redis at ${redis_host}:${redis_port} is not available"
         exit 1
       fi
