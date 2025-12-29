@@ -23,7 +23,7 @@
 #     };
 #   in container.dockerImage
 
-{ pkgs, lib, mkAppModule, coreLibs }:
+{ pkgs, lib, mkAppModule, coreLibs, waitForPortPkg }:
 
 let
   # Default Docker configuration
@@ -120,6 +120,7 @@ in
         pkgs.bashInteractive
         pkgs.cacert
         pkgs.stdenv.cc.cc.lib
+        waitForPortPkg  # Rust-based port checker - available in all containers
       ]
     );
 

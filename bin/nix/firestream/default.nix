@@ -3,13 +3,17 @@
 let
   lib = pkgs.lib;
 
+  # Import custom packages
+  packages = import ./packages { inherit pkgs lib; };
+  waitForPortPkg = packages.wait-for-port;
+
   # Import core library modules with dependency injection
   # Each module receives only the dependencies it needs
   logModule = import ./lib/log.nix { inherit pkgs lib; };
   validationsModule = import ./lib/validations.nix { inherit pkgs lib logModule; };
   fsModule = import ./lib/fs.nix { inherit pkgs lib logModule; };
   osModule = import ./lib/os.nix { inherit pkgs lib logModule fsModule validationsModule; };
-  netModule = import ./lib/net.nix { inherit pkgs lib logModule validationsModule; };
+  netModule = import ./lib/net.nix { inherit pkgs lib logModule validationsModule waitForPortPkg; };
   serviceModule = import ./lib/service.nix { inherit pkgs lib logModule validationsModule; };
   fileModule = import ./lib/file.nix { inherit pkgs lib logModule; };
   persistenceModule = import ./lib/persistence.nix { inherit pkgs lib logModule fsModule; };
@@ -46,10 +50,14 @@ let
 
   # Import container factories
   containerBase = import ./containers/base.nix {
-    inherit pkgs lib coreLibs;
+    inherit pkgs lib coreLibs waitForPortPkg;
     mkAppModule = appBase.mkAppModule;
   };
   containerPython = import ./containers/python.nix {
+    inherit pkgs lib;
+    mkContainerModule = containerBase.mkContainerModule;
+  };
+  containerJava = import ./containers/java.nix {
     inherit pkgs lib;
     mkContainerModule = containerBase.mkContainerModule;
   };
@@ -57,9 +65,15 @@ let
   containerModules = {
     mkContainerModule = containerBase.mkContainerModule;
     mkPythonContainerModule = containerPython.mkPythonContainerModule;
+    mkJavaContainerModule = containerJava.mkJavaContainerModule;
   };
 
 in {
+  # Custom packages built from source
+  # Usage: firestream.packages.wait-for-port
+  inherit packages;
+  inherit waitForPortPkg;
+
   # Core library modules (for direct access)
   # Usage: firestream.lib.log.functions
   lib = coreLibs;
@@ -80,6 +94,7 @@ in {
   # Convenience: direct access to container factories
   mkContainerModule = containerModules.mkContainerModule;
   mkPythonContainerModule = containerModules.mkPythonContainerModule;
+  mkJavaContainerModule = containerModules.mkJavaContainerModule;
 
   # Convenience: combined functions from all core libs
   # Returns a single string containing all library functions
@@ -107,6 +122,6 @@ in {
     description = "Firestream Nix Shell Module System for container initialization";
     moduleCount = builtins.length (lib.attrNames coreLibs);
     modules = lib.attrNames coreLibs;
-    containerFactories = [ "mkContainerModule" "mkPythonContainerModule" ];
+    containerFactories = [ "mkContainerModule" "mkPythonContainerModule" "mkJavaContainerModule" ];
   };
 }

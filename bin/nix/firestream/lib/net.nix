@@ -1,5 +1,5 @@
 # net.nix - Network utilities and connectivity functions
-{ pkgs, lib, logModule, validationsModule }:
+{ pkgs, lib, logModule, validationsModule, waitForPortPkg }:
 
 let
   functions = ''
@@ -447,76 +447,32 @@ let
     }
 
     ########################
-    # Wait for TCP port to be available
+    # Wait for TCP port to reach a desired state
+    # This is a thin wrapper around the Rust wait-for-port binary.
+    #
+    # Usage:
+    #   wait-for-port PORT [--host HOST] [--state inuse|free] [--timeout SECS] [--verbose]
+    #
     # Arguments:
-    #   $1 - host
-    #   $2 - port
+    #   PORT - Port number to check (1-65535)
+    #
     # Flags:
-    #   --tries - Number of retry attempts (default: 12)
-    #   --sleep - Seconds to sleep between retries (default: 5)
+    #   --host HOST      - Target host (default: localhost)
+    #   --state STATE    - Desired port state: inuse or free (default: inuse)
+    #   --timeout SECS   - Timeout in seconds (default: 30)
+    #   --verbose        - Enable verbose output
+    #
     # Returns:
-    #   Boolean
+    #   0 - Port reached desired state
+    #   1 - Timeout or error
+    #
+    # Examples:
+    #   wait-for-port 5432 --host db.example.com --timeout 120
+    #   wait-for-port 8080 --state free --timeout 5
     #########################
     wait_for_port() {
-        local host=""
-        local port=""
-        local tries=12
-        local sleep_time=5
-
-        # Parse arguments
-        while [[ "$#" -gt 0 ]]; do
-            case "$1" in
-                --tries)
-                    shift
-                    tries="''${1:?missing tries value}"
-                    ;;
-                --sleep)
-                    shift
-                    sleep_time="''${1:?missing sleep value}"
-                    ;;
-                --)
-                    shift
-                    break
-                    ;;
-                -*)
-                    stderr_print "unrecognized flag $1"
-                    return 1
-                    ;;
-                *)
-                    if [[ -z "$host" ]]; then
-                        host="$1"
-                    elif [[ -z "$port" ]]; then
-                        port="$1"
-                    else
-                        stderr_print "too many arguments"
-                        return 1
-                    fi
-                    ;;
-            esac
-            shift
-        done
-
-        if [[ -z "$host" ]]; then
-            stderr_print "host is required"
-            return 1
-        fi
-
-        if [[ -z "$port" ]]; then
-            stderr_print "port is required"
-            return 1
-        fi
-
-        for ((i = 1; i <= tries; i++)); do
-            debug "Port check attempt $i/$tries for $host:$port"
-            if ${pkgs.netcat-gnu}/bin/nc -z "$host" "$port" 2>/dev/null; then
-                debug "Port $port is available on $host"
-                return 0
-            fi
-            ${pkgs.coreutils}/bin/sleep "$sleep_time"
-        done
-
-        error "Port $port on $host not available after $tries attempts"
-        return 1
+        # Thin wrapper - pass all arguments to Rust binary
+        ${waitForPortPkg}/bin/wait-for-port "$@"
     }
   '';
 in
@@ -528,14 +484,16 @@ in
   };
 
   imports = [ logModule validationsModule ];
-  runtimeDeps = with pkgs; [
+  runtimeDeps = (with pkgs; [
     coreutils
     glibc.bin
     gawk
     findutils
     nettools
     curl
-    netcat-gnu
+    netcat-gnu  # Keep for other utilities that may need it
+  ]) ++ [
+    waitForPortPkg  # Rust-based port checker
   ];
   inherit functions;
   exports = [
