@@ -1,0 +1,4 @@
+{
+  "title": "Architecture",
+  "pages": ["overview", "rust-workspace", "python-etl", "infrastructure"]
+}
