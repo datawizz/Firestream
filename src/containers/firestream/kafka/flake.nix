@@ -2,22 +2,26 @@
   description = "Firestream Kafka Container - Pure Nix build using Firestream module system";
 
   inputs = {
-    nixpkgs.url = "github:NixOS/nixpkgs/release-24.11";
+    nixpkgs.url = "github:NixOS/nixpkgs/release-25.11";
     flake-utils.url = "github:numtide/flake-utils";
+
+    # Firestream module system (provides fenix/crane for Rust builds)
+    firestream.url = "path:../../../..";
   };
 
-  outputs = { self, nixpkgs, flake-utils }:
+  outputs = { self, nixpkgs, flake-utils, firestream }:
     flake-utils.lib.eachSystem [ "x86_64-linux" "aarch64-linux" ] (system:
       let
         pkgs = nixpkgs.legacyPackages.${system};
         lib = pkgs.lib;
 
-        # Use relative import (matches Firestream module system pattern)
-        firestream = import ../../../../bin/nix/firestream { inherit pkgs; };
+        # Import Firestream module system via flake input (includes fenix/crane)
+        firestreamLib = firestream.firestreamModules { inherit pkgs system; };
 
         # Import Kafka module for version 4.0
         kafka = import ./module.nix {
-          inherit pkgs lib firestream;
+          inherit pkgs lib;
+          firestream = firestreamLib;
           version = "4.0";
         };
       in {
@@ -39,11 +43,12 @@
       # System-independent outputs for documentation
       lib = {
         # Helper to create Kafka containers
-        mkKafkaContainer = { pkgs, version ? "4.0" }:
+        # Note: Callers should use firestream.firestreamModules for proper Rust support
+        mkKafkaContainer = { pkgs, system, firestreamLib, version ? "4.0" }:
           import ./module.nix {
             inherit pkgs version;
             lib = pkgs.lib;
-            firestream = import ../../../../bin/nix/firestream { inherit pkgs; };
+            firestream = firestreamLib;
           };
       };
     };

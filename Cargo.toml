@@ -2,10 +2,10 @@
 resolver = "2"
 
 # Default member - this makes 'cargo run' at the root run the TUI
-default-members = ["src/lib/rust/firestream-tui"]
+default-members = ["src/app/firestream-tui"]
 
 members = [
-    "src/lib/rust/firestream-tui",
+    "src/app/firestream-tui",
     "src/lib/rust/firestream-api-server/cli",
     "src/lib/rust/firestream-api-server/config",
     "src/lib/rust/firestream-api-server/db",
@@ -16,55 +16,16 @@ members = [
     "src/lib/rust/tools/templatizer-puppeteer",
     "src/lib/rust/tools/templatizer-spark",
     "src/lib/rust/tools/templatizer-superset",
-    "src/lib/rust/tools/iceberg-manager",
     "src/lib/rust/tools/docker-manager",
-    "src/lib/rust/tools/helm-manager"
+    "src/lib/rust/tools/helm-manager",
+    "src/lib/rust/tools/wait-for-port"
 ]
 
 [workspace.dependencies]
 # Internal Crates
 templatizer-spark = { path = "src/lib/rust/tools/templatizer-spark" }
 filesystem-manager = { path = "src/lib/rust/tools/filesystem-manager" }
-iceberg-manager = { path = "src/lib/rust/tools/iceberg-manager" }
-
 comfy-table = "7.1.4"
-
-# Deltalake
-deltalake = { version = "0.26.2", features = ["datafusion"] }
-polars = { version = "0.48.1", features = ["lazy", "parquet", "json", "csv", "temporal", "rolling_window"] }
-
-# Apache Iceberg - DataFusion-centric implementation
-iceberg = { version = "0.5.1", features = ["storage-memory", "storage-s3", "storage-fs", "storage-gcs"] }
-iceberg-datafusion = { version = "0.5.1" }
-iceberg-catalog-rest = { version = "0.5.1" }
-iceberg-catalog-memory = { version = "0.5.1" }
-
-# arrow
-arrow = { version = "=55.0.0" }
-arrow-arith = { version = "=55.0.0" }
-arrow-array = { version = "=55.0.0", features = ["chrono-tz"] }
-arrow-buffer = { version = "=55.0.0" }
-arrow-cast = { version = "=55.0.0" }
-arrow-ipc = { version = "=55.0.0" }
-arrow-json = { version = "=55.0.0" }
-arrow-ord = { version = "=55.0.0" }
-arrow-row = { version = "=55.0.0" }
-arrow-schema = { version = "=55.0.0" }
-arrow-select = { version = "=55.0.0" }
-object_store = { version = "0.12.1" }
-parquet = { version = "=55.0.0" }
-
-# datafusion
-datafusion = "47.0.0"
-datafusion-expr = "47.0.0"
-datafusion-common = "47.0.0"
-datafusion-ffi = "47.0.0"
-datafusion-functions = "47.0.0"
-datafusion-functions-aggregate = "47.0.0"
-datafusion-physical-expr = "47.0.0"
-datafusion-physical-plan = "47.0.0"
-datafusion-proto = "47.0.0"
-datafusion-sql = "47.0.0"
 
 
 

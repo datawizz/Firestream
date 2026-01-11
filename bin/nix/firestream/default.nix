@@ -1,10 +1,16 @@
-{ pkgs }:
+{ pkgs, fenix, crane, system }:
 
 let
   lib = pkgs.lib;
 
+  # Import Rust module (Fenix + Crane for incremental builds)
+  rustModule = import ./rust { inherit pkgs fenix crane system; };
+
   # Import custom packages
-  packages = import ./packages { inherit pkgs lib; };
+  packages = import ./packages {
+    inherit pkgs lib;
+    mkRustPackage = rustModule.mkRustPackage;
+  };
   waitForPortPkg = packages.wait-for-port;
 
   # Import core library modules with dependency injection
@@ -69,6 +75,14 @@ let
   };
 
 in {
+  # Rust module (Fenix + Crane)
+  # Usage: firestream.rust.mkRustPackage { ... }
+  # Usage: firestream.rust.toolchain
+  rust = rustModule;
+
+  # Convenience: direct access to mkRustPackage
+  mkRustPackage = rustModule.mkRustPackage;
+
   # Custom packages built from source
   # Usage: firestream.packages.wait-for-port
   inherit packages;

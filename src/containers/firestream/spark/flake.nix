@@ -2,11 +2,14 @@
   description = "Firestream Spark - Pure Nix build for Apache Spark container";
 
   inputs = {
-    nixpkgs.url = "github:NixOS/nixpkgs/nixos-24.11";
+    nixpkgs.url = "github:NixOS/nixpkgs/release-25.11";
     flake-utils.url = "github:numtide/flake-utils";
+
+    # Firestream module system (provides fenix/crane for Rust builds)
+    firestream.url = "path:../../../..";
   };
 
-  outputs = { self, nixpkgs, flake-utils }:
+  outputs = { self, nixpkgs, flake-utils, firestream }:
     let
       inherit (nixpkgs) lib;
 
@@ -27,12 +30,13 @@
         # Python for PySpark
         python = pkgs.python312;
 
-        # Import Firestream module system (relative path for standalone builds)
-        firestream = import ../../../../bin/nix/firestream { inherit pkgs; };
+        # Import Firestream module system via flake input (includes fenix/crane)
+        firestreamLib = firestream.firestreamModules { inherit pkgs system; };
 
         # Import the Spark module (Linux only for Docker image)
         sparkModule = if isLinux then import ./module.nix {
-          inherit pkgs lib firestream sparkVersion jdk python;
+          inherit pkgs lib sparkVersion jdk python;
+          firestream = firestreamLib;
         } else null;
 
       in {

@@ -9,113 +9,87 @@ help:
 	@echo "Firestream Makefile"
 	@echo ""
 	@echo "Container Pattern: <container>-<action>"
-	@echo "  Actions: build, start, stop, clean, logs, status, credentials"
+	@echo "  Actions: build, start, stop, restart, clean, logs, status, credentials"
 	@echo ""
-	@echo "Containers:"
-	@echo "  airflow     - Apache Airflow workflow orchestration"
-	@echo "  kafka       - Apache Kafka streaming platform (KRaft mode)"
-	@echo "  odoo        - Odoo ERP"
-	@echo "  postgres    - PostgreSQL (use postgres-16-* or postgres-17-*)"
-	@echo "  redis       - Redis (use redis-7-* or redis-8-*)"
+	@echo "=== Containers ==="
 	@echo ""
-	@echo "Examples:"
+	@echo "  Databases:"
+	@echo "    postgres     - PostgreSQL (use postgres-16-* or postgres-17-*)"
+	@echo "    redis        - Redis (use redis-7-* or redis-8-*)"
+	@echo ""
+	@echo "  Data Processing:"
+	@echo "    spark        - Apache Spark cluster (master + worker)"
+	@echo "    kafka        - Apache Kafka streaming (KRaft mode)"
+	@echo ""
+	@echo "  Orchestration:"
+	@echo "    airflow      - Apache Airflow workflow orchestration"
+	@echo ""
+	@echo "  Applications:"
+	@echo "    jupyterhub   - JupyterHub notebook server"
+	@echo "    odoo         - Odoo ERP system"
+	@echo "    superset     - Apache Superset BI dashboards"
+	@echo "    supabase     - Supabase Backend-as-a-Service"
+	@echo ""
+	@echo "=== Examples ==="
+	@echo ""
 	@echo "  make airflow-start       # Start Airflow"
 	@echo "  make kafka-start         # Start Kafka"
 	@echo "  make postgres-17-start   # Start PostgreSQL 17"
 	@echo "  make redis-7-start       # Start Redis 7"
+	@echo "  make superset-start      # Start Superset"
 	@echo "  make odoo-credentials    # Show Odoo login info"
 	@echo ""
-	@echo "Development:"
-	@echo "  make development         # Deploy development environment"
+	@echo "=== Convenience ==="
+	@echo ""
+	@echo "  make containers-build-all   # Build all Nix containers"
+	@echo "  make containers-status      # Status of all containers"
+	@echo "  make containers-clean-all   # Clean all containers"
+	@echo ""
+	@echo "=== Development ==="
+	@echo ""
 	@echo "  make build-devcontainer  # Build devcontainer"
-	@echo "  make resume              # Resume existing cluster"
+	@echo "  make devcontainer-start  # Start devcontainer"
+	@echo "  make docker-reset        # Clean all Docker resources"
+	@echo "  make nix-up              # Build Nix flake"
+	@echo "  make nix-fix             # Garbage collect Nix"
+	@echo ""
+	@echo "=== Documentation ==="
+	@echo ""
+	@echo "  make docs-dev            # Start docs dev server (port 3001)"
+	@echo "  make docs-build          # Build documentation site"
+	@echo "  make docs-clean          # Clean docs build artifacts"
 
+# ==============================================================================
+# Core Variables
+# ==============================================================================
 BASEDIR=$(shell pwd)
 PROJECT_NAME=firestream
 
-# Devcontainer Development
+# Devcontainer
 DEVCONTAINER_COMPOSE := docker/firestream/docker-compose.devcontainer.yml
 DEVCONTAINER_PREINIT := docker/firestream/docker_preinit.sh
 
+# Documentation
+DOCS_DIR := src/app/firestream-docs
 
-development:
-	# Deploy the development environment
-	@bash -c 'cd $(BASEDIR) && bash bootstrap.sh development'
-
-
-build-devcontainer:
-	bash $(DEVCONTAINER_PREINIT)
-	docker compose -f $(DEVCONTAINER_COMPOSE) build devcontainer
-
-devcontainer-build:
-	bash $(DEVCONTAINER_PREINIT)
-	docker compose -f $(DEVCONTAINER_COMPOSE) build devcontainer
-
-devcontainer-start:
-	bash $(DEVCONTAINER_PREINIT)
-	docker compose -f $(DEVCONTAINER_COMPOSE) up -d
-
-devcontainer-stop:
-	docker compose -f $(DEVCONTAINER_COMPOSE) down
-
-nix-up:
-	# Build the flake
-	nix build .#container
-
-nix-fix:
-	# Delete old generations
-	nix-collect-garbage -d
-
-# # Run the setup script so paths are correctly set at login
-# RUN /bin/bash /home/$HOST_USERNAME/result/bin/setup-container
-
-
-
-
-build-devcontainer-clean:
-	bash $(DEVCONTAINER_PREINIT)
-	docker compose -f $(DEVCONTAINER_COMPOSE) build devcontainer --no-cache
-
-
-development_clean:
-	@bash -c 'cd $(BASEDIR) && bash bootstrap.sh clean'
-
-# Reuse the existing cluster by re-establishing the network tunnel
-resume:
-	# Useful for resuming the container after a restart
-	@bash -c 'cd $(BASEDIR) && bash bootstrap.sh resume'
-
-# Test services
-test:
-	make development
-	@bash -c 'cd $(BASEDIR) && bash bootstrap.sh test'
-
-# Build services
-build:
-	# Establish local container registry through k3d
-	@bash -c 'cd $(BASEDIR) && bash bootstrap.sh build'
-
-# ==============================================================================
-# Container Build System (Cross-Platform)
-# ==============================================================================
-# Centralized build script handles platform detection and Nix-in-Docker on macOS
+# Container build script (handles cross-platform Nix builds)
 BUILD_CONTAINER := bin/build-container.sh
 
-# Generic container build targets
+# ==============================================================================
+# Generic Container Build Pattern
+# ==============================================================================
 container-build-%:
 	@$(BUILD_CONTAINER) $*
 
 # ==============================================================================
-# Airflow Development (Nix-based container)
+# Airflow (Nix-based container)
 # ==============================================================================
 AIRFLOW_DIR := src/containers/firestream/airflow
 AIRFLOW_COMPOSE := $(AIRFLOW_DIR)/docker-compose.yml
 
-# Build the Airflow container (cross-platform)
 airflow-build:
 	@$(BUILD_CONTAINER) airflow
 
-# Start Airflow services (auto-builds if image missing)
 airflow-start:
 	@if ! docker image inspect firestream-airflow:3.0.3 >/dev/null 2>&1; then \
 		echo "Image not found, building..."; \
@@ -124,38 +98,29 @@ airflow-start:
 	docker compose -f $(AIRFLOW_COMPOSE) up -d
 	@echo "Airflow is running at http://localhost:8090"
 
-# Alias for airflow-start (build if needed + start)
 airflow-up: airflow-start
 
-# Stop Airflow services
 airflow-stop:
 	docker compose -f $(AIRFLOW_COMPOSE) down
 
-# Restart Airflow services
 airflow-restart: airflow-stop airflow-start
 
-# View Airflow logs
 airflow-logs:
 	docker compose -f $(AIRFLOW_COMPOSE) logs -f
 
-# View logs for specific service (usage: make airflow-logs-SERVICE)
 airflow-logs-%:
 	docker compose -f $(AIRFLOW_COMPOSE) logs -f $*
 
-# Run Airflow CLI commands (usage: make airflow-cli CMD="dags list")
 airflow-cli:
 	docker compose -f $(AIRFLOW_COMPOSE) exec airflow airflow $(CMD)
 
-# Clean up Airflow containers and images
 airflow-clean: airflow-stop
 	docker rmi firestream-airflow:3.0.3 firestream-airflow:3.0.3-nix 2>/dev/null || true
 	docker compose -f $(AIRFLOW_COMPOSE) down -v
 
-# Show Airflow service status
 airflow-status:
 	docker compose -f $(AIRFLOW_COMPOSE) ps
 
-# Show Airflow credentials
 airflow-credentials:
 	@echo "=== Airflow Credentials ==="
 	@echo "URL:      http://localhost:8090"
@@ -165,9 +130,116 @@ airflow-credentials:
 	@echo "Flower:   http://localhost:5555"
 
 # ==============================================================================
-# Odoo Development (Nix-based container)
+# JupyterHub (Nix-based container)
 # ==============================================================================
-ODOO_COMPOSE := src/containers/firestream/odoo/docker-compose.yml
+JUPYTERHUB_DIR := src/containers/firestream/jupyterhub
+JUPYTERHUB_COMPOSE := $(JUPYTERHUB_DIR)/docker-compose.yml
+
+jupyterhub-build:
+	@$(BUILD_CONTAINER) jupyterhub
+
+jupyterhub-start:
+	@if ! docker image inspect firestream-jupyterhub:5.3.0-nix >/dev/null 2>&1; then \
+		echo "Image not found, building..."; \
+		$(MAKE) jupyterhub-build; \
+	fi
+	docker compose -f $(JUPYTERHUB_COMPOSE) up -d
+	@echo "JupyterHub is running at http://localhost:8000"
+
+jupyterhub-up: jupyterhub-start
+
+jupyterhub-stop:
+	docker compose -f $(JUPYTERHUB_COMPOSE) down
+
+jupyterhub-restart: jupyterhub-stop jupyterhub-start
+
+jupyterhub-logs:
+	docker compose -f $(JUPYTERHUB_COMPOSE) logs -f
+
+jupyterhub-logs-hub:
+	docker compose -f $(JUPYTERHUB_COMPOSE) logs -f jupyterhub
+
+jupyterhub-clean: jupyterhub-stop
+	docker rmi firestream-jupyterhub:5.3.0-nix 2>/dev/null || true
+	docker compose -f $(JUPYTERHUB_COMPOSE) down -v
+
+jupyterhub-status:
+	docker compose -f $(JUPYTERHUB_COMPOSE) ps
+
+jupyterhub-credentials:
+	@echo "=== JupyterHub Credentials ==="
+	@echo "URL:      http://localhost:8000"
+	@echo "Username: admin"
+	@echo "Password: admin123"
+
+# ==============================================================================
+# Kafka (Nix-based container, KRaft mode)
+# ==============================================================================
+KAFKA_DIR := src/containers/firestream/kafka
+KAFKA_COMPOSE := $(KAFKA_DIR)/docker-compose.yml
+KAFKA_CLUSTER_COMPOSE := $(KAFKA_DIR)/docker-compose-cluster.yml
+
+kafka-build:
+	@$(BUILD_CONTAINER) kafka
+
+kafka-start:
+	@if ! docker image inspect firestream-kafka:4.0 >/dev/null 2>&1; then \
+		echo "Image not found, building..."; \
+		$(MAKE) kafka-build; \
+	fi
+	docker compose -f $(KAFKA_COMPOSE) up -d
+	@echo "Kafka is running at localhost:9092"
+
+kafka-up: kafka-start
+
+kafka-stop:
+	docker compose -f $(KAFKA_COMPOSE) down
+
+kafka-restart: kafka-stop kafka-start
+
+kafka-logs:
+	docker compose -f $(KAFKA_COMPOSE) logs -f
+
+kafka-clean: kafka-stop
+	docker rmi firestream-kafka:4.0 2>/dev/null || true
+	docker compose -f $(KAFKA_COMPOSE) down -v
+
+kafka-status:
+	docker compose -f $(KAFKA_COMPOSE) ps
+
+kafka-credentials:
+	@echo "=== Kafka Connection Info ==="
+	@echo "Bootstrap Server: localhost:9092"
+	@echo "Controller:       localhost:9093"
+	@echo "Mode:             KRaft (no ZooKeeper)"
+	@echo ""
+	@echo "Test with:"
+	@echo "  kafka-topics.sh --bootstrap-server localhost:9092 --list"
+	@echo "  kafka-console-producer.sh --bootstrap-server localhost:9092 --topic test"
+	@echo "  kafka-console-consumer.sh --bootstrap-server localhost:9092 --topic test --from-beginning"
+
+kafka-cluster-start:
+	@if ! docker image inspect firestream-kafka:4.0 >/dev/null 2>&1; then \
+		echo "Image not found, building..."; \
+		$(MAKE) kafka-build; \
+	fi
+	docker compose -f $(KAFKA_CLUSTER_COMPOSE) up -d
+	@echo "Kafka cluster started (brokers: 9092, 9094, 9096)"
+
+kafka-cluster-stop:
+	docker compose -f $(KAFKA_CLUSTER_COMPOSE) down
+
+kafka-cluster-logs:
+	docker compose -f $(KAFKA_CLUSTER_COMPOSE) logs -f
+
+kafka-cluster-status:
+	docker compose -f $(KAFKA_CLUSTER_COMPOSE) ps
+
+# ==============================================================================
+# Odoo (Nix-based container)
+# ==============================================================================
+ODOO_DIR := src/containers/firestream/odoo
+ODOO_COMPOSE := $(ODOO_DIR)/docker-compose.yml
 
 odoo-build:
 	@$(BUILD_CONTAINER) odoo
@@ -178,6 +250,9 @@ odoo-start:
 		$(MAKE) odoo-build; \
 	fi
 	docker compose -f $(ODOO_COMPOSE) up -d
+	@echo "Odoo is running at http://localhost:8069"
+
+odoo-up: odoo-start
 
 odoo-stop:
 	docker compose -f $(ODOO_COMPOSE) down
@@ -202,9 +277,10 @@ odoo-credentials:
 	@echo "Password: admin"
 
 # ==============================================================================
-# PostgreSQL Development (Nix-based container)
+# PostgreSQL (Nix-based container)
 # ==============================================================================
-POSTGRES_COMPOSE := src/containers/firestream/postgresql/docker-compose.yml
+POSTGRES_DIR := src/containers/firestream/postgresql
+POSTGRES_COMPOSE := $(POSTGRES_DIR)/docker-compose.yml
 
 postgres-build:
 	@$(BUILD_CONTAINER) postgresql
@@ -212,58 +288,30 @@ postgres-build:
 postgres-build-%:
 	@$(BUILD_CONTAINER) postgresql --version $*
 
+# PostgreSQL 16
 postgres-16-start:
 	@if ! docker image inspect firestream-postgresql:16 >/dev/null 2>&1; then \
 		echo "Image not found, building..."; \
 		$(MAKE) postgres-build-16; \
 	fi
 	PG_VERSION=16 docker compose -f $(POSTGRES_COMPOSE) up -d
+	@echo "PostgreSQL 16 is running at localhost:5432"
 
 postgres-16-stop:
 	PG_VERSION=16 docker compose -f $(POSTGRES_COMPOSE) down
 
-postgres-17-start:
-	@if ! docker image inspect firestream-postgresql:17 >/dev/null 2>&1; then \
-		echo "Image not found, building..."; \
-		$(MAKE) postgres-build-17; \
-	fi
-	PG_VERSION=17 docker compose -f $(POSTGRES_COMPOSE) up -d
+postgres-16-restart: postgres-16-stop postgres-16-start
 
-postgres-17-stop:
-	PG_VERSION=17 docker compose -f $(POSTGRES_COMPOSE) down
-
-# Default version aliases (PostgreSQL 17)
-postgres-start: postgres-17-start
-postgres-stop: postgres-17-stop
-postgres-clean: postgres-17-clean
-postgres-logs: postgres-17-logs
-postgres-status: postgres-17-status
-postgres-credentials: postgres-17-credentials
-
-# Version-specific logs
 postgres-16-logs:
 	PG_VERSION=16 docker compose -f $(POSTGRES_COMPOSE) logs -f
 
-postgres-17-logs:
-	PG_VERSION=17 docker compose -f $(POSTGRES_COMPOSE) logs -f
-
-# Version-specific status
 postgres-16-status:
 	PG_VERSION=16 docker compose -f $(POSTGRES_COMPOSE) ps
 
-postgres-17-status:
-	PG_VERSION=17 docker compose -f $(POSTGRES_COMPOSE) ps
-
-# Version-specific clean
 postgres-16-clean: postgres-16-stop
 	docker rmi firestream-postgresql:16 2>/dev/null || true
 	PG_VERSION=16 docker compose -f $(POSTGRES_COMPOSE) down -v
 
-postgres-17-clean: postgres-17-stop
-	docker rmi firestream-postgresql:17 2>/dev/null || true
-	PG_VERSION=17 docker compose -f $(POSTGRES_COMPOSE) down -v
-
-# Version-specific credentials
 postgres-16-credentials:
 	@echo "=== PostgreSQL 16 Credentials ==="
 	@echo "Host:     localhost"
@@ -273,6 +321,30 @@ postgres-16-credentials:
 	@echo "Password: firestream"
 	@echo ""
 	@echo "Connection: psql -h localhost -U firestream -d firestream"
+
+# PostgreSQL 17
+postgres-17-start:
+	@if ! docker image inspect firestream-postgresql:17 >/dev/null 2>&1; then \
+		echo "Image not found, building..."; \
+		$(MAKE) postgres-build-17; \
+	fi
+	PG_VERSION=17 docker compose -f $(POSTGRES_COMPOSE) up -d
+	@echo "PostgreSQL 17 is running at localhost:5432"
+
+postgres-17-stop:
+	PG_VERSION=17 docker compose -f $(POSTGRES_COMPOSE) down
+
+postgres-17-restart: postgres-17-stop postgres-17-start
+
+postgres-17-logs:
+	PG_VERSION=17 docker compose -f $(POSTGRES_COMPOSE) logs -f
+
+postgres-17-status:
+	PG_VERSION=17 docker compose -f $(POSTGRES_COMPOSE) ps
+
+postgres-17-clean: postgres-17-stop
+	docker rmi firestream-postgresql:17 2>/dev/null || true
+	PG_VERSION=17 docker compose -f $(POSTGRES_COMPOSE) down -v
 
 postgres-17-credentials:
 	@echo "=== PostgreSQL 17 Credentials ==="
@@ -284,11 +356,21 @@ postgres-17-credentials:
 	@echo ""
 	@echo "Connection: psql -h localhost -U firestream -d firestream"
 
+# Default PostgreSQL version aliases (17)
+postgres-start: postgres-17-start
+postgres-stop: postgres-17-stop
+postgres-restart: postgres-17-restart
+postgres-logs: postgres-17-logs
+postgres-status: postgres-17-status
+postgres-clean: postgres-17-clean
+postgres-credentials: postgres-17-credentials
+
 # ==============================================================================
-# Redis Development (Nix-based container)
+# Redis (Nix-based container)
 # ==============================================================================
-REDIS_COMPOSE := src/containers/firestream/redis/docker-compose.yml
-REDIS_REPLICASET_COMPOSE := src/containers/firestream/redis/docker-compose-replicaset.yml
+REDIS_DIR := src/containers/firestream/redis
+REDIS_COMPOSE := $(REDIS_DIR)/docker-compose.yml
+REDIS_REPLICASET_COMPOSE := $(REDIS_DIR)/docker-compose-replicaset.yml
 
 redis-build:
 	@$(BUILD_CONTAINER) redis
@@ -296,6 +378,7 @@ redis-build:
 redis-build-%:
 	@$(BUILD_CONTAINER) redis --version $*
 
+# Redis 7
 redis-7-start:
 	@if ! docker image inspect firestream-redis:7-nix >/dev/null 2>&1; then \
 		echo "Image not found, building..."; \
@@ -307,6 +390,27 @@ redis-7-start:
 redis-7-stop:
 	REDIS_VERSION=7 docker compose -f $(REDIS_COMPOSE) down
 
+redis-7-restart: redis-7-stop redis-7-start
+
+redis-7-logs:
+	REDIS_VERSION=7 docker compose -f $(REDIS_COMPOSE) logs -f
+
+redis-7-status:
+	REDIS_VERSION=7 docker compose -f $(REDIS_COMPOSE) ps
+
+redis-7-clean: redis-7-stop
+	docker rmi firestream-redis:7-nix 2>/dev/null || true
+	REDIS_VERSION=7 docker compose -f $(REDIS_COMPOSE) down -v
+
+redis-7-credentials:
+	@echo "=== Redis 7 Credentials ==="
+	@echo "Host:     localhost"
+	@echo "Port:     6379"
+	@echo "Password: (none - ALLOW_EMPTY_PASSWORD=yes for dev)"
+	@echo ""
+	@echo "Connection: redis-cli -h localhost -p 6379"
+
+# Redis 8
 redis-8-start:
 	@if ! docker image inspect firestream-redis:8-nix >/dev/null 2>&1; then \
 		echo "Image not found, building..."; \
@@ -318,45 +422,17 @@ redis-8-start:
 redis-8-stop:
 	REDIS_VERSION=8 docker compose -f $(REDIS_COMPOSE) down
 
-# Default version aliases (Redis 7)
-redis-start: redis-7-start
-redis-stop: redis-7-stop
-redis-clean: redis-7-clean
-redis-logs: redis-7-logs
-redis-status: redis-7-status
-redis-credentials: redis-7-credentials
-
-# Version-specific logs
-redis-7-logs:
-	REDIS_VERSION=7 docker compose -f $(REDIS_COMPOSE) logs -f
+redis-8-restart: redis-8-stop redis-8-start
 
 redis-8-logs:
 	REDIS_VERSION=8 docker compose -f $(REDIS_COMPOSE) logs -f
 
-# Version-specific status
-redis-7-status:
-	REDIS_VERSION=7 docker compose -f $(REDIS_COMPOSE) ps
-
 redis-8-status:
 	REDIS_VERSION=8 docker compose -f $(REDIS_COMPOSE) ps
-
-# Version-specific clean
-redis-7-clean: redis-7-stop
-	docker rmi firestream-redis:7-nix 2>/dev/null || true
-	REDIS_VERSION=7 docker compose -f $(REDIS_COMPOSE) down -v
 
 redis-8-clean: redis-8-stop
 	docker rmi firestream-redis:8-nix 2>/dev/null || true
 	REDIS_VERSION=8 docker compose -f $(REDIS_COMPOSE) down -v
-
-# Version-specific credentials
-redis-7-credentials:
-	@echo "=== Redis 7 Credentials ==="
-	@echo "Host:     localhost"
-	@echo "Port:     6379"
-	@echo "Password: (none - ALLOW_EMPTY_PASSWORD=yes for dev)"
-	@echo ""
-	@echo "Connection: redis-cli -h localhost -p 6379"
 
 redis-8-credentials:
 	@echo "=== Redis 8 Credentials ==="
@@ -365,6 +441,15 @@ redis-8-credentials:
 	@echo "Password: (none - ALLOW_EMPTY_PASSWORD=yes for dev)"
 	@echo ""
 	@echo "Connection: redis-cli -h localhost -p 6379"
+
+# Default Redis version aliases (7)
+redis-start: redis-7-start
+redis-stop: redis-7-stop
+redis-restart: redis-7-restart
+redis-logs: redis-7-logs
+redis-status: redis-7-status
+redis-clean: redis-7-clean
+redis-credentials: redis-7-credentials
 
 # Redis replication mode
 redis-replicaset-start:
@@ -378,121 +463,247 @@ redis-replicaset-logs:
 	docker compose -f $(REDIS_REPLICASET_COMPOSE) logs -f
 
 # ==============================================================================
-# Kafka Development (Nix-based container, KRaft mode)
+# Spark (Nix-based container)
 # ==============================================================================
-KAFKA_DIR := src/containers/firestream/kafka
-KAFKA_COMPOSE := $(KAFKA_DIR)/docker-compose.yml
-KAFKA_CLUSTER_COMPOSE := $(KAFKA_DIR)/docker-compose-cluster.yml
+SPARK_DIR := src/containers/firestream/spark
+SPARK_COMPOSE := $(SPARK_DIR)/docker-compose.yml
 
-# Build the Kafka container (cross-platform)
-kafka-build:
-	@$(BUILD_CONTAINER) kafka
+spark-build:
+	@$(BUILD_CONTAINER) spark
 
-# Start Kafka (auto-builds if image missing)
-kafka-start:
-	@if ! docker image inspect firestream-kafka:4.0 >/dev/null 2>&1; then \
-		echo "Image not found, building..."; \
-		$(MAKE) kafka-build; \
-	fi
-	docker compose -f $(KAFKA_COMPOSE) up -d
-	@echo "Kafka is running at localhost:9092"
+spark-start:
+	docker compose -f $(SPARK_COMPOSE) up -d
+	@echo "Spark Master UI: http://localhost:8080"
 
-# Alias for kafka-start
-kafka-up: kafka-start
+spark-up: spark-start
 
-# Stop Kafka
-kafka-stop:
-	docker compose -f $(KAFKA_COMPOSE) down
+spark-stop:
+	docker compose -f $(SPARK_COMPOSE) down
 
-# Restart Kafka
-kafka-restart: kafka-stop kafka-start
+spark-restart: spark-stop spark-start
 
-# View Kafka logs
-kafka-logs:
-	docker compose -f $(KAFKA_COMPOSE) logs -f
+spark-logs:
+	docker compose -f $(SPARK_COMPOSE) logs -f
 
-# Clean up Kafka containers and images
-kafka-clean: kafka-stop
-	docker rmi firestream-kafka:4.0 2>/dev/null || true
-	docker compose -f $(KAFKA_COMPOSE) down -v
+spark-logs-master:
+	docker compose -f $(SPARK_COMPOSE) logs -f spark
 
-# Show Kafka service status
-kafka-status:
-	docker compose -f $(KAFKA_COMPOSE) ps
+spark-logs-worker:
+	docker compose -f $(SPARK_COMPOSE) logs -f spark-worker
 
-# Show Kafka connection info
-kafka-credentials:
-	@echo "=== Kafka Connection Info ==="
-	@echo "Bootstrap Server: localhost:9092"
-	@echo "Controller:       localhost:9093"
-	@echo "Mode:             KRaft (no ZooKeeper)"
+spark-status:
+	docker compose -f $(SPARK_COMPOSE) ps
+
+spark-clean:
+	docker compose -f $(SPARK_COMPOSE) down -v
+
+spark-credentials:
+	@echo "=== Spark Connection Info ==="
+	@echo "Master UI:  http://localhost:8080"
+	@echo "Master URL: spark://localhost:7077"
 	@echo ""
-	@echo "Test with:"
-	@echo "  kafka-topics.sh --bootstrap-server localhost:9092 --list"
-	@echo "  kafka-console-producer.sh --bootstrap-server localhost:9092 --topic test"
-	@echo "  kafka-console-consumer.sh --bootstrap-server localhost:9092 --topic test --from-beginning"
+	@echo "Submit job:"
+	@echo "  spark-submit --master spark://localhost:7077 your-app.py"
 
-# Kafka cluster mode (3-node)
-kafka-cluster-start:
-	@if ! docker image inspect firestream-kafka:4.0 >/dev/null 2>&1; then \
+# ==============================================================================
+# Supabase (Official Docker Compose - no custom build)
+# ==============================================================================
+SUPABASE_DIR := src/containers/firestream/supabase/supabase/docker
+SUPABASE_COMPOSE := $(SUPABASE_DIR)/docker-compose.yml
+
+supabase-start:
+	docker compose -f $(SUPABASE_COMPOSE) up -d
+	@echo "Supabase Studio: http://localhost:3000"
+
+supabase-up: supabase-start
+
+supabase-stop:
+	docker compose -f $(SUPABASE_COMPOSE) down
+
+supabase-restart: supabase-stop supabase-start
+
+supabase-logs:
+	docker compose -f $(SUPABASE_COMPOSE) logs -f
+
+supabase-status:
+	docker compose -f $(SUPABASE_COMPOSE) ps
+
+supabase-clean:
+	docker compose -f $(SUPABASE_COMPOSE) down -v
+
+supabase-credentials:
+	@echo "=== Supabase Connection Info ==="
+	@echo "Studio:     http://localhost:3000"
+	@echo "API:        http://localhost:8000"
+	@echo "Kong:       http://localhost:8000"
+	@echo ""
+	@echo "See .env file in $(SUPABASE_DIR) for API keys"
+
+# ==============================================================================
+# Superset (Nix-based container)
+# ==============================================================================
+SUPERSET_DIR := src/containers/firestream/superset
+SUPERSET_COMPOSE := $(SUPERSET_DIR)/docker-compose.yml
+
+superset-build:
+	@$(BUILD_CONTAINER) superset
+
+superset-start:
+	@if ! docker image inspect firestream-superset:4.1.1-nix >/dev/null 2>&1; then \
 		echo "Image not found, building..."; \
-		$(MAKE) kafka-build; \
+		$(MAKE) superset-build; \
 	fi
-	docker compose -f $(KAFKA_CLUSTER_COMPOSE) up -d
-	@echo "Kafka cluster started (brokers: 9092, 9094, 9096)"
+	docker compose -f $(SUPERSET_COMPOSE) up -d
+	@echo "Superset is running at http://localhost:8088"
 
-kafka-cluster-stop:
-	docker compose -f $(KAFKA_CLUSTER_COMPOSE) down
+superset-up: superset-start
 
-kafka-cluster-logs:
-	docker compose -f $(KAFKA_CLUSTER_COMPOSE) logs -f
+superset-stop:
+	docker compose -f $(SUPERSET_COMPOSE) down
 
-kafka-cluster-status:
-	docker compose -f $(KAFKA_CLUSTER_COMPOSE) ps
+superset-restart: superset-stop superset-start
 
-build_devcontainer:
-	@bash -c 'cd $(BASEDIR) && bash $(DEVCONTAINER_PREINIT)'
-	@bash -c 'cd $(BASEDIR) && docker compose -f $(DEVCONTAINER_COMPOSE) build'
+superset-logs:
+	docker compose -f $(SUPERSET_COMPOSE) logs -f
 
-build_devcontainer_no_cache:
-	@bash -c 'cd $(BASEDIR) && bash $(DEVCONTAINER_PREINIT)'
-	@bash -c 'cd $(BASEDIR) && docker compose -f $(DEVCONTAINER_COMPOSE) build --no-cache'
+superset-logs-web:
+	docker compose -f $(SUPERSET_COMPOSE) logs -f superset
 
-# Start services
-demo:
-	export DEPLOYMENT_MODE="development" && make bootstrap
+superset-logs-worker:
+	docker compose -f $(SUPERSET_COMPOSE) logs -f superset-worker
 
-	# Create dispose of the tunnel and create a new one
-	pkill ngrok
-	bash /workspace/bin/commands/create_ngrok_reverse_proxy.sh
+superset-logs-flower:
+	docker compose -f $(SUPERSET_COMPOSE) logs -f superset-flower
 
-	# Apply Demo Data
-	# POD_NAME=$(kubectl get pods --no-headers -o custom-columns=":metadata.name" | grep superset | head -n 1)
-	# kubectl exec -it ${POD_NAME} -- superset load_examples
-	# kubectl exec -it superset-69459c794f-r6j5k -- superset load_examples
+superset-status:
+	docker compose -f $(SUPERSET_COMPOSE) ps
 
+superset-clean: superset-stop
+	docker rmi firestream-superset:4.1.1-nix 2>/dev/null || true
+	docker compose -f $(SUPERSET_COMPOSE) down -v
 
-	# Start Streaming Data Generation
-	#nohup python /workspace/src/services/back_end/spark_applications/_boilerplate/metronome/src/main.py > /workspace/logs/metronome.log 2>&1 &
+superset-credentials:
+	@echo "=== Superset Credentials ==="
+	@echo "URL:      http://localhost:8088"
+	@echo "Username: admin"
+	@echo "Password: admin"
+	@echo ""
+	@echo "Flower (task monitor): http://localhost:5555"
 
+# ==============================================================================
+# Convenience Targets
+# ==============================================================================
 
+# Build all Nix-based containers (excludes supabase which uses official compose)
+containers-build-all:
+	@echo "Building all Firestream Nix containers..."
+	$(MAKE) airflow-build
+	$(MAKE) jupyterhub-build
+	$(MAKE) kafka-build
+	$(MAKE) odoo-build
+	$(MAKE) postgres-build
+	$(MAKE) redis-build
+	$(MAKE) spark-build
+	$(MAKE) superset-build
+	@echo "All containers built successfully!"
 
-# Clean up
+# Clean all containers
+containers-clean-all:
+	@echo "Cleaning all Firestream containers..."
+	-$(MAKE) airflow-clean
+	-$(MAKE) jupyterhub-clean
+	-$(MAKE) kafka-clean
+	-$(MAKE) odoo-clean
+	-$(MAKE) postgres-clean
+	-$(MAKE) redis-clean
+	-$(MAKE) spark-clean
+	-$(MAKE) supabase-clean
+	-$(MAKE) superset-clean
+	@echo "All containers cleaned!"
+
+# Status of all containers
+containers-status:
+	@echo "=== Airflow ===" && docker compose -f $(AIRFLOW_COMPOSE) ps 2>/dev/null || echo "Not running"
+	@echo ""
+	@echo "=== JupyterHub ===" && docker compose -f $(JUPYTERHUB_COMPOSE) ps 2>/dev/null || echo "Not running"
+	@echo ""
+	@echo "=== Kafka ===" && docker compose -f $(KAFKA_COMPOSE) ps 2>/dev/null || echo "Not running"
+	@echo ""
+	@echo "=== Odoo ===" && docker compose -f $(ODOO_COMPOSE) ps 2>/dev/null || echo "Not running"
+	@echo ""
+	@echo "=== PostgreSQL ===" && docker compose -f $(POSTGRES_COMPOSE) ps 2>/dev/null || echo "Not running"
+	@echo ""
+	@echo "=== Redis ===" && docker compose -f $(REDIS_COMPOSE) ps 2>/dev/null || echo "Not running"
+	@echo ""
+	@echo "=== Spark ===" && docker compose -f $(SPARK_COMPOSE) ps 2>/dev/null || echo "Not running"
+	@echo ""
+	@echo "=== Supabase ===" && docker compose -f $(SUPABASE_COMPOSE) ps 2>/dev/null || echo "Not running"
+	@echo ""
+	@echo "=== Superset ===" && docker compose -f $(SUPERSET_COMPOSE) ps 2>/dev/null || echo "Not running"
+
+# ==============================================================================
+# Devcontainer Management
+# ==============================================================================
+
+build-devcontainer:
+	bash $(DEVCONTAINER_PREINIT)
+	docker compose -f $(DEVCONTAINER_COMPOSE) build devcontainer
+
+build-devcontainer-clean:
+	bash $(DEVCONTAINER_PREINIT)
+	docker compose -f $(DEVCONTAINER_COMPOSE) build devcontainer --no-cache
+
+devcontainer-start:
+	bash $(DEVCONTAINER_PREINIT)
+	docker compose -f $(DEVCONTAINER_COMPOSE) up -d
+
+devcontainer-stop:
+	docker compose -f $(DEVCONTAINER_COMPOSE) down
+
+# ==============================================================================
+# Nix Environment
+# ==============================================================================
+
+nix-up:
+	nix build .#container
+
+nix-fix:
+	nix-collect-garbage -d
+
+# ==============================================================================
+# Docker Utilities
+# ==============================================================================
+
 docker-reset:
 	bash bin/commands/delete.sh
 
+# ==============================================================================
+# Documentation
+# ==============================================================================
 
-# Run Stress Tests
-stress:
-	make bootstrap
+docs-dev:
+	@echo "Starting documentation dev server..."
+	@if [ ! -d "$(DOCS_DIR)/node_modules" ]; then \
+		echo "Installing dependencies..."; \
+		cd $(DOCS_DIR) && pnpm install; \
+	fi
+	cd $(DOCS_DIR) && pnpm dev
 
-	bash /workspace/bin/commands/run_stress_tests.sh
+docs-build:
+	@echo "Building documentation site..."
+	@if [ ! -d "$(DOCS_DIR)/node_modules" ]; then \
+		echo "Installing dependencies..."; \
+		cd $(DOCS_DIR) && pnpm install; \
+	fi
+	cd $(DOCS_DIR) && pnpm build
+	@echo "Documentation built successfully!"
 
-load_plugins:
-	bash /workspace/src/api/plugin_manager/bootstrap.sh
+docs-clean:
+	@echo "Cleaning docs build artifacts..."
+	rm -rf $(DOCS_DIR)/.next
+	rm -rf $(DOCS_DIR)/out
+	rm -rf $(DOCS_DIR)/.source
+	@echo "Docs cleaned!"
 
-
-
-# setup:
-# 	npm install --global yarn
-# 	yarnpkg add react-native-web echarts echarts-for-react ws
+docs-install:
+	cd $(DOCS_DIR) && pnpm install

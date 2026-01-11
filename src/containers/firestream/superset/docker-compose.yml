@@ -32,7 +32,10 @@ x-superset-common: &superset-common
 services:
   # PostgreSQL - Metadata database
   postgresql:
-    image: docker.io/bitnami/postgresql:16
+    build:
+      context: ../../../..
+      dockerfile: src/containers/firestream/postgresql/17/debian-12/Dockerfile
+    image: firestream-postgresql:17
     volumes:
       - postgresql_data:/bitnami/postgresql
     environment:
@@ -48,9 +51,9 @@ services:
 
   # Redis - Cache and Celery broker
   redis:
-    image: docker.io/bitnami/redis:7.2
+    image: firestream-redis:7-nix
     volumes:
-      - redis_data:/bitnami/redis
+      - redis_data:/bitnami/redis/data
     environment:
       - ALLOW_EMPTY_PASSWORD=yes
     healthcheck:

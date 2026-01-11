@@ -2,8 +2,11 @@
   description = "Firestream Airflow - Pure Nix build replacing Bitnami stacksmith dependencies";
 
   inputs = {
-    nixpkgs.url = "github:NixOS/nixpkgs/nixos-24.11";
+    nixpkgs.url = "github:NixOS/nixpkgs/release-25.11";
     flake-utils.url = "github:numtide/flake-utils";
+
+    # Firestream module system (provides fenix/crane for Rust builds)
+    firestream.url = "path:../../../..";
 
     pyproject-nix = {
       url = "github:pyproject-nix/pyproject.nix";
@@ -24,7 +27,7 @@
     };
   };
 
-  outputs = { self, nixpkgs, flake-utils, pyproject-nix, uv2nix, pyproject-build-systems }:
+  outputs = { self, nixpkgs, flake-utils, firestream, pyproject-nix, uv2nix, pyproject-build-systems }:
     let
       inherit (nixpkgs) lib;
 
@@ -42,8 +45,8 @@
         # Airflow version (matching Bitnami's airflow-3.0.3-0)
         airflowVersion = "3.0.3";
 
-        # Import Firestream module system (relative path for standalone builds)
-        firestream = import ../../../../bin/nix/firestream { inherit pkgs; };
+        # Import Firestream module system via flake input (includes fenix/crane)
+        firestreamLib = firestream.firestreamModules { inherit pkgs system; };
 
         # ============================================================
         # uv2nix Integration - Properly resolve all Python dependencies
@@ -239,7 +242,8 @@
         # Import the Airflow module (Linux only - requires glibc for Docker image)
         # ============================================================
         airflowModule = if isLinux then import ./module.nix {
-          inherit pkgs lib firestream pythonEnv airflowVersion python;
+          inherit pkgs lib pythonEnv airflowVersion python;
+          firestream = firestreamLib;
         } else null;
 
       in {

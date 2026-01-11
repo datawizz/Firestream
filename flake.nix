@@ -3,7 +3,7 @@
 
   inputs = {
     # Fixed nixpkgs version fixes system packages that float on the latest Debian
-    nixpkgs.url = "github:NixOS/nixpkgs/release-24.11";
+    nixpkgs.url = "github:NixOS/nixpkgs/release-25.11";
 
     # flake-utils for container flake imports
     flake-utils.url = "github:numtide/flake-utils";
@@ -32,9 +32,18 @@
       url = "github:hercules-ci/gitignore.nix";
       inputs.nixpkgs.follows = "nixpkgs";
     };
+
+    # Fenix for deterministic Rust toolchain
+    fenix = {
+      url = "github:nix-community/fenix";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
+
+    # Crane for incremental Rust builds with dependency caching
+    crane.url = "github:ipetkov/crane";
   };
 
-  outputs = { self, nixpkgs, flake-utils, pyproject-nix, uv2nix, pyproject-build-systems, gitignore }: let
+  outputs = { self, nixpkgs, flake-utils, pyproject-nix, uv2nix, pyproject-build-systems, gitignore, fenix, crane }: let
     # Define supported systems (includes Darwin for package visibility)
     supportedSystems = [
       "x86_64-linux"
@@ -107,20 +116,25 @@
       pkgs = pkgsForSystem system;
       charts = getBitnamiCharts pkgs;
 
+      # Fenix Rust toolchain (deterministic, replaces rustup)
+      rustToolchain = fenix.packages.${system}.stable;
+      combinedRustToolchain = fenix.packages.${system}.combine [
+        rustToolchain.rustc
+        rustToolchain.cargo
+        rustToolchain.clippy
+        rustToolchain.rustfmt
+        rustToolchain.rust-src
+        rustToolchain.rust-analyzer
+      ];
+
       # Define the shell packages
       shellPackages = with pkgs; [
 
-        # Rust toolchain
-        # rustc
-        # cargo
-        # rust-analyzer
-        # rustfmt
-        rustup
-        # TODO rustup makes things non-deterministic. Normal Nix install doesn't include linked C libraries and struggles with rust-src required for linting
-
+        # Rust toolchain via Fenix (deterministic)
+        combinedRustToolchain
 
         # Node
-        nodejs_18
+        nodejs_22
 
         # Distribution of protoc and the gRPC Node protoc plugin for ease of installation with npm
         grpc-tools
@@ -143,7 +157,7 @@
         jdk11
 
         # Scala
-        scala_2_11
+        scala_2_13
         scalafmt
         metals
         sbt-with-scala-native
@@ -210,59 +224,72 @@
         # Try to use system lzma if available
         export LZMA_API_STATIC=1
 
-        # rustup environment
-        export PATH="$HOME/.cargo/bin:$PATH"
+        # Cargo home for crates.io cache
+        export CARGO_HOME="$HOME/.cargo"
+        export PATH="$CARGO_HOME/bin:$PATH"
 
-        # Set up Rust source path
-        export RUST_SRC_PATH="${pkgs.rust.packages.stable.rustPlatform.rustLibSrc}"
+        # Rust source path for IDE integration (Fenix)
+        export RUST_SRC_PATH="${combinedRustToolchain}/lib/rustlib/src/rust/library"
 
         # Bindgen configuration
         export LIBCLANG_PATH="${pkgs.lib.makeLibraryPath [ pkgs.llvmPackages_latest.libclang.lib ]}"
       '';
 
-    in pkgs.runCommand "container-env" {
-        buildInputs = [ pkgs.makeWrapper ];
-      } ''
-        mkdir -p $out/bin $out/etc/profile.d
+    in {
+      # Shell packages for devShell
+      packages = shellPackages;
 
-        # Copy the profile script
-        cp ${profileScript} $out/etc/profile.d/nix-env.sh
+      # Profile script for sourcing
+      inherit profileScript;
 
-        # Create the setup script
-        cat > $out/bin/setup-container <<EOF
-        #!${pkgs.bash}/bin/bash
-        set -e
+      # Combined Rust toolchain
+      inherit combinedRustToolchain;
 
-        mkdir -p /etc/profile.d
-        mkdir -p /etc/zsh
+      # Container derivation
+      container = pkgs.runCommand "container-env" {
+          buildInputs = [ pkgs.makeWrapper ];
+        } ''
+          mkdir -p $out/bin $out/etc/profile.d
 
-        cp $out/etc/profile.d/nix-env.sh /etc/profile.d/
-        chmod 644 /etc/profile.d/nix-env.sh
+          # Copy the profile script
+          cp ${profileScript} $out/etc/profile.d/nix-env.sh
 
-        touch /etc/bash.bashrc
-        touch /etc/zsh/zshrc
+          # Create the setup script
+          cat > $out/bin/setup-container <<EOF
+          #!${pkgs.bash}/bin/bash
+          set -e
 
-        if ! grep -q '. /etc/profile.d/nix-env.sh' /etc/bash.bashrc; then
-          echo '. /etc/profile.d/nix-env.sh' >> /etc/bash.bashrc
-        fi
+          mkdir -p /etc/profile.d
+          mkdir -p /etc/zsh
 
-        if ! grep -q '. /etc/profile.d/nix-env.sh' /etc/zsh/zshrc; then
-          echo '. /etc/profile.d/nix-env.sh' >> /etc/zsh/zshrc
-        fi
+          cp $out/etc/profile.d/nix-env.sh /etc/profile.d/
+          chmod 644 /etc/profile.d/nix-env.sh
 
-        echo "Container environment setup complete!"
-        echo "To activate in current shell, run:"
-        echo "  source /etc/profile.d/nix-env.sh"
-        EOF
+          touch /etc/bash.bashrc
+          touch /etc/zsh/zshrc
 
-        chmod +x $out/bin/setup-container
+          if ! grep -q '. /etc/profile.d/nix-env.sh' /etc/bash.bashrc; then
+            echo '. /etc/profile.d/nix-env.sh' >> /etc/bash.bashrc
+          fi
 
-        # Create symlinks to packages
-        mkdir -p $out/packages
-        ${pkgs.lib.concatMapStrings (pkg: ''
-          ln -s ${pkg} $out/packages/$(basename ${pkg})
-        '') shellPackages}
-      '';
+          if ! grep -q '. /etc/profile.d/nix-env.sh' /etc/zsh/zshrc; then
+            echo '. /etc/profile.d/nix-env.sh' >> /etc/zsh/zshrc
+          fi
+
+          echo "Container environment setup complete!"
+          echo "To activate in current shell, run:"
+          echo "  source /etc/profile.d/nix-env.sh"
+          EOF
+
+          chmod +x $out/bin/setup-container
+
+          # Create symlinks to packages
+          mkdir -p $out/packages
+          ${pkgs.lib.concatMapStrings (pkg: ''
+            ln -s ${pkg} $out/packages/$(basename ${pkg})
+          '') shellPackages}
+        '';
+    };
 
   in {
     packages = forAllSystems (system: let
@@ -273,6 +300,12 @@
       unavailable = name: pkgs.runCommand "${name}-not-available" {} ''
         echo "Docker images only available on Linux systems" > $out
       '';
+
+      # Import Firestream with Rust module (Fenix + Crane)
+      firestreamWithRust = import ./bin/nix/firestream {
+        inherit pkgs system;
+        inherit fenix crane;
+      };
 
       # Import PostgreSQL module directly for top-level access
       mkPostgresql = version: let
@@ -319,9 +352,10 @@
         };
       in mod.dockerImage;
 
+      config = mkContainerConfig system;
     in {
-      container = mkContainerConfig system;
-      default = mkContainerConfig system;
+      container = config.container;
+      default = config.container;
 
       # VIB (Validation, Inspection, Build) Tools bundle
       # Collection of tools for container testing and vulnerability scanning
@@ -362,6 +396,29 @@
         redis-7 = if isLinux then mkRedis "7" else unavailable "redis-7";
         redis-8 = if isLinux then mkRedis "8" else unavailable "redis-8";
       };
+
+      # ====================================================================
+      # RUST PACKAGES (built with Crane)
+      # Usage: nix build .#wait-for-port
+      # ====================================================================
+      wait-for-port = firestreamWithRust.packages.wait-for-port;
+    });
+
+    # Development shells with Darwin-specific configuration
+    # On Darwin, uses mkShellNoCC to avoid stdenv's automatic SDK setup
+    devShells = forAllSystems (system: let
+      pkgs = pkgsForSystem system;
+      isDarwin = pkgs.stdenv.isDarwin;
+      darwin = import ./bin/nix/firestream/modules/darwin.nix {
+        inherit pkgs;
+        lib = pkgs.lib;
+      };
+      config = mkContainerConfig system;
+    in {
+      default = (if isDarwin then pkgs.mkShellNoCC else pkgs.mkShell) {
+        packages = config.packages;
+        shellHook = darwin.shellHook;
+      };
     });
 
     # Firestream module system library
@@ -369,6 +426,10 @@
     lib = forAllSystems (system: let
       pkgs = pkgsForSystem system;
       firestream = import ./bin/nix/firestream { inherit pkgs; };
+      firestreamWithRust = import ./bin/nix/firestream {
+        inherit pkgs system;
+        inherit fenix crane;
+      };
     in {
       # Complete Firestream module system
       firestream = firestream;
@@ -380,7 +441,25 @@
 
       # Core libraries for custom modules
       coreLibs = firestream.coreLibs;
+
+      # Rust module - allows external flakes to build Rust packages
+      # Usage: firestream.lib.${system}.rust.mkRustPackage { ... }
+      rust = firestreamWithRust.rust;
+      mkRustPackage = firestreamWithRust.mkRustPackage;
+      rustToolchain = if firestreamWithRust.rust != null
+        then firestreamWithRust.rust.toolchain
+        else null;
     });
+
+    # Overlay for nixpkgs integration
+    # Usage: nixpkgs.overlays = [ firestream.overlays.default ];
+    overlays.default = final: prev: {
+      firestream = {
+        wait-for-port = self.packages.${prev.system}.wait-for-port;
+        mkRustPackage = self.lib.${prev.system}.mkRustPackage;
+        rustToolchain = self.lib.${prev.system}.rustToolchain;
+      };
+    };
 
     # Test suite for the Firestream module system
     # Build with: nix build .#checks.x86_64-linux.firestream-tests
@@ -412,10 +491,13 @@
     #   inputs.firestream.url = "path:./path/to/Firestream";
     #   outputs = { firestream, nixpkgs, ... }:
     #     let
-    #       modules = firestream.firestreamModules { inherit pkgs; };
+    #       modules = firestream.firestreamModules { inherit pkgs system; };
     #     in { ... };
     # }
-    firestreamModules = { pkgs }: import ./bin/nix/firestream { inherit pkgs; };
+    firestreamModules = { pkgs, system }: import ./bin/nix/firestream {
+      inherit pkgs system;
+      inherit fenix crane;
+    };
 
     # Container modules - expose container flake paths for external use
     # Usage from other flakes:

@@ -2,22 +2,26 @@
   description = "Firestream Redis Container - Pure Nix build using Firestream module system";
 
   inputs = {
-    nixpkgs.url = "github:NixOS/nixpkgs/release-24.11";
+    nixpkgs.url = "github:NixOS/nixpkgs/release-25.11";
     flake-utils.url = "github:numtide/flake-utils";
+
+    # Firestream module system (provides fenix/crane for Rust builds)
+    firestream.url = "path:../../../..";
   };
 
-  outputs = { self, nixpkgs, flake-utils }:
+  outputs = { self, nixpkgs, flake-utils, firestream }:
     flake-utils.lib.eachSystem [ "x86_64-linux" "aarch64-linux" ] (system:
       let
         pkgs = nixpkgs.legacyPackages.${system};
         lib = pkgs.lib;
 
-        # Use relative import (matches PostgreSQL/Airflow pattern)
-        firestream = import ../../../../bin/nix/firestream { inherit pkgs; };
+        # Import Firestream module system via flake input (includes fenix/crane)
+        firestreamLib = firestream.firestreamModules { inherit pkgs system; };
 
         # Import module for each Redis version
         mkRedisContainer = redisVersion: import ./module.nix {
-          inherit pkgs lib firestream redisVersion;
+          inherit pkgs lib redisVersion;
+          firestream = firestreamLib;
         };
 
         redis7 = mkRedisContainer "7";
@@ -48,11 +52,12 @@
       # System-independent outputs for documentation
       lib = {
         # Helper to create Redis containers
-        mkRedisContainer = { pkgs, redisVersion ? "7" }:
+        # Note: Callers should use firestream.firestreamModules for proper Rust support
+        mkRedisContainer = { pkgs, system, firestreamLib, redisVersion ? "7" }:
           import ./module.nix {
             inherit pkgs redisVersion;
             lib = pkgs.lib;
-            firestream = import ../../../../bin/nix/firestream { inherit pkgs; };
+            firestream = firestreamLib;
           };
       };
     };

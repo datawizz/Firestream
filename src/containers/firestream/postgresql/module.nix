@@ -429,7 +429,7 @@ in firestream.mkContainerModule {
   exposedPorts = [ 5432 ];
   volumes = [ "/bitnami/postgresql" "/docker-entrypoint-initdb.d" "/docker-entrypoint-preinitdb.d" ];
 
-  user = { name = "postgres"; uid = 1001; gid = 1001; };
+  user = { name = "postgres"; group = "postgres"; uid = 1001; gid = 1001; };
 
   # Development shell extras
   devShellPackages = with pkgs; [ docker docker-compose ];

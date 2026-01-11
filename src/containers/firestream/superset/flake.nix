@@ -2,8 +2,11 @@
   description = "Firestream Superset - Pure Nix build replacing Bitnami stacksmith dependencies";
 
   inputs = {
-    nixpkgs.url = "github:NixOS/nixpkgs/nixos-24.11";
+    nixpkgs.url = "github:NixOS/nixpkgs/release-25.11";
     flake-utils.url = "github:numtide/flake-utils";
+
+    # Firestream module system (provides fenix/crane for Rust builds)
+    firestream.url = "path:../../../..";
 
     pyproject-nix = {
       url = "github:pyproject-nix/pyproject.nix";
@@ -24,7 +27,7 @@
     };
   };
 
-  outputs = { self, nixpkgs, flake-utils, pyproject-nix, uv2nix, pyproject-build-systems }:
+  outputs = { self, nixpkgs, flake-utils, firestream, pyproject-nix, uv2nix, pyproject-build-systems }:
     let
       inherit (nixpkgs) lib;
 
@@ -42,8 +45,8 @@
         # Superset version (matching pyproject.toml)
         supersetVersion = "4.1.1";
 
-        # Import Firestream module system (relative path for standalone builds)
-        firestream = import ../../../../bin/nix/firestream { inherit pkgs; };
+        # Import Firestream module system via flake input (includes fenix/crane)
+        firestreamLib = firestream.firestreamModules { inherit pkgs system; };
 
         # ============================================================
         # uv2nix Integration - Properly resolve all Python dependencies
@@ -122,18 +125,40 @@
               pkgs.stdenv.cc.cc.lib
             ];
           });
+
+          # numba needs Intel TBB for tbbpool threading backend
+          numba = prev.numba.overrideAttrs (old: {
+            buildInputs = (old.buildInputs or [ ]) ++ [
+              pkgs.tbb
+              pkgs.stdenv.cc.cc.lib
+            ];
+          });
+
+          # llvmlite (numba dependency) needs LLVM
+          llvmlite = prev.llvmlite.overrideAttrs (old: {
+            buildInputs = (old.buildInputs or [ ]) ++ [
+              pkgs.llvm
+              pkgs.stdenv.cc.cc.lib
+            ];
+          });
         };
 
         # 3b. Source build overrides for packages without Linux wheels
         sourceOverrides = final: prev:
           let
-            buildPython = pkgs.python311.withPackages (ps: [ ps.setuptools ps.cython ps.wheel ]);
+            buildPython = pkgs.python311.withPackages (ps: [ ps.setuptools ps.cython ps.wheel ps.hatchling ps.flit-core ]);
             setupPythonPath = ''
               export PATH="${buildPython}/bin:$PATH"
               export PYTHONPATH="${buildPython}/lib/python3.11/site-packages:''${PYTHONPATH:-}"
             '';
+
+            # Helper to add setuptools to a package (use explicit attribute name)
+            addSetuptools = pkg: pkg.overrideAttrs (old: {
+              nativeBuildInputs = (old.nativeBuildInputs or [ ]) ++ [ buildPython ];
+              preBuild = (old.preBuild or "") + setupPythonPath;
+            });
           in {
-          # python-ldap needs openldap
+          # python-ldap needs additional system libraries
           python-ldap = prev.python-ldap.overrideAttrs (old: {
             nativeBuildInputs = (old.nativeBuildInputs or [ ]) ++ [
               buildPython
@@ -168,6 +193,113 @@
             ];
             preBuild = setupPythonPath;
           });
+
+          # All sdist-only packages that need setuptools for building
+          # (packages without prebuilt wheels on PyPI)
+          apache-superset = addSetuptools prev.apache-superset;
+          bottleneck = addSetuptools prev.bottleneck;
+          func-timeout = addSetuptools prev.func-timeout;
+          python-geohash = addSetuptools prev.python-geohash;
+          shortid = addSetuptools prev.shortid;
+          alembic = addSetuptools prev.alembic;
+          apispec = addSetuptools prev.apispec;
+          babel = addSetuptools prev.babel;
+          backoff = addSetuptools prev.backoff;
+          blinker = addSetuptools prev.blinker;
+          cachelib = addSetuptools prev.cachelib;
+          cachetools = addSetuptools prev.cachetools;
+          celery = addSetuptools prev.celery;
+          click = addSetuptools prev.click;
+          click-didyoumean = addSetuptools prev.click-didyoumean;
+          click-option-group = addSetuptools prev.click-option-group;
+          click-plugins = addSetuptools prev.click-plugins;
+          click-repl = addSetuptools prev.click-repl;
+          colorama = addSetuptools prev.colorama;
+          cron-descriptor = addSetuptools prev.cron-descriptor;
+          croniter = addSetuptools prev.croniter;
+          deprecated = addSetuptools prev.deprecated;
+          deprecation = addSetuptools prev.deprecation;
+          dnspython = addSetuptools prev.dnspython;
+          email-validator = addSetuptools prev.email-validator;
+          et-xmlfile = addSetuptools prev.et-xmlfile;
+          filelock = addSetuptools prev.filelock;
+          flask = addSetuptools prev.flask;
+          flask-appbuilder = addSetuptools prev.flask-appbuilder;
+          flask-babel = addSetuptools prev.flask-babel;
+          flask-caching = addSetuptools prev.flask-caching;
+          flask-jwt-extended = addSetuptools prev.flask-jwt-extended;
+          flask-limiter = addSetuptools prev.flask-limiter;
+          flask-login = addSetuptools prev.flask-login;
+          flask-migrate = addSetuptools prev.flask-migrate;
+          flask-session = addSetuptools prev.flask-session;
+          flask-sqlalchemy = addSetuptools prev.flask-sqlalchemy;
+          flask-talisman = addSetuptools prev.flask-talisman;
+          flask-wtf = addSetuptools prev.flask-wtf;
+          flower = addSetuptools prev.flower;
+          future = addSetuptools prev.future;
+          geographiclib = addSetuptools prev.geographiclib;
+          geopy = addSetuptools prev.geopy;
+          google-api-core = addSetuptools prev.google-api-core;
+          google-auth = addSetuptools prev.google-auth;
+          google-cloud-bigquery = addSetuptools prev.google-cloud-bigquery;
+          google-cloud-core = addSetuptools prev.google-cloud-core;
+          google-resumable-media = addSetuptools prev.google-resumable-media;
+          gunicorn = addSetuptools prev.gunicorn;
+          holidays = addSetuptools prev.holidays;
+          humanize = addSetuptools prev.humanize;
+          idna = addSetuptools prev.idna;
+          isodate = addSetuptools prev.isodate;
+          itsdangerous = addSetuptools prev.itsdangerous;
+          jinja2 = addSetuptools prev.jinja2;
+          jmespath = addSetuptools prev.jmespath;
+          jsonschema = addSetuptools prev.jsonschema;
+          kombu = addSetuptools prev.kombu;
+          limits = addSetuptools prev.limits;
+          mako = addSetuptools prev.mako;
+          markdown = addSetuptools prev.markdown;
+          marshmallow = addSetuptools prev.marshmallow;
+          marshmallow-sqlalchemy = addSetuptools prev.marshmallow-sqlalchemy;
+          ordered-set = addSetuptools prev.ordered-set;
+          packaging = addSetuptools prev.packaging;
+          prison = addSetuptools prev.prison;
+          prompt-toolkit = addSetuptools prev.prompt-toolkit;
+          proto-plus = addSetuptools prev.proto-plus;
+          protobuf = addSetuptools prev.protobuf;
+          pyasn1 = addSetuptools prev.pyasn1;
+          pyasn1-modules = addSetuptools prev.pyasn1-modules;
+          pyjwt = addSetuptools prev.pyjwt;
+          python-dateutil = addSetuptools prev.python-dateutil;
+          python-dotenv = addSetuptools prev.python-dotenv;
+          pytz = addSetuptools prev.pytz;
+          pyyaml = addSetuptools prev.pyyaml;
+          redis = addSetuptools prev.redis;
+          rich = addSetuptools prev.rich;
+          rsa = addSetuptools prev.rsa;
+          s3transfer = addSetuptools prev.s3transfer;
+          selenium = addSetuptools prev.selenium;
+          shortuuid = addSetuptools prev.shortuuid;
+          simplejson = addSetuptools prev.simplejson;
+          six = addSetuptools prev.six;
+          slack-sdk = addSetuptools prev.slack-sdk;
+          sqlalchemy = addSetuptools prev.sqlalchemy;
+          sqlalchemy-utils = addSetuptools prev.sqlalchemy-utils;
+          sqlparse = addSetuptools prev.sqlparse;
+          tabulate = addSetuptools prev.tabulate;
+          tenacity = addSetuptools prev.tenacity;
+          toml = addSetuptools prev.toml;
+          tornado = addSetuptools prev.tornado;
+          trino = addSetuptools prev.trino;
+          typing-extensions = addSetuptools prev.typing-extensions;
+          tzdata = addSetuptools prev.tzdata;
+          urllib3 = addSetuptools prev.urllib3;
+          vine = addSetuptools prev.vine;
+          wcwidth = addSetuptools prev.wcwidth;
+          werkzeug = addSetuptools prev.werkzeug;
+          wrapt = addSetuptools prev.wrapt;
+          wtforms = addSetuptools prev.wtforms;
+          wtforms-json = addSetuptools prev.wtforms-json;
+          xlsxwriter = addSetuptools prev.xlsxwriter;
+          zipp = addSetuptools prev.zipp;
         };
 
         # 4. Create base Python package set
@@ -192,7 +324,8 @@
         # Import the Superset module (Linux only - requires glibc for Docker image)
         # ============================================================
         supersetModule = if isLinux then import ./module.nix {
-          inherit pkgs lib firestream pythonEnv supersetVersion python;
+          inherit pkgs lib pythonEnv supersetVersion python;
+          firestream = firestreamLib;
         } else null;
 
       in {
