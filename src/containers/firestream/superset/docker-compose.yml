@@ -70,7 +70,7 @@ services:
       SUPERSET_USERNAME: admin
       SUPERSET_PASSWORD: admin
       SUPERSET_EMAIL: admin@superset.local
-      SUPERSET_LOAD_EXAMPLES: "true"
+      SUPERSET_LOAD_EXAMPLES: "${SUPERSET_LOAD_EXAMPLES:-true}"  # Env var with default true
     restart: "no"
 
   # Superset Webserver - Main application

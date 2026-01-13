@@ -167,6 +167,9 @@ let
     # Database connection (metadata database)
     SQLALCHEMY_DATABASE_URI = "{{SUPERSET_DATABASE_URI}}"
 
+    # Examples database (for demo data - defaults to metadata database)
+    SQLALCHEMY_EXAMPLES_URI = "{{SUPERSET_EXAMPLES_DATABASE_URI}}"
+
     # Redis for caching
     CACHE_CONFIG = {
         "CACHE_TYPE": "RedisCache",
@@ -297,9 +300,19 @@ in firestream.mkPythonContainerModule {
     SUPERSET_ROLE = "webserver";
 
     # Init configuration
-    SUPERSET_LOAD_EXAMPLES = "false";
+    SUPERSET_LOAD_EXAMPLES = "true";  # Default to loading demo data
     SUPERSET_SKIP_DATABASE_WAIT = "no";
     SUPERSET_IMPORT_DATASOURCES = "";
+
+    # Examples database (defaults to metadata DB if empty)
+    # Used by SUPERSET_LOAD_EXAMPLES to store demo data
+    EXAMPLES_DATABASE_DIALECT = "";  # Empty = use SUPERSET_DATABASE_DIALECT
+    EXAMPLES_DATABASE_HOST = "";     # Empty = use SUPERSET_DATABASE_HOST
+    EXAMPLES_DATABASE_PORT_NUMBER = "";
+    EXAMPLES_DATABASE_NAME = "";     # Empty = use SUPERSET_DATABASE_NAME
+    EXAMPLES_DATABASE_USER = "";
+    EXAMPLES_DATABASE_PASSWORD = "";
+    EXAMPLES_DATABASE_USE_SSL = "";
 
     # Python cache
     PYTHONPYCACHEPREFIX = "/opt/superset/tmp/pycache";
@@ -339,6 +352,14 @@ in firestream.mkPythonContainerModule {
     "SUPERSET_WEBSERVER_PORT_NUMBER"
     "SUPERSET_WEBSERVER_WORKERS"
     "SUPERSET_WEBSERVER_TIMEOUT"
+    # Examples database (for demo data)
+    "EXAMPLES_DATABASE_DIALECT"
+    "EXAMPLES_DATABASE_HOST"
+    "EXAMPLES_DATABASE_PORT_NUMBER"
+    "EXAMPLES_DATABASE_NAME"
+    "EXAMPLES_DATABASE_USER"
+    "EXAMPLES_DATABASE_PASSWORD"
+    "EXAMPLES_DATABASE_USE_SSL"
   ];
 
   # Runtime directories with declarative schema
@@ -438,6 +459,20 @@ in firestream.mkPythonContainerModule {
     is_boolean_yes "''${SUPERSET_DATABASE_USE_SSL:-no}" && db_ssl_opt="?sslmode=require"
     db_uri="''${SUPERSET_DATABASE_DIALECT:-postgresql}://''${db_user}:''${db_pass}@''${SUPERSET_DATABASE_HOST:-localhost}:''${SUPERSET_DATABASE_PORT_NUMBER:-5432}/''${SUPERSET_DATABASE_NAME:-superset}''${db_ssl_opt}"
 
+    # Build examples database URI (defaults to metadata database)
+    local ex_dialect ex_host ex_port ex_name ex_user ex_pass ex_user_enc ex_pass_enc ex_ssl_opt examples_uri
+    ex_dialect="''${EXAMPLES_DATABASE_DIALECT:-''${SUPERSET_DATABASE_DIALECT:-postgresql}}"
+    ex_host="''${EXAMPLES_DATABASE_HOST:-''${SUPERSET_DATABASE_HOST:-localhost}}"
+    ex_port="''${EXAMPLES_DATABASE_PORT_NUMBER:-''${SUPERSET_DATABASE_PORT_NUMBER:-5432}}"
+    ex_name="''${EXAMPLES_DATABASE_NAME:-''${SUPERSET_DATABASE_NAME:-superset}}"
+    ex_user="''${EXAMPLES_DATABASE_USER:-''${SUPERSET_DATABASE_USERNAME:-superset}}"
+    ex_pass="''${EXAMPLES_DATABASE_PASSWORD:-''${SUPERSET_DATABASE_PASSWORD:-}}"
+    ex_user_enc=$(superset_encode_url "$ex_user")
+    ex_pass_enc=$(superset_encode_url "$ex_pass")
+    ex_ssl_opt=""
+    is_boolean_yes "''${EXAMPLES_DATABASE_USE_SSL:-''${SUPERSET_DATABASE_USE_SSL:-no}}" && ex_ssl_opt="?sslmode=require"
+    examples_uri="''${ex_dialect}://''${ex_user_enc}:''${ex_pass_enc}@''${ex_host}:''${ex_port}/''${ex_name}''${ex_ssl_opt}"
+
     # Build Redis URLs
     local redis_proto redis_pass redis_auth redis_base_url
     redis_proto="redis"
@@ -463,6 +498,7 @@ in firestream.mkPythonContainerModule {
       ${pkgs.gnused}/bin/sed \
         -e "s|{{SUPERSET_SECRET_KEY}}|''${SUPERSET_SECRET_KEY}|g" \
         -e "s|{{SUPERSET_DATABASE_URI}}|''${db_uri}|g" \
+        -e "s|{{SUPERSET_EXAMPLES_DATABASE_URI}}|''${examples_uri}|g" \
         -e "s|{{SUPERSET_CACHE_REDIS_URL}}|''${cache_url}|g" \
         -e "s|{{SUPERSET_CELERY_BROKER_URL}}|''${celery_broker}|g" \
         -e "s|{{SUPERSET_CELERY_RESULT_BACKEND}}|''${celery_backend}|g" \
