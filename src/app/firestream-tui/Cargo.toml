@@ -4,12 +4,20 @@ version = "0.1.0"
 description = "Terminal User Interface for Firestream"
 authors = ["Datawizz <36938650+datawizz@users.noreply.github.com>"]
 license = ""
-edition = "2021"
+edition = "2024"
 
 [lib]
 name = "firestream_tui"
 
+[[bin]]
+name = "firestream-tui"
+path = "src/main.rs"
+
 [dependencies]
+# Main library - TUI imports all functionality through firestream
+firestream = { workspace = true }
+
+# TUI-specific dependencies
 crossterm = { workspace = true }
 futures = { workspace = true }
 ratatui = { workspace = true }
@@ -23,6 +31,5 @@ uuid = { workspace = true }
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true }
 dirs = { workspace = true }
-templatizer-spark = { workspace = true }
 tera = { workspace = true }
 keyring = "2.0"

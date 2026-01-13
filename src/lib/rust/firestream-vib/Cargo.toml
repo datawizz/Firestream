@@ -1,0 +1,66 @@
+[package]
+name = "firestream-vib"
+version = "0.1.0"
+edition = "2024"
+description = "Container verification harness for Nix-built containers"
+license = "Apache-2.0"
+
+[dependencies]
+# CLI
+clap = { workspace = true, features = ["derive", "env"] }
+
+# Async runtime
+tokio = { workspace = true, features = ["process"] }
+
+# Serialization
+serde = { workspace = true }
+serde_json = { workspace = true }
+serde_yaml = { workspace = true }
+toml = { workspace = true }
+
+# Templating (Goss YAML generation)
+tera = { workspace = true }
+
+# Docker interaction
+bollard = { workspace = true }
+futures-util = { workspace = true }
+
+# Kubernetes interaction
+kube = { workspace = true, features = ["runtime", "client"] }
+k8s-openapi = { workspace = true }
+
+# Error handling
+thiserror = { workspace = true }
+anyhow = { workspace = true }
+
+# Logging
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+
+# Path handling
+camino = "1"
+
+# Time handling
+chrono = { workspace = true }
+
+# Directories
+dirs = { workspace = true }
+
+# UUID generation for SBOM
+uuid = { workspace = true, features = ["v5"] }
+
+# Regex for parsing store paths
+regex = "1"
+
+[dev-dependencies]
+tempfile = { workspace = true }
+assert_cmd = "2"
+predicates = "3"
+
+[[bin]]
+name = "firestream-vib"
+path = "src/main.rs"
+
+[lib]
+name = "firestream_vib"
+path = "src/lib.rs"

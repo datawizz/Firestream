@@ -1,31 +1,54 @@
 [workspace]
 resolver = "2"
 
-# Default member - this makes 'cargo run' at the root run the TUI
-default-members = ["src/app/firestream-tui"]
+# Default member - this makes 'cargo run' at the root run firestream
+default-members = ["src/lib/rust/firestream"]
 
 members = [
+    # Main crates
+    "src/lib/rust/firestream",
     "src/app/firestream-tui",
+
+    # API Server
     "src/lib/rust/firestream-api-server/cli",
     "src/lib/rust/firestream-api-server/config",
     "src/lib/rust/firestream-api-server/db",
     "src/lib/rust/firestream-api-server/web",
     "src/lib/rust/firestream-api-server/macros",
-    "src/lib/rust/tools/filesystem-manager",
-    "src/lib/rust/tools/firestream-vib",
-    "src/lib/rust/tools/k8s-manager",
-    "src/lib/rust/tools/templatizer-puppeteer",
-    "src/lib/rust/tools/templatizer-spark",
-    "src/lib/rust/tools/templatizer-superset",
-    "src/lib/rust/tools/docker-manager",
-    "src/lib/rust/tools/helm-manager",
-    "src/lib/rust/tools/wait-for-port"
+
+    # Infrastructure crates (flattened)
+    "src/lib/rust/docker-manager",
+    "src/lib/rust/filesystem-manager",
+    "src/lib/rust/firestream-vib",
+    "src/lib/rust/helm-manager",
+    "src/lib/rust/k8s-manager",
+    "src/lib/rust/templatizer-puppeteer",
+    "src/lib/rust/templatizer-spark",
+    "src/lib/rust/templatizer-superset",
+    "src/lib/rust/wait-for-port",
 ]
 
 [workspace.dependencies]
 # Internal Crates
-templatizer-spark = { path = "src/lib/rust/tools/templatizer-spark" }
-filesystem-manager = { path = "src/lib/rust/tools/filesystem-manager" }
+firestream = { path = "src/lib/rust/firestream" }
+firestream-tui = { path = "src/app/firestream-tui" }
+docker-manager = { path = "src/lib/rust/docker-manager" }
+filesystem-manager = { path = "src/lib/rust/filesystem-manager" }
+firestream-vib = { path = "src/lib/rust/firestream-vib" }
+helm-manager = { path = "src/lib/rust/helm-manager" }
+k8s-manager = { path = "src/lib/rust/k8s-manager" }
+templatizer-puppeteer = { path = "src/lib/rust/templatizer-puppeteer" }
+templatizer-spark = { path = "src/lib/rust/templatizer-spark" }
+templatizer-superset = { path = "src/lib/rust/templatizer-superset" }
+wait-for-port = { path = "src/lib/rust/wait-for-port" }
+
+# API Server sub-crates
+firestream-api-server-cli = { path = "src/lib/rust/firestream-api-server/cli" }
+firestream-api-server-config = { path = "src/lib/rust/firestream-api-server/config" }
+firestream-api-server-db = { path = "src/lib/rust/firestream-api-server/db" }
+firestream-api-server-web = { path = "src/lib/rust/firestream-api-server/web" }
+firestream-api-server-macros = { path = "src/lib/rust/firestream-api-server/macros" }
+
 comfy-table = "7.1.4"
 
 

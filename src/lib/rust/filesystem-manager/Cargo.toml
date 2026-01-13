@@ -1,0 +1,30 @@
+[package]
+name = "filesystem-manager"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+# Core dependencies
+tokio = { workspace = true }
+anyhow = { workspace = true }
+thiserror = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+
+# Path and filesystem utilities
+home = "0.5"
+glob = "0.3"
+walkdir = "2.4"
+
+# Date/time handling
+chrono = { workspace = true }
+
+# Diff functionality
+similar = { version = "2.4", features = ["text", "inline"] }
+
+# Logging
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+
+[dev-dependencies]
+tempfile = { workspace = true }
