@@ -1,0 +1,7 @@
+# Firestream VIB Template - Check CA Certificates
+# Validates that CA certificates are properly installed by accessing an HTTPS URL
+# Template context variables: None
+
+http:
+  https://google.com:
+    status: 200

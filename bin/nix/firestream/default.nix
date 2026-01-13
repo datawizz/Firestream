@@ -12,6 +12,7 @@ let
     mkRustPackage = rustModule.mkRustPackage;
   };
   waitForPortPkg = packages.wait-for-port;
+  firestreamVibPkg = packages.firestream-vib;
 
   # Import core library modules with dependency injection
   # Each module receives only the dependencies it needs
@@ -27,7 +28,11 @@ let
   stateModule = import ./lib/state.nix { inherit pkgs lib logModule fsModule configModule; };
   volumesModule = import ./lib/volumes.nix { inherit pkgs lib logModule fsModule; };
 
+  # Metadata module (separate from coreLibs as it generates derivations, not shell functions)
+  metadataModule = import ./lib/metadata.nix { inherit pkgs lib; };
+
   # Aggregate core libraries into a single attribute set
+  # These modules provide shell functions (via 'functions' attr) and runtime deps
   coreLibs = {
     log = logModule;
     validations = validationsModule;
@@ -56,7 +61,7 @@ let
 
   # Import container factories
   containerBase = import ./containers/base.nix {
-    inherit pkgs lib coreLibs waitForPortPkg;
+    inherit pkgs lib coreLibs waitForPortPkg firestreamVibPkg;
     mkAppModule = appBase.mkAppModule;
   };
   containerPython = import ./containers/python.nix {
@@ -102,6 +107,11 @@ in {
   # Core library modules (for direct access)
   # Usage: firestream.lib.log.functions
   lib = coreLibs;
+
+  # Metadata generation module (generates derivations, not shell functions)
+  # Usage: firestream.metadata.mkContainerMetadata { ... }
+  # Usage: firestream.metadata.mkMetadataForContainer containerModule { ... }
+  metadata = metadataModule;
 
   # Environment generation functions
   # Usage: firestream.env.mkEnvDefaults { ... }

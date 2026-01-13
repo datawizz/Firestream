@@ -1,0 +1,9 @@
+# Firestream VIB Template - Check SPDX
+# Validates that SPDX files exist in the specified directory
+# Template context variables:
+#   - root_dir: Root directory to scan for SPDX files
+
+command:
+  check-spdx:
+    exec: export ROOT_DIR={{ root_dir }} && ./scripts/check-spdx.sh
+    exit-status: 0

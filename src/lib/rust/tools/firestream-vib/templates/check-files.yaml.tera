@@ -1,0 +1,26 @@
+# Firestream VIB Template - Check Files
+# Validates file existence and optionally checks permissions
+# Template context variables:
+#   - files: Array of file objects with:
+#     - paths: Array of file paths
+#     - mode: (optional) Expected file mode
+#     - owner: (optional) Expected owner
+#     - group: (optional) Expected group
+
+file:
+{%- for file_group in files %}
+{%- for path in file_group.paths %}
+  {{ path }}:
+    exists: true
+    filetype: file
+{%- if file_group.mode is defined %}
+    mode: "{{ file_group.mode }}"
+{%- endif %}
+{%- if file_group.owner is defined %}
+    owner: {{ file_group.owner }}
+{%- endif %}
+{%- if file_group.group is defined %}
+    group: {{ file_group.group }}
+{%- endif %}
+{%- endfor %}
+{%- endfor %}

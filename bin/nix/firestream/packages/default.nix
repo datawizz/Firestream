@@ -13,4 +13,8 @@
   # wait-for-port: Rust-based port availability checker
   # Usage: wait-for-port PORT [--host HOST] [--state inuse|free] [--timeout SECS]
   wait-for-port = import ./wait-for-port.nix { inherit pkgs lib mkRustPackage; };
+
+  # firestream-vib: Container verification harness and metadata generator
+  # Usage: firestream-vib generate-metadata --closure-graph FILE --config FILE --output DIR
+  firestream-vib = import ./firestream-vib.nix { inherit pkgs lib mkRustPackage; };
 }

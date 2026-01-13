@@ -23,9 +23,12 @@
 #     };
 #   in container.dockerImage
 
-{ pkgs, lib, mkAppModule, coreLibs, waitForPortPkg }:
+{ pkgs, lib, mkAppModule, coreLibs, waitForPortPkg, firestreamVibPkg }:
 
 let
+  # Import metadata library for SBOM and container metadata generation
+  metadataLib = import ../lib/metadata.nix { inherit pkgs lib firestreamVibPkg; };
+
   # Default Docker configuration
   defaultDockerConfig = {
     WorkingDir = "/opt/firestream";
@@ -124,6 +127,18 @@ in
       ]
     );
 
+    # Generate container metadata files (SBOM, closure, etc.)
+    # These are generated at Nix build time and included in the container image
+    containerMetadata = metadataLib.mkContainerMetadata {
+      inherit name version;
+      mainDrv = appModule.prepopulatedEnv;  # Use prepopulated env as representative derivation
+      exposedPorts = exposedPorts;
+      user = "${toString user.uid}:${toString user.gid}";
+      workdir = paths.base;
+      flakeUri = builtins.getEnv "FLAKE_URI";
+      flakeRevision = builtins.getEnv "GIT_COMMIT_HASH";
+    };
+
     # Build exposed ports config
     portsConfig = lib.listToAttrs (
       map (port: {
@@ -214,6 +229,8 @@ ${user.name}:!:::::::
       ] ++ customScriptPackages ++ [
         # Layer group 3: Config templates (change frequently)
         appModule.prepopulatedEnv
+        # Layer group 4: Metadata files (SBOM, closure info - regenerated on each build)
+        containerMetadata
       ];
 
       # Fix ownership for non-root user (runs as fakeroot during image build)

@@ -1,4 +1,8 @@
 {
+    // Show Nix build output symlinks (gitignored but browsable)
+    "files.exclude": {
+        "result": false
+    },
     // rust-analyzer is now provided by Nix in the devcontainer
     "rust-analyzer.enable": true,
     "[rust]": {

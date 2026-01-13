@@ -12,6 +12,7 @@ members = [
     "src/lib/rust/firestream-api-server/web",
     "src/lib/rust/firestream-api-server/macros",
     "src/lib/rust/tools/filesystem-manager",
+    "src/lib/rust/tools/firestream-vib",
     "src/lib/rust/tools/k8s-manager",
     "src/lib/rust/tools/templatizer-puppeteer",
     "src/lib/rust/tools/templatizer-spark",
