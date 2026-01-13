@@ -95,6 +95,12 @@ impl From<serde_yaml::Error> for FirestreamError {
     }
 }
 
+impl From<k8s_manager::K8sManagerError> for FirestreamError {
+    fn from(err: k8s_manager::K8sManagerError) -> Self {
+        FirestreamError::KubernetesError(err.to_string())
+    }
+}
+
 /// Result type alias for Firestream operations
 pub type Result<T> = std::result::Result<T, FirestreamError>;
 

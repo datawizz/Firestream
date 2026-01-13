@@ -1,0 +1,55 @@
+[package]
+name = "nix-container-builder"
+version = "0.1.0"
+edition = "2021"
+description = "Build containers from Nix flakes"
+license = "MIT"
+readme = "README.md"
+
+[lib]
+name = "nix_container_builder"
+path = "src/lib.rs"
+
+[[bin]]
+name = "nix-container-builder"
+path = "src/main.rs"
+
+[dependencies]
+# Async runtime
+tokio = { workspace = true, features = ["full", "process", "fs"] }
+futures = { workspace = true }
+async-trait = { workspace = true }
+
+# CLI
+clap = { workspace = true, features = ["derive", "env"] }
+
+# Error handling
+thiserror = { workspace = true }
+anyhow = { workspace = true }
+
+# Serialization
+serde = { workspace = true }
+serde_json = { workspace = true }
+
+# Logging
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+
+# Utilities
+tempfile = { workspace = true }
+which = { workspace = true }
+comfy-table = { workspace = true }
+indicatif = "0.17"
+num_cpus = "1.16"
+
+# File embedding for portable binary
+rust-embed = "8.5"
+
+# Workspace embedding with gitignore support
+workspace-embed = { path = "../workspace-embed" }
+
+[build-dependencies]
+workspace-embed = { path = "../workspace-embed" }
+
+[dev-dependencies]
+tokio-test = "0.4"

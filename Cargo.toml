@@ -22,10 +22,12 @@ members = [
     "src/lib/rust/firestream-vib",
     "src/lib/rust/helm-manager",
     "src/lib/rust/k8s-manager",
+    "src/lib/rust/nix-container-builder",
     "src/lib/rust/templatizer-puppeteer",
     "src/lib/rust/templatizer-spark",
     "src/lib/rust/templatizer-superset",
     "src/lib/rust/wait-for-port",
+    "src/lib/rust/workspace-embed",
 ]
 
 [workspace.dependencies]
@@ -41,6 +43,8 @@ templatizer-puppeteer = { path = "src/lib/rust/templatizer-puppeteer" }
 templatizer-spark = { path = "src/lib/rust/templatizer-spark" }
 templatizer-superset = { path = "src/lib/rust/templatizer-superset" }
 wait-for-port = { path = "src/lib/rust/wait-for-port" }
+nix-container-builder = { path = "src/lib/rust/nix-container-builder" }
+workspace-embed = { path = "src/lib/rust/workspace-embed" }
 
 # API Server sub-crates
 firestream-api-server-cli = { path = "src/lib/rust/firestream-api-server/cli" }

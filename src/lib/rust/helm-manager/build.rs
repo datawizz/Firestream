@@ -6,22 +6,33 @@ use walkdir::WalkDir;
 
 fn main() -> Result<()> {
     println!("cargo:rerun-if-changed=build.rs");
-    
+
     let out_dir = env::var("OUT_DIR")?;
     let home_dir = env::var("HOME").unwrap_or_else(|_| "/home/firestream".to_string());
     let bitnami_charts_dir = Path::new(&home_dir).join("bitnami-charts").join("bitnami");
-    
-    if !bitnami_charts_dir.exists() {
-        panic!(
-            "Bitnami charts directory not found at: {}. \
-            Please ensure bitnami-charts are available at $HOME/bitnami-charts",
-            bitnami_charts_dir.display()
-        );
-    }
 
     // Create a directory in OUT_DIR to store processed charts
     let charts_out_dir = Path::new(&out_dir).join("charts");
     fs::create_dir_all(&charts_out_dir)?;
+
+    // If bitnami charts don't exist, generate stub with empty charts
+    if !bitnami_charts_dir.exists() {
+        eprintln!(
+            "cargo:warning=Bitnami charts directory not found at: {}. Building with empty charts stub.",
+            bitnami_charts_dir.display()
+        );
+
+        // Create a placeholder file so include_dir! has something to include
+        let placeholder_path = charts_out_dir.join(".placeholder");
+        fs::write(&placeholder_path, "# Placeholder - bitnami charts not available\n")?;
+
+        // Generate stub manifest with empty charts
+        let manifest_path = Path::new(&out_dir).join("chart_manifest.rs");
+        let manifest_content = generate_manifest_code(&[]);
+        fs::write(manifest_path, manifest_content)?;
+
+        return Ok(());
+    }
 
     // Generate a manifest of available charts
     let mut chart_manifest = Vec::new();
@@ -30,25 +41,25 @@ fn main() -> Result<()> {
     for entry in fs::read_dir(&bitnami_charts_dir)? {
         let entry = entry?;
         let path = entry.path();
-        
+
         if path.is_dir() {
             let chart_name = path.file_name()
                 .and_then(|n| n.to_str())
                 .expect("Invalid chart directory name");
-            
+
             // Skip the common chart as it's a dependency
             if chart_name == "common" {
                 continue;
             }
-            
+
             // Check if Chart.yaml exists
             let chart_yaml_path = path.join("Chart.yaml");
             if chart_yaml_path.exists() {
                 println!("cargo:rerun-if-changed={}", chart_yaml_path.display());
-                
+
                 // Copy the chart directory to OUT_DIR
                 copy_chart_dir(&path, &charts_out_dir.join(chart_name))?;
-                
+
                 // Add to manifest
                 chart_manifest.push(chart_name.to_string());
             }
