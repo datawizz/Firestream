@@ -14,6 +14,10 @@ done
 # Ensure volume directory exists
 ensure_dir_exists "$REDIS_VOLUME_DIR"
 
+# Create AOF directory for persistence (must exist before Redis starts)
+# This is needed because the volume mount overwrites build-time directories
+ensure_dir_exists "${REDIS_DATA_DIR}/appendonlydir"
+
 # Check for initialization marker
 REDIS_INIT_MARKER="${REDIS_DATA_DIR}/.redis_initialized"
 

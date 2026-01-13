@@ -15,6 +15,7 @@
 , pythonEnv          # The virtual environment from uv2nix
 , supersetVersion    # e.g., "4.1.1"
 , python ? pkgs.python311
+, waitForPortPkg     # Rust-based port checker for init scripts
 }:
 
 let
@@ -148,6 +149,7 @@ let
   runtimeBinDeps = with pkgs; [
     coreutils bash gnused gnugrep gawk findutils which
     postgresql git curl netcat-gnu openssh jq
+    waitForPortPkg  # Rust-based port checker for init scripts
   ];
 
   # Superset config template with {{PLACEHOLDER}} syntax
@@ -515,8 +517,8 @@ in firestream.mkPythonContainerModule {
 
       celery-beat)
         info "Starting Celery beat scheduler..."
-        local beat_pid="/opt/superset/tmp/superset-celerybeat.pid"
-        local beat_schedule="/opt/superset/tmp/superset-celerybeat-schedule"
+        beat_pid="/opt/superset/tmp/superset-celerybeat.pid"
+        beat_schedule="/opt/superset/tmp/superset-celerybeat-schedule"
         rm -f "$beat_pid"
         exec celery --app=superset.tasks.celery_app:app beat \
           --pidfile "$beat_pid" \
@@ -526,7 +528,7 @@ in firestream.mkPythonContainerModule {
 
       celery-flower)
         info "Starting Celery Flower..."
-        local flower_args=("--app=superset.tasks.celery_app:app" "flower")
+        flower_args=("--app=superset.tasks.celery_app:app" "flower")
         if [[ -n "''${FLOWER_BASIC_AUTH:-}" ]]; then
           flower_args+=("--basic-auth=''${FLOWER_BASIC_AUTH}")
         fi

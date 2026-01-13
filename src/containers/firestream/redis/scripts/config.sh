@@ -22,6 +22,9 @@ if [[ -e "${REDIS_MOUNTED_CONF_DIR}/redis.conf" ]]; then
 else
     info "Generating Redis configuration from environment variables"
 
+    # Set data directory (where appendonlydir and RDB files are stored)
+    redis_conf_set dir "$REDIS_DATA_DIR"
+
     # Allow remote connections
     if is_boolean_yes "$ALLOW_EMPTY_PASSWORD"; then
         redis_conf_set protected-mode no

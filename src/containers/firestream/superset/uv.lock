@@ -821,10 +821,12 @@ dependencies = [
     { name = "gevent" },
     { name = "geventhttpclient" },
     { name = "gunicorn" },
+    { name = "marshmallow" },
     { name = "mysqlclient" },
     { name = "psycopg2-binary" },
     { name = "pymysql" },
     { name = "python-ldap" },
+    { name = "setuptools" },
     { name = "slack-sdk" },
     { name = "trino" },
 ]
@@ -883,6 +885,7 @@ requires-dist = [
     { name = "geventhttpclient", specifier = ">=2.3.1" },
     { name = "google-cloud-bigquery", marker = "extra == 'bigquery'", specifier = ">=3.17.0" },
     { name = "gunicorn", specifier = ">=22.0.0" },
+    { name = "marshmallow", specifier = ">=3.26.1,<4.0.0" },
     { name = "mypy", marker = "extra == 'dev'", specifier = ">=1.8.0" },
     { name = "mysqlclient", specifier = ">=2.2.4" },
     { name = "psycopg2-binary", specifier = ">=2.9.9" },
@@ -894,6 +897,7 @@ requires-dist = [
     { name = "python-ldap", specifier = ">=3.4.4" },
     { name = "redshift-connector", marker = "extra == 'redshift'", specifier = ">=2.0.918" },
     { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.2.0" },
+    { name = "setuptools", specifier = ">=80.0.0" },
     { name = "slack-sdk", specifier = ">=3.27.0" },
     { name = "snowflake-connector-python", marker = "extra == 'snowflake'", specifier = ">=3.6.0" },
     { name = "snowflake-sqlalchemy", marker = "extra == 'snowflake'", specifier = ">=1.5.1" },
@@ -1701,11 +1705,14 @@ wheels = [
 
 [[package]]
 name = "marshmallow"
-version = "4.1.2"
+version = "3.26.2"
 source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/e9/e1/5edfd1edf05d3cc98415b0810ca45fa19d7dee6def0d0ec639eb4eb14e20/marshmallow-4.1.2.tar.gz", hash = "sha256:083f250643d2e75fd363f256aeb6b1af369a7513ad37647ce4a601f6966e3ba5", size = 220974, upload-time = "2025-12-22T06:16:35.283Z" }
+dependencies = [
+    { name = "packaging" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/55/79/de6c16cc902f4fc372236926b0ce2ab7845268dcc30fb2fbb7f71b418631/marshmallow-3.26.2.tar.gz", hash = "sha256:bbe2adb5a03e6e3571b573f42527c6fe926e17467833660bebd11593ab8dfd57", size = 222095, upload-time = "2025-12-22T06:53:53.309Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/af/b6/66d1748fb45453e337c8a334dafed7b818e72ac9cf9d105a56e0cf21865f/marshmallow-4.1.2-py3-none-any.whl", hash = "sha256:a8cfa18bd8d0e5f7339e734edf84815fe8db1bdb57358c7ccc05472b746eeadc", size = 48360, upload-time = "2025-12-22T06:16:33.994Z" },
+    { url = "https://files.pythonhosted.org/packages/be/2f/5108cb3ee4ba6501748c4908b908e55f42a5b66245b4cfe0c99326e1ef6e/marshmallow-3.26.2-py3-none-any.whl", hash = "sha256:013fa8a3c4c276c24d26d84ce934dc964e2aa794345a0f8c7e5a7191482c8a73", size = 50964, upload-time = "2025-12-22T06:53:51.801Z" },
 ]
 
 [[package]]

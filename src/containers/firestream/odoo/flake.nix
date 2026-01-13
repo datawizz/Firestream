@@ -307,7 +307,7 @@
             program = toString (pkgs.writeShellScript "load-docker" ''
               echo "Loading Odoo Docker image..."
               docker load < ${odooModule.dockerImage}
-              echo "Image loaded: firestream-odoo:${odooVersion}-nix"
+              echo "Image loaded: firestream-odoo:${odooVersion}"
             '');
           };
         };

@@ -6,10 +6,10 @@
 # These defaults are also set in module.nix envVars.
 
 # Paths (set by Nix, documented here for reference)
-export REDIS_BASE_DIR="${REDIS_BASE_DIR:-/opt/bitnami/redis}"
+export REDIS_BASE_DIR="${REDIS_BASE_DIR:-/opt/firestream/redis}"
 export REDIS_CONF_DIR="${REDIS_CONF_DIR:-${REDIS_BASE_DIR}/etc}"
 export REDIS_DEFAULT_CONF_DIR="${REDIS_DEFAULT_CONF_DIR:-${REDIS_BASE_DIR}/etc.default}"
-export REDIS_DATA_DIR="${REDIS_DATA_DIR:-/bitnami/redis/data}"
+export REDIS_DATA_DIR="${REDIS_DATA_DIR:-/firestream/redis/data}"
 export REDIS_MOUNTED_CONF_DIR="${REDIS_MOUNTED_CONF_DIR:-${REDIS_BASE_DIR}/mounted-etc}"
 export REDIS_OVERRIDES_FILE="${REDIS_OVERRIDES_FILE:-${REDIS_MOUNTED_CONF_DIR}/overrides.conf}"
 export REDIS_CONF_FILE="${REDIS_CONF_FILE:-${REDIS_CONF_DIR}/redis.conf}"
@@ -18,7 +18,7 @@ export REDIS_LOG_FILE="${REDIS_LOG_FILE:-${REDIS_LOG_DIR}/redis.log}"
 export REDIS_TMP_DIR="${REDIS_TMP_DIR:-${REDIS_BASE_DIR}/tmp}"
 export REDIS_PID_FILE="${REDIS_PID_FILE:-${REDIS_TMP_DIR}/redis.pid}"
 export REDIS_BIN_DIR="${REDIS_BIN_DIR:-${REDIS_BASE_DIR}/bin}"
-export REDIS_VOLUME_DIR="${REDIS_VOLUME_DIR:-/bitnami/redis}"
+export REDIS_VOLUME_DIR="${REDIS_VOLUME_DIR:-/firestream/redis}"
 
 # System users (when running with a privileged user)
 export REDIS_DAEMON_USER="${REDIS_DAEMON_USER:-redis}"

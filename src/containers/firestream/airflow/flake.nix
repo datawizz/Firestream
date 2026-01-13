@@ -283,7 +283,7 @@
             program = toString (pkgs.writeShellScript "load-docker" ''
               echo "Loading Airflow Docker image..."
               docker load < ${airflowModule.dockerImage}
-              echo "Image loaded: firestream-airflow:${airflowVersion}-nix"
+              echo "Image loaded: firestream-airflow:${airflowVersion}"
             '');
           };
         };

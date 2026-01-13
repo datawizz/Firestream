@@ -11,7 +11,7 @@
 
 VERSION := 5.3.0
 IMAGE_NAME := firestream-jupyterhub
-IMAGE_TAG := $(VERSION)-nix
+IMAGE_TAG := $(VERSION)
 
 help:
 	@echo "Firestream JupyterHub Build Targets:"

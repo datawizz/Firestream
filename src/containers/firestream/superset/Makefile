@@ -37,7 +37,7 @@ build:
 load:
 	@echo "Loading Superset image into Docker..."
 	docker load < result
-	@echo "Image loaded: firestream-superset:4.1.1-nix"
+	@echo "Image loaded: firestream-superset:4.1.1"
 
 # Enter development shell
 dev:

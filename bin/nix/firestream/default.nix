@@ -67,12 +67,23 @@ let
     inherit pkgs lib;
     mkContainerModule = containerBase.mkContainerModule;
   };
+  containerNode = import ./containers/node.nix {
+    inherit pkgs lib;
+    mkContainerModule = containerBase.mkContainerModule;
+  };
 
   containerModules = {
     mkContainerModule = containerBase.mkContainerModule;
     mkPythonContainerModule = containerPython.mkPythonContainerModule;
     mkJavaContainerModule = containerJava.mkJavaContainerModule;
+    mkNodeContainerModule = containerNode.mkNodeContainerModule;
   };
+
+  # Import Node.js module (development environment)
+  nodeModule = import ./modules/node.nix { inherit pkgs lib; };
+
+  # Import Node.js package builder
+  nodeBuilder = import ./node { inherit pkgs lib; };
 
 in {
   # Rust module (Fenix + Crane)
@@ -109,6 +120,15 @@ in {
   mkContainerModule = containerModules.mkContainerModule;
   mkPythonContainerModule = containerModules.mkPythonContainerModule;
   mkJavaContainerModule = containerModules.mkJavaContainerModule;
+  mkNodeContainerModule = containerModules.mkNodeContainerModule;
+
+  # Node.js module (development environment)
+  # Usage: firestream.node.packages, firestream.node.shellHook
+  node = nodeModule;
+
+  # Node.js package builder
+  # Usage: firestream.mkNodePackage { pname = "my-app"; src = ./.; ... }
+  mkNodePackage = nodeBuilder.mkNodePackage;
 
   # Convenience: combined functions from all core libs
   # Returns a single string containing all library functions
@@ -136,6 +156,8 @@ in {
     description = "Firestream Nix Shell Module System for container initialization";
     moduleCount = builtins.length (lib.attrNames coreLibs);
     modules = lib.attrNames coreLibs;
-    containerFactories = [ "mkContainerModule" "mkPythonContainerModule" "mkJavaContainerModule" ];
+    containerFactories = [ "mkContainerModule" "mkPythonContainerModule" "mkJavaContainerModule" "mkNodeContainerModule" ];
+    packageBuilders = [ "mkRustPackage" "mkNodePackage" ];
+    devModules = [ "node" ];
   };
 }

@@ -20,7 +20,7 @@ services:
     build:
       context: ../../../..
       dockerfile: src/containers/firestream/odoo/18/debian-12/Dockerfile
-    image: firestream-odoo:18-nix
+    image: firestream-odoo:18
     ports:
       - '8069:8069'
       - '8072:8072'

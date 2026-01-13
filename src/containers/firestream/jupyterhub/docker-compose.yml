@@ -23,7 +23,7 @@ services:
     build:
       context: ../../../..
       dockerfile: src/containers/firestream/jupyterhub/5/debian-12/Dockerfile
-    image: firestream-jupyterhub:5.3.0-nix
+    image: firestream-jupyterhub:5.3.0
     container_name: jupyterhub
     ports:
       - '8000:8000'

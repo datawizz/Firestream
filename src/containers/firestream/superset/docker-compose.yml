@@ -12,7 +12,7 @@
 name: firestream-superset
 
 x-superset-common: &superset-common
-  image: firestream-superset:4.1.1-nix
+  image: firestream-superset:4.1.1
   environment: &superset-env
     SUPERSET_SECRET_KEY: ${SUPERSET_SECRET_KEY:-your-secret-key-here-must-be-at-least-42-chars-long}
     SUPERSET_DATABASE_HOST: postgresql
@@ -31,13 +31,11 @@ x-superset-common: &superset-common
 
 services:
   # PostgreSQL - Metadata database
+  # Note: Build image first with: cd ../postgresql && nix build .#dockerImage && docker load < result
   postgresql:
-    build:
-      context: ../../../..
-      dockerfile: src/containers/firestream/postgresql/17/debian-12/Dockerfile
     image: firestream-postgresql:17
     volumes:
-      - postgresql_data:/bitnami/postgresql
+      - postgresql_data:/firestream/postgresql
     environment:
       - POSTGRESQL_DATABASE=superset
       - POSTGRESQL_USERNAME=superset
@@ -50,10 +48,11 @@ services:
       retries: 5
 
   # Redis - Cache and Celery broker
+  # Note: Build image first with: cd ../redis && nix build .#dockerImage && docker load < result
   redis:
-    image: firestream-redis:7-nix
+    image: firestream-redis:7
     volumes:
-      - redis_data:/bitnami/redis/data
+      - redis_data:/firestream/redis/data
     environment:
       - ALLOW_EMPTY_PASSWORD=yes
     healthcheck:

@@ -220,6 +220,22 @@ ${user.name}:!:::::::
       # Create all runtime directories at build time so container can run as non-root
       # Note: /etc/passwd, /etc/group, /etc/shadow are created as Nix derivations above
       fakeRootCommands = ''
+        # Create system /tmp directory with sticky bit (required for mktemp, etc.)
+        mkdir -p ./tmp
+        chmod 1777 ./tmp
+
+        # CRITICAL: Resolve /etc symlinks to actual files
+        # Docker health checks fail with "path escapes from parent" if /etc/* are symlinks
+        # to Nix store paths (e.g., /etc/passwd -> /nix/store/xxx-passwd/etc/passwd)
+        for etc_file in ./etc/passwd ./etc/group ./etc/shadow; do
+          if [ -L "$etc_file" ]; then
+            target=$(readlink -f "$etc_file")
+            rm "$etc_file"
+            cp "$target" "$etc_file"
+            echo "Resolved /etc symlink: $etc_file"
+          fi
+        done
+
         # Create all runtime directories from runtimeDirs schema
         ${lib.concatMapStringsSep "\n" (dirSpec: ''
           mkdir -p .${dirSpec.path}
@@ -242,7 +258,7 @@ ${user.name}:!:::::::
         }
 
         # OPTIMIZED: Only resolve app-specific directories (not system paths)
-        # Skip /bin, /lib, /etc which can remain as read-only symlinks
+        # /bin, /lib remain as symlinks; /etc is resolved above for health check compatibility
         for base_dir in ./opt ./firestream; do
           app_dir="$base_dir/${name}"
           resolve_symlink "$app_dir"

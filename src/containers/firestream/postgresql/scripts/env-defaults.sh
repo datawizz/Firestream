@@ -3,8 +3,8 @@
 # Copyright Firestream. Apache-2.0 License.
 
 # Base directories
-export POSTGRESQL_BASE_DIR="${POSTGRESQL_BASE_DIR:-/opt/bitnami/postgresql}"
-export POSTGRESQL_VOLUME_DIR="${POSTGRESQL_VOLUME_DIR:-/bitnami/postgresql}"
+export POSTGRESQL_BASE_DIR="${POSTGRESQL_BASE_DIR:-/opt/firestream/postgresql}"
+export POSTGRESQL_VOLUME_DIR="${POSTGRESQL_VOLUME_DIR:-/firestream/postgresql}"
 export POSTGRESQL_DATA_DIR="${POSTGRESQL_DATA_DIR:-$POSTGRESQL_VOLUME_DIR/data}"
 export POSTGRESQL_CONF_DIR="${POSTGRESQL_CONF_DIR:-$POSTGRESQL_BASE_DIR/conf}"
 export POSTGRESQL_MOUNTED_CONF_DIR="${POSTGRESQL_MOUNTED_CONF_DIR:-$POSTGRESQL_VOLUME_DIR/conf}"

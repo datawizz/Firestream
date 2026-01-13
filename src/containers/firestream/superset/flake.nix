@@ -48,6 +48,9 @@
         # Import Firestream module system via flake input (includes fenix/crane)
         firestreamLib = firestream.firestreamModules { inherit pkgs system; };
 
+        # Get wait-for-port package for container runtime
+        waitForPortPkg = firestreamLib.waitForPortPkg;
+
         # ============================================================
         # uv2nix Integration - Properly resolve all Python dependencies
         # ============================================================
@@ -324,7 +327,7 @@
         # Import the Superset module (Linux only - requires glibc for Docker image)
         # ============================================================
         supersetModule = if isLinux then import ./module.nix {
-          inherit pkgs lib pythonEnv supersetVersion python;
+          inherit pkgs lib pythonEnv supersetVersion python waitForPortPkg;
           firestream = firestreamLib;
         } else null;
 
@@ -365,7 +368,7 @@
             program = toString (pkgs.writeShellScript "load-docker" ''
               echo "Loading Superset Docker image..."
               docker load < ${supersetModule.dockerImage}
-              echo "Image loaded: firestream-superset:${supersetVersion}-nix"
+              echo "Image loaded: firestream-superset:${supersetVersion}"
             '');
           };
         };

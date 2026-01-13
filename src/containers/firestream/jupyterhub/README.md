@@ -40,7 +40,7 @@ docker load < result
 docker run -d -p 8000:8000 -p 8081:8081 \
   -e JUPYTERHUB_USERNAME=admin \
   -e JUPYTERHUB_PASSWORD=secretpassword \
-  firestream-jupyterhub:5.3.0-nix
+  firestream-jupyterhub:5.3.0
 ```
 
 ## Environment Variables

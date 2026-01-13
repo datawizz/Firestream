@@ -178,7 +178,7 @@
             program = toString (pkgs.writeShellScript "load-docker" ''
               echo "Loading JupyterHub Docker image..."
               docker load < ${jupyterhubModule.dockerImage}
-              echo "Image loaded: firestream-jupyterhub:${jupyterhubVersion}-nix"
+              echo "Image loaded: firestream-jupyterhub:${jupyterhubVersion}"
             '');
           };
         };

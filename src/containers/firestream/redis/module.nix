@@ -278,28 +278,28 @@ in firestream.mkContainerModule {
 
   # Paths configuration (Bitnami compatibility)
   paths = {
-    base = "/opt/bitnami/redis";
-    conf = "/opt/bitnami/redis/etc";
-    data = "/bitnami/redis/data";
-    logs = "/opt/bitnami/redis/logs";
+    base = "/opt/firestream/redis";
+    conf = "/opt/firestream/redis/etc";
+    data = "/firestream/redis/data";
+    logs = "/opt/firestream/redis/logs";
   };
 
   # Environment variables with defaults
   envVars = {
     # Base directories
-    REDIS_BASE_DIR = "/opt/bitnami/redis";
-    REDIS_VOLUME_DIR = "/bitnami/redis";
-    REDIS_DATA_DIR = "/bitnami/redis/data";
-    REDIS_CONF_DIR = "/opt/bitnami/redis/etc";
-    REDIS_DEFAULT_CONF_DIR = "/opt/bitnami/redis/etc.default";
-    REDIS_MOUNTED_CONF_DIR = "/opt/bitnami/redis/mounted-etc";
-    REDIS_OVERRIDES_FILE = "/opt/bitnami/redis/mounted-etc/overrides.conf";
-    REDIS_CONF_FILE = "/opt/bitnami/redis/etc/redis.conf";
-    REDIS_LOG_DIR = "/opt/bitnami/redis/logs";
-    REDIS_LOG_FILE = "/opt/bitnami/redis/logs/redis.log";
-    REDIS_TMP_DIR = "/opt/bitnami/redis/tmp";
-    REDIS_PID_FILE = "/opt/bitnami/redis/tmp/redis.pid";
-    REDIS_BIN_DIR = "/opt/bitnami/redis/bin";
+    REDIS_BASE_DIR = "/opt/firestream/redis";
+    REDIS_VOLUME_DIR = "/firestream/redis";
+    REDIS_DATA_DIR = "/firestream/redis/data";
+    REDIS_CONF_DIR = "/opt/firestream/redis/etc";
+    REDIS_DEFAULT_CONF_DIR = "/opt/firestream/redis/etc.default";
+    REDIS_MOUNTED_CONF_DIR = "/opt/firestream/redis/mounted-etc";
+    REDIS_OVERRIDES_FILE = "/opt/firestream/redis/mounted-etc/overrides.conf";
+    REDIS_CONF_FILE = "/opt/firestream/redis/etc/redis.conf";
+    REDIS_LOG_DIR = "/opt/firestream/redis/logs";
+    REDIS_LOG_FILE = "/opt/firestream/redis/logs/redis.log";
+    REDIS_TMP_DIR = "/opt/firestream/redis/tmp";
+    REDIS_PID_FILE = "/opt/firestream/redis/tmp/redis.pid";
+    REDIS_BIN_DIR = "/opt/firestream/redis/bin";
 
     # User and group
     REDIS_DAEMON_USER = "redis";
@@ -365,7 +365,7 @@ in firestream.mkContainerModule {
   # Declarative directory schema
   runtimeDirs = {
     data = {
-      path = "/bitnami/redis/data";
+      path = "/firestream/redis/data";
       type = "data";
       persistence = "persistent";
       mode = "0755";
@@ -374,7 +374,7 @@ in firestream.mkContainerModule {
       description = "Redis data directory (AOF and RDB files)";
     };
     conf = {
-      path = "/opt/bitnami/redis/etc";
+      path = "/opt/firestream/redis/etc";
       type = "conf";
       persistence = "persistent";
       mode = "0755";
@@ -383,7 +383,7 @@ in firestream.mkContainerModule {
       description = "Redis configuration directory";
     };
     confDefault = {
-      path = "/opt/bitnami/redis/etc.default";
+      path = "/opt/firestream/redis/etc.default";
       type = "conf";
       persistence = "ephemeral";
       mode = "0755";
@@ -392,7 +392,7 @@ in firestream.mkContainerModule {
       description = "Default configuration templates";
     };
     mountedConf = {
-      path = "/opt/bitnami/redis/mounted-etc";
+      path = "/opt/firestream/redis/mounted-etc";
       type = "conf";
       persistence = "persistent";
       mode = "0755";
@@ -401,7 +401,7 @@ in firestream.mkContainerModule {
       description = "User-provided configuration mount point";
     };
     logs = {
-      path = "/opt/bitnami/redis/logs";
+      path = "/opt/firestream/redis/logs";
       type = "logs";
       persistence = "ephemeral";
       mode = "0755";
@@ -410,20 +410,30 @@ in firestream.mkContainerModule {
       description = "Redis log directory";
     };
     tmp = {
-      path = "/opt/bitnami/redis/tmp";
+      path = "/opt/firestream/redis/tmp";
       type = "tmp";
       persistence = "ephemeral";
       mode = "1777";
       description = "Temporary files and PID";
     };
     volumeDir = {
-      path = "/bitnami/redis";
+      path = "/firestream/redis";
       type = "data";
       persistence = "persistent";
       mode = "0755";
       owner = 1001;
       group = 1001;
       description = "Persistent volume root";
+    };
+    # Redis AOF (Append-Only File) directory for persistence
+    appendonlydir = {
+      path = "/firestream/redis/data/appendonlydir";
+      type = "data";
+      persistence = "persistent";
+      mode = "0755";
+      owner = 1001;
+      group = 1001;
+      description = "Redis append-only file directory for AOF persistence";
     };
   };
 
@@ -456,8 +466,8 @@ in firestream.mkContainerModule {
 
     info "Starting Redis ${redisVersion}..."
 
-    # Build extra flags array
-    local -a flags=()
+    # Build extra flags array (not using 'local' since runCmd runs at script top-level)
+    flags=()
     if [[ -n "$REDIS_EXTRA_FLAGS" ]]; then
       read -ra flags <<< "$REDIS_EXTRA_FLAGS"
     fi
@@ -473,7 +483,7 @@ in firestream.mkContainerModule {
   inherit systemDeps runtimeBinDeps;
 
   exposedPorts = [ 6379 ];
-  volumes = [ "/bitnami/redis" ];
+  volumes = [ "/firestream/redis" ];
 
   user = { name = "redis"; group = "redis"; uid = 1001; gid = 1001; };
 

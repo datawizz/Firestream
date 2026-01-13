@@ -10,7 +10,7 @@ services:
     ports:
       - '5432:5432'
     volumes:
-      - 'postgresql_data:/bitnami/postgresql'
+      - 'postgresql_data:/firestream/postgresql'
       - './init:/docker-entrypoint-initdb.d'
     environment:
       - POSTGRESQL_PASSWORD=firestream

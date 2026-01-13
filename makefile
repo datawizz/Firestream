@@ -545,13 +545,37 @@ supabase-credentials:
 SUPERSET_DIR := src/containers/firestream/superset
 SUPERSET_COMPOSE := $(SUPERSET_DIR)/docker-compose.yml
 
-superset-build:
+superset-build: superset-build-deps
 	@$(BUILD_CONTAINER) superset
 
+# Build superset dependencies (redis and postgresql)
+superset-build-deps:
+	@echo "==> Building Superset dependencies..."
+	@if ! docker image inspect firestream-redis:7 >/dev/null 2>&1; then \
+		echo "Building Redis..."; \
+		$(BUILD_CONTAINER) redis; \
+	else \
+		echo "Redis image already exists"; \
+	fi
+	@if ! docker image inspect firestream-postgresql:17 >/dev/null 2>&1; then \
+		echo "Building PostgreSQL..."; \
+		$(BUILD_CONTAINER) postgresql; \
+	else \
+		echo "PostgreSQL image already exists"; \
+	fi
+
 superset-start:
-	@if ! docker image inspect firestream-superset:4.1.1-nix >/dev/null 2>&1; then \
-		echo "Image not found, building..."; \
+	@if ! docker image inspect firestream-superset:4.1.1 >/dev/null 2>&1; then \
+		echo "Superset image not found, building..."; \
 		$(MAKE) superset-build; \
+	fi
+	@if ! docker image inspect firestream-redis:7 >/dev/null 2>&1; then \
+		echo "Redis image not found, building..."; \
+		$(BUILD_CONTAINER) redis; \
+	fi
+	@if ! docker image inspect firestream-postgresql:17 >/dev/null 2>&1; then \
+		echo "PostgreSQL image not found, building..."; \
+		$(BUILD_CONTAINER) postgresql; \
 	fi
 	docker compose -f $(SUPERSET_COMPOSE) up -d
 	@echo "Superset is running at http://localhost:8088"
