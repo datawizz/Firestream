@@ -1,0 +1,50 @@
+# SBT
+dist/*
+target/
+lib_managed/
+src_managed/
+project/boot/
+project/plugins/project/
+.history
+.cache
+.lib/
+
+# Scala-IDE specific
+.scala_dependencies
+.worksheet
+
+# IntelliJ IDEA
+.idea/
+*.iml
+*.iws
+out/
+
+# VS Code
+.vscode/
+
+# Metals
+.metals/
+.bloop/
+project/metals.sbt
+
+# Eclipse
+.project
+.classpath
+.settings/
+
+# Mac
+.DS_Store
+
+# Logs
+*.log
+logs/
+
+# Spark
+spark-warehouse/
+metastore_db/
+derby.log
+
+# Application specific
+{% if additional_gitignore_patterns %}{% for pattern in additional_gitignore_patterns %}
+{{ pattern }}
+{% endfor %}{% endif %}

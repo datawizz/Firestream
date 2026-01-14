@@ -3,7 +3,7 @@
 
   inputs = {
     # Fixed nixpkgs version for reproducible builds
-    nixpkgs.url = "github:NixOS/nixpkgs/release-25.05";
+    nixpkgs.url = "github:NixOS/nixpkgs/release-25.11";
   };
 
   outputs = { self, nixpkgs }:

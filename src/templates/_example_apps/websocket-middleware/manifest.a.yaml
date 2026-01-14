@@ -1,0 +1,35 @@
+name: Websocket Middleware
+version: 1.0.0
+author: Datawizz
+description: Consume Kafka and produce websocket data
+feature_flags:
+  - FEATURE_FLAG_KAFKA
+  - websocket-middleware
+
+
+
+ingress:
+  enabled: true
+  annotations:
+    kubernetes.io/ingress.class: traefik
+    traefik.ingress.kubernetes.io/router.entrypoints: web
+  hosts:
+    - host: "example.com"
+      paths:
+        - path: "/"
+          pathType: Prefix
+          backend:
+            service:
+              name: websocket-middleware
+              port: 8080
+  tls: []
+service:
+  port: 8080
+
+websocket-middleware:
+env:
+  SERVICE_NAME: "websocket-middleware"
+  TOPICS: |
+    [
+      "A_RUSTY_TOPIC"
+    ]

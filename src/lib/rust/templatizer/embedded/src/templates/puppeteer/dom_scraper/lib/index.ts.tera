@@ -1,0 +1,34 @@
+import { DOMWorkflow } from './workflows/dom-workflow';
+import { APIWorkflow } from './workflows/api-workflow';
+import { DOMScrapingImplementation, APIScrapingImplementation } from './workflows/workflow-types';
+import { SiteConfig } from './core/types';
+import { Logger } from './utils/logger';
+
+export function createWorkflow(
+  type: 'dom' | 'api',
+  implementation: DOMScrapingImplementation | APIScrapingImplementation,
+  config: SiteConfig,
+  logger: Logger
+) {
+  if (type === 'dom') {
+    return new DOMWorkflow(
+      implementation as DOMScrapingImplementation,
+      config,
+      logger
+    );
+  } else {
+    return new APIWorkflow(
+      implementation as APIScrapingImplementation,
+      config,
+      logger
+    );
+  }
+}
+
+// Re-export commonly used types and classes
+export * from './core/types';
+export * from './workflows/workflow-types';
+export { Logger } from './utils/logger';
+export { BrowserManager } from './core/browser';
+export { AuthHandler } from './core/auth';
+export { StorageManager } from './core/storage';

@@ -1,0 +1,39 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: {{ service_account | default(value="spark") }}
+  namespace: {{ namespace | default(value="spark-apps") }}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ app_name | lower | replace(from=" ", to="-") }}-spark-role
+  namespace: {{ namespace | default(value="spark-apps") }}
+rules:
+- apiGroups: [""]
+  resources: ["pods", "services", "configmaps"]
+  verbs: ["create", "get", "list", "watch", "delete", "update", "patch"]
+- apiGroups: [""]
+  resources: ["pods/log"]
+  verbs: ["get", "list"]
+{% if additional_rbac_rules %}
+{% for rule in additional_rbac_rules %}
+- apiGroups: [{% for group in rule.apiGroups %}"{{ group }}"{% if not loop.last %}, {% endif %}{% endfor %}]
+  resources: [{% for resource in rule.resources %}"{{ resource }}"{% if not loop.last %}, {% endif %}{% endfor %}]
+  verbs: [{% for verb in rule.verbs %}"{{ verb }}"{% if not loop.last %}, {% endif %}{% endfor %}]
+{% endfor %}
+{% endif %}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ app_name | lower | replace(from=" ", to="-") }}-spark-role-binding
+  namespace: {{ namespace | default(value="spark-apps") }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: {{ app_name | lower | replace(from=" ", to="-") }}-spark-role
+subjects:
+- kind: ServiceAccount
+  name: {{ service_account | default(value="spark") }}
+  namespace: {{ namespace | default(value="spark-apps") }}

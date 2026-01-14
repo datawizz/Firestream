@@ -1,0 +1,46 @@
+[package]
+name = "templatizer"
+version = "0.1.0"
+edition = "2021"
+description = "Unified template generator for Spark, Puppeteer, and Superset projects"
+authors = ["Cogent Creation Co"]
+license = "MIT"
+
+[[bin]]
+name = "templatizer"
+path = "src/main.rs"
+
+[dependencies]
+# Templating
+tera = { workspace = true }
+
+# CLI
+clap = { workspace = true }
+
+# Serialization
+serde = { workspace = true }
+serde_json = { workspace = true }
+serde_yaml = { workspace = true }
+
+# Embedding
+rust-embed = { version = "8.0", features = ["include-exclude"] }
+workspace-embed = { workspace = true }
+
+# Async (for superset uploader)
+tokio = { workspace = true }
+reqwest = { version = "0.11", features = ["json", "multipart", "stream"] }
+
+# Utilities
+tempfile = { workspace = true }
+uuid = { workspace = true }
+chrono = { workspace = true }
+zip = "0.6"
+thiserror = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+
+[build-dependencies]
+workspace-embed = { workspace = true }
+
+[dev-dependencies]
+tempfile = { workspace = true }

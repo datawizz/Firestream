@@ -1,0 +1,48 @@
+table_name: {{ table_name }}
+main_dttm_col: {{ main_dttm_col | default(value="null") }}
+description: {{ description | default(value="") }}
+default_endpoint:
+offset: 0
+cache_timeout: {{ cache_timeout | default(value="null") }}
+schema: {{ schema }}
+{% if sql -%}
+sql: |
+  {{ sql | indent(first=false) }}
+{% else -%}
+sql:
+{% endif -%}
+params:
+template_params:
+filter_select_enabled: true
+fetch_values_predicate:
+extra:
+uuid: {{ uuid }}
+metrics:
+{% for metric in metrics -%}
+- metric_name: {{ metric.name }}
+  verbose_name: {{ metric.display_name }}
+  metric_type: {{ metric.metric_type | default(value="") }}
+  expression: {{ metric.expression }}
+  description: {{ metric.description | default(value="") }}
+  d3format: {{ metric.format }}
+  warning_text:
+  uuid: {{ metric.uuid }}
+{% endfor -%}
+columns:
+{% for column in columns -%}
+- column_name: {{ column.name }}
+  verbose_name: {{ column.display_name | default(value=column.name) }}
+  is_dttm: {{ column.is_temporal }}
+  is_active: true
+  type: {{ column.column_type }}
+  advanced_data_type:
+  groupby: {{ column.groupable }}
+  filterable: {{ column.filterable }}
+  expression:
+  description: {{ column.description | default(value="") }}
+  python_date_format:
+  extra:
+  uuid: {{ column.uuid }}
+{% endfor -%}
+database_uuid: {{ database_uuid }}
+version: 1.0.0

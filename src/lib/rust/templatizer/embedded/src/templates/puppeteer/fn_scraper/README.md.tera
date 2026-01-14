@@ -1,0 +1,209 @@
+# {{ site_name | capitalize }} Scraper (Functional)
+
+Functional web scraper for {{ site_name }} using the {{ workflow_type }} workflow, built with Effect-TS and pure functions.
+
+## Overview
+
+This scraper uses a functional programming approach where all site-specific logic is expressed as pure functions that return data structures describing browser actions. An interpreter executes these descriptions using Puppeteer.
+
+## Architecture
+
+### Core Concepts
+
+1. **Scraper Actions as Data**: All browser interactions are represented as an ADT (Algebraic Data Type)
+2. **Pure Functions**: Site-specific logic is implemented as pure functions
+3. **Effect System**: Error handling and async operations use Effect-TS
+4. **Type Safety**: Branded types ensure invalid programs won't compile
+
+### Workflow Type: {{ workflow_type | capitalize | replace(from="-", to=" ") }}
+
+{% if workflow_type == "dom-scraping" -%}
+This scraper uses the DOM scraping workflow:
+1. Builds a login program (pure function returning actions)
+2. Builds an extraction program (pure function returning actions)
+3. Interpreter executes programs using Puppeteer
+4. Processes and transforms data using Effect
+5. Saves data to S3
+{%- else -%}
+This scraper uses the API scraping workflow:
+1. Builds a login program to extract authentication
+2. Interpreter executes login and extracts auth tokens
+3. Makes API calls using extracted authentication
+4. Processes responses and transforms data
+5. Saves data to S3
+{%- endif %}
+
+## Site-Specific Implementation
+
+The site-specific logic is in `src/scraper-definition.ts`:
+
+```typescript
+export const {{ site_name }}Scraper: ScraperDefinition<Config, {{ site_name | capitalize }}Data> = {
+  configSchema: ConfigSchema,  // Validates configuration
+  
+  buildLoginProgram: (config) => 
+    // Returns ScraperAction describing login steps
+    
+  buildExtractionProgram: (config) =>
+    // Returns ScraperAction describing data extraction
+    
+  processData: (raw) =>
+    // Effect-based data validation and processing
+    
+  transformData: (data) =>
+    // Pure transformation to final format
+};
+```
+
+## Configuration
+
+### Environment Variables
+
+```bash
+{% if auth_type == "form" -%}
+{{ site_name | upper }}_USERNAME=your-username
+{{ site_name | upper }}_PASSWORD=your-password
+{%- elif auth_type == "api-key" -%}
+{{ site_name | upper }}_API_KEY=your-api-key
+{%- endif %}
+S3_BUCKET=your-s3-bucket
+AWS_REGION={{ s3_region | default(value="us-east-1") }}
+```
+
+### Site Configuration
+
+Configuration is validated using Effect Schema in `src/config.ts`.
+
+## Development
+
+### Prerequisites
+
+- Node.js 18+
+- Chrome/Chromium (for local development)
+- AWS credentials
+
+### Local Development
+
+1. Install dependencies:
+   ```bash
+   npm install
+   ```
+
+2. Implement your scraper in `src/scraper-definition.ts`:
+   - Define configuration schema
+   - Build login program using DSL
+   - Build extraction program
+   - Implement data processing with Effect
+
+3. Run in development mode:
+   ```bash
+   npm run dev
+   ```
+
+### Using the DSL
+
+The scraper provides a rich DSL for building programs:
+
+```typescript
+import { Scraper, Extractors, CssSelector, Url } from '../lib';
+
+// Navigation and interaction
+Scraper.navigate(Url('https://example.com'))
+Scraper.click(CssSelector('#submit'))
+Scraper.type(CssSelector('#search'), 'query')
+
+// Extraction
+Scraper.extract(Extractors.text(CssSelector('.title')))
+Scraper.extractAll(
+  CssSelector('.item'),
+  Extractors.composite({
+    name: Extractors.text(CssSelector('.name')),
+    price: Extractors.text(CssSelector('.price'), parseFloat)
+  })
+)
+
+// Composition
+Scraper.sequence(action1, action2, action3)
+Scraper.parallel(action1, action2)
+Scraper.map(action, data => transform(data))
+
+// Error handling
+Scraper.retry(action, times: 3)
+Scraper.withTimeout(action, 5000)
+```
+
+## Testing
+
+Since the scraper logic is pure functions, it's easy to test:
+
+```typescript
+test('login program builds correct actions', () => {
+  const program = myScraper.buildLoginProgram(config);
+  expect(program._tag).toBe('Sequence');
+  expect(program.actions[0]._tag).toBe('Navigate');
+});
+```
+
+## Docker Build
+
+```bash
+docker build -t {{ site_name }}-scraper:latest .
+```
+
+## Kubernetes Deployment
+
+Example Job:
+
+```yaml
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ site_name }}-scraper
+spec:
+  template:
+    spec:
+      containers:
+      - name: scraper
+        image: your-registry/{{ site_name }}-scraper:latest
+        env:
+        - name: {{ site_name | upper }}_USERNAME
+          valueFrom:
+            secretKeyRef:
+              name: {{ site_name }}-credentials
+              key: username
+        # ... other env vars
+```
+
+## Benefits of Functional Approach
+
+1. **Testability**: Pure functions are easy to test without browser
+2. **Composability**: Build complex flows from simple actions
+3. **Type Safety**: Invalid programs won't compile
+4. **Debugging**: Inspect programs as data before execution
+5. **Error Handling**: Effect system provides robust error handling
+
+## Troubleshooting
+
+### Debug Mode
+
+Set `DEBUG=true` to enable verbose logging and screenshots.
+
+### Common Issues
+
+1. **Type Errors**: Ensure all strings are properly branded (Url, CssSelector)
+2. **Effect Errors**: Use Effect.gen for sequential operations
+3. **Selector Issues**: Validate selectors match current site structure
+
+## Exit Codes
+
+- `0` - Success
+- `1` - Known error (handled by Effect)
+- `2` - Unexpected error
+
+## Contributing
+
+When adding new functionality:
+1. Define new action types in the ADT
+2. Add constructors to the DSL
+3. Implement interpretation in the interpreter
+4. Keep all logic pure and testable

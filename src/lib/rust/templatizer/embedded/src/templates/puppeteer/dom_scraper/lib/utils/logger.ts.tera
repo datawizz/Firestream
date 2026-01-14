@@ -1,0 +1,51 @@
+// Simple structured logger for K8s environments
+export class Logger {
+  private context: Record<string, any>;
+
+  constructor(context?: Record<string, any>) {
+    this.context = context || {};
+  }
+
+  private log(level: string, message: string, data?: Record<string, any>): void {
+    const timestamp = new Date().toISOString();
+    const logEntry = {
+      timestamp,
+      level,
+      message,
+      ...this.context,
+      ...data
+    };
+    
+    console.log(JSON.stringify(logEntry));
+  }
+
+  info(message: string, data?: Record<string, any>): void {
+    this.log('INFO', message, data);
+  }
+
+  error(message: string, error?: Error | any, data?: Record<string, any>): void {
+    const errorData = {
+      ...data,
+      error: error instanceof Error ? {
+        message: error.message,
+        stack: error.stack,
+        name: error.name
+      } : error
+    };
+    this.log('ERROR', message, errorData);
+  }
+
+  warn(message: string, data?: Record<string, any>): void {
+    this.log('WARN', message, data);
+  }
+
+  debug(message: string, data?: Record<string, any>): void {
+    if (process.env.DEBUG === 'true') {
+      this.log('DEBUG', message, data);
+    }
+  }
+
+  child(context: Record<string, any>): Logger {
+    return new Logger({ ...this.context, ...context });
+  }
+}

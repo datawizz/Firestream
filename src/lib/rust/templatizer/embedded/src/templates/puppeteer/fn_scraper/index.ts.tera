@@ -1,0 +1,67 @@
+import { Effect, runScraper } from './lib';
+import { {{ site_name }}Scraper } from './src/scraper-definition';
+import { config, validateEnvironment } from './src/config';
+import * as dotenv from 'dotenv';
+
+// Load environment variables
+dotenv.config();
+
+async function main() {
+  try {
+    // Validate environment
+    validateEnvironment();
+    
+    console.log(JSON.stringify({
+      timestamp: new Date().toISOString(),
+      level: 'INFO',
+      message: 'Starting {{ site_name }} scraper',
+      workflow: config.workflow,
+      site: config.name
+    }));
+    
+    // Run the scraper
+    const result = await Effect.runPromise(
+      runScraper(
+        {{ site_name }}Scraper,
+        config.siteConfig,
+        config.workflowConfig
+      )
+    );
+    
+    if (result.success) {
+      console.log(JSON.stringify({
+        timestamp: new Date().toISOString(),
+        level: 'INFO',
+        message: 'Scraping completed successfully',
+        records: result.recordsScraped,
+        s3Path: result.s3Path,
+        duration: result.metrics?.duration,
+        {% if workflow_type == "dom-scraping" -%}
+        pagesVisited: result.metrics?.pagesVisited
+        {%- else -%}
+        apiCallsMade: result.metrics?.apiCallsMade
+        {%- endif %}
+      }));
+      process.exit(0);
+    } else {
+      console.log(JSON.stringify({
+        timestamp: new Date().toISOString(),
+        level: 'ERROR',
+        message: 'Scraping failed',
+        error: result.error?.message
+      }));
+      process.exit(1);
+    }
+  } catch (error) {
+    console.log(JSON.stringify({
+      timestamp: new Date().toISOString(),
+      level: 'ERROR',
+      message: 'Unexpected error',
+      error: error instanceof Error ? error.message : String(error)
+    }));
+    process.exit(2);
+  }
+}
+
+// Run the scraper
+main();

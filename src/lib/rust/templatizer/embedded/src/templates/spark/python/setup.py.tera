@@ -1,0 +1,60 @@
+"""
+Setup script for {{ app_name }}.
+"""
+
+from setuptools import setup, find_packages
+
+with open("README.md", "r", encoding="utf-8") as fh:
+    long_description = fh.read()
+
+with open("requirements.txt", "r", encoding="utf-8") as fh:
+    requirements = [line.strip() for line in fh if line.strip() and not line.startswith("#")]
+
+setup(
+    name="{{ package_name | default(value=app_name | lower | replace(from=" ", to="-")) }}",
+    version="{{ version }}",
+    author="{{ author | default(value=organization) }}",
+    author_email="{{ author_email }}",
+    description="{{ description }}",
+    long_description=long_description,
+    long_description_content_type="text/markdown",
+    url="{{ project_url }}",
+    packages=find_packages(where="src"),
+    package_dir={"": "src"},
+    classifiers=[
+        "Development Status :: {{ development_status | default(value="3 - Alpha") }}",
+        "Intended Audience :: Developers",
+        "Topic :: Software Development :: Libraries :: Python Modules",
+        "License :: OSI Approved :: {{ license | default(value="Apache Software License") }}",
+        "Programming Language :: Python :: 3",
+        "Programming Language :: Python :: 3.8",
+        "Programming Language :: Python :: 3.9",
+        "Programming Language :: Python :: 3.10",
+        "Programming Language :: Python :: 3.11",
+    ],
+    python_requires=">=3.8",
+    install_requires=requirements,
+    entry_points={
+        "console_scripts": [
+            "{{ app_name | lower | replace(from=" ", to="-") }}={{ package_name | default(value="spark_app") }}.main:main",
+        ],
+    },
+    include_package_data=True,
+    package_data={
+        "{{ package_name | default(value="spark_app") }}": [
+            {% if include_package_data %}
+            {% for data_file in package_data_files %}
+            "{{ data_file }}",
+            {% endfor %}
+            {% endif %}
+        ],
+    },
+    zip_safe=False,
+    {% if extras_require %}
+    extras_require={
+        {% for extra, deps in extras_require %}
+        "{{ extra }}": {{ deps }},
+        {% endfor %}
+    },
+    {% endif %}
+)

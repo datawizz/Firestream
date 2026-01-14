@@ -1,0 +1,44 @@
+# Use the official Spark image as base
+FROM {{ spark_base_image | default(value="apache/spark:3.5.1-scala2.13-java11-ubuntu") }}
+
+# Set the working directory
+WORKDIR /opt/spark/work-dir
+
+# Copy the application JAR file
+COPY target/scala-{{ scala_major_version | default(value="2.13") }}/{{ app_name | lower | replace(from=" ", to="-") }}-{{ version }}.jar /opt/spark/jars/
+
+{% if config_files %}
+# Copy configuration files
+{% for file in config_files %}
+COPY {{ file.source }} {{ file.destination }}
+{% endfor %}
+{% endif %}
+
+{% if additional_jars %}
+# Copy additional JAR dependencies
+{% for jar in additional_jars %}
+COPY {{ jar }} /opt/spark/jars/
+{% endfor %}
+{% endif %}
+
+{% if environment_vars %}
+# Set environment variables
+{% for var in environment_vars %}
+ENV {{ var.name }}="{{ var.value }}"
+{% endfor %}
+{% endif %}
+
+{% if apt_packages %}
+# Install additional packages
+USER root
+RUN apt-get update && \
+    apt-get install -y {% for pkg in apt_packages %}{{ pkg }} {% endfor %}&& \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
+USER ${spark_uid}
+{% endif %}
+
+# Set the user to run the application
+USER ${spark_uid}
+
+# The entrypoint is already set in the base image

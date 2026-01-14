@@ -1,0 +1,22 @@
+database_name: {{ name }}
+sqlalchemy_uri: {{ sqlalchemy_uri }}
+cache_timeout: {{ cache_timeout | default(value="null") }}
+expose_in_sqllab: {{ expose_in_sqllab }}
+allow_run_async: {{ allow_run_async | default(value=true) }}
+allow_ctas: {{ allow_ctas }}
+allow_cvas: {{ allow_cvas }}
+allow_dml: {{ allow_dml }}
+allow_csv_upload: {{ allow_csv_upload }}
+extra: |
+  {
+    "metadata_params": {},
+    "engine_params": {
+      "connect_args": {
+        {% if sslmode %}"sslmode": "{{ sslmode }}"{% endif %}
+      }
+    },
+    "metadata_cache_timeout": {},
+    "schemas_allowed_for_csv_upload": ["{{ schema | default(value="public") }}"]
+  }
+uuid: {{ uuid }}
+version: 1.0.0

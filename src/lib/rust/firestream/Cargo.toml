@@ -19,9 +19,7 @@ filesystem-manager = { workspace = true }
 firestream-vib = { workspace = true }
 helm-manager = { workspace = true }
 k8s-manager = { workspace = true }
-templatizer-puppeteer = { workspace = true }
-templatizer-spark = { workspace = true }
-templatizer-superset = { workspace = true }
+templatizer = { workspace = true }
 wait-for-port = { workspace = true }
 
 # External dependencies (workspace)

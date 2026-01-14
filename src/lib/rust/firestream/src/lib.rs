@@ -34,9 +34,7 @@ pub use filesystem_manager;
 pub use firestream_vib;
 pub use helm_manager;
 pub use k8s_manager;
-pub use templatizer_puppeteer;
-pub use templatizer_spark;
-pub use templatizer_superset;
+pub use templatizer;
 pub use wait_for_port;
 
 // Re-export commonly used types from internal modules

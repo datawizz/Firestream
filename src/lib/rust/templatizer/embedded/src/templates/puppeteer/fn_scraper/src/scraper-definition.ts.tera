@@ -1,0 +1,162 @@
+import { 
+  ScraperDefinition, 
+  Scraper, 
+  Extractors,
+  CssSelector,
+  Url,
+  Effect,
+  Schema,
+  ProcessingError,
+  validateData,
+  transformToParquet,
+  login
+} from '../lib';
+
+// TODO: Define your configuration schema
+const ConfigSchema = Schema.Struct({
+  loginUrl: Schema.String.pipe(Schema.brand("Url")),
+  credentials: Schema.Struct({
+    {% if auth_type == "form" -%}
+    username: Schema.String,
+    password: Schema.String
+    {%- elif auth_type == "api-key" -%}
+    apiKey: Schema.String
+    {%- endif %}
+  }),
+  {% for step in navigation_steps -%}
+  {{ step.name | replace(from="-", to="_") }}Url: Schema.String.pipe(Schema.brand("Url")),
+  {% endfor -%}
+  // Add more configuration fields as needed
+});
+
+type Config = Schema.Schema.Type<typeof ConfigSchema>;
+
+// TODO: Define your data schema
+const {{ site_name | capitalize }}DataSchema = Schema.Struct({
+  // TODO: Define your data structure
+  // Example:
+  // id: Schema.String,
+  // name: Schema.String,
+  // price: Schema.Number,
+  // url: Schema.optional(Schema.String)
+});
+
+type {{ site_name | capitalize }}Data = Schema.Schema.Type<typeof {{ site_name | capitalize }}DataSchema>;
+
+// Main scraper definition
+export const {{ site_name }}Scraper: ScraperDefinition<Config, {{ site_name | capitalize }}Data> = {
+  configSchema: ConfigSchema,
+  
+  // Build login program
+  buildLoginProgram: (config) => 
+    Scraper.sequence(
+      Scraper.navigate(config.loginUrl as Url),
+      login(
+        {% if auth_type == "form" -%}
+        config.credentials.username,
+        config.credentials.password,
+        {%- elif auth_type == "api-key" -%}
+        config.credentials.apiKey,
+        '',  // No password for API key auth
+        {%- endif %}
+        {
+          usernameField: CssSelector('{{ login_username_selector | default(value="#username") }}'),
+          passwordField: CssSelector('{{ login_password_selector | default(value="#password") }}'),
+          submitButton: CssSelector('{{ login_submit_selector | default(value="#login-button") }}')
+        }
+      ),
+      // Wait for successful login
+      Scraper.waitForSelector(CssSelector('{{ login_success_selector | default(value=".dashboard") }}'))
+    ),
+  
+  // Build extraction program
+  buildExtractionProgram: (config) => {
+    // TODO: Implement your extraction logic
+    {% if navigation_steps and navigation_steps | length > 0 -%}
+    // Example: Extract from multiple pages
+    const extractionSteps = [
+      {% for step in navigation_steps -%}
+      Scraper.sequence(
+        Scraper.navigate(config.{{ step.name | replace(from="-", to="_") }}Url as Url),
+        Scraper.waitForSelector(CssSelector('{{ step.wait_value | default(value=".content-loaded") }}')),
+        {% if step.screenshot -%}
+        Scraper.screenshot('{{ step.name }}'),
+        {% endif -%}
+        Scraper.extractAll(
+          CssSelector('.item-selector'), // TODO: Update selector
+          Extractors.composite<{{ site_name | capitalize }}Data>({
+            // TODO: Define field extractors
+            // Example:
+            // id: Extractors.attribute(CssSelector('[data-id]'), 'data-id'),
+            // name: Extractors.text(CssSelector('.item-name')),
+            // price: Extractors.text(
+            //   CssSelector('.price'),
+            //   (text) => parseFloat(text.replace(/[^0-9.]/g, ''))
+            // )
+          })
+        )
+      ),
+      {% endfor -%}
+    ];
+    
+    return Scraper.sequence(
+      ...extractionSteps,
+      Scraper.map(
+        results => results.flat() // Flatten results from all pages
+      )
+    );
+    {%- else -%}
+    // Single page extraction
+    return Scraper.sequence(
+      Scraper.navigate(Url('{{ site_url }}/data')), // TODO: Update URL
+      Scraper.waitForSelector(CssSelector('.content-loaded')),
+      Scraper.extractAll(
+        CssSelector('.item-selector'), // TODO: Update selector
+        Extractors.composite<{{ site_name | capitalize }}Data>({
+          // TODO: Define field extractors
+        })
+      )
+    );
+    {%- endif %}
+  },
+  
+  // Process raw data with validation
+  processData: (raw: unknown) => 
+    Effect.gen(function* (_) {
+      // Validate data structure
+      const parsed = yield* _(
+        Schema.decodeUnknown(Schema.Array({{ site_name | capitalize }}DataSchema))(raw),
+        Effect.mapError(error => new ProcessingError('Data validation failed', error))
+      );
+      
+      // Additional validation
+      yield* _(validateData<{{ site_name | capitalize }}Data>(data => {
+        const errors: string[] = [];
+        
+        if (data.length === 0) {
+          errors.push('No data extracted');
+        }
+        
+        // TODO: Add your validation logic
+        // Example:
+        // data.forEach((item, index) => {
+        //   if (!item.id) {
+        //     errors.push(`Item at index ${index} missing ID`);
+        //   }
+        // });
+        
+        return { valid: errors.length === 0, errors };
+      })(parsed));
+      
+      return parsed;
+    }),
+  
+  // Transform data to final format
+  transformData: transformToParquet('{{ site_name }}', (item: {{ site_name | capitalize }}Data) => ({
+    ...item,
+    // TODO: Add any transformations
+    // Example:
+    // priceInCents: Math.round((item.price || 0) * 100),
+    // scrapedAt: new Date().toISOString()
+  }))
+};

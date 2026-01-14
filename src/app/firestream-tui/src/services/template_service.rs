@@ -3,7 +3,8 @@ use std::path::{Path, PathBuf};
 use std::fs;
 // use serde::{Deserialize, Serialize};
 use tera::Context;
-use templatizer_spark::{SparkTemplatizer, TemplateType};
+// Use the unified templatizer crate with compatibility layer
+use firestream::templatizer::compat::spark::{SparkTemplatizer, TemplateType};
 use crate::models::{
     TemplateConfiguration, TemplateVariable, VariableType, 
     VariableGroup, TemplateGenerationRequest, TemplateGenerationResult,

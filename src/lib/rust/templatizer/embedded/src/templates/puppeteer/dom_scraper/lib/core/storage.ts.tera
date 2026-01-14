@@ -1,0 +1,125 @@
+import * as AWS from 'aws-sdk';
+import * as parquet from 'parquetjs';
+import { StorageConfig } from './types';
+import { Logger } from '../utils/logger';
+import * as fs from 'fs';
+import * as path from 'path';
+
+export class StorageManager {
+  private s3: AWS.S3;
+
+  constructor(
+    private config: StorageConfig,
+    private logger: Logger
+  ) {
+    this.s3 = new AWS.S3({
+      region: config.s3.region,
+      // Credentials will come from environment or IAM role
+    });
+  }
+
+  async save(data: any): Promise<string> {
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+    const filename = `data-${timestamp}`;
+    
+    if (this.config.format === 'parquet') {
+      return await this.saveAsParquet(data, filename);
+    } else {
+      return await this.saveAsJSON(data, filename);
+    }
+  }
+
+  private async saveAsParquet(data: any, filename: string): Promise<string> {
+    this.logger.info('Saving data as Parquet');
+    
+    const localPath = `/tmp/${filename}.parquet`;
+    
+    try {
+      // Define schema based on data
+      const schema = this.inferParquetSchema(data.data[0]);
+      
+      // Create parquet writer
+      const writer = await parquet.ParquetWriter.openFile(schema, localPath);
+      
+      // Write rows
+      for (const row of data.data) {
+        await writer.appendRow(row);
+      }
+      
+      await writer.close();
+      
+      // Upload to S3
+      const s3Key = `${this.config.s3.prefix}${filename}.parquet`;
+      await this.uploadToS3(localPath, s3Key);
+      
+      // Clean up local file
+      fs.unlinkSync(localPath);
+      
+      this.logger.info('Parquet file uploaded to S3', { key: s3Key });
+      return `s3://${this.config.s3.bucket}/${s3Key}`;
+      
+    } catch (error) {
+      this.logger.error('Failed to save as Parquet', error);
+      // Fallback to JSON
+      this.logger.warn('Falling back to JSON format');
+      return await this.saveAsJSON(data, filename);
+    }
+  }
+
+  private async saveAsJSON(data: any, filename: string): Promise<string> {
+    this.logger.info('Saving data as JSON');
+    
+    const s3Key = `${this.config.s3.prefix}${filename}.json`;
+    
+    const params = {
+      Bucket: this.config.s3.bucket,
+      Key: s3Key,
+      Body: JSON.stringify(data, null, 2),
+      ContentType: 'application/json'
+    };
+    
+    await this.s3.putObject(params).promise();
+    
+    this.logger.info('JSON file uploaded to S3', { key: s3Key });
+    return `s3://${this.config.s3.bucket}/${s3Key}`;
+  }
+
+  private async uploadToS3(localPath: string, s3Key: string): Promise<void> {
+    const fileStream = fs.createReadStream(localPath);
+    
+    const params = {
+      Bucket: this.config.s3.bucket,
+      Key: s3Key,
+      Body: fileStream,
+      ContentType: 'application/octet-stream'
+    };
+    
+    await this.s3.upload(params).promise();
+  }
+
+  private inferParquetSchema(sample: any): any {
+    // Basic schema inference - in production, this should be more sophisticated
+    const fields: any = {};
+    
+    for (const [key, value] of Object.entries(sample)) {
+      if (typeof value === 'string') {
+        fields[key] = { type: 'UTF8' };
+      } else if (typeof value === 'number') {
+        if (Number.isInteger(value)) {
+          fields[key] = { type: 'INT64' };
+        } else {
+          fields[key] = { type: 'DOUBLE' };
+        }
+      } else if (typeof value === 'boolean') {
+        fields[key] = { type: 'BOOLEAN' };
+      } else if (value instanceof Date) {
+        fields[key] = { type: 'TIMESTAMP_MILLIS' };
+      } else {
+        // Default to string for complex types
+        fields[key] = { type: 'UTF8' };
+      }
+    }
+    
+    return new parquet.ParquetSchema(fields);
+  }
+}

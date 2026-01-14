@@ -23,9 +23,7 @@ members = [
     "src/lib/rust/helm-manager",
     "src/lib/rust/k8s-manager",
     "src/lib/rust/nix-container-builder",
-    "src/lib/rust/templatizer-puppeteer",
-    "src/lib/rust/templatizer-spark",
-    "src/lib/rust/templatizer-superset",
+    "src/lib/rust/templatizer",
     "src/lib/rust/wait-for-port",
     "src/lib/rust/workspace-embed",
 ]
@@ -39,9 +37,7 @@ filesystem-manager = { path = "src/lib/rust/filesystem-manager" }
 firestream-vib = { path = "src/lib/rust/firestream-vib" }
 helm-manager = { path = "src/lib/rust/helm-manager" }
 k8s-manager = { path = "src/lib/rust/k8s-manager" }
-templatizer-puppeteer = { path = "src/lib/rust/templatizer-puppeteer" }
-templatizer-spark = { path = "src/lib/rust/templatizer-spark" }
-templatizer-superset = { path = "src/lib/rust/templatizer-superset" }
+templatizer = { path = "src/lib/rust/templatizer" }
 wait-for-port = { path = "src/lib/rust/wait-for-port" }
 nix-container-builder = { path = "src/lib/rust/nix-container-builder" }
 workspace-embed = { path = "src/lib/rust/workspace-embed" }

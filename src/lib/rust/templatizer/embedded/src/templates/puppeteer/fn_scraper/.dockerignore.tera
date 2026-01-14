@@ -1,0 +1,47 @@
+# Dependencies
+node_modules
+npm-debug.log
+
+# Development files
+.env
+.env.local
+.env.*.local
+
+# Build artifacts
+dist
+*.tsbuildinfo
+
+# IDE
+.vscode
+.idea
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Git
+.git
+.gitignore
+
+# Documentation
+README.md
+docs
+
+# Tests
+__tests__
+*.test.ts
+*.spec.ts
+coverage
+.nyc_output
+
+# CI/CD
+.github
+.gitlab-ci.yml
+Jenkinsfile
+
+# Temporary files
+*.tmp
+*.temp
+.cache
