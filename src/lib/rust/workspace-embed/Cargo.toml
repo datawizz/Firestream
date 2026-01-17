@@ -1,0 +1,22 @@
+[package]
+name = "workspace-embed"
+version = "0.1.0"
+edition = "2021"
+description = "Workspace embedding with gitignore support for Nix builds"
+license = "MIT"
+
+[dependencies]
+thiserror = { workspace = true }
+walkdir = "2.5"
+ignore = "0.4"
+globset = { workspace = true }
+tempfile = { workspace = true }
+tracing = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+flate2 = "1.0"
+rust-embed = "8.5"
+
+[build-dependencies]
+walkdir = "2.5"
+ignore = "0.4"

@@ -1,0 +1,81 @@
+# General
+.DS_Store
+*.log
+*.tmp
+*.temp
+.env
+.env.local
+
+# Generated files
+docker/standard_project/docker-compose.devcontainer.yml
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.Python
+env/
+venv/
+.venv/
+pip-log.txt
+pip-delete-this-directory.txt
+.pytest_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+dist/
+build/
+*.egg-info/
+.eggs/
+
+# Rust
+target/
+target-ra/
+Cargo.lock
+**/*.rs.bk
+.sccache/
+
+# Node.js
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.npm
+.yarn/
+
+# Scala/Java
+*.class
+*.jar
+target/
+.bsp/
+.idea/
+.metals/
+.bloop/
+project/project/
+project/target/
+
+# IDE
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+.idea/
+*.swp
+*.swo
+*~
+
+# Nix
+result
+result-*
+
+# Docker
+.docker/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Local
+_WIP/*
+src/dags/ecommerce/tests/results/**
+google_application_credentials.json

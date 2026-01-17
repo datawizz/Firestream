@@ -1,0 +1,208 @@
+import { AxiosInstance } from 'axios';
+import axios from 'axios';
+import { APIScrapingImplementation, APIRequest, APIResponse } from './workflow-types';
+import { SiteConfig, ExecutionResult, AuthData } from '../core/types';
+import { BrowserManager } from '../core/browser';
+import { AuthHandler } from '../core/auth';
+import { StorageManager } from '../core/storage';
+import { Logger } from '../utils/logger';
+
+export class APIWorkflow {
+  private browserManager: BrowserManager;
+  private authHandler: AuthHandler;
+  private storageManager: StorageManager;
+
+  constructor(
+    private implementation: APIScrapingImplementation,
+    private config: SiteConfig,
+    private logger: Logger
+  ) {
+    this.browserManager = new BrowserManager(logger);
+    this.authHandler = new AuthHandler(logger);
+    this.storageManager = new StorageManager(config.storage, logger);
+  }
+
+  async execute(): Promise<ExecutionResult> {
+    const startTime = new Date();
+    
+    try {
+      // Step 1: Launch browser and extract auth
+      const authData = await this.extractAuthentication();
+      
+      // Step 2: Create API client with auth
+      const apiClient = this.createAPIClient();
+      this.implementation.configureClient(apiClient, authData);
+      
+      // Step 3: Make API calls
+      const apiResponses = await this.executeAPIRequests(apiClient);
+      
+      // Step 4: Process responses into data
+      const rawData = await this.implementation.processResponses(apiResponses);
+      this.logger.info('API data processed', { recordCount: rawData.length });
+      
+      // Step 5: Transform data
+      const transformed = await this.implementation.transformData(rawData);
+      
+      // Step 6: Save to S3 as Parquet
+      const s3Path = await this.storageManager.save(transformed);
+      
+      const endTime = new Date();
+      
+      return {
+        success: true,
+        recordsScraped: rawData.length,
+        s3Path,
+        metrics: {
+          startTime,
+          endTime,
+          duration: endTime.getTime() - startTime.getTime(),
+          apiCallsMade: apiResponses.length
+        }
+      };
+      
+    } catch (error) {
+      this.logger.error('API workflow failed', error);
+      return {
+        success: false,
+        recordsScraped: 0,
+        error: error as Error
+      };
+    }
+  }
+
+  private async extractAuthentication(): Promise<AuthData> {
+    this.logger.info('Extracting authentication data');
+    
+    const browser = await this.browserManager.launch({ 
+      headless: true,
+      viewport: { width: 1920, height: 1080 }
+    });
+
+    try {
+      const page = await this.browserManager.createPage(browser);
+      
+      // Monitor network for auth tokens
+      const authData = await this.authHandler.captureAuthData(page, async () => {
+        // Login
+        const selectors = this.implementation.getLoginSelectors();
+        
+        await page.goto(this.config.auth.loginUrl || `${this.config.baseUrl}/login`, {
+          waitUntil: 'networkidle2'
+        });
+
+        await this.authHandler.performFormLogin(page, selectors, this.config.auth.credentials);
+
+        // Wait for login to complete
+        if (selectors.successIndicator) {
+          await page.waitForSelector(selectors.successIndicator, { timeout: 10000 });
+        }
+        
+        // Let implementation extract auth
+        return await this.implementation.extractAuth(page);
+      });
+
+      this.logger.info('Authentication extracted successfully');
+      return authData;
+      
+    } finally {
+      await this.browserManager.close(browser);
+    }
+  }
+
+  private createAPIClient(): AxiosInstance {
+    return axios.create({
+      baseURL: this.config.baseUrl,
+      timeout: 30000,
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36',
+        'Accept': 'application/json',
+        'Content-Type': 'application/json'
+      }
+    });
+  }
+
+  private async executeAPIRequests(client: AxiosInstance): Promise<APIResponse[]> {
+    const requests = this.implementation.getAPIRequests();
+    const responses: APIResponse[] = [];
+    
+    this.logger.info('Executing API requests', { totalRequests: requests.length });
+    
+    for (const request of requests) {
+      try {
+        this.logger.info('Making API request', { 
+          method: request.method, 
+          endpoint: request.endpoint,
+          name: request.name 
+        });
+        
+        const response = await this.makeRequest(client, request);
+        
+        responses.push({
+          name: request.name,
+          data: response.data,
+          status: response.status,
+          headers: response.headers as Record<string, string>
+        });
+        
+        this.logger.info('API request successful', { 
+          name: request.name,
+          status: response.status,
+          dataReceived: !!response.data
+        });
+        
+        // Small delay between requests to avoid rate limiting
+        await new Promise(resolve => setTimeout(resolve, 100));
+        
+      } catch (error: any) {
+        this.logger.error('API request failed', error, { 
+          request: request.name,
+          endpoint: request.endpoint 
+        });
+        
+        // Decide whether to continue or fail
+        if (error.response?.status === 429) {
+          // Rate limited - wait and retry
+          this.logger.warn('Rate limited, waiting before retry');
+          await new Promise(resolve => setTimeout(resolve, 5000));
+          // Retry the request
+          const response = await this.makeRequest(client, request);
+          responses.push({
+            name: request.name,
+            data: response.data,
+            status: response.status,
+            headers: response.headers as Record<string, string>
+          });
+        } else {
+          // For other errors, continue with other requests
+          responses.push({
+            name: request.name,
+            data: null,
+            status: error.response?.status || 0,
+            headers: {}
+          });
+        }
+      }
+    }
+    
+    return responses;
+  }
+
+  private async makeRequest(client: AxiosInstance, request: APIRequest) {
+    switch (request.method) {
+      case 'GET':
+        return await client.get(request.endpoint, { params: request.params });
+      
+      case 'POST':
+        return await client.post(request.endpoint, request.data, { params: request.params });
+      
+      case 'PUT':
+        return await client.put(request.endpoint, request.data, { params: request.params });
+      
+      case 'DELETE':
+        return await client.delete(request.endpoint, { params: request.params });
+      
+      default:
+        throw new Error(`Unsupported HTTP method: ${request.method}`);
+    }
+  }
+}

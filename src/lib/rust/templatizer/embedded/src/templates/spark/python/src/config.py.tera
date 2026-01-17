@@ -1,0 +1,164 @@
+"""
+Configuration management for {{ app_name }}.
+"""
+
+import os
+import json
+import logging
+from typing import Optional, Dict, Any, List
+from dataclasses import dataclass, field
+{% if config_format == "yaml" %}
+import yaml
+{% endif %}
+{% if config_format == "toml" %}
+import toml
+{% endif %}
+
+logger = logging.getLogger(__name__)
+
+
+{% if config_enabled %}
+@dataclass
+class AppConfig:
+    """Application configuration."""
+    app_name: str = "{{ app_name }}"
+    {% for field in config_fields %}
+    {{ field.name }}: {{ field.python_type | default(value="str") }} = {{ field.python_default | default(value='"' ~ field.default_value ~ '"') }}
+    {% endfor %}
+    
+    @classmethod
+    def from_dict(cls, config_dict: Dict[str, Any]) -> 'AppConfig':
+        """Create config from dictionary."""
+        return cls(**{
+            k: v for k, v in config_dict.items() 
+            if k in cls.__dataclass_fields__
+        })
+    
+    @classmethod
+    def from_env(cls) -> 'AppConfig':
+        """Create config from environment variables."""
+        config_dict = {
+            'app_name': os.getenv('{{ app_name | upper | replace(from=" ", to="_") }}_APP_NAME', '{{ app_name }}'),
+            {% for field in config_fields %}
+            '{{ field.name }}': {% if field.python_type == "int" %}int(os.getenv('{{ field.env_var | default(value=field.name | upper) }}', '{{ field.default_value }}')){% elif field.python_type == "float" %}float(os.getenv('{{ field.env_var | default(value=field.name | upper) }}', '{{ field.default_value }}')){% elif field.python_type == "bool" %}os.getenv('{{ field.env_var | default(value=field.name | upper) }}', '{{ field.default_value }}').lower() == 'true'{% else %}os.getenv('{{ field.env_var | default(value=field.name | upper) }}', '{{ field.default_value }}'){% endif %},
+            {% endfor %}
+        }
+        return cls.from_dict(config_dict)
+
+
+def load_config(args: List[str]) -> AppConfig:
+    """Load configuration from various sources."""
+    # Start with defaults
+    config = AppConfig()
+    
+    # Override with environment variables
+    env_config = AppConfig.from_env()
+    for field_name in AppConfig.__dataclass_fields__:
+        env_value = getattr(env_config, field_name)
+        if env_value != getattr(config, field_name):
+            setattr(config, field_name, env_value)
+    
+    # Override with config file if specified
+    config_file = os.getenv('CONFIG_FILE')
+    if config_file and os.path.exists(config_file):
+        logger.info(f"Loading configuration from {config_file}")
+        config_dict = load_config_file(config_file)
+        for key, value in config_dict.items():
+            if hasattr(config, key):
+                setattr(config, key, value)
+    
+    # Override with command line arguments
+    {% for field in config_fields %}
+    {% if field.arg_index is defined and field.arg_index >= 0 %}
+    if len(args) > {{ field.arg_index }}:
+        {% if field.python_type == "int" %}
+        config.{{ field.name }} = int(args[{{ field.arg_index }}])
+        {% elif field.python_type == "float" %}
+        config.{{ field.name }} = float(args[{{ field.arg_index }}])
+        {% elif field.python_type == "bool" %}
+        config.{{ field.name }} = args[{{ field.arg_index }}].lower() == 'true'
+        {% else %}
+        config.{{ field.name }} = args[{{ field.arg_index }}]
+        {% endif %}
+    {% endif %}
+    {% endfor %}
+    
+    logger.info(f"Loaded configuration: {config}")
+    return config
+
+
+def load_config_file(file_path: str) -> Dict[str, Any]:
+    """Load configuration from file."""
+    _, ext = os.path.splitext(file_path)
+    
+    with open(file_path, 'r') as f:
+        if ext in ['.json']:
+            return json.load(f)
+        {% if config_format == "yaml" %}
+        elif ext in ['.yaml', '.yml']:
+            return yaml.safe_load(f)
+        {% endif %}
+        {% if config_format == "toml" %}
+        elif ext in ['.toml']:
+            return toml.load(f)
+        {% endif %}
+        else:
+            # Try JSON by default
+            return json.load(f)
+
+
+{% else %}
+# Configuration disabled - using command line arguments only
+class AppConfig:
+    """Placeholder configuration class."""
+    pass
+{% endif %}
+
+# Spark configuration
+SPARK_CONF = {
+    {% for conf in spark_configs %}
+    "{{ conf.key }}": os.getenv("{{ conf.env_var | default(value=conf.key | upper | replace(from=".", to="_")) }}", "{{ conf.value }}"),
+    {% endfor %}
+}
+
+# Logging configuration
+LOG_CONFIG = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'formatters': {
+        'standard': {
+            'format': '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+        },
+    },
+    'handlers': {
+        'console': {
+            'class': 'logging.StreamHandler',
+            'level': '{{ log_level | default(value="INFO") }}',
+            'formatter': 'standard',
+            'stream': 'ext://sys.stdout'
+        },
+        {% if file_logging %}
+        'file': {
+            'class': 'logging.handlers.RotatingFileHandler',
+            'level': '{{ log_level | default(value="INFO") }}',
+            'formatter': 'standard',
+            'filename': '{{ log_file_path | default(value="/tmp/spark-app.log") }}',
+            'maxBytes': {{ log_file_size_bytes | default(value=104857600) }},
+            'backupCount': {{ log_file_count | default(value=10) }}
+        }
+        {% endif %}
+    },
+    'loggers': {
+        '': {
+            'handlers': ['console'{% if file_logging %}, 'file'{% endif %}],
+            'level': '{{ log_level | default(value="INFO") }}',
+            'propagate': False
+        },
+        'py4j': {
+            'level': 'WARNING'
+        },
+        'pyspark': {
+            'level': 'WARNING'
+        }
+    }
+}

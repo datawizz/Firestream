@@ -1,0 +1,25 @@
+---
+title: DevContainer Setup
+description: Configure the Firestream development container
+---
+
+# DevContainer Setup
+
+The DevContainer provides a consistent development environment with all tools pre-installed.
+
+## Docker-from-Docker Pattern
+
+The devcontainer binds to `/var/run/docker.sock`, sharing the host's Docker Engine:
+
+- No nested virtualization overhead
+- K3D cluster runs on host Docker
+- Seamless kubectl access from container
+
+## DNS Resolution
+
+The container configures IP tables to resolve Kubernetes internal DNS:
+
+```bash
+# Services are accessible via internal DNS
+ping service-name.namespace.svc.cluster.local
+```

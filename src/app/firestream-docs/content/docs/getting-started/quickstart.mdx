@@ -1,0 +1,30 @@
+---
+title: Quickstart
+description: Run your first Firestream cluster
+---
+
+# Quickstart
+
+## Start the Development Environment
+
+```bash
+# Initialize the development environment
+make development
+```
+
+This will:
+1. Create a K3D cluster
+2. Install Helm charts for all services
+3. Set up port forwarding
+4. Configure DNS resolution
+
+## Verify Installation
+
+```bash
+# Check cluster status
+kubectl get pods -A
+
+# Access services
+# MinIO: http://localhost:9001
+# Airflow: http://localhost:8080
+```

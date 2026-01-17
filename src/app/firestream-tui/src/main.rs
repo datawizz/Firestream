@@ -1,0 +1,19 @@
+use firestream_tui::app::App;
+
+#[tokio::main]
+async fn main() -> color_eyre::Result<()> {
+    // Install color-eyre hooks for better error reporting
+    color_eyre::install()?;
+    
+    // Initialize terminal
+    let terminal = ratatui::init();
+    
+    // Create and run the application
+    let app = App::new().await;
+    let result = app.run(terminal).await;
+    
+    // Restore terminal on exit
+    ratatui::restore();
+    
+    result
+}

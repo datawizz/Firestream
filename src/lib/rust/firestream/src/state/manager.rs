@@ -439,7 +439,8 @@ impl StateManager {
     
     /// Apply cluster change
     async fn apply_cluster_change(&self, change: &PlannedChange) -> Result<()> {
-        use crate::deploy::{k3d, k3d_advanced::K3dClusterManager};
+        use crate::deploy::k3d;
+        use k8s_manager::K3dClusterManager;
         
         info!("Applying cluster change: {}", change.description);
         

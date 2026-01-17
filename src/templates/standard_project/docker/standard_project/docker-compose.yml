@@ -1,0 +1,55 @@
+services:
+  devcontainer:
+    init: true
+    image: ${PROJECT_NAME:-standard_project}:latest
+    build:
+      context: ../../
+      dockerfile: docker/standard_project/Dockerfile
+      target: devcontainer
+      args:
+        HOST_USERNAME: ${HOST_USERNAME:-developer}
+        HOST_USER_ID: ${HOST_USER_ID:-1000}
+        HOST_GROUP_ID: ${HOST_GROUP_ID:-1000}
+        HOST_DOCKER_GID: ${HOST_DOCKER_GID:-999}
+    environment:
+      - PROJECT_NAME=${PROJECT_NAME:-standard_project}
+      - DEPLOYMENT_MODE=development
+      - DOCKER_BUILDKIT=1
+    volumes:
+      # Mount the project directory
+      - ../..:/workspace
+
+      # Enable Docker-from-Docker
+      - /var/run/docker.sock:/var/run/docker-host.sock
+
+      # # Optional: Mount SSH keys for git operations
+      # - ~/.ssh:/home/${HOST_USERNAME:-developer}/.ssh:ro
+
+      # # Optional: Mount git config
+      # - ~/.gitconfig:/home/${HOST_USERNAME:-developer}/.gitconfig:ro
+
+    # Required for network operations
+    cap_add:
+      - NET_ADMIN
+
+    # Network mode - can be changed to "bridge" if needed
+    # network_mode: "host"
+
+    # Keep container running
+    command: sleep infinity
+
+  # Example database service (uncomment if needed)
+  # postgres:
+  #   image: postgres:15
+  #   restart: unless-stopped
+  #   environment:
+  #     POSTGRES_USER: ${POSTGRES_USER:-dbuser}
+  #     POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-dbpass}
+  #     POSTGRES_DB: ${POSTGRES_DB:-appdb}
+  #   volumes:
+  #     - postgres_data:/var/lib/postgresql/data
+  #   ports:
+  #     - "5432:5432"
+
+# volumes:
+#   postgres_data:

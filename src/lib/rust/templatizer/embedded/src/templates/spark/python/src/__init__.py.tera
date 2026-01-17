@@ -1,0 +1,28 @@
+"""
+{{ app_name }} - {{ description }}
+"""
+
+__version__ = "{{ version }}"
+__author__ = "{{ author | default(value=organization) }}"
+
+from .main import {{ main_class_name | default(value="SparkApp") }}, main
+{% if config_enabled %}
+from .config import AppConfig, load_config
+{% endif %}
+{% if include_utils %}
+from .utils import *
+{% endif %}
+
+__all__ = [
+    "{{ main_class_name | default(value="SparkApp") }}",
+    "main",
+    {% if config_enabled %}
+    "AppConfig",
+    "load_config",
+    {% endif %}
+    {% if include_utils %}
+    {% for util_name in exported_utils %}
+    "{{ util_name }}",
+    {% endfor %}
+    {% endif %}
+]

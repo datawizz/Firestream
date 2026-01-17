@@ -1,0 +1,1 @@
+sbt.version={{ sbt_version | default(value="1.9.7") }}

@@ -1,0 +1,141 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "firestream-airflow"
+version = "3.0.3"
+description = "Firestream Airflow container dependencies"
+requires-python = ">=3.12,<3.13"
+dependencies = [
+    "apache-airflow==3.0.3",
+
+    # Core dependencies that were in Bitnami's build
+    "celery>=5.3.0",
+    "redis>=4.5.0",
+    "psycopg2-binary>=2.9.0",
+    # Note: mysqlclient requires MySQL dev libraries, using PyMySQL as alternative
+    "pymysql>=1.1.0",
+
+    # Authentication and security
+    "cryptography>=41.0.0",
+    "flask-appbuilder>=4.3.0",
+    "flask-login>=0.6.0",
+    "werkzeug>=2.2.0",
+
+    # LDAP support (requires system libraries - provided by Nix build)
+    "python-ldap>=3.4.0",
+
+    # Kerberos support (requires system libraries - provided by Nix build)
+    "pykerberos>=1.2.0",
+    "requests-kerberos>=0.14.0",
+
+    # FAB auth manager (required for Airflow 3.x authentication)
+    "apache-airflow-providers-fab>=2.0.0",
+
+    # Common providers that Bitnami included
+    "apache-airflow-providers-celery>=3.3.0",
+    "apache-airflow-providers-redis>=3.2.0",
+    "apache-airflow-providers-postgres>=5.5.0",
+    "apache-airflow-providers-mysql>=3.4.0",
+    "apache-airflow-providers-http>=4.5.0",
+    "apache-airflow-providers-ssh>=3.7.0",
+    "apache-airflow-providers-ftp>=3.4.0",
+    "apache-airflow-providers-smtp>=1.0.0",
+
+    # Additional providers for cloud support
+    "apache-airflow-providers-amazon>=8.5.0",
+    "apache-airflow-providers-google>=10.3.0",
+    "apache-airflow-providers-microsoft-azure>=6.2.0",
+
+    # Kubernetes support (optional but useful for K3D)
+    "apache-airflow-providers-cncf-kubernetes>=7.4.0",
+
+    # Database migration and management
+    "alembic>=1.11.0",
+    "sqlalchemy>=1.4.0,<2.0.0",
+
+    # Web server dependencies
+    "gunicorn>=20.1.0",
+    "flower>=2.0.0",
+
+    # Monitoring and metrics
+    "statsd>=3.3.0",
+    "prometheus-client>=0.17.0",
+
+    # Utilities
+    "pandas>=2.0.0",
+    "numpy>=1.24.0",
+    "pytz>=2023.3",
+    "python-dateutil>=2.8.0",
+    "typing-extensions>=4.7.0",
+    "attrs>=23.1.0",
+    "cattrs>=23.1.0",
+    "jsonschema>=4.18.0",
+    "pyyaml>=6.0",
+    "rich>=13.5.0",
+    "click>=8.1.0",
+    "colorlog>=6.7.0",
+    "tabulate>=0.9.0",
+    "jinja2>=3.1.0",
+    "markupsafe>=2.1.0",
+    "pygments>=2.15.0",
+    "docutils>=0.20.0",
+
+    # Connection pooling and async
+    "sqlalchemy-utils>=0.41.0",
+    "connexion>=2.14.0",
+    "flask>=2.2.0",
+    "flask-cors>=4.0.0",
+    "flask-wtf>=1.1.0",
+    "wtforms>=3.0.0",
+
+    # Parsing and serialization
+    "marshmallow>=3.20.0",
+    "marshmallow-sqlalchemy>=0.29.0",
+    "python-nvd3>=0.15.0",
+    "python-slugify>=8.0.0",
+    "rfc3339-validator>=0.1.0",
+
+    # Process management
+    "setproctitle>=1.3.0",
+    "psutil>=5.9.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.4.0",
+    "pytest-cov>=4.1.0",
+    "black>=23.7.0",
+    "ruff>=0.0.285",
+    "mypy>=1.4.0",
+    "pre-commit>=3.3.0",
+]
+
+# Extra dependencies for specific executors
+celery = [
+    "apache-airflow[celery]",
+]
+
+kubernetes = [
+    "apache-airflow[cncf.kubernetes]",
+]
+
+# Development dependencies for DAG testing
+test = [
+    "pytest-mock>=3.11.0",
+    "freezegun>=1.2.0",
+    "parameterized>=0.9.0",
+]
+
+[tool.uv]
+dev-dependencies = []
+
+# UV will use PyPI by default and prefer pre-built wheels automatically
+# Platform detection is automatic - do not hard-code to allow cross-arch builds
+
+[tool.hatch.metadata]
+allow-direct-references = true
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/firestream_airflow"]

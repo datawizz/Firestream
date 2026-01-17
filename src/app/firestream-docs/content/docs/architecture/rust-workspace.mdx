@@ -1,0 +1,27 @@
+---
+title: Rust Workspace
+description: Rust components in Firestream
+---
+
+# Rust Workspace
+
+The Rust workspace contains the core tooling and interfaces.
+
+## Components
+
+- `firestream-tui/` - Terminal UI for resource management
+- `firestream-api-server/` - Web API with PostgreSQL backend
+- `tools/` - Infrastructure management utilities
+
+## Building
+
+```bash
+# Build and run the TUI (default)
+cargo run
+
+# Build specific component
+cargo run -p firestream-api-server
+
+# Run tests
+cargo test --workspace
+```

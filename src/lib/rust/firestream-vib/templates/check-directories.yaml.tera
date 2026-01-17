@@ -1,0 +1,26 @@
+# Firestream VIB Template - Check Directories
+# Validates directory existence and optionally checks permissions
+# Template context variables:
+#   - directories: Array of directory objects with:
+#     - paths: Array of directory paths
+#     - mode: (optional) Expected file mode
+#     - owner: (optional) Expected owner
+#     - group: (optional) Expected group
+
+file:
+{%- for dir in directories %}
+{%- for path in dir.paths %}
+  {{ path }}:
+    exists: true
+    filetype: directory
+{%- if dir.mode is defined %}
+    mode: "{{ dir.mode }}"
+{%- endif %}
+{%- if dir.owner is defined %}
+    owner: {{ dir.owner }}
+{%- endif %}
+{%- if dir.group is defined %}
+    group: {{ dir.group }}
+{%- endif %}
+{%- endfor %}
+{%- endfor %}

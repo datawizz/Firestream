@@ -1,0 +1,55 @@
+# Firestream JupyterHub - Docker Compose
+# Uses Nix-based JupyterHub container with official PostgreSQL
+#
+# Usage: docker compose up -d
+
+services:
+  postgresql:
+    image: postgres:16
+    container_name: jupyterhub-postgresql
+    volumes:
+      - 'postgresql_data:/var/lib/postgresql/data'
+    environment:
+      - POSTGRES_USER=bn_jupyterhub
+      - POSTGRES_PASSWORD=bitnami
+      - POSTGRES_DB=bitnami_jupyterhub
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U bn_jupyterhub -d bitnami_jupyterhub"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  jupyterhub:
+    build:
+      context: ../../../..
+      dockerfile: src/containers/firestream/jupyterhub/5/debian-12/Dockerfile
+    image: firestream-jupyterhub:5.3.0
+    container_name: jupyterhub
+    ports:
+      - '8000:8000'
+      - '8081:8081'
+    volumes:
+      - 'jupyterhub_data:/bitnami/jupyterhub'
+      - './docker-entrypoint-init.d:/docker-entrypoint-init.d:ro'
+    depends_on:
+      postgresql:
+        condition: service_healthy
+    environment:
+      - JUPYTERHUB_USERNAME=admin
+      - JUPYTERHUB_PASSWORD=admin123
+      - JUPYTERHUB_DATABASE_TYPE=postgresql
+      - JUPYTERHUB_DATABASE_HOST=postgresql
+      - JUPYTERHUB_DATABASE_PORT_NUMBER=5432
+      - JUPYTERHUB_DATABASE_NAME=bitnami_jupyterhub
+      - JUPYTERHUB_DATABASE_USER=bn_jupyterhub
+      - JUPYTERHUB_DATABASE_PASSWORD=bitnami
+      - JUPYTERHUB_SPAWNER=localprocess
+      - JUPYTERHUB_AUTHENTICATOR=pam
+      - BITNAMI_DEBUG=true
+    restart: unless-stopped
+
+volumes:
+  postgresql_data:
+    driver: local
+  jupyterhub_data:
+    driver: local

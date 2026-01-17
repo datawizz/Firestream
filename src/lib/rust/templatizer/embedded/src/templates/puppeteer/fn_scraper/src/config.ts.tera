@@ -1,0 +1,59 @@
+import { WorkflowConfig } from '../lib';
+
+// Environment-based configuration
+export const config = {
+  // Scraper metadata
+  name: '{{ site_name }}',
+  workflow: '{{ workflow_type }}' as 'dom' | 'api',
+  
+  // Site-specific configuration passed to scraper definition
+  siteConfig: {
+    loginUrl: '{{ site_url }}/{{ login_path | default(value="login") }}',
+    credentials: {
+      {% if auth_type == "form" -%}
+      username: process.env.{{ site_name | upper }}_USERNAME!,
+      password: process.env.{{ site_name | upper }}_PASSWORD!
+      {%- elif auth_type == "api-key" -%}
+      apiKey: process.env.{{ site_name | upper }}_API_KEY!
+      {%- endif %}
+    },
+    {% for step in navigation_steps -%}
+    {{ step.name | replace(from="-", to="_") }}Url: '{{ site_url }}{{ step.url }}',
+    {% endfor -%}
+  },
+  
+  // Workflow configuration
+  workflowConfig: {
+    workflow: '{{ workflow_type | replace(from="-scraping", to="") }}' as 'dom' | 'api',
+    storage: {
+      bucket: process.env.S3_BUCKET || '{{ s3_bucket }}',
+      prefix: `scraped-data/{{ site_name }}/${new Date().toISOString().split('T')[0]}/`,
+      region: process.env.AWS_REGION || '{{ s3_region | default(value="us-east-1") }}',
+      format: '{{ output_format | default(value="parquet") }}' as 'parquet' | 'json'
+    },
+    browser: {
+      headless: process.env.DEBUG !== 'true',
+      viewport: { width: 1920, height: 1080 }
+    }
+  } satisfies WorkflowConfig & { workflow: 'dom' | 'api' }
+};
+
+// Type-safe environment variable validation
+export function validateEnvironment(): void {
+  const required = [
+    {% if auth_type == "form" -%}
+    '{{ site_name | upper }}_USERNAME',
+    '{{ site_name | upper }}_PASSWORD',
+    {%- elif auth_type == "api-key" -%}
+    '{{ site_name | upper }}_API_KEY',
+    {%- endif %}
+    'S3_BUCKET',
+    'AWS_REGION'
+  ];
+  
+  const missing = required.filter(key => !process.env[key]);
+  
+  if (missing.length > 0) {
+    throw new Error(`Missing required environment variables: ${missing.join(', ')}`);
+  }
+}

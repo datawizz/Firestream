@@ -1,0 +1,42 @@
+# Application configuration
+{{ app_name | lower | replace(from=" ", to=".") }} {
+  app {
+    name = "{{ app_name }}"
+    name = ${?{{ app_name | upper | replace(from=" ", to="_") }}_APP_NAME}
+    
+    {% if config_fields %}
+    {% for field in config_fields %}
+    {% if field.config_section %}
+    {{ field.config_section }} {
+      {{ field.config_key | default(value=field.name) }} = "{{ field.default_value }}"
+      {{ field.config_key | default(value=field.name) }} = ${?{{ field.env_var | default(value=field.name | upper) }}}
+    }
+    {% else %}
+    {{ field.config_key | default(value=field.name) }} = "{{ field.default_value }}"
+    {{ field.config_key | default(value=field.name) }} = ${?{{ field.env_var | default(value=field.name | upper) }}}
+    {% endif %}
+    {% endfor %}
+    {% endif %}
+  }
+  
+  {% if spark_configs %}
+  # Spark configurations
+  spark {
+    {% for conf in spark_configs %}
+    {{ conf.key | replace(from="spark.", to="") }} = "{{ conf.value }}"
+    {{ conf.key | replace(from="spark.", to="") }} = ${?{{ conf.env_var | default(value=conf.key | upper | replace(from=".", to="_")) }}}
+    {% endfor %}
+  }
+  {% endif %}
+}
+
+{% if logging_config %}
+# Logging configuration
+logging {
+  level = "{{ log_level | default(value="INFO") }}"
+  level = ${?LOG_LEVEL}
+  
+  # Log4j pattern
+  pattern = "%d{yyyy-MM-dd HH:mm:ss} %-5p %c{1}:%L - %m%n"
+}
+{% endif %}

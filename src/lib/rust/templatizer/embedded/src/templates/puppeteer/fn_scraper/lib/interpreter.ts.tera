@@ -1,0 +1,352 @@
+import { Effect, pipe } from 'effect';
+import { Page, Browser } from 'puppeteer';
+import { match } from 'ts-pattern';
+import { ScraperAction, Extractor, AuthData } from './dsl';
+import { ScraperError, BrowserService } from './services';
+
+// Interpreter for scraper actions
+export const interpret = <T>(
+  action: ScraperAction<T>
+): Effect.Effect<T, ScraperError, BrowserService> => {
+  return match(action)
+    .with({ _tag: "Navigate" }, ({ url, waitUntil }) =>
+      BrowserService.pipe(
+        Effect.flatMap(service => 
+          Effect.tryPromise({
+            try: () => service.page.goto(url, { waitUntil: waitUntil || 'networkidle2' }),
+            catch: (error) => new ScraperError({ 
+              message: `Failed to navigate to ${url}`,
+              cause: error 
+            })
+          })
+        ),
+        Effect.map(() => undefined as any)
+      )
+    )
+    
+    .with({ _tag: "Click" }, ({ selector, options }) =>
+      BrowserService.pipe(
+        Effect.flatMap(service =>
+          Effect.tryPromise({
+            try: async () => {
+              await service.page.waitForSelector(selector, { visible: true });
+              await service.page.click(selector, options);
+            },
+            catch: (error) => new ScraperError({
+              message: `Failed to click ${selector}`,
+              cause: error
+            })
+          })
+        ),
+        Effect.map(() => undefined as any)
+      )
+    )
+    
+    .with({ _tag: "Type" }, ({ selector, text, options }) =>
+      BrowserService.pipe(
+        Effect.flatMap(service =>
+          Effect.tryPromise({
+            try: async () => {
+              await service.page.waitForSelector(selector, { visible: true });
+              
+              if (options?.clear) {
+                await service.page.click(selector, { clickCount: 3 });
+                await service.page.keyboard.press('Backspace');
+              }
+              
+              await service.page.type(selector, text, { delay: options?.delay || 50 });
+            },
+            catch: (error) => new ScraperError({
+              message: `Failed to type into ${selector}`,
+              cause: error
+            })
+          })
+        ),
+        Effect.map(() => undefined as any)
+      )
+    )
+    
+    .with({ _tag: "Wait" }, ({ condition }) =>
+      BrowserService.pipe(
+        Effect.flatMap(service =>
+          match(condition)
+            .with({ type: "selector" }, ({ value }) =>
+              Effect.tryPromise({
+                try: () => service.page.waitForSelector(value, { visible: true }),
+                catch: (error) => new ScraperError({
+                  message: `Timeout waiting for selector ${value}`,
+                  cause: error
+                })
+              })
+            )
+            .with({ type: "timeout" }, ({ value }) =>
+              Effect.promise(() => new Promise(resolve => setTimeout(resolve, value)))
+            )
+            .with({ type: "function" }, ({ value }) =>
+              Effect.tryPromise({
+                try: () => service.page.waitForFunction(value),
+                catch: (error) => new ScraperError({
+                  message: `Timeout waiting for function`,
+                  cause: error
+                })
+              })
+            )
+            .with({ type: "navigation" }, () =>
+              Effect.tryPromise({
+                try: () => service.page.waitForNavigation({ waitUntil: 'networkidle2' }),
+                catch: (error) => new ScraperError({
+                  message: `Timeout waiting for navigation`,
+                  cause: error
+                })
+              })
+            )
+            .exhaustive()
+        ),
+        Effect.map(() => undefined as any)
+      )
+    )
+    
+    .with({ _tag: "Extract" }, ({ extractor }) =>
+      BrowserService.pipe(
+        Effect.flatMap(service => interpretExtractor(extractor, service.page))
+      )
+    )
+    
+    .with({ _tag: "ExtractAll" }, ({ selector, itemExtractor }) =>
+      BrowserService.pipe(
+        Effect.flatMap(service =>
+          Effect.tryPromise({
+            try: async () => {
+              const elements = await service.page.$$(selector);
+              const results: T[] = [];
+              
+              for (const element of elements) {
+                const result = await interpretExtractorOnElement(itemExtractor, element);
+                results.push(result);
+              }
+              
+              return results;
+            },
+            catch: (error) => new ScraperError({
+              message: `Failed to extract all from ${selector}`,
+              cause: error
+            })
+          })
+        )
+      )
+    )
+    
+    .with({ _tag: "ExtractAuth" }, ({ storage, keys }) =>
+      BrowserService.pipe(
+        Effect.flatMap(service =>
+          Effect.tryPromise({
+            try: async () => {
+              const authData: AuthData = {};
+              
+              if (storage === "localStorage" || storage === "sessionStorage") {
+                for (const key of keys) {
+                  const value = await service.page.evaluate(
+                    (storage, key) => window[storage].getItem(key),
+                    storage,
+                    key
+                  );
+                  if (value) {
+                    authData.token = value;
+                    break;
+                  }
+                }
+              } else if (storage === "cookies") {
+                const cookies = await service.page.cookies();
+                authData.cookies = cookies.filter(c => keys.includes(c.name))
+                  .map(c => ({ name: c.name, value: c.value }));
+              }
+              
+              return authData;
+            },
+            catch: (error) => new ScraperError({
+              message: `Failed to extract auth data`,
+              cause: error
+            })
+          })
+        )
+      )
+    )
+    
+    .with({ _tag: "Screenshot" }, ({ name, fullPage }) =>
+      BrowserService.pipe(
+        Effect.flatMap(service =>
+          Effect.tryPromise({
+            try: () => service.page.screenshot({
+              path: `/tmp/screenshots/${name}.png`,
+              fullPage: fullPage ?? true
+            }),
+            catch: (error) => new ScraperError({
+              message: `Failed to take screenshot ${name}`,
+              cause: error
+            })
+          })
+        ),
+        Effect.map(() => undefined as any)
+      )
+    )
+    
+    .with({ _tag: "Sequence" }, ({ actions, keepLast }) =>
+      Effect.gen(function* (_) {
+        const results = [];
+        for (const action of actions) {
+          const result = yield* _(interpret(action));
+          results.push(result);
+        }
+        return keepLast ? results[results.length - 1] : results;
+      })
+    )
+    
+    .with({ _tag: "Parallel" }, ({ actions, maxConcurrency }) =>
+      Effect.all(
+        actions.map(interpret),
+        { concurrency: maxConcurrency || "unbounded" }
+      ) as any
+    )
+    
+    .with({ _tag: "Map" }, ({ action, fn }) =>
+      pipe(
+        interpret(action),
+        Effect.map(fn)
+      )
+    )
+    
+    .with({ _tag: "FlatMap" }, ({ action, fn }) =>
+      pipe(
+        interpret(action),
+        Effect.flatMap(a => interpret(fn(a)))
+      )
+    )
+    
+    .with({ _tag: "Retry" }, ({ action, times, delay }) =>
+      pipe(
+        interpret(action),
+        Effect.retry({
+          times,
+          delay: delay ? Effect.sleep(delay) : undefined
+        })
+      )
+    )
+    
+    .with({ _tag: "WithTimeout" }, ({ action, timeoutMs }) =>
+      pipe(
+        interpret(action),
+        Effect.timeout(timeoutMs),
+        Effect.flatMap(option =>
+          option._tag === "Some"
+            ? Effect.succeed(option.value)
+            : Effect.fail(new ScraperError({ message: `Action timed out after ${timeoutMs}ms` }))
+        )
+      )
+    )
+    
+    .exhaustive();
+};
+
+// Interpreter for extractors
+const interpretExtractor = <T>(
+  extractor: Extractor<T>,
+  page: Page
+): Effect.Effect<T, ScraperError> => {
+  return match(extractor)
+    .with({ _tag: "TextExtractor" }, ({ selector, transform }) =>
+      Effect.tryPromise({
+        try: async () => {
+          const text = await page.$eval(selector, el => el.textContent?.trim() || '');
+          return transform ? transform(text) : text;
+        },
+        catch: (error) => new ScraperError({
+          message: `Failed to extract text from ${selector}`,
+          cause: error
+        })
+      })
+    )
+    
+    .with({ _tag: "AttributeExtractor" }, ({ selector, attribute }) =>
+      Effect.tryPromise({
+        try: () => page.$eval(selector, (el, attr) => el.getAttribute(attr) || '', attribute),
+        catch: (error) => new ScraperError({
+          message: `Failed to extract attribute ${attribute} from ${selector}`,
+          cause: error
+        })
+      })
+    )
+    
+    .with({ _tag: "HtmlExtractor" }, ({ selector, inner }) =>
+      Effect.tryPromise({
+        try: () => page.$eval(
+          selector,
+          (el, inner) => inner ? el.innerHTML : el.outerHTML,
+          inner ?? true
+        ),
+        catch: (error) => new ScraperError({
+          message: `Failed to extract HTML from ${selector}`,
+          cause: error
+        })
+      })
+    )
+    
+    .with({ _tag: "JsonExtractor" }, ({ selector, schema }) =>
+      pipe(
+        Effect.tryPromise({
+          try: () => page.$eval(selector, el => el.textContent || '{}'),
+          catch: (error) => new ScraperError({
+            message: `Failed to extract JSON from ${selector}`,
+            cause: error
+          })
+        }),
+        Effect.flatMap(text =>
+          Effect.try({
+            try: () => JSON.parse(text),
+            catch: (error) => new ScraperError({
+              message: `Failed to parse JSON`,
+              cause: error
+            })
+          })
+        ),
+        Effect.flatMap(data =>
+          pipe(
+            schema.decode(data),
+            Effect.mapError(error => new ScraperError({
+              message: `JSON validation failed`,
+              cause: error
+            }))
+          )
+        )
+      )
+    )
+    
+    .with({ _tag: "CompositeExtractor" }, ({ fields }) =>
+      Effect.gen(function* (_) {
+        const result: any = {};
+        
+        for (const [key, fieldExtractor] of Object.entries(fields)) {
+          result[key] = yield* _(interpretExtractor(fieldExtractor, page));
+        }
+        
+        return result as T;
+      })
+    )
+    
+    .exhaustive() as Effect.Effect<T, ScraperError>;
+};
+
+// Helper for extracting from specific elements
+const interpretExtractorOnElement = async <T>(
+  extractor: Extractor<T>,
+  element: any
+): Promise<T> => {
+  // Simplified version - in real implementation would handle all cases
+  return match(extractor)
+    .with({ _tag: "TextExtractor" }, async ({ transform }) => {
+      const text = await element.evaluate((el: Element) => el.textContent?.trim() || '');
+      return transform ? transform(text) : text;
+    })
+    .otherwise(() => {
+      throw new Error('Extractor not supported on elements yet');
+    }) as any;
+};

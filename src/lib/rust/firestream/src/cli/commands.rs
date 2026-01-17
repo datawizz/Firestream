@@ -6,7 +6,7 @@ use super::args::{Cli, Command, ConfigCommand, StateCommand, ClusterCommand};
 use crate::services::ServiceManager;
 use crate::config::{ConfigManager, ServiceState, ServiceStatus, ResourceUsage};
 use crate::state::{StateManager, ResourceType, K3dClusterConfig, FirestreamState};
-use crate::deploy::k3d_advanced::{K3dClusterManager};
+use k8s_manager::K3dClusterManager;
 use crate::core::{FirestreamError, Result};
 use std::path::PathBuf;
 use tracing::{info, error};
@@ -672,15 +672,22 @@ async fn execute_cluster_command(command: &ClusterCommand, state_dir: &PathBuf) 
             
             let manager = K3dClusterManager::new(config);
             let info = manager.get_cluster_info().await?;
-            
+
             println!("Cluster Information:");
-            println!("  Name: {}", cluster_name);
-            
-            for (key, value) in info {
-                if key == "nodes" {
-                    println!("\nNodes:");
-                    println!("{}", value);
-                } else {
+            println!("  Name: {}", info.name);
+            println!("  Provider: {:?}", info.provider);
+            println!("  Status: {:?}", info.status);
+            if let Some(endpoint) = &info.endpoint {
+                println!("  Endpoint: {}", endpoint);
+            }
+            if let Some(version) = &info.kubernetes_version {
+                println!("  Kubernetes Version: {}", version);
+            }
+            println!("  Node Count: {}", info.node_count);
+
+            if !info.metadata.is_empty() {
+                println!("\nMetadata:");
+                for (key, value) in &info.metadata {
                     println!("  {}: {}", key, value);
                 }
             }

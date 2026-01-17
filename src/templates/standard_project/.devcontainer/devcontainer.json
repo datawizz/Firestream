@@ -1,0 +1,94 @@
+{
+  "name": "standard_project",
+  // Docker compose configuration
+  "dockerComposeFile": "../docker/standard_project/docker-compose.devcontainer.yml",
+  "service": "devcontainer",
+  "workspaceFolder": "/workspace",
+  // initializeCommand runs on the host before building the container.
+  "initializeCommand": "bash docker/standard_project/docker_preinit.sh",
+  // User configuration
+  "remoteUser": "developer",
+  // Prevent VS Code from overriding the container command
+  "overrideCommand": false,
+  // Environment variables
+  "remoteEnv": {
+    "LOCAL_WORKSPACE_FOLDER": "${localWorkspaceFolder}"
+  },
+  // Port forwarding
+  "forwardPorts": [
+    // 3000,
+    // 8080
+  ],
+  // Host requirements
+  "hostRequirements": {
+    "cpus": 2,
+    "memory": "4gb",
+    "storage": "16gb"
+  },
+  // VS Code customizations
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        // // Python
+        // "ms-python.python",
+        // "ms-python.vscode-pylance",
+        // "ms-toolsai.jupyter",
+        // // JavaScript/TypeScript
+        // "dbaeumer.vscode-eslint",
+        // "esbenp.prettier-vscode",
+        // // Rust
+        // "rust-lang.rust-analyzer",
+        // // Scala
+        // "scala-lang.scala",
+        // "scalameta.metals",
+        // // General development
+        // "eamodio.gitlens",
+        // "GitHub.copilot",
+        // "ms-azuretools.vscode-docker",
+        // "ms-vscode.makefile-tools",
+        // "redhat.vscode-yaml",
+        // "streetsidesoftware.code-spell-checker"
+      ],
+      "settings": {
+        // Python settings
+        "python.defaultInterpreterPath": "/home/developer/.python",
+        "python.formatting.provider": "black",
+        "python.linting.enabled": true,
+        "python.linting.pylintEnabled": true,
+        // Rust settings
+        "rust-analyzer.checkOnSave.command": "clippy",
+        "rust-analyzer.cargo.buildScripts.enable": true,
+        // Editor settings
+        "editor.formatOnSave": true,
+        "editor.insertSpaces": true,
+        "editor.tabSize": 2,
+        "editor.detectIndentation": true,
+        // Terminal settings
+        "terminal.integrated.defaultProfile.linux": "bash",
+        // File exclusions
+        "files.exclude": {
+          "**/.git": true,
+          "**/.svn": true,
+          "**/.hg": true,
+          "**/CVS": true,
+          "**/.DS_Store": true,
+          "**/target": true,
+          "**/node_modules": true,
+          "**/__pycache__": true,
+          "**/.pytest_cache": true
+        },
+        // Search exclusions
+        "search.exclude": {
+          "**/node_modules": true,
+          "**/bower_components": true,
+          "**/target": true,
+          "**/.sccache": true
+        }
+      }
+    }
+  },
+  // Post-create command
+  "postCreateCommand": "echo 'Welcome to your development container!'",
+  // Post-start command
+  "postStartCommand": "git config --global --add safe.directory /workspace"
+}

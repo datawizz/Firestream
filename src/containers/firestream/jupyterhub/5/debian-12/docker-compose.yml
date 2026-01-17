@@ -1,0 +1,81 @@
+# Docker Compose for JupyterHub development/testing
+# Copyright Firestream. Apache-2.0 License.
+#
+# Usage:
+#   docker compose up -d
+#
+# This configuration runs JupyterHub with a PostgreSQL database.
+
+version: '3.8'
+
+services:
+  jupyterhub:
+    build:
+      context: ../../../../../..  # Build from repo root
+      dockerfile: src/containers/firestream/jupyterhub/5/debian-12/Dockerfile
+    image: firestream-jupyterhub:5.3.0
+    container_name: jupyterhub
+    ports:
+      - "8000:8000"  # Proxy port
+      - "8081:8081"  # API port
+    environment:
+      # Debug mode
+      - BITNAMI_DEBUG=true
+      # Allow empty password for development
+      - ALLOW_EMPTY_PASSWORD=yes
+      # Admin user
+      - JUPYTERHUB_USERNAME=admin
+      - JUPYTERHUB_PASSWORD=admin123
+      # Database configuration
+      - JUPYTERHUB_DATABASE_TYPE=postgresql
+      - JUPYTERHUB_DATABASE_HOST=postgresql
+      - JUPYTERHUB_DATABASE_PORT_NUMBER=5432
+      - JUPYTERHUB_DATABASE_NAME=bitnami_jupyterhub
+      - JUPYTERHUB_DATABASE_USER=bn_jupyterhub
+      - JUPYTERHUB_DATABASE_PASSWORD=bitnami123
+      # Spawner and authenticator
+      - JUPYTERHUB_SPAWNER=simple
+      - JUPYTERHUB_AUTHENTICATOR=dummy
+    volumes:
+      - jupyterhub_data:/bitnami/jupyterhub
+      - ./init-scripts:/docker-entrypoint-init.d
+    depends_on:
+      postgresql:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/hub/api"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+    restart: unless-stopped
+
+  postgresql:
+    image: docker.io/bitnami/postgresql:16
+    container_name: jupyterhub-postgresql
+    ports:
+      - "5432:5432"
+    environment:
+      - POSTGRESQL_DATABASE=bitnami_jupyterhub
+      - POSTGRESQL_USERNAME=bn_jupyterhub
+      - POSTGRESQL_PASSWORD=bitnami123
+      - ALLOW_EMPTY_PASSWORD=yes
+    volumes:
+      - postgresql_data:/bitnami/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U bn_jupyterhub -d bitnami_jupyterhub"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    restart: unless-stopped
+
+volumes:
+  jupyterhub_data:
+    driver: local
+  postgresql_data:
+    driver: local
+
+networks:
+  default:
+    name: jupyterhub-network

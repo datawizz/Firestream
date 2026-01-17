@@ -45,4 +45,27 @@ _WIP/**
 src/deploy/rendered/**
 **/.pulumi/**
 _build/**
-target-ra/**
+.env
+
+# Nix build outputs
+result
+**/result/**
+result-*
+.nix-cache/
+
+# Nix/direnv caches
+.direnv/
+.devenv/
+.envrc.local
+
+# Rust target directories at root
+target/
+
+# Python eggs
+*.egg-info/
+.eggs/
+
+# Additional caches
+.mypy_cache/
+.tox/
+.cache/

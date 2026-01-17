@@ -1,0 +1,22 @@
+# Firestream PostgreSQL - Nix-based Docker Compose
+
+services:
+  postgresql:
+    build:
+      context: ../../../..
+      dockerfile: src/containers/firestream/postgresql/${PG_VERSION:-17}/debian-12/Dockerfile
+    image: firestream-postgresql:${PG_VERSION:-17}
+    container_name: firestream-postgresql-${PG_VERSION:-17}
+    ports:
+      - '5432:5432'
+    volumes:
+      - 'postgresql_data:/firestream/postgresql'
+      - './init:/docker-entrypoint-initdb.d'
+    environment:
+      - POSTGRESQL_PASSWORD=firestream
+      - POSTGRESQL_USERNAME=firestream
+      - POSTGRESQL_DATABASE=firestream
+
+volumes:
+  postgresql_data:
+    driver: local

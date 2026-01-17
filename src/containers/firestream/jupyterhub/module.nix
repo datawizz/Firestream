@@ -1,0 +1,484 @@
+# JupyterHub Container Module - Using Firestream Factories
+# Copyright Firestream. Apache-2.0 License.
+#
+# This module defines the JupyterHub container using mkPythonContainerModule.
+# Much simpler than manual implementation - the factory handles:
+# - Entrypoint generation
+# - Docker image building
+# - Environment loading and secrets
+# - Development shell
+#
+# Usage:
+#   jupyterhubModule = import ./module.nix {
+#     inherit pkgs lib firestream pythonEnv jupyterhubVersion python;
+#   };
+
+{ pkgs
+, lib
+, firestream
+, pythonEnv          # The virtual environment from uv2nix
+, jupyterhubVersion  # e.g., "5.3.0"
+, python ? pkgs.python312
+}:
+
+let
+  # Read external script files
+  validateScript = builtins.readFile ./scripts/validate.sh;
+  configScript = builtins.readFile ./scripts/config.sh;
+  initScript = builtins.readFile ./scripts/init.sh;
+  secretsScript = builtins.readFile ./scripts/secrets.sh;
+
+  # JupyterHub-specific helper functions (needed by scripts)
+  jupyterhubHelpers = ''
+    ########################
+    # Print validation error
+    # Arguments:
+    #   $1 - error message
+    # Returns:
+    #   Sets error_code=1
+    #########################
+    print_validation_error() {
+      error "$1"
+      error_code=1
+    }
+
+    ########################
+    # Check if value is empty
+    # Arguments:
+    #   $1 - value
+    # Returns:
+    #   0 if empty, 1 otherwise
+    #########################
+    is_empty_value() {
+      local value="''${1:-}"
+      [[ -z "$value" ]]
+    }
+
+    ########################
+    # Check if value is boolean yes
+    # Arguments:
+    #   $1 - value
+    # Returns:
+    #   0 if yes/true/1, 1 otherwise
+    #########################
+    is_boolean_yes() {
+      local bool="''${1:-}"
+      [[ "$bool" =~ ^(yes|true|1)$ ]]
+    }
+
+    ########################
+    # Ensure directory exists
+    # Arguments:
+    #   $1 - directory path
+    #########################
+    ensure_dir_exists() {
+      local dir="$1"
+      [[ -d "$dir" ]] || mkdir -p "$dir"
+    }
+
+    ########################
+    # Wait for PostgreSQL to be available
+    # Uses environment variables for connection details
+    # Returns:
+    #   0 if connection succeeded, 1 otherwise
+    #########################
+    jupyterhub_wait_for_postgresql() {
+      local host="''${JUPYTERHUB_DATABASE_HOST:-postgresql}"
+      local port="''${JUPYTERHUB_DATABASE_PORT_NUMBER:-5432}"
+      local timeout="''${JUPYTERHUB_DB_WAIT_TIMEOUT:-120}"
+
+      info "Waiting for PostgreSQL at $host:$port (timeout: $timeout seconds)..."
+
+      if wait-for-port --host "$host" --timeout "$timeout" "$port"; then
+        info "PostgreSQL is available at $host:$port"
+        return 0
+      else
+        error "Timeout waiting for PostgreSQL at $host:$port"
+        return 1
+      fi
+    }
+
+    ########################
+    # Execute SQL against the JupyterHub database
+    # Arguments:
+    #   $1 - SQL statement
+    # Returns:
+    #   Query result
+    #########################
+    jupyterhub_db_execute() {
+      local sql="''${1:?SQL statement required}"
+      local host="''${JUPYTERHUB_DATABASE_HOST:-postgresql}"
+      local port="''${JUPYTERHUB_DATABASE_PORT_NUMBER:-5432}"
+      local db="''${JUPYTERHUB_DATABASE_NAME:-bitnami_jupyterhub}"
+      local user="''${JUPYTERHUB_DATABASE_USER:-bn_jupyterhub}"
+
+      PGPASSWORD="''${JUPYTERHUB_DATABASE_PASSWORD:-}" ${pkgs.postgresql}/bin/psql \
+        -h "$host" \
+        -p "$port" \
+        -U "$user" \
+        -d "$db" \
+        -t -c "$sql"
+    }
+
+    ########################
+    # Execute JupyterHub CLI command
+    # Arguments:
+    #   $@ - Arguments to pass to jupyterhub
+    #########################
+    jupyterhub_execute() {
+      local config="''${JUPYTERHUB_CONF_FILE:-/opt/bitnami/jupyterhub/etc/jupyterhub_config.py}"
+
+      debug "Executing: jupyterhub $*"
+      jupyterhub --config="$config" "$@"
+    }
+
+    ########################
+    # Get JupyterHub version
+    # Returns:
+    #   Version string
+    #########################
+    jupyterhub_version() {
+      jupyterhub --version 2>/dev/null | head -1
+    }
+  '';
+
+  # System dependencies (libs needed in the container)
+  systemDeps = with pkgs; [
+    # SSL/TLS and crypto
+    cacert openssl
+
+    # Database clients
+    postgresql
+
+    # Network utilities
+    curl netcat-gnu
+
+    # Terminal
+    ncurses readline
+
+    # Node.js (for configurable-http-proxy)
+    nodejs_22
+
+    # PAM authentication
+    linux-pam
+
+    # Process management
+    procps
+
+    # C++ runtime
+    stdenv.cc.cc.lib
+  ];
+
+  # Runtime binary deps (need to be in PATH)
+  runtimeBinDeps = with pkgs; [
+    coreutils bash gnused gnugrep gawk findutils which
+    postgresql curl netcat-gnu openssl
+    nodejs_22  # configurable-http-proxy
+    procps
+  ];
+
+  # JupyterHub config template with {{PLACEHOLDER}} syntax
+  jupyterhubConfigTemplate = ''
+    # JupyterHub configuration file
+    # Generated by Firestream container initialization
+    # Template version: ${jupyterhubVersion}
+
+    c = get_config()
+
+    # Network settings
+    c.JupyterHub.ip = '0.0.0.0'
+    c.JupyterHub.port = {{JUPYTERHUB_PROXY_PORT_NUMBER}}
+    c.JupyterHub.hub_port = {{JUPYTERHUB_API_PORT_NUMBER}}
+
+    # Database configuration
+    c.JupyterHub.db_url = '{{JUPYTERHUB_DATABASE_URL}}'
+
+    # Data directory
+    c.JupyterHub.data_files_path = '{{JUPYTERHUB_DATA_DIR}}'
+
+    # Spawner configuration
+    c.JupyterHub.spawner_class = '{{JUPYTERHUB_SPAWNER_CLASS}}'
+
+    # Authenticator configuration
+    c.JupyterHub.authenticator_class = '{{JUPYTERHUB_AUTHENTICATOR_CLASS}}'
+
+    # Admin users
+    c.Authenticator.admin_users = {'{{JUPYTERHUB_USERNAME}}'}
+
+    # Logging
+    c.JupyterHub.log_level = 'INFO'
+
+    # Cookie secret and proxy auth token paths
+    c.JupyterHub.cookie_secret_file = '{{JUPYTERHUB_DATA_DIR}}/jupyterhub_cookie_secret'
+
+    # Proxy configuration
+    c.ConfigurableHTTPProxy.command = ['configurable-http-proxy']
+  '';
+
+in firestream.mkPythonContainerModule {
+  name = "jupyterhub";
+  version = jupyterhubVersion;
+  inherit pythonEnv python;
+
+  # Paths configuration (Bitnami compatibility)
+  paths = {
+    base = "/opt/bitnami/jupyterhub";
+    conf = "/opt/bitnami/jupyterhub/etc";
+    data = "/bitnami/jupyterhub/data";
+    logs = "/opt/bitnami/jupyterhub/log";
+  };
+
+  # Environment variables with defaults
+  envVars = {
+    # Paths
+    JUPYTERHUB_BASE_DIR = "/opt/bitnami/jupyterhub";
+    JUPYTERHUB_BIN_DIR = "/opt/bitnami/jupyterhub/bin";
+    JUPYTERHUB_CONF_DIR = "/opt/bitnami/jupyterhub/etc";
+    JUPYTERHUB_CONF_FILE = "/opt/bitnami/jupyterhub/etc/jupyterhub_config.py";
+    JUPYTERHUB_DATA_DIR = "/opt/bitnami/jupyterhub/data";
+    JUPYTERHUB_TMP_DIR = "/opt/bitnami/jupyterhub/tmp";
+    JUPYTERHUB_PID_FILE = "/opt/bitnami/jupyterhub/tmp/jupyterhub.pid";
+    JUPYTERHUB_LOGS_DIR = "/opt/bitnami/jupyterhub/log";
+    JUPYTERHUB_LOG_FILE = "/opt/bitnami/jupyterhub/log/jupyterhub.log";
+
+    # Volume paths
+    JUPYTERHUB_VOLUME_DIR = "/bitnami/jupyterhub";
+
+    # User/group
+    JUPYTERHUB_DAEMON_USER = "jupyterhub";
+    JUPYTERHUB_DAEMON_GROUP = "jupyterhub";
+
+    # Port configuration
+    JUPYTERHUB_PROXY_PORT_NUMBER = "8000";
+    JUPYTERHUB_API_PORT_NUMBER = "8081";
+
+    # Bootstrap configuration
+    JUPYTERHUB_SKIP_BOOTSTRAP = "no";
+
+    # Admin credentials
+    JUPYTERHUB_USERNAME = "user";
+    JUPYTERHUB_PASSWORD = "bitnami";
+
+    # Database configuration
+    JUPYTERHUB_DATABASE_TYPE = "postgresql";
+    JUPYTERHUB_DATABASE_HOST = "postgresql";
+    JUPYTERHUB_DATABASE_PORT_NUMBER = "5432";
+    JUPYTERHUB_DATABASE_NAME = "bitnami_jupyterhub";
+    JUPYTERHUB_DATABASE_USER = "bn_jupyterhub";
+    JUPYTERHUB_DATABASE_PASSWORD = "";
+
+    # Spawner configuration
+    JUPYTERHUB_SPAWNER = "localprocess";
+
+    # Authenticator configuration
+    JUPYTERHUB_AUTHENTICATOR = "pam";
+
+    # Timeouts
+    JUPYTERHUB_DB_WAIT_TIMEOUT = "120";
+
+    # Empty password flag
+    ALLOW_EMPTY_PASSWORD = "no";
+
+    # Debug mode
+    BITNAMI_DEBUG = "false";
+
+    # JupyterHub version (for scripts)
+    JUPYTERHUB_VERSION = jupyterhubVersion;
+  };
+
+  # Variables that support Docker secrets (_FILE suffix)
+  envVarsWithSecrets = [
+    "JUPYTERHUB_PASSWORD"
+    "JUPYTERHUB_DATABASE_PASSWORD"
+    "JUPYTERHUB_DATABASE_HOST"
+    "JUPYTERHUB_DATABASE_PORT_NUMBER"
+    "JUPYTERHUB_DATABASE_NAME"
+    "JUPYTERHUB_DATABASE_USER"
+    "JUPYTERHUB_USERNAME"
+    "JUPYTERHUB_SKIP_BOOTSTRAP"
+  ];
+
+  # Runtime directories with declarative schema
+  runtimeDirs = {
+    home = {
+      path = "/opt/bitnami/jupyterhub";
+      type = "conf";
+      persistence = "ephemeral";
+      mode = "0755";
+      owner = 1001;
+      group = 1001;
+      description = "JupyterHub home directory";
+    };
+    conf = {
+      path = "/opt/bitnami/jupyterhub/etc";
+      type = "conf";
+      persistence = "persistent";
+      mode = "0755";
+      owner = 1001;
+      group = 1001;
+      description = "JupyterHub configuration directory";
+    };
+    data = {
+      path = "/opt/bitnami/jupyterhub/data";
+      type = "data";
+      persistence = "persistent";
+      mode = "0755";
+      owner = 1001;
+      group = 1001;
+      description = "JupyterHub data directory";
+    };
+    logs = {
+      path = "/opt/bitnami/jupyterhub/log";
+      type = "logs";
+      persistence = "ephemeral";
+      mode = "0755";
+      owner = 1001;
+      group = 1001;
+      description = "JupyterHub log files";
+    };
+    tmp = {
+      path = "/opt/bitnami/jupyterhub/tmp";
+      type = "tmp";
+      persistence = "ephemeral";
+      mode = "1777";
+      description = "Temporary files";
+    };
+    volume = {
+      path = "/bitnami/jupyterhub";
+      type = "data";
+      persistence = "persistent";
+      mode = "0755";
+      owner = 1001;
+      group = 1001;
+      description = "Bitnami volume mount point";
+    };
+    state = {
+      path = "/firestream/jupyterhub/.state";
+      type = "state";
+      persistence = "persistent";
+      mode = "0755";
+      owner = 1001;
+      group = 1001;
+      description = "Application state tracking";
+    };
+  };
+
+  # Build-time: Static config templates
+  prepopulateFiles = {
+    "/opt/bitnami/jupyterhub/etc/jupyterhub_config.py.template" = jupyterhubConfigTemplate;
+  };
+
+  # Validation function
+  validateFn = jupyterhubHelpers + ''
+    error_code=0
+    ${validateScript}
+    [[ "$error_code" -eq 0 ]] || exit "$error_code"
+  '';
+
+  # Activation: Load secrets and process config templates
+  activateFn = jupyterhubHelpers + ''
+    info "Activating JupyterHub configuration..."
+
+    # Load secrets from _FILE variables
+    ${secretsScript}
+
+    # Build database URL based on database type
+    local db_url
+    if [[ "''${JUPYTERHUB_DATABASE_TYPE:-sqlite}" == "postgresql" ]]; then
+      db_url="postgresql://''${JUPYTERHUB_DATABASE_USER}:''${JUPYTERHUB_DATABASE_PASSWORD}@''${JUPYTERHUB_DATABASE_HOST}:''${JUPYTERHUB_DATABASE_PORT_NUMBER}/''${JUPYTERHUB_DATABASE_NAME}"
+    else
+      db_url="sqlite:///jupyterhub.sqlite"
+    fi
+
+    # Determine spawner class
+    local spawner_class
+    case "''${JUPYTERHUB_SPAWNER:-localprocess}" in
+      localprocess) spawner_class="jupyterhub.spawner.LocalProcessSpawner" ;;
+      docker) spawner_class="dockerspawner.DockerSpawner" ;;
+      kubernetes) spawner_class="kubespawner.KubeSpawner" ;;
+      simple) spawner_class="jupyterhub.spawner.SimpleLocalProcessSpawner" ;;
+      *) spawner_class="jupyterhub.spawner.LocalProcessSpawner" ;;
+    esac
+
+    # Determine authenticator class
+    local authenticator_class
+    case "''${JUPYTERHUB_AUTHENTICATOR:-pam}" in
+      pam) authenticator_class="jupyterhub.auth.PAMAuthenticator" ;;
+      dummy) authenticator_class="jupyterhub.auth.DummyAuthenticator" ;;
+      oauth) authenticator_class="oauthenticator.generic.GenericOAuthenticator" ;;
+      ldap) authenticator_class="ldapauthenticator.LDAPAuthenticator" ;;
+      *) authenticator_class="jupyterhub.auth.PAMAuthenticator" ;;
+    esac
+
+    # Process config template if exists
+    local conf_dir="''${JUPYTERHUB_CONF_DIR:-/opt/bitnami/jupyterhub/etc}"
+    local conf_file="''${JUPYTERHUB_CONF_FILE:-$conf_dir/jupyterhub_config.py}"
+
+    if [[ -f "$conf_dir/jupyterhub_config.py.template" ]] && [[ ! -f "$conf_file" ]]; then
+      info "Generating jupyterhub_config.py from template..."
+      ${pkgs.gnused}/bin/sed \
+        -e "s|{{JUPYTERHUB_PROXY_PORT_NUMBER}}|''${JUPYTERHUB_PROXY_PORT_NUMBER:-8000}|g" \
+        -e "s|{{JUPYTERHUB_API_PORT_NUMBER}}|''${JUPYTERHUB_API_PORT_NUMBER:-8081}|g" \
+        -e "s|{{JUPYTERHUB_DATABASE_URL}}|''${db_url}|g" \
+        -e "s|{{JUPYTERHUB_DATA_DIR}}|''${JUPYTERHUB_DATA_DIR:-/opt/bitnami/jupyterhub/data}|g" \
+        -e "s|{{JUPYTERHUB_SPAWNER_CLASS}}|''${spawner_class}|g" \
+        -e "s|{{JUPYTERHUB_AUTHENTICATOR_CLASS}}|''${authenticator_class}|g" \
+        -e "s|{{JUPYTERHUB_USERNAME}}|''${JUPYTERHUB_USERNAME:-user}|g" \
+        "$conf_dir/jupyterhub_config.py.template" > "$conf_file"
+
+      info "Generated jupyterhub_config.py"
+    fi
+
+    # Save config hash for change detection
+    save_config_hash "jupyterhub" "$conf_file"
+
+    info "JupyterHub configuration activated"
+  '';
+
+  # Configuration generation
+  configFn = jupyterhubHelpers + configScript;
+
+  # Initialization
+  initFn = jupyterhubHelpers + initScript;
+
+  # Startup command
+  runCmd = ''
+    ${jupyterhubHelpers}
+
+    info "Starting JupyterHub ${jupyterhubVersion}..."
+
+    local conf_file="''${JUPYTERHUB_CONF_FILE:-/opt/bitnami/jupyterhub/etc/jupyterhub_config.py}"
+    local pid_file="''${JUPYTERHUB_PID_FILE:-/opt/bitnami/jupyterhub/tmp/jupyterhub.pid}"
+
+    # Run JupyterHub
+    exec jupyterhub \
+      --config="$conf_file" \
+      --pid-file="$pid_file"
+  '';
+
+  inherit systemDeps runtimeBinDeps;
+
+  exposedPorts = [ 8000 8081 ];
+  volumes = [ "/bitnami/jupyterhub" "/docker-entrypoint-init.d" ];
+
+  user = {
+    name = "jupyterhub";
+    group = "jupyterhub";
+    uid = 1001;
+    gid = 1001;
+  };
+
+  # Python-specific options
+  compileByteCode = false;
+  enablePip = true;
+
+  # Development shell extras
+  devShellPackages = with pkgs; [ uv docker docker-compose ];
+  devShellHook = ''
+    echo "JupyterHub Version: ${jupyterhubVersion}"
+    echo ""
+    echo "Build commands:"
+    echo "  nix build .#dockerImage    - Build the Docker image"
+    echo "  docker load < result       - Load image into Docker"
+  '';
+}

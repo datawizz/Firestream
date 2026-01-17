@@ -1,0 +1,161 @@
+//! Native Nix build strategy
+//!
+//! This strategy builds containers using the host's native Nix installation.
+//! It's the fastest option but only works on Linux systems with Nix installed.
+
+use crate::config::BuildConfig;
+use crate::discovery::ContainerInfo;
+use crate::error::{NixContainerError, Result};
+use crate::platform::PlatformInfo;
+use crate::progress::{BuildPhase, BuildProgress};
+use crate::strategy::{BoxedProgressCallback, BuildStrategy, ContainerBuildStrategy};
+use async_trait::async_trait;
+use std::path::PathBuf;
+use tokio::process::Command;
+use tracing::{debug, info, warn};
+
+/// Native Nix build strategy
+///
+/// Builds containers directly using the host's Nix installation.
+/// This is only available on Linux systems.
+pub struct NativeNixStrategy {
+    platform: PlatformInfo,
+}
+
+impl NativeNixStrategy {
+    /// Create a new native Nix strategy
+    pub fn new(platform: PlatformInfo) -> Self {
+        Self { platform }
+    }
+
+    /// Run the nix build command
+    async fn run_nix_build(&self, flake_dir: &PathBuf, attr: &str) -> Result<PathBuf> {
+        info!("Building with native Nix: {}#{}", flake_dir.display(), attr);
+
+        let flake_ref = format!(".#{}", attr);
+
+        let output = Command::new("nix")
+            .args(["build", &flake_ref, "--no-link", "--print-out-paths"])
+            .current_dir(flake_dir)
+            .output()
+            .await?;
+
+        if !output.status.success() {
+            let stderr = String::from_utf8_lossy(&output.stderr);
+            warn!("Nix build failed: {}", stderr);
+            return Err(NixContainerError::BuildFailed {
+                container: flake_dir.display().to_string(),
+                message: stderr.to_string(),
+            });
+        }
+
+        let path_str = String::from_utf8_lossy(&output.stdout).trim().to_string();
+
+        if path_str.is_empty() {
+            return Err(NixContainerError::BuildFailed {
+                container: flake_dir.display().to_string(),
+                message: "Nix build produced no output".to_string(),
+            });
+        }
+
+        // Take the first path if multiple are returned
+        let path = path_str
+            .lines()
+            .next()
+            .map(PathBuf::from)
+            .ok_or_else(|| NixContainerError::BuildFailed {
+                container: flake_dir.display().to_string(),
+                message: "Failed to parse Nix build output".to_string(),
+            })?;
+
+        debug!("Nix build output: {}", path.display());
+
+        // Verify the output exists
+        if !path.exists() {
+            return Err(NixContainerError::BuildFailed {
+                container: flake_dir.display().to_string(),
+                message: format!("Build output does not exist: {}", path.display()),
+            });
+        }
+
+        Ok(path)
+    }
+}
+
+#[async_trait]
+impl ContainerBuildStrategy for NativeNixStrategy {
+    fn name(&self) -> &'static str {
+        "Native Nix"
+    }
+
+    fn strategy_type(&self) -> BuildStrategy {
+        BuildStrategy::NativeNix
+    }
+
+    async fn is_available(&self) -> bool {
+        // Native Nix is only available on Linux with Nix installed
+        self.platform.can_build_native()
+    }
+
+    async fn build(&self, container: &ContainerInfo, config: &BuildConfig) -> Result<PathBuf> {
+        self.run_nix_build(&container.path, &config.nix_attribute).await
+    }
+
+    async fn build_with_progress(
+        &self,
+        container: &ContainerInfo,
+        config: &BuildConfig,
+        mut progress: BoxedProgressCallback,
+    ) -> Result<PathBuf> {
+        // Report resolving phase
+        progress(BuildProgress::new(
+            &container.name,
+            BuildPhase::Resolving,
+            "Resolving flake inputs...",
+        ));
+
+        // Report building phase
+        progress(BuildProgress::new(
+            &container.name,
+            BuildPhase::Building { current: 1, total: 1 },
+            format!("Building {}#{}...", container.path.display(), config.nix_attribute),
+        ));
+
+        // Run the actual build
+        let result = self.run_nix_build(&container.path, &config.nix_attribute).await;
+
+        // Report completion or failure
+        match &result {
+            Ok(path) => {
+                progress(BuildProgress::complete(
+                    &container.name,
+                    format!("Built: {}", path.display()),
+                ));
+            }
+            Err(e) => {
+                progress(BuildProgress::failed(&container.name, e.to_string()));
+            }
+        }
+
+        result
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_native_strategy_name() {
+        let platform = PlatformInfo {
+            platform: crate::platform::Platform::Linux,
+            arch: crate::platform::Architecture::X86_64,
+            nix_available: true,
+            docker_available: false,
+            in_container: false,
+        };
+        let strategy = NativeNixStrategy::new(platform);
+        assert_eq!(strategy.name(), "Native Nix");
+        assert_eq!(strategy.strategy_type(), BuildStrategy::NativeNix);
+    }
+}

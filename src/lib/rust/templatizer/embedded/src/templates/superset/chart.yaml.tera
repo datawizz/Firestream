@@ -1,0 +1,75 @@
+slice_name: {{ title }}
+viz_type: {{ viz_type }}
+params:
+  datasource: {{ dataset_uuid }}__table
+  viz_type: {{ viz_type }}
+  {% if time_range -%}
+  time_range: {{ time_range }}
+  {% endif -%}
+  {% if time_grain -%}
+  time_grain_sqla: {{ time_grain }}
+  {% endif -%}
+  metrics:
+  {% for metric in metrics -%}
+  - {{ metric }}
+  {% endfor -%}
+  adhoc_filters: {{ adhoc_filters | json_encode }}
+  groupby:
+  {% for dimension in dimensions -%}
+  - {{ dimension }}
+  {% endfor -%}
+  {% if viz_type == "line" or viz_type == "bar" -%}
+  limit: 10000
+  timeseries_limit_metric: {% if metrics %}{{ metrics[0] }}{% endif %}
+  order_desc: true
+  contribution: false
+  row_limit: 10000
+  {% endif -%}
+  {% if viz_type == "line" -%}
+  show_brush: auto
+  show_legend: true
+  rich_tooltip: true
+  show_markers: false
+  line_interpolation: linear
+  {% endif -%}
+  {% if viz_type == "bar" -%}
+  bar_stacked: false
+  show_legend: true
+  show_bar_value: true
+  {% endif -%}
+  {% if viz_type == "pie" -%}
+  donut: {{ options.donut | default(value=false) }}
+  show_labels: {{ options.show_labels | default(value=true) }}
+  label_type: {{ options.label_type | default(value="key") }}
+  {% endif -%}
+  {% if viz_type == "table" -%}
+  table_timestamp_format: smart_date
+  page_length: {{ options.page_size | default(value=25) }}
+  include_search: {{ options.include_search | default(value=true) }}
+  table_filter: true
+  {% endif -%}
+  {% if viz_type == "big_number_total" -%}
+  metric: {% if metrics %}{{ metrics[0] }}{% endif %}
+  compare_lag: {{ options.compare_lag | default(value=0) }}
+  compare_suffix: {{ options.compare_suffix | default(value="") }}
+  show_trend_line: {{ options.show_trend | default(value=true) }}
+  start_y_axis_at_zero: true
+  {% endif -%}
+  {% if x_axis_label -%}
+  x_axis_label: {{ x_axis_label }}
+  {% endif -%}
+  {% if y_axis_label -%}
+  y_axis_label: {{ y_axis_label }}
+  {% endif -%}
+  {% if options -%}
+  {% for key, value in options -%}
+  {% if key not in ["donut", "show_labels", "label_type", "page_size", "include_search", "compare_lag", "compare_suffix", "show_trend"] -%}
+  {{ key }}: {{ value | json_encode }}
+  {% endif -%}
+  {% endfor -%}
+  {% endif -%}
+  color_scheme: {{ color_scheme | default(value="supersetColors") }}
+cache_timeout:
+uuid: {{ uuid }}
+version: 1.0.0
+dataset_uuid: {{ dataset_uuid }}

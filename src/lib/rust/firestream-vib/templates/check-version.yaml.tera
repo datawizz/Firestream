@@ -1,0 +1,18 @@
+# Firestream VIB Template - Check Version
+# Validates application version via binary execution
+# Template context variables:
+#   - version: Object with:
+#     - command: Binary name to execute
+#     - args: Command line arguments/flags
+#     - expected: Expected version string to match
+#     - timeout_ms: (optional) Timeout in milliseconds
+
+command:
+  check-app-version:
+    exec: {{ version.command }} {{ version.args }} 2>&1
+    exit-status: 0
+{%- if version.timeout_ms is defined %}
+    timeout: {{ version.timeout_ms }}
+{%- endif %}
+    stdout:
+    - "{{ version.expected }}"

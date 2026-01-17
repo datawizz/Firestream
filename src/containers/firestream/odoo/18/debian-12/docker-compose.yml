@@ -1,0 +1,51 @@
+# Firestream Odoo 18 - Docker Compose
+# Uses Nix-based Odoo container with Bitnami PostgreSQL
+# Note: Prefer using the parent docker-compose.yml for consistent builds
+
+services:
+  postgresql:
+    image: docker.io/bitnami/postgresql:17
+    volumes:
+      - 'postgresql_data:/bitnami/postgresql'
+    environment:
+      # ALLOW_EMPTY_PASSWORD is recommended only for development.
+      - ALLOW_EMPTY_PASSWORD=yes
+      - POSTGRESQL_USERNAME=bn_odoo
+      - POSTGRESQL_DATABASE=bitnami_odoo
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U bn_odoo -d bitnami_odoo"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  odoo:
+    build:
+      context: ../../../../..
+      dockerfile: src/containers/firestream/odoo/18/debian-12/Dockerfile
+    image: firestream-odoo:18
+    ports:
+      - '8069:8069'
+      - '8072:8072'
+    volumes:
+      - 'odoo_data:/bitnami/odoo'
+      - 'odoo_addons:/opt/odoo/addons'
+    depends_on:
+      postgresql:
+        condition: service_healthy
+    environment:
+      # ALLOW_EMPTY_PASSWORD is recommended only for development.
+      - ALLOW_EMPTY_PASSWORD=yes
+      - ODOO_DATABASE_HOST=postgresql
+      - ODOO_DATABASE_PORT_NUMBER=5432
+      - ODOO_DATABASE_USER=bn_odoo
+      - ODOO_DATABASE_NAME=bitnami_odoo
+      - ODOO_EMAIL=admin@example.com
+      - ODOO_PASSWORD=admin
+
+volumes:
+  postgresql_data:
+    driver: local
+  odoo_data:
+    driver: local
+  odoo_addons:
+    driver: local

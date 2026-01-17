@@ -1,0 +1,100 @@
+import { Page } from 'puppeteer';
+import { AxiosInstance } from 'axios';
+
+// Interface for DOM scraping workflow (Workflow 1)
+export interface DOMScrapingImplementation<T = unknown> {
+  // Define selectors for login form
+  getLoginSelectors(): LoginSelectors;
+  
+  // Custom login logic if needed (optional)
+  performLogin?: (page: Page, credentials: any) => Promise<void>;
+  
+  // Define what pages to visit and in what order
+  getNavigationSteps(): NavigationStep[];
+  
+  // Extract data from the page
+  extractData(page: Page, step: NavigationStep): Promise<T[]>;
+  
+  // Transform raw data into final format
+  transformData(raw: T[]): Promise<TransformedData>;
+  
+  // Validate extracted data (optional)
+  validateData?: (data: T[]) => ValidationResult;
+}
+
+// Interface for API scraping workflow (Workflow 2)
+export interface APIScrapingImplementation<T = unknown> {
+  // Define selectors for login form
+  getLoginSelectors(): LoginSelectors;
+  
+  // Extract auth token/cookies after login
+  extractAuth(page: Page): Promise<AuthData>;
+  
+  // Configure API client with extracted auth
+  configureClient(client: AxiosInstance, auth: AuthData): void;
+  
+  // Define API calls to make
+  getAPIRequests(): APIRequest[];
+  
+  // Process API responses into data
+  processResponses(responses: APIResponse[]): Promise<T[]>;
+  
+  // Transform raw data into final format
+  transformData(raw: T[]): Promise<TransformedData>;
+}
+
+// Supporting types
+export interface LoginSelectors {
+  usernameField: string;
+  passwordField: string;
+  submitButton: string;
+  successIndicator?: string;  // Element that appears after successful login
+  errorIndicator?: string;    // Element that indicates login failure
+}
+
+export interface NavigationStep {
+  url: string;
+  waitFor: WaitForOption;
+  name: string;
+  screenshot?: boolean;
+}
+
+export interface APIRequest {
+  method: 'GET' | 'POST' | 'PUT' | 'DELETE';
+  endpoint: string;
+  params?: Record<string, any>;
+  data?: any;
+  name: string;
+}
+
+export interface APIResponse {
+  name: string;
+  data: any;
+  status: number;
+  headers: Record<string, string>;
+}
+
+export type WaitForOption = 
+  | { type: 'selector'; value: string }
+  | { type: 'navigation' }
+  | { type: 'networkidle' }
+  | { type: 'timeout'; value: number }
+  | { type: 'function'; value: () => boolean };
+
+export interface TransformedData {
+  recordCount: number;
+  extractedAt: string;
+  data: any[];
+  metadata?: Record<string, any>;
+}
+
+export interface ValidationResult {
+  valid: boolean;
+  errors?: string[];
+}
+
+export interface AuthData {
+  token?: string;
+  cookies?: any[];
+  headers?: Record<string, string>;
+}

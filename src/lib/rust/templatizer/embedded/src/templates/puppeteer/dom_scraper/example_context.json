@@ -1,0 +1,84 @@
+{
+  "site_name": "example_shop",
+  "site_url": "https://shop.example.com",
+  "workflow_type": "dom-scraping",
+  
+  "auth_type": "form",
+  "login_path": "account/login",
+  
+  "login_username_selector": "input[name='email']",
+  "login_password_selector": "input[name='password']",
+  "login_submit_selector": "button[type='submit']",
+  "login_success_selector": ".account-dashboard",
+  "login_error_selector": ".error-message",
+  
+  "auth_storage": "localStorage",
+  "auth_token_key": "auth_token",
+  "auth_cookie_name": "session_id",
+  "auth_header_format": "Bearer {token}",
+  
+  "s3_bucket": "my-data-lake",
+  "s3_region": "us-east-1",
+  "output_format": "parquet",
+  
+  "enable_retry": true,
+  "retry_attempts": 3,
+  "retry_backoff": 1000,
+  
+  "navigation_steps": [
+    {
+      "name": "products-list",
+      "url": "/products",
+      "wait_type": "selector",
+      "wait_value": ".product-grid",
+      "screenshot": true
+    },
+    {
+      "name": "categories",
+      "url": "/categories",
+      "wait_type": "networkidle",
+      "wait_value": "",
+      "screenshot": false
+    }
+  ],
+  
+  "api_version": "v2",
+  "api_endpoints": [
+    {
+      "name": "products",
+      "method": "GET",
+      "path": "/api/v2/products",
+      "params": {
+        "page": 1,
+        "limit": 100
+      }
+    },
+    {
+      "name": "categories",
+      "method": "GET",
+      "path": "/api/v2/categories"
+    },
+    {
+      "name": "inventory",
+      "method": "POST",
+      "path": "/api/v2/inventory/search",
+      "data": {
+        "status": "available"
+      }
+    }
+  ],
+  
+  "api_headers": [
+    {
+      "name": "X-API-Version",
+      "value": "2.0"
+    },
+    {
+      "name": "Accept",
+      "value": "application/json"
+    }
+  ],
+  
+  "docker_registry": "docker.io/myorg",
+  "maintainer_email": "data-team@example.com"
+}

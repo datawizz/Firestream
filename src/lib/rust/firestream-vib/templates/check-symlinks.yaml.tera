@@ -1,0 +1,9 @@
+# Firestream VIB Template - Check Symlinks
+# Validates there are no broken symlinks in specified directory
+# Template context variables:
+#   - root_dir: Root directory to scan for broken symlinks
+
+command:
+  check-broken-symlinks:
+    exec: if [ $(find {{ root_dir }} -xtype l | wc -l) -gt 0 ]; then exit 1; fi
+    exit-status: 0

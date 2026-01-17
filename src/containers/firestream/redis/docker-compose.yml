@@ -1,0 +1,29 @@
+# Firestream Redis - Docker Compose for Development
+# Copyright Firestream. Apache-2.0 License.
+#
+# Usage:
+#   1. Build with Nix: nix build .#dockerImage
+#   2. Load image: docker load < result
+#   3. Run: docker compose up
+
+services:
+  redis:
+    image: firestream-redis:7
+    environment:
+      # ALLOW_EMPTY_PASSWORD is recommended only for development
+      - ALLOW_EMPTY_PASSWORD=yes
+      - REDIS_DISABLE_COMMANDS=FLUSHDB,FLUSHALL
+      - BITNAMI_DEBUG=true
+    ports:
+      - '6379:6379'
+    volumes:
+      - 'redis_data:/firestream/redis/data'
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  redis_data:
+    driver: local

@@ -1,0 +1,22 @@
+# Firestream VIB Template - Check Linked Libraries
+# Validates that executables have no missing linked libraries
+# Template context variables:
+#   - linked_libraries: Object with:
+#     - enabled: Boolean to enable/disable check
+#     - root_dir: Root directory to scan
+#     - exclude_patterns: (optional) Array of patterns to exclude
+#     - timeout_ms: (optional) Timeout in milliseconds
+
+command:
+  check-linked-libraries:
+{%- if linked_libraries.exclude_patterns is defined %}
+    exec: export ROOT_DIR={{ linked_libraries.root_dir }} && export EXCLUDE_PATTERNS='{{ linked_libraries.exclude_patterns | join(sep="|") }}' && ./scripts/check-linked-libraries.sh
+{%- else %}
+    exec: export ROOT_DIR={{ linked_libraries.root_dir }} && export EXCLUDE_PATTERNS='' && ./scripts/check-linked-libraries.sh
+{%- endif %}
+{%- if linked_libraries.timeout_ms is defined %}
+    timeout: {{ linked_libraries.timeout_ms }}
+{%- else %}
+    timeout: 20000
+{%- endif %}
+    exit-status: 0

@@ -6,9 +6,9 @@
 	],
 	"service": "devcontainer",
 	"hostRequirements": {
-		"cpus": 4,
-		"memory": "8gb",
-		"storage": "32gb"
+		"cpus": 8,
+		"memory": "16gb",
+		"storage": "64gb"
 	},
 	"remoteUser": "firestream",
 	// initializeCommand runs on the host before building the container.
@@ -48,7 +48,9 @@
 			"settings": {
 				// Force rust-analyzer to only run in the workspace (container), not on host
 				"remote.extensionKind": {
-					"rust-lang.rust-analyzer": ["workspace"]
+					"rust-lang.rust-analyzer": [
+						"workspace"
+					]
 				},
 				"python.defaultInterpreterPath": "/home/firestream/.python",
 				"jupyter.defaultKernelPath": "/home/firestream/.python",
@@ -104,7 +106,10 @@
 				"rust-analyzer.cargo.autoreload": true,
 				"rust-analyzer.server.path": "rust-analyzer",
 				"rust-analyzer.cargo.buildScripts.enable": true,
-				"rust-analyzer.rustfmt.extraArgs": ["--edition", "2021"],
+				"rust-analyzer.rustfmt.extraArgs": [
+					"--edition",
+					"2021"
+				],
 				"rust-analyzer.check.command": "clippy",
 				"rust-analyzer.checkOnSave.extraArgs": [
 					"--target-dir=target-ra"

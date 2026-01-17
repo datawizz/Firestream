@@ -1,0 +1,11 @@
+# Firestream VIB Template - Check Binaries
+# Validates that specified binaries are available in $PATH
+# Template context variables:
+#   - binaries: Array of binary names to check
+
+command:
+{%- for binary in binaries %}
+  check-{{ binary }}-binary:
+    exec: which {{ binary }}
+    exit-status: 0
+{%- endfor %}
