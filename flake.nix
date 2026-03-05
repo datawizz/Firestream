@@ -463,6 +463,11 @@
       };
     };
 
+    # Home Manager module for Firestream CLI/TUI
+    # Usage: imports = [ inputs.firestream.homeManagerModules.default ];
+    homeManagerModules.default = import ./bin/nix/firestream/home-manager/firestream.nix;
+    homeModules.default = import ./bin/nix/firestream/home-manager/firestream.nix;
+
     # Test suite for the Firestream module system
     # Build with: nix build .#checks.x86_64-linux.firestream-tests
     # Or run all checks: nix flake check
