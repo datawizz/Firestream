@@ -10,6 +10,10 @@
 { pkgs, lib, mkRustPackage }:
 
 {
+  # firestream: CLI/TUI for managing data infrastructure services
+  # Usage: firestream [COMMAND] or launch the TUI
+  firestream = import ./firestream.nix { inherit pkgs lib mkRustPackage; };
+
   # wait-for-port: Rust-based port availability checker
   # Usage: wait-for-port PORT [--host HOST] [--state inuse|free] [--timeout SECS]
   wait-for-port = import ./wait-for-port.nix { inherit pkgs lib mkRustPackage; };

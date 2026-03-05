@@ -51,11 +51,18 @@ in {
     nativeBuildInputs ? [],
     env ? {},
     meta ? {},
+    sourceFilter ? null,
     ...
   }@args:
     let
-      # Filter source to only Rust-relevant files
-      cleanedSrc = craneLib.cleanCargoSource src;
+      # Filter source: Rust files + optional extra files (templates, configs, etc.)
+      cleanedSrc = if sourceFilter != null
+        then lib.cleanSourceWith {
+          inherit src;
+          filter = path: type:
+            (sourceFilter path type) || (craneLib.filterCargoSources path type);
+        }
+        else craneLib.cleanCargoSource src;
 
       # Common arguments for both deps and final build
       commonArgs = {

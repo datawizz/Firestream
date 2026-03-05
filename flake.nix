@@ -355,7 +355,7 @@
       config = mkContainerConfig system;
     in {
       container = config.container;
-      default = config.container;
+      default = firestreamWithRust.packages.firestream;
 
       # VIB (Validation, Inspection, Build) Tools bundle
       # Collection of tools for container testing and vulnerability scanning
@@ -399,8 +399,10 @@
 
       # ====================================================================
       # RUST PACKAGES (built with Crane)
+      # Usage: nix build .#firestream
       # Usage: nix build .#wait-for-port
       # ====================================================================
+      firestream = firestreamWithRust.packages.firestream;
       wait-for-port = firestreamWithRust.packages.wait-for-port;
     });
 
