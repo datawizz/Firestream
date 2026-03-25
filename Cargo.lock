@@ -1765,6 +1765,7 @@ dependencies = [
  "tera",
  "thiserror 1.0.69",
  "tokio",
+ "toml",
  "tracing",
  "tracing-subscriber",
  "uuid",
@@ -5473,6 +5474,7 @@ version = "0.1.0"
 dependencies = [
  "chrono",
  "clap",
+ "regex",
  "reqwest",
  "rust-embed",
  "serde",
@@ -5482,6 +5484,7 @@ dependencies = [
  "tera",
  "thiserror 1.0.69",
  "tokio",
+ "toml",
  "tracing",
  "tracing-subscriber",
  "uuid",

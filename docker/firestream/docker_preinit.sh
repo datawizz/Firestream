@@ -10,11 +10,48 @@ fi
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
 PROJECT_ROOT="$(dirname "$(dirname "$SCRIPT_DIR")")"
 
+# ── Reusable functions ────────────────────────────────────────────────
+# These are safe to use when this script is sourced by other scripts.
+
+# Detect if the project root is a git worktree and export paths needed
+# for Docker mount setup. In a worktree, .git is a file containing an
+# absolute gitdir pointer. To make this work inside a Docker container,
+# the repo and the main .git dir must be mounted at their original host
+# paths so every absolute pointer resolves unchanged.
+#
+# Sets:
+#   GIT_WORKTREE_DETECTED   — "true" or "false"
+#   GIT_WORKTREE_COMMON_DIR — absolute path to the main .git dir, or empty
+detect_git_worktree() {
+    local project_root="${1:-.}"
+    GIT_WORKTREE_DETECTED="false"
+    GIT_WORKTREE_COMMON_DIR=""
+
+    if [[ -f "$project_root/.git" ]]; then
+        local git_common_dir
+        git_common_dir="$(cd "$(git -C "$project_root" rev-parse --git-common-dir)" && pwd)"
+
+        if [[ -d "$git_common_dir/objects" ]]; then
+            GIT_WORKTREE_DETECTED="true"
+            GIT_WORKTREE_COMMON_DIR="$git_common_dir"
+        fi
+    fi
+
+    export GIT_WORKTREE_DETECTED GIT_WORKTREE_COMMON_DIR
+}
+
+# ── Main execution (skipped when sourced) ─────────────────────────────
+# When this script is sourced by another script, only the functions
+# above are defined. The main body below runs only on direct execution.
+if [[ "${BASH_SOURCE[0]}" != "${0}" ]]; then
+    return 0 2>/dev/null || true
+fi
 
 echo "SCRIPT_DIR: $SCRIPT_DIR"
 echo "PROJECT_ROOT: $PROJECT_ROOT"
 echo "Looking for files at:"
-echo " - ${PROJECT_ROOT}/etc/.env.example"
+echo " - ${PROJECT_ROOT}/etc/.env.secrets"
+echo " - ${PROJECT_ROOT}/etc/.env.secrets.example"
 
 # Determine OS platform
 OS_PLATFORM="$(uname -s)"
@@ -173,15 +210,15 @@ fi
 
 # Function to set variable based on file existence
 set_env_variable() {
-    local example_file_path="${PROJECT_ROOT}/etc/.env.example"
-    local expected_file_path="${PROJECT_ROOT}/etc/.env"
+    local example_file_path="${PROJECT_ROOT}/etc/.env.secrets.example"
+    local expected_file_path="${PROJECT_ROOT}/etc/.env.secrets"
 
     if [ -e "$expected_file_path" ]; then
         ENV_SECRETS_PATH="$expected_file_path"
     elif [ -e "$example_file_path" ]; then
         ENV_SECRETS_PATH="$example_file_path"
     else
-        echo "Error: Neither .env nor .env.example found"
+        echo "Error: Neither .env.secrets nor .env.secrets.example found"
         exit 1
     fi
 

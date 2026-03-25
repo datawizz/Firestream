@@ -203,6 +203,7 @@ let
   runtimeBinDeps = with pkgs; [
     coreutils bash gnused gnugrep gawk findutils which
     postgresql git crudini curl netcat-gnu openssh jq
+    firestream.waitForPortPkg  # Required by init.sh for database/redis readiness checks
   ];
 
   # Build-time: Airflow config template with {{PLACEHOLDER}} syntax
@@ -218,6 +219,7 @@ let
     load_examples = {{AIRFLOW_LOAD_EXAMPLES}}
     fernet_key = {{AIRFLOW_FERNET_KEY}}
     auth_manager = airflow.providers.fab.auth_manager.fab_auth_manager.FabAuthManager
+    execution_api_server_url = {{AIRFLOW_EXECUTION_API_SERVER_URL}}
 
     [database]
     sql_alchemy_conn = {{AIRFLOW_DATABASE_SQL_ALCHEMY_CONN}}
@@ -292,8 +294,8 @@ in firestream.mkPythonContainerModule {
     AIRFLOW_WEBSERVER_CONF_FILE = "/opt/airflow/webserver_config.py";
 
     # User configuration
-    AIRFLOW_USERNAME = "user";
-    AIRFLOW_PASSWORD = "bitnami";
+    AIRFLOW_USERNAME = "admin";
+    AIRFLOW_PASSWORD = "admin";
     AIRFLOW_FIRSTNAME = "Firstname";
     AIRFLOW_LASTNAME = "Lastname";
     AIRFLOW_EMAIL = "user@example.com";
@@ -322,8 +324,8 @@ in firestream.mkPythonContainerModule {
     # Database configuration
     AIRFLOW_DATABASE_HOST = "postgresql";
     AIRFLOW_DATABASE_PORT_NUMBER = "5432";
-    AIRFLOW_DATABASE_NAME = "bitnami_airflow";
-    AIRFLOW_DATABASE_USERNAME = "bn_airflow";
+    AIRFLOW_DATABASE_NAME = "airflow";
+    AIRFLOW_DATABASE_USERNAME = "airflow";
     AIRFLOW_DATABASE_USE_SSL = "no";
     AIRFLOW_DATABASE_PASSWORD = "";
 
@@ -523,6 +525,9 @@ in firestream.mkPythonContainerModule {
     [[ "$port" != "80" && "$port" != "443" ]] && \
       base_url="''${base_url}:''${port}"
 
+    # Compute execution API URL (Airflow 3 scheduler needs this)
+    local execution_api_url="http://''${AIRFLOW_APISERVER_HOST:-localhost}:''${port}/execution/"
+
     # Compute Celery broker URL if needed
     local celery_broker_url="" celery_result_backend=""
     local executor="''${AIRFLOW_EXECUTOR:-LocalExecutor}"
@@ -557,6 +562,7 @@ in firestream.mkPythonContainerModule {
         -e "s|{{AIRFLOW_APISERVER_PORT_NUMBER}}|''${port}|g" \
         -e "s|{{AIRFLOW_APISERVER_HOST}}|''${AIRFLOW_APISERVER_HOST:-localhost}|g" \
         -e "s|{{AIRFLOW_BASE_URL}}|''${base_url}|g" \
+        -e "s|{{AIRFLOW_EXECUTION_API_SERVER_URL}}|''${execution_api_url}|g" \
         -e "s|{{AIRFLOW_WEBSERVER_SECRET_KEY}}|''${AIRFLOW_WEBSERVER_SECRET_KEY:-}|g" \
         -e "s|{{AIRFLOW_APISERVER_SECRET_KEY}}|''${AIRFLOW_APISERVER_SECRET_KEY:-}|g" \
         -e "s|{{AIRFLOW_JWT_SECRET_KEY}}|''${AIRFLOW_JWT_SECRET_KEY:-}|g" \

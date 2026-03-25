@@ -218,7 +218,8 @@ ${user.name}:!:::::::
         pkgs.bashInteractive
         pkgs.cacert
         pkgs.stdenv.cc.cc.lib
-      ] ++ systemDeps ++ runtimeBinDeps ++ [
+        waitForPortPkg
+      ] ++ systemDeps ++ runtimeBinDeps ++ extraDeps ++ [
         # Layer group 2: App scripts (change with code updates)
         appModule.scripts.envDefaults
         appModule.scripts.fileLoader

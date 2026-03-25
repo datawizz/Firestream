@@ -82,18 +82,48 @@ container-build-%:
 	@$(BUILD_CONTAINER) $*
 
 # ==============================================================================
+# Shared Dependency Targets
+# ==============================================================================
+build-dep-redis:
+	@if ! docker image inspect firestream-redis:7 >/dev/null 2>&1; then \
+		echo "Building Redis..."; \
+		$(BUILD_CONTAINER) redis; \
+	else \
+		echo "Redis image already exists"; \
+	fi
+
+build-dep-postgresql:
+	@if ! docker image inspect firestream-postgresql:17 >/dev/null 2>&1; then \
+		echo "Building PostgreSQL..."; \
+		$(BUILD_CONTAINER) postgresql; \
+	else \
+		echo "PostgreSQL image already exists"; \
+	fi
+
+# ==============================================================================
 # Airflow (Nix-based container)
 # ==============================================================================
 AIRFLOW_DIR := src/containers/firestream/airflow
 AIRFLOW_COMPOSE := $(AIRFLOW_DIR)/docker-compose.yml
 
-airflow-build:
+airflow-build-deps: build-dep-redis build-dep-postgresql
+	@echo "==> Airflow dependencies ready"
+
+airflow-build: airflow-build-deps
 	@$(BUILD_CONTAINER) airflow
 
 airflow-start:
 	@if ! docker image inspect firestream-airflow:3.0.3 >/dev/null 2>&1; then \
-		echo "Image not found, building..."; \
+		echo "Airflow image not found, building..."; \
 		$(MAKE) airflow-build; \
+	fi
+	@if ! docker image inspect firestream-redis:7 >/dev/null 2>&1; then \
+		echo "Redis image not found, building..."; \
+		$(BUILD_CONTAINER) redis; \
+	fi
+	@if ! docker image inspect firestream-postgresql:17 >/dev/null 2>&1; then \
+		echo "PostgreSQL image not found, building..."; \
+		$(BUILD_CONTAINER) postgresql; \
 	fi
 	docker compose -f $(AIRFLOW_COMPOSE) up -d
 	@echo "Airflow is running at http://localhost:8090"
@@ -542,30 +572,25 @@ supabase-credentials:
 # ==============================================================================
 # Superset (Nix-based container)
 # ==============================================================================
-SUPERSET_DIR := src/containers/firestream/superset
+SUPERSET_VERSION ?= 5
+SUPERSET_DIR := src/containers/firestream/superset/$(SUPERSET_VERSION)
 SUPERSET_COMPOSE := $(SUPERSET_DIR)/docker-compose.yml
+
+ifeq ($(SUPERSET_VERSION),4)
+  SUPERSET_IMAGE_TAG := 4.1.1
+else
+  SUPERSET_IMAGE_TAG := $(SUPERSET_VERSION)
+endif
 
 superset-build: superset-build-deps
 	@$(BUILD_CONTAINER) superset
 
 # Build superset dependencies (redis and postgresql)
-superset-build-deps:
-	@echo "==> Building Superset dependencies..."
-	@if ! docker image inspect firestream-redis:7 >/dev/null 2>&1; then \
-		echo "Building Redis..."; \
-		$(BUILD_CONTAINER) redis; \
-	else \
-		echo "Redis image already exists"; \
-	fi
-	@if ! docker image inspect firestream-postgresql:17 >/dev/null 2>&1; then \
-		echo "Building PostgreSQL..."; \
-		$(BUILD_CONTAINER) postgresql; \
-	else \
-		echo "PostgreSQL image already exists"; \
-	fi
+superset-build-deps: build-dep-redis build-dep-postgresql
+	@echo "==> Superset dependencies ready"
 
 superset-start:
-	@if ! docker image inspect firestream-superset:4.1.1 >/dev/null 2>&1; then \
+	@if ! docker image inspect firestream-superset:$(SUPERSET_IMAGE_TAG) >/dev/null 2>&1; then \
 		echo "Superset image not found, building..."; \
 		$(MAKE) superset-build; \
 	fi
@@ -603,7 +628,7 @@ superset-status:
 	docker compose -f $(SUPERSET_COMPOSE) ps
 
 superset-clean: superset-stop
-	docker rmi firestream-superset:4.1.1-nix 2>/dev/null || true
+	docker rmi firestream-superset:$(SUPERSET_IMAGE_TAG) 2>/dev/null || true
 	docker compose -f $(SUPERSET_COMPOSE) down -v
 
 superset-credentials:

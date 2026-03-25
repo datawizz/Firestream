@@ -127,7 +127,7 @@
     } ''
       mkdir -p $out/bin
       makeWrapper ${entrypoint}/bin/${name}-entrypoint $out/bin/${name}-entrypoint \
-        --set PATH "${lib.makeBinPath (pythonRuntimeBins ++ systemDeps)}:$PATH" \
+        --set PATH "${lib.makeBinPath (pythonRuntimeBins ++ systemDeps)}:/bin:/usr/bin" \
         --set PYTHONPATH "${pythonSitePackages}" \
         --set LD_LIBRARY_PATH "${lib.makeLibraryPath [ pkgs.stdenv.cc.cc.lib ]}:''${LD_LIBRARY_PATH:-}" \
         --set SSL_CERT_FILE "${pkgs.cacert}/etc/ssl/certs/ca-bundle.crt" \

@@ -343,6 +343,15 @@
         };
       in jupyterhubOutputs.packages.${system}.dockerImage;
 
+      # Import Superset (requires Python packaging inputs, supports versions 4 and 5)
+      mkSuperset = version: let
+        repoSrc = filteredRepoSource pkgs;
+        supersetFlake = import "${repoSrc}/src/containers/firestream/superset/${version}/flake.nix";
+        supersetOutputs = supersetFlake.outputs {
+          inherit self nixpkgs flake-utils pyproject-nix uv2nix pyproject-build-systems;
+        };
+      in supersetOutputs.packages.${system}.dockerImage;
+
       # Import Redis module directly for top-level access
       mkRedis = redisVersion: let
         firestream = import ./bin/nix/firestream { inherit pkgs; };
@@ -380,6 +389,9 @@
       airflow = if isLinux then mkAirflow else unavailable "airflow";
       odoo = if isLinux then mkOdoo else unavailable "odoo";
       jupyterhub = if isLinux then mkJupyterhub else unavailable "jupyterhub";
+      superset = if isLinux then mkSuperset "5" else unavailable "superset";
+      superset-4 = if isLinux then mkSuperset "4" else unavailable "superset-4";
+      superset-5 = if isLinux then mkSuperset "5" else unavailable "superset-5";
 
       # ====================================================================
       # Container images namespace (backward compatible)
@@ -389,6 +401,9 @@
         airflow = if isLinux then mkAirflow else unavailable "airflow";
         odoo = if isLinux then mkOdoo else unavailable "odoo";
         jupyterhub = if isLinux then mkJupyterhub else unavailable "jupyterhub";
+        superset = if isLinux then mkSuperset "5" else unavailable "superset";
+        superset-4 = if isLinux then mkSuperset "4" else unavailable "superset-4";
+        superset-5 = if isLinux then mkSuperset "5" else unavailable "superset-5";
         postgresql = if isLinux then mkPostgresql "17" else unavailable "postgresql";
         postgresql-16 = if isLinux then mkPostgresql "16" else unavailable "postgresql-16";
         postgresql-17 = if isLinux then mkPostgresql "17" else unavailable "postgresql-17";
