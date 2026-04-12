@@ -78,9 +78,8 @@ in {
       } // env;
 
       # Build only the dependencies (cached layer)
-      cargoArtifacts = craneLib.buildDepsOnly (commonArgs // {
-        pname = "${name}-deps";
-      });
+      # Note: Crane automatically appends "-deps" to pname internally
+      cargoArtifacts = craneLib.buildDepsOnly commonArgs;
 
     in craneLib.buildPackage (commonArgs // {
       inherit cargoArtifacts cargoExtraArgs;
