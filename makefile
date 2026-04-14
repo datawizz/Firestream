@@ -52,6 +52,15 @@ help:
 	@echo "  make docker-reset        # Clean all Docker resources"
 	@echo "  make nix-up              # Build Nix flake"
 	@echo "  make nix-fix             # Garbage collect Nix"
+	@echo "  make builder-cache-stats # Show Nix cache volume usage"
+	@echo "  make builder-cache-clean # Remove Nix cache volumes"
+	@echo ""
+	@echo "=== SBOM / Fleet Manifest ==="
+	@echo ""
+	@echo "  make manifest            # Build fleet SBOM (CycloneDX + SPDX)"
+	@echo "  make sbom-airflow        # Build individual container SBOM"
+	@echo "  make manifest-validate   # Validate CycloneDX compliance"
+	@echo "  make manifest-clean      # Clean manifest build artifacts"
 	@echo ""
 	@echo "=== Documentation ==="
 	@echo ""
@@ -644,17 +653,10 @@ superset-credentials:
 # ==============================================================================
 
 # Build all Nix-based containers (excludes supabase which uses official compose)
+# Uses batch mode for efficient serial builds with shared Nix cache
 containers-build-all:
-	@echo "Building all Firestream Nix containers..."
-	$(MAKE) airflow-build
-	$(MAKE) jupyterhub-build
-	$(MAKE) kafka-build
-	$(MAKE) odoo-build
-	$(MAKE) postgres-build
-	$(MAKE) redis-build
-	$(MAKE) spark-build
-	$(MAKE) superset-build
-	@echo "All containers built successfully!"
+	@echo "Building all Firestream Nix containers (batch mode)..."
+	@$(BUILD_CONTAINER) postgresql redis airflow kafka spark jupyterhub --version 15 odoo --version 16 odoo --version 17 odoo --version 18 odoo superset
 
 # Clean all containers
 containers-clean-all:
@@ -725,6 +727,57 @@ nix-fix:
 
 docker-reset:
 	bash bin/commands/delete.sh
+
+# ==============================================================================
+# Builder Cache Management
+# ==============================================================================
+
+# Show Nix store cache usage (volume-based caching)
+builder-cache-stats:
+	@echo "=== Nix Store Cache Volumes ==="
+	@docker volume ls --filter name=firestream-nix-store
+	@echo ""
+	@for vol in $$(docker volume ls -q --filter name=firestream-nix-store); do \
+		echo "  $$vol"; \
+	done
+
+# Clean Nix store cache (reclaim disk space)
+builder-cache-clean:
+	@echo "Removing Nix store cache volumes..."
+	-docker volume rm firestream-nix-store-amd64 2>/dev/null || true
+	-docker volume rm firestream-nix-store-arm64 2>/dev/null || true
+	@echo "Cache cleared. Next build will be slower (cold cache)."
+
+# ==============================================================================
+# SBOM / Fleet Manifest
+# ==============================================================================
+
+# Build script (handles git worktrees, Docker resources, etc.)
+MANIFEST_SCRIPT := bin/build/manifest.sh
+
+# Build fleet manifest in a Linux container (required for macOS)
+# Produces: sbom-cyclonedx.json, sbom-spdx.json, manifest.json
+manifest:
+	@$(MANIFEST_SCRIPT)
+
+# Build individual container SBOM in a Linux container
+# Usage: make sbom-airflow, make sbom-spark, etc.
+sbom-%:
+	@$(MANIFEST_SCRIPT) $*
+
+# Validate CycloneDX SBOM compliance
+manifest-validate: manifest
+	@echo "Validating CycloneDX SBOM..."
+	@if command -v cyclonedx &>/dev/null; then \
+		cyclonedx validate --input-file _build/manifest/sbom-cyclonedx.json; \
+	else \
+		echo "cyclonedx-cli not found. Install with: nix run nixpkgs#cyclonedx-cli"; \
+		echo "Alternatively, check online at: https://cyclonedx.org/validator"; \
+	fi
+
+# Clean manifest build artifacts
+manifest-clean:
+	rm -rf _build/manifest _build/sbom
 
 # ==============================================================================
 # Documentation
