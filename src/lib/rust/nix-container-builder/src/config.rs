@@ -1,6 +1,7 @@
 //! Configuration types for nix-container-builder
 
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use std::path::PathBuf;
 use std::time::Duration;
 
@@ -31,6 +32,40 @@ pub struct BuildConfig {
 
     /// Maximum concurrent builds (for parallel building)
     pub max_concurrent: usize,
+
+    /// Package registry mapping container names to root flake package names.
+    /// Mirrors the CONTAINER_REGISTRY from bin/build/_common.sh.
+    /// Keys are "container" or "container:version", values are flake package names.
+    #[serde(default = "default_package_registry")]
+    pub package_registry: HashMap<String, String>,
+}
+
+/// Create the default package registry matching bin/build/_common.sh CONTAINER_REGISTRY.
+fn default_package_registry() -> HashMap<String, String> {
+    let entries = [
+        // PostgreSQL
+        ("postgresql", "postgresql-17"),
+        ("postgresql:16", "postgresql-16"),
+        ("postgresql:17", "postgresql-17"),
+        // Redis
+        ("redis", "redis-7"),
+        ("redis:7", "redis-7"),
+        ("redis:8", "redis-8"),
+        // Superset
+        ("superset", "superset-5"),
+        ("superset:4", "superset-4"),
+        ("superset:5", "superset-5"),
+        // Single-version containers
+        ("airflow", "airflow"),
+        ("kafka", "kafka"),
+        ("spark", "spark"),
+        ("jupyterhub", "jupyterhub"),
+        ("odoo", "odoo"),
+    ];
+    entries
+        .iter()
+        .map(|(k, v)| (k.to_string(), v.to_string()))
+        .collect()
 }
 
 impl Default for BuildConfig {
@@ -44,6 +79,7 @@ impl Default for BuildConfig {
             timeout: Duration::from_secs(600),
             retries: RetryConfig::default(),
             max_concurrent: num_cpus::get(),
+            package_registry: default_package_registry(),
         }
     }
 }
@@ -69,7 +105,34 @@ impl BuildConfig {
             timeout: Duration::from_secs(600),
             retries: RetryConfig::default(),
             max_concurrent: num_cpus::get(),
+            package_registry: default_package_registry(),
         }
+    }
+
+    /// Resolve a container name (with optional version) to a root flake package name.
+    ///
+    /// Tries exact match with version first, then falls back to default version.
+    /// Mirrors the logic in bin/build/_common.sh `resolve_package_name()`.
+    ///
+    /// # Examples
+    /// ```
+    /// use nix_container_builder::BuildConfig;
+    /// let config = BuildConfig::default();
+    /// assert_eq!(config.resolve_package_name("postgresql", Some("17")), Some("postgresql-17".to_string()));
+    /// assert_eq!(config.resolve_package_name("postgresql", None), Some("postgresql-17".to_string()));
+    /// assert_eq!(config.resolve_package_name("airflow", None), Some("airflow".to_string()));
+    /// assert_eq!(config.resolve_package_name("unknown", None), None);
+    /// ```
+    pub fn resolve_package_name(&self, container: &str, version: Option<&str>) -> Option<String> {
+        // Try exact match with version first
+        if let Some(ver) = version {
+            let key = format!("{}:{}", container, ver);
+            if let Some(pkg) = self.package_registry.get(&key) {
+                return Some(pkg.clone());
+            }
+        }
+        // Fall back to default (no version)
+        self.package_registry.get(container).cloned()
     }
 
     /// Set the containers directory
@@ -184,6 +247,7 @@ mod tests {
         assert!(!config.force_native);
         assert!(!config.force_docker);
         assert_eq!(config.timeout, Duration::from_secs(600));
+        assert!(!config.package_registry.is_empty());
     }
 
     #[test]
@@ -198,6 +262,34 @@ mod tests {
         assert_eq!(config.nix_attribute, "customAttr");
         assert!(config.force_native);
         assert_eq!(config.timeout, Duration::from_secs(300));
+    }
+
+    #[test]
+    fn test_resolve_package_name() {
+        let config = BuildConfig::default();
+
+        // Exact version match
+        assert_eq!(config.resolve_package_name("postgresql", Some("17")), Some("postgresql-17".to_string()));
+        assert_eq!(config.resolve_package_name("postgresql", Some("16")), Some("postgresql-16".to_string()));
+        assert_eq!(config.resolve_package_name("redis", Some("7")), Some("redis-7".to_string()));
+        assert_eq!(config.resolve_package_name("redis", Some("8")), Some("redis-8".to_string()));
+        assert_eq!(config.resolve_package_name("superset", Some("4")), Some("superset-4".to_string()));
+
+        // Default version (no version specified)
+        assert_eq!(config.resolve_package_name("postgresql", None), Some("postgresql-17".to_string()));
+        assert_eq!(config.resolve_package_name("redis", None), Some("redis-7".to_string()));
+        assert_eq!(config.resolve_package_name("superset", None), Some("superset-5".to_string()));
+
+        // Single-version containers
+        assert_eq!(config.resolve_package_name("airflow", None), Some("airflow".to_string()));
+        assert_eq!(config.resolve_package_name("kafka", None), Some("kafka".to_string()));
+        assert_eq!(config.resolve_package_name("spark", None), Some("spark".to_string()));
+        assert_eq!(config.resolve_package_name("jupyterhub", None), Some("jupyterhub".to_string()));
+        assert_eq!(config.resolve_package_name("odoo", None), Some("odoo".to_string()));
+
+        // Unknown container
+        assert_eq!(config.resolve_package_name("unknown", None), None);
+        assert_eq!(config.resolve_package_name("postgresql", Some("99")), Some("postgresql-17".to_string())); // falls back to default
     }
 
     #[test]

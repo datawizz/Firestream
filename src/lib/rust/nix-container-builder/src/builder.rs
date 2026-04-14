@@ -10,7 +10,7 @@ use crate::embedded::{containers_dir, extract_embedded, ExtractedWorkspace};
 use crate::error::{NixContainerError, Result};
 use crate::platform::PlatformInfo;
 use crate::progress::{BuildPhase, BuildProgress, MultiProgress};
-use crate::strategy::{create_strategy_with_workspace, BuildStrategy};
+use crate::strategy::{create_strategy_with_workspace, BuildMode, BuildStrategy};
 use futures::stream::{self, StreamExt};
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -419,6 +419,83 @@ impl NixContainerBuilder {
         }
 
         Ok(successes)
+    }
+
+    /// Build a container by root flake package name (e.g., "airflow", "postgresql-17").
+    ///
+    /// This uses `BuildMode::RootFlake` to build from the repo root with `nix build .#<package>`.
+    /// This is the preferred method for all containers, especially those without per-container flake.nix
+    /// (airflow, jupyterhub, odoo, superset).
+    pub async fn build_package(&self, package_name: &str) -> Result<BuildResult> {
+        self.build_package_with_progress(package_name, |_| {}).await
+    }
+
+    /// Build a container by root flake package name with progress reporting.
+    pub async fn build_package_with_progress<F>(
+        &self,
+        package_name: &str,
+        mut progress: F,
+    ) -> Result<BuildResult>
+    where
+        F: FnMut(BuildProgress) + Send,
+    {
+        let start = Instant::now();
+
+        progress(BuildProgress::new(
+            package_name,
+            BuildPhase::Resolving,
+            format!("Resolving package .#{}...", package_name),
+        ));
+
+        // Create build strategy
+        let strategy = create_strategy_with_workspace(
+            &self.platform,
+            &self.config,
+            self.workspace_root.clone(),
+        );
+        let strategy_type = strategy.strategy_type();
+
+        info!("Building package {} with {} strategy", package_name, strategy.name());
+
+        if !strategy.is_available().await {
+            return Err(NixContainerError::UnsupportedPlatform(format!(
+                "{} strategy is not available on this platform",
+                strategy.name()
+            )));
+        }
+
+        let mode = BuildMode::RootFlake {
+            package_name: package_name.to_string(),
+        };
+
+        progress(BuildProgress::new(
+            package_name,
+            BuildPhase::Building { current: 1, total: 1 },
+            format!("Building .#{}...", package_name),
+        ));
+
+        // Build using the root flake mode
+        let tarball_path = strategy.build_with_mode(&mode, &self.config).await?;
+
+        // Load into Docker
+        progress(BuildProgress::loading(package_name));
+        let load_result = self.loader.load_image(&tarball_path).await?;
+
+        let duration = start.elapsed();
+
+        progress(BuildProgress::complete(
+            package_name,
+            format!("Built {} in {:?}", load_result.full_ref(), duration),
+        ));
+
+        Ok(BuildResult {
+            container: package_name.to_string(),
+            image_name: load_result.image_name,
+            image_tag: load_result.image_tag,
+            image_id: load_result.image_id,
+            duration,
+            strategy: strategy_type,
+        })
     }
 
     /// Build all discovered containers
