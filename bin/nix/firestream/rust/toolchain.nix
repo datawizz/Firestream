@@ -1,5 +1,5 @@
 # Rust Toolchain via Fenix
-# Copyright Firestream. Apache-2.0 License.
+# Copyright Firestream. MIT License.
 #
 # Provides a deterministic Rust toolchain using Fenix.
 # Edition 2024 is fully supported in nixpkgs 25.11 (Rust 1.85+).

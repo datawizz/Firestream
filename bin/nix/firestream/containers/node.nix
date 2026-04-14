@@ -1,5 +1,5 @@
 # Node.js Container Module Factory
-# Copyright Firestream. Apache-2.0 License.
+# Copyright Firestream. MIT License.
 #
 # This module provides mkNodeContainerModule - a specialized factory for
 # Node.js applications that integrates with buildNpmPackage.

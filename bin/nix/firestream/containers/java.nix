@@ -1,5 +1,5 @@
 # Java Container Module Factory
-# Copyright Firestream. Apache-2.0 License.
+# Copyright Firestream. MIT License.
 #
 # This module provides mkJavaContainerModule - a specialized factory for
 # Java applications with JVM tuning, NSS wrapper support, and classpath management.

@@ -1,5 +1,5 @@
 # firestream Nix package
-# Copyright Firestream. Apache-2.0 License.
+# Copyright Firestream. MIT License.
 #
 # Builds the Rust firestream CLI/TUI binary for managing data infrastructure services.
 #

@@ -1,5 +1,5 @@
 # Python Container Module Factory
-# Copyright Firestream. Apache-2.0 License.
+# Copyright Firestream. MIT License.
 #
 # This module provides mkPythonContainerModule - a specialized factory for
 # Python applications that integrates with uv2nix/pyproject-nix for dependency

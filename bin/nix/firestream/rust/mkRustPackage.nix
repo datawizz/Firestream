@@ -1,5 +1,5 @@
 # Crane-based Rust Package Builder
-# Copyright Firestream. Apache-2.0 License.
+# Copyright Firestream. MIT License.
 #
 # Provides incremental Rust builds with dependency caching via Crane.
 # Uses buildDepsOnly to create a cached dependency layer that is
@@ -87,7 +87,7 @@ in {
       meta = {
         description = args.description or "Firestream ${name}";
         homepage = "https://github.com/Cogent-Creation-Co/Firestream";
-        license = lib.licenses.asl20;
+        license = lib.licenses.mit;
         maintainers = [ "Firestream Team" ];
         mainProgram = args.mainProgram or name;
       } // meta;

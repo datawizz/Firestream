@@ -1,5 +1,5 @@
 # Tests for the config module (lib/config.nix)
-# Copyright Firestream. Apache-2.0 License.
+# Copyright Firestream. MIT License.
 { pkgs, firestream }:
 
 let

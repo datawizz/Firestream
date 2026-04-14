@@ -1,5 +1,5 @@
 # wait-for-port Nix package
-# Copyright Firestream. Apache-2.0 License.
+# Copyright Firestream. MIT License.
 #
 # Builds the Rust wait-for-port binary for container use.
 # This tool waits for a TCP port to reach a desired state (inuse or free).
