@@ -1,0 +1,20 @@
+{
+  "project_name": "Acme Odoo Addons",
+  "description": "Custom Odoo modules for Acme Corporation",
+  "organization": "Acme Corp",
+  "author": "Acme Developer",
+  "author_email": "dev@acme.com",
+  "license": "LGPL-3",
+  "odoo_version": 18,
+  "odoo_http_port": 8069,
+  "odoo_longpolling_port": 8072,
+  "odoo_admin_email": "admin",
+  "odoo_admin_password": "admin",
+  "postgresql_version": "17",
+  "postgresql_port": 5432,
+  "database_name": "firestream_odoo",
+  "database_user": "firestream",
+  "database_password": "firestream",
+  "firestream_ref": "github:Cogent-Creation-Co/Firestream",
+  "demo_data": false
+}

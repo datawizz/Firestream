@@ -1,0 +1,131 @@
+#!/usr/bin/env bash
+# {{ project_name }} — Addon Scaffolding
+# Usage: ./scripts/scaffold.sh <addon_name>
+
+set -euo pipefail
+
+NAME="${1:?Usage: $0 <addon_name>}"
+ADDONS_DIR="$(cd "$(dirname "$0")/.." && pwd)/src/addons"
+ADDON_DIR="${ADDONS_DIR}/${NAME}"
+
+if [ -d "$ADDON_DIR" ]; then
+    echo "Error: addon '${NAME}' already exists at ${ADDON_DIR}"
+    exit 1
+fi
+
+echo "Scaffolding addon: ${NAME}"
+
+mkdir -p "${ADDON_DIR}/models"
+mkdir -p "${ADDON_DIR}/views"
+mkdir -p "${ADDON_DIR}/security"
+mkdir -p "${ADDON_DIR}/static/description"
+
+# __manifest__.py
+cat > "${ADDON_DIR}/__manifest__.py" << 'PYEOF'
+{
+    "name": "ADDON_NAME",
+    "version": "{{ odoo_version_full }}.1.0.0",
+    "category": "Uncategorized",
+    "summary": "ADDON_NAME module",
+    "description": """
+        ADDON_NAME
+        ==========
+        Custom Odoo module.
+    """,
+    "author": "{{ author }}",
+    "website": "",
+    "license": "{{ license }}",
+    "depends": ["base"],
+    "data": [
+        "security/ir.model.access.csv",
+        "views/views.xml",
+    ],
+    "demo": [],
+    "installable": True,
+    "application": False,
+    "auto_install": False,
+}
+PYEOF
+sed -i'' -e "s/ADDON_NAME/${NAME}/g" "${ADDON_DIR}/__manifest__.py"
+
+# __init__.py
+cat > "${ADDON_DIR}/__init__.py" << 'PYEOF'
+from . import models
+PYEOF
+
+# models/__init__.py
+cat > "${ADDON_DIR}/models/__init__.py" << 'PYEOF'
+from . import models
+PYEOF
+
+# models/models.py
+cat > "${ADDON_DIR}/models/models.py" << PYEOF
+from odoo import models, fields, api
+
+
+class ${NAME^}(models.Model):
+    _name = "${NAME}.${NAME}"
+    _description = "${NAME}"
+
+    name = fields.Char(string="Name", required=True)
+    description = fields.Text(string="Description")
+    active = fields.Boolean(string="Active", default=True)
+PYEOF
+
+# views/views.xml
+cat > "${ADDON_DIR}/views/views.xml" << XMLEOF
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_${NAME}_tree" model="ir.ui.view">
+        <field name="name">${NAME}.tree</field>
+        <field name="model">${NAME}.${NAME}</field>
+        <field name="arch" type="xml">
+            <tree>
+                <field name="name"/>
+                <field name="description"/>
+            </tree>
+        </field>
+    </record>
+
+    <record id="view_${NAME}_form" model="ir.ui.view">
+        <field name="name">${NAME}.form</field>
+        <field name="model">${NAME}.${NAME}</field>
+        <field name="arch" type="xml">
+            <form>
+                <sheet>
+                    <group>
+                        <field name="name"/>
+                        <field name="description"/>
+                        <field name="active"/>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_${NAME}" model="ir.actions.act_window">
+        <field name="name">${NAME}</field>
+        <field name="res_model">${NAME}.${NAME}</field>
+        <field name="view_mode">tree,form</field>
+    </record>
+
+    <menuitem id="menu_${NAME}_root" name="${NAME}" sequence="10"/>
+    <menuitem id="menu_${NAME}_main" name="${NAME}"
+              parent="menu_${NAME}_root"
+              action="action_${NAME}"
+              sequence="10"/>
+</odoo>
+XMLEOF
+
+# security/ir.model.access.csv
+cat > "${ADDON_DIR}/security/ir.model.access.csv" << CSVEOF
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_${NAME}_${NAME},${NAME}.${NAME},model_${NAME}_${NAME},base.group_user,1,1,1,0
+CSVEOF
+
+echo "Addon scaffolded at: ${ADDON_DIR}"
+echo ""
+echo "Next steps:"
+echo "  1. Start Odoo:   make up"
+echo "  2. Go to Apps, enable 'Update Apps List'"
+echo "  3. Search for '${NAME}' and install"

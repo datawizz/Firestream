@@ -6,6 +6,7 @@
 use crate::config::{GenerationOptions, OutputFormat, TemplateConfig};
 use crate::embedded::{self, TemplateType};
 use crate::error::{Result, TemplatizerError};
+use crate::odoo::{OdooConfig, OdooConfigBuilder, OdooGenerator};
 use crate::puppeteer::{PuppeteerGenerator, ScraperConfig, ScraperConfigBuilder, WorkflowType};
 use crate::spark::{LanguageType, SparkAppConfig, SparkAppConfigBuilder, SparkGenerator};
 use crate::superset::{DashboardConfig, SupersetConfigBuilder, SupersetGenerator, SupersetUploader};
@@ -13,7 +14,7 @@ use clap::{Parser, Subcommand};
 use std::path::PathBuf;
 use tracing::info;
 
-/// Unified template generator for Spark, Puppeteer, and Superset projects
+/// Unified template generator for Spark, Puppeteer, Superset, and Odoo projects
 #[derive(Parser, Debug)]
 #[command(name = "templatizer")]
 #[command(author = "Cogent Creation Co")]
@@ -24,6 +25,7 @@ Templatizer is a unified template generator for creating:
   - Spark applications (Python and Scala)
   - Puppeteer web scrapers
   - Superset dashboards
+  - Odoo addons projects
 
 Each generator has its own subcommand with specific options.
 Use --help on any subcommand for more details.
@@ -51,6 +53,10 @@ pub enum Commands {
     /// Generate a Superset dashboard
     #[command(alias = "ss")]
     Superset(SupersetArgs),
+
+    /// Generate an Odoo addons project
+    #[command(alias = "odo")]
+    Odoo(OdooArgs),
 
     /// List available templates
     #[command(alias = "ls")]
@@ -161,6 +167,34 @@ pub struct SupersetArgs {
     pub dry_run: bool,
 }
 
+/// Arguments for Odoo template generation
+#[derive(Parser, Debug)]
+pub struct OdooArgs {
+    /// Name of the project
+    #[arg(short, long)]
+    pub name: String,
+
+    /// Output directory
+    #[arg(short, long, default_value = ".")]
+    pub output: PathBuf,
+
+    /// Odoo major version (15, 16, 17, 18)
+    #[arg(short = 'r', long = "odoo-version", default_value = "18")]
+    pub odoo_version: u8,
+
+    /// Configuration file (JSON or YAML)
+    #[arg(short, long)]
+    pub config: Option<PathBuf>,
+
+    /// Overwrite existing files
+    #[arg(long)]
+    pub overwrite: bool,
+
+    /// Dry run - show what would be generated without writing
+    #[arg(long)]
+    pub dry_run: bool,
+}
+
 /// Arguments for listing templates
 #[derive(Parser, Debug)]
 pub struct ListArgs {
@@ -190,6 +224,7 @@ pub fn run(cli: Cli) -> Result<()> {
         Commands::Spark(args) => run_spark(args, cli.verbose),
         Commands::Puppeteer(args) => run_puppeteer(args, cli.verbose),
         Commands::Superset(args) => run_superset(args, cli.verbose),
+        Commands::Odoo(args) => run_odoo(args, cli.verbose),
         Commands::List(args) => run_list(args, cli.verbose),
     }
 }
@@ -367,20 +402,56 @@ fn run_superset(args: SupersetArgs, verbose: bool) -> Result<()> {
     Ok(())
 }
 
+fn run_odoo(args: OdooArgs, verbose: bool) -> Result<()> {
+    if verbose {
+        info!("Generating Odoo addons project: {}", args.name);
+        info!("Odoo version: {}", args.odoo_version);
+        info!("Output: {}", args.output.display());
+    }
+
+    // Load config from file or create default
+    let config = if let Some(config_path) = &args.config {
+        OdooConfig::from_json_file(config_path).or_else(|_| {
+            OdooConfig::from_yaml_file(config_path)
+        })?
+    } else {
+        OdooConfigBuilder::new(&args.name)
+            .odoo_version(args.odoo_version)
+            .build()?
+    };
+
+    // Create generation options
+    let options = GenerationOptions::new()
+        .overwrite(args.overwrite)
+        .verbose(verbose)
+        .dry_run(args.dry_run);
+
+    // Generate
+    let generator = OdooGenerator::new()?;
+    generator.generate_with_options(&config, &args.output, &options)?;
+
+    if !args.dry_run {
+        println!("Successfully generated Odoo addons project at {}", args.output.display());
+    }
+
+    Ok(())
+}
+
 fn run_list(args: ListArgs, verbose: bool) -> Result<()> {
     let types: Vec<TemplateType> = if let Some(ref filter) = args.filter {
         match filter.to_lowercase().as_str() {
             "spark" | "sp" => vec![TemplateType::Spark],
             "puppeteer" | "pup" => vec![TemplateType::Puppeteer],
             "superset" | "ss" => vec![TemplateType::Superset],
+            "odoo" | "odo" => vec![TemplateType::Odoo],
             _ => {
                 eprintln!("Unknown template type: {}", filter);
-                eprintln!("Valid types: spark, puppeteer, superset");
+                eprintln!("Valid types: spark, puppeteer, superset, odoo");
                 return Ok(());
             }
         }
     } else {
-        vec![TemplateType::Spark, TemplateType::Puppeteer, TemplateType::Superset]
+        vec![TemplateType::Spark, TemplateType::Puppeteer, TemplateType::Superset, TemplateType::Odoo]
     };
 
     println!("Available templates:");
@@ -484,6 +555,34 @@ mod tests {
     }
 
     #[test]
+    fn test_cli_parse_odoo() {
+        let args = vec!["templatizer", "odoo", "-n", "my-addons", "-r", "17"];
+        let cli = Cli::try_parse_from(args).unwrap();
+
+        match cli.command {
+            Commands::Odoo(odoo_args) => {
+                assert_eq!(odoo_args.name, "my-addons");
+                assert_eq!(odoo_args.odoo_version, 17);
+            }
+            _ => panic!("Expected Odoo command"),
+        }
+    }
+
+    #[test]
+    fn test_cli_parse_odoo_defaults() {
+        let args = vec!["templatizer", "odoo", "-n", "test"];
+        let cli = Cli::try_parse_from(args).unwrap();
+
+        match cli.command {
+            Commands::Odoo(odoo_args) => {
+                assert_eq!(odoo_args.odoo_version, 18);
+                assert_eq!(odoo_args.output, PathBuf::from("."));
+            }
+            _ => panic!("Expected Odoo command"),
+        }
+    }
+
+    #[test]
     fn test_cli_aliases() {
         // Test spark alias
         let args = vec!["templatizer", "sp", "-n", "test"];
@@ -495,6 +594,10 @@ mod tests {
 
         // Test superset alias
         let args = vec!["templatizer", "ss", "-n", "test"];
+        assert!(Cli::try_parse_from(args).is_ok());
+
+        // Test odoo alias
+        let args = vec!["templatizer", "odo", "-n", "test"];
         assert!(Cli::try_parse_from(args).is_ok());
 
         // Test list alias

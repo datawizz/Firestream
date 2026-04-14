@@ -27,6 +27,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .include_dir("src/templates/puppeteer")
         .include_dir("src/templates/spark")
         .include_dir("src/templates/superset")
+        .include_dir("src/templates/odoo")
         // Respect ignore files
         .respect_gitignore(true)
         // Standard exclusions
