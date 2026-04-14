@@ -1,5 +1,5 @@
 # Redis Configuration Generation
-# Copyright Firestream. Apache-2.0 License.
+# Copyright Firestream. MIT License.
 # This file is sourced, not executed directly
 #
 # Generates redis.conf from environment variables

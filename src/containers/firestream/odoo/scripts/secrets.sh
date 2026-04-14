@@ -1,5 +1,5 @@
 # Odoo secrets loading
-# Copyright Firestream. Apache-2.0 License.
+# Copyright Firestream. MIT License.
 # This file is sourced, not executed directly
 #
 # Loads secrets from _FILE environment variables (Docker secrets pattern)

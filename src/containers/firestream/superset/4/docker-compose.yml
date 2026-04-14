@@ -1,5 +1,5 @@
 # Firestream Superset - Docker Compose for Local Development
-# Copyright Firestream. Apache-2.0 License.
+# Copyright Firestream. MIT License.
 #
 # Usage:
 #   1. Build the Docker image: nix build .#dockerImage && docker load < result

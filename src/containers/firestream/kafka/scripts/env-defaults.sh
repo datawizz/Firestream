@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Kafka environment variable defaults - KRaft mode only (Kafka 4.0+)
-# Copyright Firestream. Apache-2.0 License.
+# Copyright Firestream. MIT License.
 # This file is sourced, not executed directly
 
 # Base directories - use absolute paths to avoid variable expansion issues with set -u

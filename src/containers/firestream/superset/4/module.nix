@@ -1,5 +1,5 @@
 # Superset Container Module - Using Firestream Factories
-# Copyright Firestream. Apache-2.0 License.
+# Copyright Firestream. MIT License.
 #
 # This module defines the Superset container using mkPythonContainerModule.
 # Supports multiple roles: webserver, celery-worker, celery-beat, celery-flower, init

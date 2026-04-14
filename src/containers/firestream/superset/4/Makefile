@@ -1,5 +1,5 @@
 # Firestream Superset - Build and Development Makefile
-# Copyright Firestream. Apache-2.0 License.
+# Copyright Firestream. MIT License.
 
 .PHONY: build load dev test up down logs clean lock help
 

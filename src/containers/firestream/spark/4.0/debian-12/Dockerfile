@@ -1,4 +1,4 @@
-# Copyright Firestream. Apache-2.0 License.
+# Copyright Firestream. MIT License.
 # SPDX-License-Identifier: APACHE-2.0
 #
 # Apache Spark Container - Two-Stage Nix Build

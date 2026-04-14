@@ -1,5 +1,5 @@
 # JupyterHub environment defaults
-# Copyright Firestream. Apache-2.0 License.
+# Copyright Firestream. MIT License.
 # This file is sourced, not executed directly
 #
 # These defaults are applied if variables are not set.

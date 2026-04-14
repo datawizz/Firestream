@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright Firestream. Apache-2.0 License.
+# Copyright Firestream. MIT License.
 # Post-init script: PostgreSQL database setup
 #
 # This script performs any additional PostgreSQL setup after JupyterHub initialization.

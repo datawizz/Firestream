@@ -1,6 +1,6 @@
 # Superset secrets processing
 # This file is sourced, not executed directly
-# Copyright Firestream. Apache-2.0 License.
+# Copyright Firestream. MIT License.
 
 # Docker secrets support is handled automatically by the Firestream
 # file-loader module which processes all *_FILE environment variables.

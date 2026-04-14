@@ -1,5 +1,5 @@
 # Airflow Container Module - Using Firestream Factories
-# Copyright Firestream. Apache-2.0 License.
+# Copyright Firestream. MIT License.
 #
 # This module defines the Airflow container using mkPythonContainerModule.
 # Much simpler than manual implementation - the factory handles:

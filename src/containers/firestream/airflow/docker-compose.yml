@@ -1,5 +1,5 @@
 # Firestream Airflow - Docker Compose for Local Development
-# Copyright Firestream. Apache-2.0 License.
+# Copyright Firestream. MIT License.
 #
 # Usage:
 #   1. Build images: make airflow-build

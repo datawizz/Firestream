@@ -1,7 +1,7 @@
 # Firestream JupyterHub Container
 # Multi-stage build: Nix -> Debian minimal runtime
 #
-# Copyright Firestream. Apache-2.0 License.
+# Copyright Firestream. MIT License.
 
 # =============================================================================
 # Stage 1: Nix builder

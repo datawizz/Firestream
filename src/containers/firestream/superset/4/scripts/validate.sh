@@ -1,6 +1,6 @@
 # Superset validation logic
 # This file is sourced, not executed directly
-# Copyright Firestream. Apache-2.0 License.
+# Copyright Firestream. MIT License.
 
 # Validate SUPERSET_ROLE
 case "${SUPERSET_ROLE:-webserver}" in

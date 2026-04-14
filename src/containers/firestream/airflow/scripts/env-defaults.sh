@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Airflow environment variable defaults - matching Bitnami exactly
-# Copyright Firestream. Apache-2.0 License.
+# Copyright Firestream. MIT License.
 
 # Paths
 export AIRFLOW_HOME="${AIRFLOW_HOME:-/opt/airflow}"

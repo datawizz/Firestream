@@ -1,6 +1,6 @@
 # Superset runtime configuration adjustments
 # This file is sourced, not executed directly
-# Copyright Firestream. Apache-2.0 License.
+# Copyright Firestream. MIT License.
 
 info "Configuring Superset runtime settings..."
 

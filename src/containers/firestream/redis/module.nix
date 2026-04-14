@@ -1,5 +1,5 @@
 # Redis Container Module - Using Firestream Factories
-# Copyright Firestream. Apache-2.0 License.
+# Copyright Firestream. MIT License.
 #
 # This module defines the Redis container using mkContainerModule.
 # The factory handles:

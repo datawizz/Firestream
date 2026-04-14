@@ -1,5 +1,5 @@
 # Airflow initialization logic
-# Copyright Firestream. Apache-2.0 License.
+# Copyright Firestream. MIT License.
 # This file is sourced, not executed directly
 
 # Helper function for retry_while - checks if admin user exists

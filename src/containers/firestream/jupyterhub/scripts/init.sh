@@ -1,5 +1,5 @@
 # JupyterHub initialization logic
-# Copyright Firestream. Apache-2.0 License.
+# Copyright Firestream. MIT License.
 # This file is sourced, not executed directly
 #
 # Handles database initialization, admin user setup, and first-run configuration

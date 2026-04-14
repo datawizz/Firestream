@@ -7,7 +7,7 @@ name = "firestream-superset"
 version = "5.0.0"
 description = "Firestream Superset container dependencies - Pure Nix build replacing Bitnami stacksmith"
 requires-python = ">=3.10,<3.13"
-license = { text = "Apache-2.0" }
+license = { text = "MIT" }
 
 dependencies = [
     # Core Superset 5.x - includes all core dependencies (flask, sqlalchemy, pandas, etc.)

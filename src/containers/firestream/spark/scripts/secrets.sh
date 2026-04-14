@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright Firestream. Apache-2.0 License.
+# Copyright Firestream. MIT License.
 # SPDX-License-Identifier: APACHE-2.0
 #
 # Docker Secrets loader for Apache Spark container
