@@ -167,8 +167,10 @@ impl<'a> Widget for ResourcesPane<'a> {
                 Color::Gray
             };
             
-            // Special formatting for root items
-            let name_style = if item.depth == 0 {
+            // Special formatting for root items and coming soon
+            let name_style = if item.name.contains("(coming soon)") {
+                Style::default().fg(Color::DarkGray)
+            } else if item.depth == 0 {
                 Style::default()
                     .fg(name_color)
                     .add_modifier(Modifier::BOLD | Modifier::UNDERLINED)
@@ -189,8 +191,29 @@ impl<'a> Widget for ResourcesPane<'a> {
                 }
             }
             
-            // Status indicator
-            if let Some(status) = &item.status {
+            // Status indicators
+            if item.resource_type == crate::models::ResourceType::Container && item.depth > 0 {
+                // Dual status for containers: build + running
+                if let Some(status) = &item.status {
+                    let (symbol, color) = match status.as_str() {
+                        "Built" => ("●", Color::Green),
+                        "Not Built" => ("○", Color::DarkGray),
+                        "Building" => ("◐", Color::Cyan),
+                        _ => ("?", Color::Gray),
+                    };
+                    spans.push(Span::raw(" "));
+                    spans.push(Span::styled(symbol, Style::default().fg(color)));
+                }
+                if let Some(run_status) = &item.secondary_status {
+                    let (symbol, color) = match run_status.as_str() {
+                        "running" => ("▶", Color::Green),
+                        "exited" => ("■", Color::DarkGray),
+                        "paused" => ("⏸", Color::Yellow),
+                        _ => ("■", Color::DarkGray),
+                    };
+                    spans.push(Span::styled(symbol, Style::default().fg(color)));
+                }
+            } else if let Some(status) = &item.status {
                 let (symbol, color) = match status.as_str() {
                     "Running" | "Ready" => ("●", Color::Green),
                     "Pending" | "Provisioning" => ("◐", Color::Yellow),

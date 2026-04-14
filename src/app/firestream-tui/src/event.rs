@@ -37,6 +37,28 @@ pub enum AppEvent {
     RefreshData,
     /// Loading completed for a resource type
     LoadComplete(crate::models::ResourceType),
+
+    // ── Build events (phase-based, no percentage — Nix doesn't emit percentages) ──
+
+    /// Build was enqueued (with queue position)
+    BuildQueued { container: String, position: usize },
+    /// Build started executing
+    BuildStarted { container: String, build_id: String },
+    /// Build phase changed
+    BuildPhaseChanged { container: String, phase: String },
+    /// A line of build log output
+    BuildLogLine { container: String, line: String },
+    /// Dependencies resolved before build
+    DependenciesResolved { container: String, deps: Vec<String> },
+    /// Build completed
+    BuildComplete { container: String, success: bool, message: String, duration_secs: u64 },
+    /// Build cancelled
+    BuildCancelled { container: String, reason: String },
+
+    // ── Service events ──
+
+    /// Compose service state changed
+    ServiceStateChanged { service: String, running: bool },
 }
 
 /// Terminal event handler.
@@ -61,6 +83,13 @@ impl EventHandler {
     /// Constructs a new instance of [`EventHandler`] and spawns a new thread to handle events.
     pub fn new() -> Self {
         let (sender, receiver) = mpsc::unbounded_channel();
+        Self::from_parts(sender, receiver)
+    }
+
+    /// Construct from pre-created channel parts.
+    ///
+    /// Use this when the sender needs to be shared with other components (e.g., LocalBackend).
+    pub fn from_parts(sender: mpsc::UnboundedSender<Event>, receiver: mpsc::UnboundedReceiver<Event>) -> Self {
         let actor = EventTask::new(sender.clone());
         tokio::spawn(async { actor.run().await });
         Self { sender, receiver }

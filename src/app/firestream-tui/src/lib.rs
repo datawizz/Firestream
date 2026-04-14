@@ -9,4 +9,4 @@ pub mod ui;
 
 // Re-export commonly used types
 pub use app::App;
-pub use backend::{FirestreamBackend, ApiClient, MockClient};
+pub use backend::{FirestreamBackend, ApiClient, LocalBackend};
