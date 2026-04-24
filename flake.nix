@@ -464,7 +464,7 @@
       config = mkContainerConfig system;
     in {
       container = config.container;
-      default = firestreamWithRust.packages.firestream;
+      default = pkgs.callPackage ./nix/package.nix {};
 
       # VIB (Validation, Inspection, Build) Tools bundle
       # Collection of tools for container testing and vulnerability scanning
@@ -533,11 +533,11 @@
       };
 
       # ====================================================================
-      # RUST PACKAGES (built with Crane)
+      # RUST PACKAGES
       # Usage: nix build .#firestream
       # Usage: nix build .#wait-for-port
       # ====================================================================
-      firestream = firestreamWithRust.packages.firestream;
+      firestream = pkgs.callPackage ./nix/package.nix {};
       wait-for-port = firestreamWithRust.packages.wait-for-port;
       firestream-vib = firestreamWithRust.packages.firestream-vib;
 
