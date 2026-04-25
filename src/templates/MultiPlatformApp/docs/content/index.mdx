@@ -1,0 +1,73 @@
+# Multi-Platform App Template
+
+A comprehensive template for building multi-platform applications with shared TypeScript code.
+
+## Platforms
+
+- **Web** - Next.js 15 with App Router and Turbopack
+- **Desktop** - Tauri v2 (Windows, macOS, Linux)
+- **iOS** - Native app with SwiftUI and XcodeGen
+
+## Features
+
+- Turbo monorepo with pnpm workspaces
+- Shared TypeScript library with platform adapters
+- Nix-based reproducible development environment
+- Docker devcontainer support
+- Protocol Buffer type generation
+- Opinionated UI stack (Radix UI, Zustand, TanStack Query, Tailwind CSS)
+- Working examples and documentation
+
+## Quick Start
+
+```bash
+# Initialize project
+make init
+
+# Install dependencies
+make install
+
+# Start development
+make run-web-dev      # Web app (http://localhost:3000)
+make run-desktop-dev  # Desktop app
+make run-ios-dev      # iOS app (macOS only)
+```
+
+## Platform Support
+
+| Platform | Status | Technologies |
+|----------|--------|--------------|
+| Web | Supported | Next.js 15, React 18 |
+| Desktop | Supported | Tauri v2, Rust 1.77+ |
+| iOS | Supported | SwiftUI, XcodeGen |
+
+## Technology Stack
+
+### Frontend
+- React 18
+- Next.js 15
+- Radix UI
+- Tailwind CSS
+- class-variance-authority
+- Zustand
+- TanStack Query
+
+### Desktop
+- Tauri v2
+- Rust 1.77+
+
+### iOS
+- SwiftUI
+- XcodeGen
+
+### Build Tools
+- Turbo (monorepo)
+- pnpm (packages)
+- Makefile (automation)
+- Nix (environment)
+- Docker (containers)
+
+### Type System
+- TypeScript
+- Protocol Buffers
+- Zod

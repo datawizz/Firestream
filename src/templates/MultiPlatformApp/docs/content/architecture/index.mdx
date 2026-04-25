@@ -1,0 +1,55 @@
+# Architecture Overview
+
+This template uses a **platform adapter pattern** to enable code sharing across web, desktop, and mobile platforms.
+
+## Core Concepts
+
+The architecture is built around three key principles:
+
+1. **Shared Code First** - Write once, run everywhere
+2. **Platform Abstraction** - Interface-based service design
+3. **Type Safety** - Full TypeScript coverage across platforms
+
+## Data Flow
+
+```
+User Interaction → React Component
+        ↓
+    Component → Zustand Store (state)
+        ↓
+      Store → Service Factory
+        ↓
+    Factory → Platform Adapter (Tauri/Web)
+        ↓
+    Adapter → Native Platform API
+        ↓
+    Response ← Platform API
+        ↓
+ Update Store ← Adapter
+        ↓
+   Re-render ← Store subscription
+```
+
+## Type Safety
+
+The template ensures type safety through multiple layers:
+
+- **Protocol Buffers** - Cross-platform data schemas
+- **TypeScript** - Compile-time safety
+- **Zod** - Runtime validation
+- **Shared types** - Consistent interfaces across all platforms
+
+## Build System
+
+- **Turbo** - Monorepo orchestration and caching
+- **pnpm** - Package management with workspaces
+- **Makefile** - Cross-platform build automation
+- **Nix** - Reproducible development environment
+
+## Best Practices
+
+1. **Define interfaces first** - Always create an interface before implementation
+2. **Use adapters** - Never call platform APIs directly from shared code
+3. **Keep shared code pure** - No platform-specific imports in shared lib
+4. **Version proto schemas** - Use v1, v2, etc. for backwards compatibility
+5. **Test adapters** - Each adapter should have unit tests

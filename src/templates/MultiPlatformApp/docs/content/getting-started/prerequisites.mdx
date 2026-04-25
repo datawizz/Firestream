@@ -1,0 +1,62 @@
+# Prerequisites
+
+Before you begin, ensure you have the following tools installed.
+
+## All Platforms
+
+- **Node.js 18+** - JavaScript runtime
+- **pnpm 9.0.0** - Package manager
+
+## Desktop Development
+
+- **Rust 1.77+** - For Tauri builds
+- Platform-specific dependencies (via Nix or manual install)
+
+## iOS Development (macOS only)
+
+- **Xcode 15+** - Apple's IDE
+- **XcodeGen 2.39+** - Xcode project generator
+
+## Optional
+
+- **Docker Desktop** - For devcontainer support
+- **Nix package manager** - For reproducible environment
+
+## Development Environments
+
+The template supports three development environment options:
+
+### Option A: Nix (Recommended)
+
+```bash
+# Enter Nix shell (all tools available)
+nix develop
+
+# Or use direnv for automatic shell activation
+echo "use flake" > .envrc
+direnv allow
+```
+
+### Option B: Docker Devcontainer
+
+```bash
+# Build and start container
+make devcontainer
+
+# Open in VS Code and use "Reopen in Container"
+code .
+```
+
+### Option C: Local Development
+
+Install dependencies manually as listed above.
+
+## Verification
+
+After setup, verify your environment:
+
+```bash
+node --version    # Should be 18+
+pnpm --version    # Should be 9.0.0
+rustc --version   # Should be 1.77+ (for desktop)
+```

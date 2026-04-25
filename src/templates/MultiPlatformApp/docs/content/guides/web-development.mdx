@@ -1,0 +1,85 @@
+# Web Development
+
+Guide to developing the Next.js web application.
+
+## Starting Development
+
+```bash
+make run-web-dev
+```
+
+This starts the Next.js development server at http://localhost:3000.
+
+## Development Workflow
+
+1. Start the dev server with `make run-web-dev`
+2. Open browser at http://localhost:3000
+3. Edit files in `src/app/web/` or `src/lib/typescript/shared/`
+4. Hot reload is automatic
+
+## Project Structure
+
+```
+src/app/web/
+├── app/              # Next.js App Router
+│   ├── layout.tsx    # Root layout
+│   ├── page.tsx      # Home page
+│   └── globals.css   # Global styles
+├── public/           # Static assets
+├── package.json
+├── next.config.js
+└── tailwind.config.js
+```
+
+## Using Shared Components
+
+Import components from the shared library:
+
+```typescript
+import { Button, Counter } from '@multi-platform-app/shared/components';
+import { useExampleStore } from '@multi-platform-app/shared/stores';
+import { usePlatform } from '@multi-platform-app/shared/hooks';
+
+function MyPage() {
+  const { count, increment } = useExampleStore();
+  const { isWeb } = usePlatform();
+
+  return (
+    <div>
+      <p>Count: {count}</p>
+      <Button onClick={increment}>Increment</Button>
+      {isWeb && <p>Running on web</p>}
+    </div>
+  );
+}
+```
+
+## Styling
+
+The web app uses Tailwind CSS with the shared configuration:
+
+```typescript
+import { cn } from '@multi-platform-app/shared/utils';
+
+function MyComponent({ className }) {
+  return (
+    <div className={cn('p-4 bg-white rounded', className)}>
+      Content
+    </div>
+  );
+}
+```
+
+## Debugging
+
+- Use browser DevTools (F12 or Cmd+Option+I)
+- React DevTools extension recommended
+- VS Code debugger configured in `.vscode/launch.json`
+
+## Building for Production
+
+```bash
+make build-web
+```
+
+Output is in `src/app/web/.next/`.

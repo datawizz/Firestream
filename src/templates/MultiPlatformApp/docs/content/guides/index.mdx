@@ -1,0 +1,89 @@
+# Development Guide
+
+Comprehensive guide to developing with the multi-platform app template.
+
+## Available Commands
+
+### Setup
+
+```bash
+make init             # Initialize project
+make install          # Install dependencies
+make devcontainer     # Build Docker container
+```
+
+### Development
+
+```bash
+make run-web-dev      # Start Next.js dev server
+make run-desktop-dev  # Start Tauri development
+make run-ios-dev      # Build and run iOS (macOS only)
+```
+
+### Build
+
+```bash
+make build            # Build all packages
+make build-libs       # Build shared libraries
+make build-web        # Build web app
+make build-desktop    # Build desktop app
+make build-ios        # Build iOS app
+```
+
+### Utilities
+
+```bash
+make proto-generate   # Generate proto types
+make clean            # Clean build artifacts
+make lint             # Lint code
+make test             # Run tests
+make help             # Show all commands
+```
+
+## Testing
+
+```bash
+# Run all tests
+make test
+
+# Run specific package tests
+pnpm --filter @multi-platform-app/shared test
+
+# Run with coverage
+pnpm --filter @multi-platform-app/shared test:coverage
+```
+
+## Linting & Formatting
+
+```bash
+# Lint all code
+make lint
+
+# Format code
+pnpm format
+
+# Fix linting issues
+pnpm lint:fix
+```
+
+## Performance
+
+### Turbo Cache
+
+Turbo caches build outputs for speed:
+
+```bash
+# Clear Turbo cache
+pnpm turbo clean
+
+# Run without cache
+pnpm turbo build --force
+```
+
+### Bundle Analysis
+
+```bash
+# Web bundle analysis
+cd src/app/web
+pnpm analyze
+```

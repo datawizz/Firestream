@@ -1,0 +1,98 @@
+{
+  "name": "@multi-platform-app/auth",
+  "version": "0.1.0",
+  "description": "Authentication and subscription management for MultiPlatformApp",
+  "private": true,
+  "main": "./dist/index.js",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.js"
+    },
+    "./types": {
+      "types": "./dist/types/index.d.ts",
+      "import": "./dist/types/index.mjs",
+      "require": "./dist/types/index.js"
+    },
+    "./services": {
+      "types": "./dist/services/index.d.ts",
+      "import": "./dist/services/index.mjs",
+      "require": "./dist/services/index.js"
+    },
+    "./hooks": {
+      "types": "./dist/hooks/index.d.ts",
+      "import": "./dist/hooks/index.mjs",
+      "require": "./dist/hooks/index.js"
+    },
+    "./stores": {
+      "types": "./dist/stores/index.d.ts",
+      "import": "./dist/stores/index.mjs",
+      "require": "./dist/stores/index.js"
+    },
+    "./context": {
+      "types": "./dist/context/index.d.ts",
+      "import": "./dist/context/index.mjs",
+      "require": "./dist/context/index.js"
+    },
+    "./adapters": {
+      "types": "./dist/adapters/index.d.ts",
+      "import": "./dist/adapters/index.mjs",
+      "require": "./dist/adapters/index.js"
+    },
+    "./adapters/web": {
+      "types": "./dist/adapters/web/index.d.ts",
+      "import": "./dist/adapters/web/index.mjs",
+      "require": "./dist/adapters/web/index.js"
+    },
+    "./adapters/tauri": {
+      "types": "./dist/adapters/tauri/index.d.ts",
+      "import": "./dist/adapters/tauri/index.mjs",
+      "require": "./dist/adapters/tauri/index.js"
+    },
+    "./adapters/dev": {
+      "types": "./dist/adapters/dev/index.d.ts",
+      "import": "./dist/adapters/dev/index.mjs",
+      "require": "./dist/adapters/dev/index.js"
+    },
+    "./server": {
+      "types": "./dist/server/index.d.ts",
+      "import": "./dist/server/index.mjs",
+      "require": "./dist/server/index.js"
+    }
+  },
+  "files": ["dist"],
+  "scripts": {
+    "build": "vite build",
+    "dev": "vite build --watch --mode development",
+    "typecheck": "tsc --noEmit",
+    "clean": "rm -rf dist",
+    "lint": "eslint src"
+  },
+  "peerDependencies": {
+    "@tanstack/react-query": "^5.0.0",
+    "react": "^18.0.0 || ^19.0.0",
+    "zustand": "^5.0.0"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.100.0",
+    "@supabase/ssr": "^0.9.0"
+  },
+  "devDependencies": {
+    "@multi-platform-app/typescript-config": "workspace:*",
+    "@types/react": "catalog:",
+    "@vitejs/plugin-react": "catalog:",
+    "typescript": "catalog:",
+    "vite": "catalog:",
+    "vite-plugin-dts": "catalog:"
+  },
+  "optionalDependencies": {
+    "@tauri-apps/api": "catalog:",
+    "stripe": "^20.4.1",
+    "resend": "^6.9.4",
+    "@react-email/components": "^1.0.10",
+    "@react-email/tailwind": "^2.0.6"
+  }
+}

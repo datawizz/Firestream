@@ -1,0 +1,148 @@
+# Hooks
+
+Custom React hooks provided by the shared library.
+
+## usePlatform
+
+Provides platform detection and utilities.
+
+### Import
+
+```typescript
+import { usePlatform } from '@multi-platform-app/shared/hooks';
+```
+
+### Usage
+
+```typescript
+function MyComponent() {
+  const { platform, isTauri, isWeb, isMobile } = usePlatform();
+
+  return <div>Platform: {platform}</div>;
+}
+```
+
+### Returns
+
+```typescript
+{
+  platform: 'tauri' | 'web' | 'mobile';
+  isTauri: boolean;
+  isWeb: boolean;
+  isMobile: boolean;
+}
+```
+
+### Example
+
+```typescript
+function PlatformAwareComponent() {
+  const { isTauri, isWeb } = usePlatform();
+
+  if (isTauri) {
+    return <DesktopLayout />;
+  }
+
+  return <WebLayout />;
+}
+```
+
+## useExampleStore
+
+Example Zustand store demonstrating state management.
+
+### Import
+
+```typescript
+import { useExampleStore } from '@multi-platform-app/shared/stores';
+```
+
+### Usage
+
+```typescript
+function Counter() {
+  const { count, increment, decrement, reset } = useExampleStore();
+
+  return (
+    <div>
+      <p>{count}</p>
+      <button onClick={increment}>+</button>
+      <button onClick={decrement}>-</button>
+      <button onClick={reset}>Reset</button>
+    </div>
+  );
+}
+```
+
+### State
+
+```typescript
+{
+  count: number;
+  increment: () => void;
+  decrement: () => void;
+  reset: () => void;
+}
+```
+
+## useStorage
+
+Platform-agnostic storage hook with async loading state.
+
+### Import
+
+```typescript
+import { useStorage } from '@multi-platform-app/shared/hooks';
+```
+
+### Usage
+
+```typescript
+function MyComponent() {
+  const { storage, loading, error } = useStorage();
+
+  if (loading) return <div>Loading...</div>;
+  if (error) return <div>Error: {error.message}</div>;
+
+  const handleSave = async () => {
+    await storage.setItem('key', 'value');
+  };
+
+  return <button onClick={handleSave}>Save</button>;
+}
+```
+
+### Returns
+
+```typescript
+{
+  storage: IStorageService | null;
+  loading: boolean;
+  error: Error | null;
+}
+```
+
+## Creating Custom Hooks
+
+Follow this pattern for service-based hooks:
+
+```typescript
+import { useState, useEffect } from 'react';
+import { ServiceFactory } from '../services';
+import type { IMyService } from '../services/api/my-service.interface';
+
+export function useMyService() {
+  const [service, setService] = useState<IMyService | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<Error | null>(null);
+
+  useEffect(() => {
+    ServiceFactory.getMyService()
+      .then(setService)
+      .catch(setError)
+      .finally(() => setLoading(false));
+  }, []);
+
+  return { service, loading, error };
+}
+```

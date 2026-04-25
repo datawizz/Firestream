@@ -1,0 +1,107 @@
+# Project Structure
+
+Overview of the monorepo directory layout and package organization.
+
+## Root Directory
+
+```
+multi_platform_app/
+├── src/
+│   ├── app/              # Platform applications
+│   └── lib/              # Shared libraries
+├── bin/nix/              # Nix modules
+├── docker/               # Docker configuration
+├── scripts/              # Build scripts
+├── docs/                 # Documentation (this site)
+├── Makefile              # Build automation
+├── turbo.json            # Turbo configuration
+└── pnpm-workspace.yaml   # Workspace definition
+```
+
+## Applications (`src/app/`)
+
+```
+src/app/
+├── desktop/         # Tauri desktop app
+│   ├── src/         # Frontend source
+│   └── src-tauri/   # Rust backend
+├── web/             # Next.js web app
+│   ├── app/         # App router pages
+│   └── public/      # Static assets
+└── ios/             # iOS app
+    ├── Sources/     # Swift source files
+    └── project.yml  # XcodeGen config
+```
+
+## Libraries (`src/lib/`)
+
+### TypeScript Packages
+
+```
+src/lib/typescript/
+├── shared/              # Main shared library
+│   ├── src/
+│   │   ├── components/  # React components
+│   │   ├── hooks/       # Custom hooks
+│   │   ├── services/    # Platform adapters
+│   │   ├── stores/      # Zustand stores
+│   │   ├── types/       # TypeScript types
+│   │   └── utils/       # Utility functions
+│   └── package.json
+├── proto-types/         # Generated protobuf types
+├── tailwind-config/     # Shared Tailwind config
+└── typescript-config/   # Shared TS config
+```
+
+### Protocol Buffers
+
+```
+src/lib/proto/
+├── example/v1/
+│   └── messages.proto   # Example proto definitions
+└── README.md
+```
+
+## Package Exports
+
+The shared library exports subpaths for tree-shaking:
+
+```json
+{
+  ".": "Main library",
+  "./components": "React components",
+  "./stores": "Zustand stores",
+  "./hooks": "Custom hooks",
+  "./services": "Service factory",
+  "./utils": "Utility functions",
+  "./styles": "CSS styles"
+}
+```
+
+## Workspace Configuration
+
+### pnpm Workspace
+
+```yaml
+# pnpm-workspace.yaml
+packages:
+  - "src/app/*"
+  - "src/lib/typescript/*"
+  - "docs"
+```
+
+### Turbo Pipeline
+
+```json
+// turbo.json
+{
+  "tasks": {
+    "build": {
+      "dependsOn": ["^build"]
+    },
+    "dev": {
+      "cache": false
+    }
+  }
+}
+```

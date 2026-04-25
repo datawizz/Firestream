@@ -1,0 +1,78 @@
+# Quick Start Guide
+
+Get up and running with the multi-platform app template in minutes.
+
+## Installation
+
+```bash
+# Navigate to template
+cd multi_platform_app
+
+# Initialize project (creates .env and config files)
+make init
+
+# Install all dependencies
+make install
+```
+
+## Development
+
+### Web App
+
+```bash
+make run-web-dev
+```
+
+Opens http://localhost:3000
+
+### Desktop App
+
+```bash
+make run-desktop-dev
+```
+
+Launches Tauri application with hot reload.
+
+### iOS App (macOS only)
+
+```bash
+make run-ios-dev
+```
+
+Generates Xcode project and launches simulator.
+
+## Project Structure
+
+```
+multi_platform_app/
+├── src/
+│   ├── app/
+│   │   ├── desktop/    # Tauri app
+│   │   ├── web/        # Next.js app
+│   │   └── ios/        # iOS app
+│   └── lib/
+│       ├── proto/      # Protocol Buffers
+│       └── typescript/
+│           └── shared/ # Shared library
+├── docs/               # Documentation
+├── Makefile           # Build commands
+└── README.md          # Full documentation
+```
+
+## Common Commands
+
+```bash
+make help              # Show all commands
+make build             # Build everything
+make clean             # Clean build artifacts
+make lint              # Lint code
+make test              # Run tests
+make proto-generate    # Generate proto types
+```
+
+## Next Steps
+
+1. Read the [Architecture Guide](/docs/architecture)
+2. Explore [Examples](/docs/guides/adding-features)
+3. Check the [Development Guide](/docs/guides)
+4. Start building your app!

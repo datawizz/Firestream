@@ -1,0 +1,56 @@
+{
+  "$schema": "https://turbo.build/schema.json",
+  "ui": "stream",
+  "globalEnv": [
+    "PUBLIC_SUPABASE_URL",
+    "PUBLIC_SUPABASE_ANON_KEY",
+    "SUPABASE_SERVICE_ROLE_KEY",
+    "PUBLIC_STRIPE_PUBLISHABLE_KEY",
+    "STRIPE_SECRET_KEY",
+    "STRIPE_WEBHOOK_SECRET",
+    "RESEND_API_KEY",
+    "RESEND_FROM_EMAIL",
+    "RESEND_FROM_NAME",
+    "PUBLIC_SITE_URL",
+    "PUBLIC_API_URL",
+    "NODE_ENV"
+  ],
+  "tasks": {
+    "proto:generate": {
+      "outputs": ["src/generated/**"],
+      "cache": true
+    },
+    "build": {
+      "dependsOn": ["^build", "proto:generate"],
+      "outputs": ["dist/**", ".next/**", "out/**"],
+      "env": [
+        "PUBLIC_SUPABASE_URL",
+        "PUBLIC_SUPABASE_ANON_KEY",
+        "PUBLIC_STRIPE_PUBLISHABLE_KEY",
+        "PUBLIC_SITE_URL"
+      ]
+    },
+    "dev": {
+      "dependsOn": ["^build"],
+      "cache": false,
+      "persistent": true
+    },
+    "lint": {
+      "dependsOn": ["^lint"]
+    },
+    "typecheck": {
+      "dependsOn": ["^typecheck"]
+    },
+    "docs:dev": {
+      "cache": false,
+      "persistent": true
+    },
+    "docs:build": {
+      "outputs": [".next/**"],
+      "cache": true
+    },
+    "clean": {
+      "cache": false
+    }
+  }
+}

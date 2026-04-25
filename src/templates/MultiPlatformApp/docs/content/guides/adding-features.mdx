@@ -1,0 +1,152 @@
+# Adding Features
+
+Step-by-step guide to adding new features to the multi-platform app.
+
+## Adding a Service
+
+### 1. Create Service Interface
+
+```typescript
+// src/lib/typescript/shared/src/services/api/my-feature.interface.ts
+export interface IMyFeatureService {
+  doSomething(): Promise<void>;
+  getData(): Promise<string>;
+}
+```
+
+### 2. Implement Tauri Adapter
+
+```typescript
+// src/lib/typescript/shared/src/services/adapters/tauri/my-feature.adapter.ts
+import { invoke } from '@tauri-apps/api/core';
+import { IMyFeatureService } from '../../api/my-feature.interface';
+
+export class TauriMyFeatureAdapter implements IMyFeatureService {
+  async doSomething() {
+    await invoke('my_feature_do_something');
+  }
+
+  async getData() {
+    return await invoke('my_feature_get_data');
+  }
+}
+```
+
+### 3. Implement Web Adapter
+
+```typescript
+// src/lib/typescript/shared/src/services/adapters/web/my-feature.adapter.ts
+import { IMyFeatureService } from '../../api/my-feature.interface';
+
+export class WebMyFeatureAdapter implements IMyFeatureService {
+  async doSomething() {
+    await fetch('/api/my-feature', { method: 'POST' });
+  }
+
+  async getData() {
+    const res = await fetch('/api/my-feature');
+    return await res.text();
+  }
+}
+```
+
+### 4. Add to Service Factory
+
+```typescript
+// src/lib/typescript/shared/src/services/factory.ts
+static async getMyFeatureService(): Promise<IMyFeatureService> {
+  if ('__TAURI__' in window) {
+    const { TauriMyFeatureAdapter } = await import(
+      './adapters/tauri/my-feature.adapter'
+    );
+    return new TauriMyFeatureAdapter();
+  }
+  const { WebMyFeatureAdapter } = await import(
+    './adapters/web/my-feature.adapter'
+  );
+  return new WebMyFeatureAdapter();
+}
+```
+
+### 5. Use in Component
+
+```typescript
+import { ServiceFactory } from '@multi-platform-app/shared/services';
+
+function MyComponent() {
+  const handleClick = async () => {
+    const service = await ServiceFactory.getMyFeatureService();
+    await service.doSomething();
+  };
+
+  return <button onClick={handleClick}>Do Something</button>;
+}
+```
+
+## Adding a UI Component
+
+### 1. Create Component
+
+```typescript
+// src/lib/typescript/shared/src/components/ui/my-component.tsx
+import React from 'react';
+import { cn } from '../../utils';
+
+interface MyComponentProps {
+  className?: string;
+  children: React.ReactNode;
+}
+
+export function MyComponent({ className, children }: MyComponentProps) {
+  return (
+    <div className={cn('p-4 rounded bg-gray-100', className)}>
+      {children}
+    </div>
+  );
+}
+```
+
+### 2. Export from Index
+
+```typescript
+// src/lib/typescript/shared/src/components/ui/index.ts
+export * from './button';
+export * from './my-component';
+```
+
+### 3. Use in Apps
+
+```typescript
+import { MyComponent } from '@multi-platform-app/shared/components';
+
+function App() {
+  return <MyComponent>Hello World</MyComponent>;
+}
+```
+
+## Adding a Store
+
+```typescript
+// src/lib/typescript/shared/src/stores/my-feature.store.ts
+import { create } from 'zustand';
+
+interface MyFeatureState {
+  data: string;
+  setData: (data: string) => void;
+  reset: () => void;
+}
+
+export const useMyFeatureStore = create<MyFeatureState>((set) => ({
+  data: '',
+  setData: (data) => set({ data }),
+  reset: () => set({ data: '' }),
+}));
+```
+
+Export from stores index:
+
+```typescript
+// src/lib/typescript/shared/src/stores/index.ts
+export * from './example.store';
+export * from './my-feature.store';
+```

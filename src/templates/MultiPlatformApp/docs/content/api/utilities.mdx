@@ -1,0 +1,127 @@
+# Utilities
+
+Utility functions provided by the shared library.
+
+## cn
+
+Tailwind class name merger using `clsx` and `tailwind-merge`.
+
+### Import
+
+```typescript
+import { cn } from '@multi-platform-app/shared/utils';
+```
+
+### Usage
+
+```typescript
+const className = cn(
+  'base-class',
+  isActive && 'active-class',
+  { 'conditional-class': condition }
+);
+```
+
+### Parameters
+
+Accepts any number of arguments:
+- Strings
+- Conditionals (`condition && 'class'`)
+- Objects (`{ 'class': boolean }`)
+- Arrays of the above
+
+### Examples
+
+```typescript
+// Basic usage
+cn('p-4', 'bg-white');
+// => 'p-4 bg-white'
+
+// Conditional classes
+cn('p-4', isActive && 'bg-blue-500');
+// => 'p-4 bg-blue-500' or 'p-4'
+
+// Object syntax
+cn('p-4', { 'bg-blue-500': isActive, 'bg-gray-500': !isActive });
+// => 'p-4 bg-blue-500' or 'p-4 bg-gray-500'
+
+// Tailwind conflict resolution
+cn('px-4', 'px-8');
+// => 'px-8' (later value wins)
+
+// Complex example
+cn(
+  'base-styles p-4 rounded',
+  variant === 'primary' && 'bg-blue-500 text-white',
+  variant === 'secondary' && 'bg-gray-200 text-gray-900',
+  disabled && 'opacity-50 cursor-not-allowed',
+  className // allow external overrides
+);
+```
+
+### Implementation
+
+```typescript
+import { clsx, type ClassValue } from 'clsx';
+import { twMerge } from 'tailwind-merge';
+
+export function cn(...inputs: ClassValue[]) {
+  return twMerge(clsx(inputs));
+}
+```
+
+## Platform Detection
+
+Utility for detecting the current runtime platform.
+
+### Import
+
+```typescript
+import { detectPlatform } from '@multi-platform-app/shared/utils';
+```
+
+### Usage
+
+```typescript
+const platform = detectPlatform();
+// Returns: 'tauri' | 'web' | 'mobile'
+```
+
+### Implementation
+
+```typescript
+export function detectPlatform(): 'tauri' | 'web' | 'mobile' {
+  if (typeof window !== 'undefined') {
+    if ('__TAURI__' in window) {
+      return 'tauri';
+    }
+    if (/iPhone|iPad|iPod|Android/i.test(navigator.userAgent)) {
+      return 'mobile';
+    }
+  }
+  return 'web';
+}
+```
+
+## Type Definitions
+
+Common types used across the library.
+
+### Platform Types
+
+```typescript
+type Platform = 'tauri' | 'web' | 'mobile';
+
+interface PlatformInfo {
+  platform: Platform;
+  isTauri: boolean;
+  isWeb: boolean;
+  isMobile: boolean;
+}
+```
+
+### Import Types
+
+```typescript
+import type { Platform, PlatformInfo } from '@multi-platform-app/shared/types';
+```

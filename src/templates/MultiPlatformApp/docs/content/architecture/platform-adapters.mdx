@@ -1,0 +1,82 @@
+# Platform Adapters
+
+Platform adapters provide a common interface with platform-specific implementations.
+
+## The Pattern
+
+Define an interface once, implement it for each platform:
+
+```typescript
+interface IStorageService {
+  getItem(key: string): Promise<string | null>;
+  setItem(key: string, value: string): Promise<void>;
+}
+```
+
+### Tauri Implementation
+
+```typescript
+class TauriStorageAdapter implements IStorageService {
+  async getItem(key: string) {
+    return await invoke('get_storage_item', { key });
+  }
+
+  async setItem(key: string, value: string) {
+    await invoke('set_storage_item', { key, value });
+  }
+}
+```
+
+### Web Implementation
+
+```typescript
+class WebStorageAdapter implements IStorageService {
+  async getItem(key: string) {
+    return localStorage.getItem(key);
+  }
+
+  async setItem(key: string, value: string) {
+    localStorage.setItem(key, value);
+  }
+}
+```
+
+## Directory Structure
+
+```
+src/lib/typescript/shared/src/services/
+├── api/
+│   └── storage.interface.ts    # Interface definitions
+├── adapters/
+│   ├── tauri/
+│   │   └── storage.adapter.ts  # Tauri implementation
+│   └── web/
+│       └── storage.adapter.ts  # Web implementation
+└── index.ts                    # Service factory
+```
+
+## Platform Detection
+
+Use the `usePlatform` hook to conditionally render platform-specific UI:
+
+```typescript
+import { usePlatform } from '@multi-platform-app/shared/hooks';
+
+function MyComponent() {
+  const { isTauri, isWeb, platform } = usePlatform();
+
+  if (isTauri) {
+    return <TauriSpecificUI />;
+  }
+
+  return <WebSpecificUI />;
+}
+```
+
+## Benefits
+
+- **Write Once, Run Everywhere** - Same codebase for web and desktop
+- **Type Safety** - Full TypeScript support across platforms
+- **Tree Shakeable** - Vite preserves modules for optimal bundling
+- **Developer Experience** - Shared configs reduce boilerplate
+- **Maintainability** - Single source of truth for UI and logic

@@ -1,0 +1,126 @@
+# Protocol Buffers
+
+Guide to using Protocol Buffers for cross-platform type definitions.
+
+## Overview
+
+Protocol Buffers provide:
+- Strongly typed data schemas
+- Cross-language compatibility
+- Efficient serialization
+- Version control for data structures
+
+## Defining Schemas
+
+Create proto files in `src/lib/proto/`:
+
+```protobuf
+// src/lib/proto/my-feature/v1/messages.proto
+syntax = "proto3";
+package my_feature.v1;
+
+message MyMessage {
+  string id = 1;
+  string data = 2;
+  int32 count = 3;
+  repeated string tags = 4;
+}
+
+message MyRequest {
+  string query = 1;
+  int32 limit = 2;
+}
+
+message MyResponse {
+  repeated MyMessage items = 1;
+  int32 total = 2;
+}
+```
+
+## Directory Structure
+
+```
+src/lib/proto/
+├── example/v1/
+│   └── messages.proto
+├── my-feature/v1/
+│   └── messages.proto
+└── README.md
+```
+
+## Generating Types
+
+Run the generation script:
+
+```bash
+make proto-generate
+```
+
+This generates TypeScript types in `src/lib/typescript/proto-types/src/generated/`.
+
+## Using Generated Types
+
+Import from the proto-types package:
+
+```typescript
+import {
+  MyMessage,
+  MyRequest,
+  MyResponse
+} from '@multi-platform-app/proto-types';
+
+// Create a message
+const msg = new MyMessage({
+  id: '123',
+  data: 'test',
+  count: 42,
+  tags: ['a', 'b']
+});
+
+// Serialize to binary
+const bytes = msg.toBinary();
+
+// Deserialize from binary
+const parsed = MyMessage.fromBinary(bytes);
+
+// Convert to JSON
+const json = msg.toJson();
+```
+
+## Versioning
+
+Use versioned packages for backwards compatibility:
+
+```
+my-feature/
+├── v1/
+│   └── messages.proto
+└── v2/
+    └── messages.proto
+```
+
+Import the version you need:
+
+```typescript
+import { MyMessage as MyMessageV1 } from '@multi-platform-app/proto-types/my-feature/v1';
+import { MyMessage as MyMessageV2 } from '@multi-platform-app/proto-types/my-feature/v2';
+```
+
+## Best Practices
+
+1. **Always version schemas** - Never modify existing fields in production
+2. **Use optional fields** - Allows for backwards compatibility
+3. **Document fields** - Add comments explaining each field
+4. **Validate at boundaries** - Use Zod for runtime validation after parsing
+
+## Integration with Services
+
+Use proto types in service interfaces:
+
+```typescript
+import { MyRequest, MyResponse } from '@multi-platform-app/proto-types';
+
+interface IMyService {
+  query(request: MyRequest): Promise<MyResponse>;
+}
+```

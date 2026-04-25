@@ -1,0 +1,107 @@
+# ServiceFactory
+
+Central factory for loading platform-specific service implementations.
+
+## Import
+
+```typescript
+import { ServiceFactory } from '@multi-platform-app/shared/services';
+```
+
+## Methods
+
+### `getStorageService()`
+
+Returns the platform-specific storage service.
+
+```typescript
+const storage = await ServiceFactory.getStorageService();
+```
+
+**Returns:** `Promise<IStorageService>`
+
+**Example:**
+
+```typescript
+const storage = await ServiceFactory.getStorageService();
+await storage.setItem('key', 'value');
+const value = await storage.getItem('key');
+```
+
+## IStorageService Interface
+
+Platform-agnostic key-value storage interface.
+
+### Methods
+
+#### `getItem(key: string): Promise<string | null>`
+
+Gets the value for a key.
+
+- **Parameters:** `key` - The storage key
+- **Returns:** The value, or `null` if key doesn't exist
+
+#### `setItem(key: string, value: string): Promise<void>`
+
+Sets a value for a key.
+
+- **Parameters:**
+  - `key` - The storage key
+  - `value` - The value to store
+- **Returns:** Promise that resolves when complete
+
+#### `removeItem(key: string): Promise<void>`
+
+Removes a key-value pair.
+
+- **Parameters:** `key` - The key to remove
+
+#### `clear(): Promise<void>`
+
+Removes all stored items.
+
+## Platform Implementations
+
+### Tauri (Desktop)
+
+Uses Tauri's invoke API to call Rust storage commands:
+
+```typescript
+class TauriStorageAdapter implements IStorageService {
+  async getItem(key: string) {
+    return await invoke('get_storage_item', { key });
+  }
+}
+```
+
+### Web (Browser)
+
+Uses the browser's localStorage API:
+
+```typescript
+class WebStorageAdapter implements IStorageService {
+  async getItem(key: string) {
+    return localStorage.getItem(key);
+  }
+}
+```
+
+## Adding Custom Services
+
+To add a new service to the factory:
+
+1. Define the interface
+2. Implement platform adapters
+3. Add a factory method
+
+```typescript
+// In ServiceFactory class
+static async getMyService(): Promise<IMyService> {
+  if ('__TAURI__' in window) {
+    const { TauriMyAdapter } = await import('./adapters/tauri/my.adapter');
+    return new TauriMyAdapter();
+  }
+  const { WebMyAdapter } = await import('./adapters/web/my.adapter');
+  return new WebMyAdapter();
+}
+```

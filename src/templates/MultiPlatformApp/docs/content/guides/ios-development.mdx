@@ -1,0 +1,124 @@
+# iOS Development
+
+Guide to developing the iOS application (macOS only).
+
+## Prerequisites
+
+- macOS
+- Xcode 15+
+- XcodeGen 2.39+
+
+## Starting Development
+
+```bash
+make run-ios-dev
+```
+
+This generates the Xcode project and launches the iOS simulator.
+
+## Development Workflow
+
+### Option 1: Command Line
+
+```bash
+make run-ios-dev
+```
+
+### Option 2: Xcode
+
+1. Generate the Xcode project:
+   ```bash
+   make setup-ios-project
+   ```
+
+2. Open in Xcode:
+   ```bash
+   open src/app/ios/MultiPlatformApp.xcodeproj
+   ```
+
+3. Build and run from Xcode (Cmd+R)
+
+## Project Structure
+
+```
+src/app/ios/
+├── Sources/
+│   ├── App/
+│   │   └── MultiPlatformAppApp.swift   # App entry point
+│   ├── Views/
+│   │   └── ContentView.swift           # Main view
+│   └── Services/
+│       └── ...                         # Native services
+├── project.yml        # XcodeGen configuration
+└── Info.plist
+```
+
+## XcodeGen Configuration
+
+The `project.yml` file defines the Xcode project structure:
+
+```yaml
+name: MultiPlatformApp
+options:
+  bundleIdPrefix: com.example
+targets:
+  MultiPlatformApp:
+    type: application
+    platform: iOS
+    sources:
+      - Sources
+    settings:
+      PRODUCT_BUNDLE_IDENTIFIER: com.example.multiplatformapp
+```
+
+Regenerate the project after changes:
+
+```bash
+cd src/app/ios
+xcodegen generate
+```
+
+## Bridging TypeScript
+
+For sharing logic between TypeScript and Swift, consider:
+
+1. **Protocol Buffers** - Define shared data structures
+2. **REST API** - If using a web backend
+3. **WebView** - For rendering shared React components
+
+## Debugging
+
+- Use Xcode's debugger (breakpoints, LLDB)
+- Console.app for system logs
+- Instruments for performance profiling
+
+## Building for Production
+
+```bash
+make build-ios
+```
+
+## Troubleshooting
+
+### Build fails
+
+```bash
+# Ensure Xcode command line tools are installed
+xcode-select --install
+
+# Accept Xcode license
+sudo xcodebuild -license accept
+
+# Regenerate project
+make setup-ios-project
+```
+
+### Simulator issues
+
+```bash
+# Reset simulator
+xcrun simctl erase all
+
+# List available simulators
+xcrun simctl list devices
+```

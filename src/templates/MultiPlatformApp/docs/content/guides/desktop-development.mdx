@@ -1,0 +1,109 @@
+# Desktop Development
+
+Guide to developing the Tauri desktop application.
+
+## Starting Development
+
+```bash
+make run-desktop-dev
+```
+
+This starts the Tauri development mode with hot reload.
+
+## Development Workflow
+
+1. Start dev mode with `make run-desktop-dev`
+2. Edit files in `src/app/desktop/` or shared library
+3. Frontend changes hot reload automatically
+4. Rust changes require app restart
+
+## Project Structure
+
+```
+src/app/desktop/
+├── src/              # Frontend source (React)
+│   ├── main.tsx
+│   └── App.tsx
+├── src-tauri/        # Rust backend
+│   ├── src/
+│   │   ├── main.rs   # Entry point
+│   │   └── lib.rs    # Commands
+│   ├── Cargo.toml
+│   └── tauri.conf.json
+├── package.json
+└── vite.config.ts
+```
+
+## Using Tauri Commands
+
+Call Rust functions from TypeScript:
+
+```typescript
+import { invoke } from '@tauri-apps/api/core';
+
+async function callRust() {
+  const result = await invoke('my_command', { arg: 'value' });
+  console.log(result);
+}
+```
+
+Define commands in Rust:
+
+```rust
+#[tauri::command]
+fn my_command(arg: String) -> String {
+    format!("Hello, {}", arg)
+}
+```
+
+## Platform Adapters
+
+The Tauri adapter uses `invoke` to call Rust commands:
+
+```typescript
+class TauriStorageAdapter implements IStorageService {
+  async getItem(key: string) {
+    return await invoke('get_storage_item', { key });
+  }
+}
+```
+
+The ServiceFactory automatically selects this adapter when running in Tauri.
+
+## Debugging
+
+### Frontend
+- Open DevTools in Tauri window: Cmd+Option+I (macOS) or Ctrl+Shift+I (Windows/Linux)
+
+### Rust Backend
+- Use `lldb` or VS Code with rust-analyzer
+- Add `println!` statements for quick debugging
+- Check console for Rust panic messages
+
+## Building for Production
+
+```bash
+make build-desktop
+```
+
+Output binaries are in `src/app/desktop/src-tauri/target/release/`.
+
+## Troubleshooting
+
+### Desktop app won't start
+
+```bash
+# Kill any process on port 1420
+lsof -ti:1420 | xargs kill -9
+
+# Rebuild shared library
+make build-libs
+```
+
+### Rust compilation errors
+
+```bash
+cd src/app/desktop/src-tauri
+cargo clean
+cargo build
+```

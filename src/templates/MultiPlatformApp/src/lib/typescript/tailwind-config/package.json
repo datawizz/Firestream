@@ -1,0 +1,9 @@
+{
+  "name": "@multi-platform-app/tailwind-config",
+  "version": "0.1.0",
+  "private": true,
+  "files": ["*.css"],
+  "dependencies": {
+    "tailwindcss": "catalog:"
+  }
+}

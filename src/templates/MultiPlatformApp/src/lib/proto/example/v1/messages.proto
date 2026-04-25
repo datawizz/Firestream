@@ -1,0 +1,35 @@
+syntax = "proto3";
+
+package example.v1;
+
+// Example request message
+message ExampleRequest {
+  // Unique identifier for the request
+  string id = 1;
+  
+  // Data payload
+  string data = 2;
+  
+  // Optional timestamp
+  int64 timestamp = 3;
+}
+
+// Example response message
+message ExampleResponse {
+  // Success indicator
+  bool success = 1;
+  
+  // Response message
+  string message = 2;
+  
+  // Optional error code
+  int32 error_code = 3;
+}
+
+// Example user entity
+message User {
+  string id = 1;
+  string name = 2;
+  string email = 3;
+  int64 created_at = 4;
+}

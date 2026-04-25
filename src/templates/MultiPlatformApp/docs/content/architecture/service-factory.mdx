@@ -1,0 +1,82 @@
+# Service Factory
+
+The `ServiceFactory` dynamically loads the correct adapter based on the runtime platform.
+
+## How It Works
+
+```typescript
+class ServiceFactory {
+  static async getStorageService(): Promise<IStorageService> {
+    if ('__TAURI__' in window) {
+      const { TauriStorageAdapter } = await import(
+        './adapters/tauri/storage.adapter'
+      );
+      return new TauriStorageAdapter();
+    }
+    const { WebStorageAdapter } = await import(
+      './adapters/web/storage.adapter'
+    );
+    return new WebStorageAdapter();
+  }
+}
+```
+
+## Key Features
+
+### Runtime Platform Detection
+
+The factory detects which platform it's running on by checking for Tauri's global object:
+
+```typescript
+if ('__TAURI__' in window) {
+  // Running in Tauri desktop app
+} else {
+  // Running in web browser
+}
+```
+
+### Dynamic Imports
+
+Adapters are loaded dynamically to:
+- Reduce initial bundle size
+- Only load platform-specific code when needed
+- Enable tree-shaking of unused adapters
+
+### Singleton Pattern
+
+Service instances can be cached for reuse:
+
+```typescript
+class ServiceFactory {
+  private static storageService: IStorageService | null = null;
+
+  static async getStorageService(): Promise<IStorageService> {
+    if (!this.storageService) {
+      this.storageService = await this.createStorageService();
+    }
+    return this.storageService;
+  }
+}
+```
+
+## Usage in Components
+
+```typescript
+import { ServiceFactory } from '@multi-platform-app/shared/services';
+
+function MyComponent() {
+  const handleSave = async () => {
+    const storage = await ServiceFactory.getStorageService();
+    await storage.setItem('key', 'value');
+  };
+
+  return <button onClick={handleSave}>Save</button>;
+}
+```
+
+## Adding New Services
+
+1. Define the interface in `api/`
+2. Implement adapters in `adapters/tauri/` and `adapters/web/`
+3. Add a factory method to `ServiceFactory`
+4. Export from the services index

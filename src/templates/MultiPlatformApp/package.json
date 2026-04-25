@@ -1,0 +1,23 @@
+{
+  "name": "multi-platform-app",
+  "private": true,
+  "version": "0.1.0",
+  "packageManager": "pnpm@10.33.0",
+  "scripts": {
+    "build": "turbo build",
+    "dev": "turbo dev",
+    "dev:web": "turbo build --filter=@multi-platform-app/shared --filter=@multi-platform-app/auth && pnpm --filter web dev",
+    "dev:desktop": "turbo build --filter=@multi-platform-app/shared --filter=@multi-platform-app/auth && pnpm --filter desktop tauri dev",
+    "dev:mobile": "pnpm --filter mobile tauri ios dev",
+    "lint": "turbo lint",
+    "typecheck": "turbo typecheck",
+    "proto:generate": "turbo proto:generate",
+    "db:generate-types": "cd src/lib/typescript/auth && node scripts/generate-types.js > src/types/database.ts",
+    "db:migrate": "cd src/lib/typescript/auth && pnpm exec supabase db push",
+    "db:seed": "cd src/lib/typescript/auth && pnpm exec supabase db seed"
+  },
+  "devDependencies": {
+    "turbo": "^2.8.20",
+    "typescript": "catalog:"
+  }
+}

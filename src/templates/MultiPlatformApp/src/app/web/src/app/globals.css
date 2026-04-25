@@ -1,0 +1,14 @@
+@import "tailwindcss";
+@import '@multi-platform-app/tailwind-config/main.css';
+
+/* Tailwind v4 ignores the `content` array in JS configs — use @source to scan workspace packages */
+@source "../../../../lib/typescript/shared/src";
+@source "../../../../lib/typescript/auth/src";
+
+body {
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
+    sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}

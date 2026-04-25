@@ -1,0 +1,42 @@
+{
+  "name": "desktop",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "preview": "vite preview",
+    "tauri": "tauri",
+    "typecheck": "tsc --noEmit",
+    "lint": "pnpm typecheck",
+    "clean": "rm -rf dist"
+  },
+  "dependencies": {
+    "@multi-platform-app/shared": "workspace:*",
+    "@multi-platform-app/auth": "workspace:*",
+    "@tanstack/react-query": "catalog:",
+    "@tanstack/react-query-devtools": "catalog:",
+    "@tauri-apps/api": "catalog:",
+    "@tauri-apps/plugin-deep-link": "^2",
+    "@tauri-apps/plugin-opener": "^2",
+    "react": "catalog:",
+    "react-dom": "catalog:",
+    "react-router-dom": "^7.13.2",
+    "zustand": "catalog:"
+  },
+  "devDependencies": {
+    "@multi-platform-app/tailwind-config": "workspace:*",
+    "@multi-platform-app/typescript-config": "workspace:*",
+    "@tailwindcss/postcss": "catalog:",
+    "@tauri-apps/cli": "^2",
+    "@types/react": "catalog:",
+    "@types/react-dom": "catalog:",
+    "@vitejs/plugin-react": "catalog:",
+    "autoprefixer": "catalog:",
+    "postcss": "catalog:",
+    "tailwindcss": "catalog:",
+    "typescript": "catalog:",
+    "vite": "catalog:"
+  }
+}

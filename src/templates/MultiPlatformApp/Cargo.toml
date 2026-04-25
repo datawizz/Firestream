@@ -1,0 +1,28 @@
+[workspace]
+resolver = "2"
+
+# Default member - run Tauri desktop app with 'cargo run'
+default-members = ["src/app/desktop/src-tauri"]
+
+members = [
+    "src/app/desktop/src-tauri",
+    "src/app/mobile/src-tauri",
+    # Future Rust library crates go here:
+    # "src/lib/rust/core-types",
+    # "src/lib/rust/core-logic",
+]
+
+[workspace.dependencies]
+# Shared dependencies for workspace members
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+thiserror = "1"
+anyhow = "1"
+tokio = { version = "1", features = ["full"] }
+
+[profile.release]
+panic = "abort"
+codegen-units = 1
+lto = true
+opt-level = "s"
+strip = true

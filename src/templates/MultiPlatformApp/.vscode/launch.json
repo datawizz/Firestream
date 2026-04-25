@@ -1,0 +1,26 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "type": "lldb",
+      "request": "launch",
+      "name": "Debug Tauri (Rust)",
+      "cargo": {
+        "args": [
+          "build",
+          "--manifest-path=./src/app/desktop/src-tauri/Cargo.toml",
+          "--no-default-features"
+        ]
+      }
+    },
+    {
+      "type": "node",
+      "request": "launch",
+      "name": "Debug Next.js",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": ["dev:web"],
+      "console": "integratedTerminal",
+      "internalConsoleOptions": "neverOpen"
+    }
+  ]
+}

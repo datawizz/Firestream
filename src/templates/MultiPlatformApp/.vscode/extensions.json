@@ -1,0 +1,14 @@
+{
+  "recommendations": [
+    "mkhl.direnv",
+    "rust-lang.rust-analyzer",
+    "tauri-apps.tauri-vscode",
+    "bradlc.vscode-tailwindcss",
+    "dbaeumer.vscode-eslint",
+    "esbenp.prettier-vscode",
+    "ms-vscode.vscode-typescript-next",
+    "jnoortheen.nix-ide",
+    "arrterian.nix-env-selector",
+    "ms-azuretools.vscode-docker"
+  ]
+}

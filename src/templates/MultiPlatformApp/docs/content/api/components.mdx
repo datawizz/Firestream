@@ -1,0 +1,152 @@
+# Components
+
+React components provided by the shared library.
+
+## Button
+
+Radix-based button component with variants.
+
+### Import
+
+```typescript
+import { Button } from '@multi-platform-app/shared/components';
+```
+
+### Usage
+
+```typescript
+<Button variant="default" size="lg">Click me</Button>
+```
+
+### Props
+
+```typescript
+interface ButtonProps {
+  variant?: 'default' | 'destructive' | 'outline' | 'secondary' | 'ghost' | 'link';
+  size?: 'default' | 'sm' | 'lg' | 'icon';
+  asChild?: boolean;
+  // ...standard HTML button props
+}
+```
+
+### Variants
+
+| Variant | Description |
+|---------|-------------|
+| `default` | Primary button style |
+| `destructive` | Red/danger button |
+| `outline` | Border-only button |
+| `secondary` | Muted background |
+| `ghost` | Transparent background |
+| `link` | Styled as a link |
+
+### Sizes
+
+| Size | Description |
+|------|-------------|
+| `default` | Standard size |
+| `sm` | Small button |
+| `lg` | Large button |
+| `icon` | Square icon button |
+
+### Examples
+
+```typescript
+// Primary button
+<Button>Save</Button>
+
+// Destructive action
+<Button variant="destructive">Delete</Button>
+
+// Outline style
+<Button variant="outline" size="sm">Cancel</Button>
+
+// Icon button
+<Button variant="ghost" size="icon">
+  <IconComponent />
+</Button>
+
+// As child (for links)
+<Button asChild>
+  <a href="/page">Go to page</a>
+</Button>
+```
+
+## Counter
+
+Example counter component using Zustand store.
+
+### Import
+
+```typescript
+import { Counter } from '@multi-platform-app/shared/components';
+```
+
+### Usage
+
+```typescript
+<Counter />
+```
+
+This component demonstrates:
+- Zustand store integration
+- Button component usage
+- State management patterns
+
+### Implementation
+
+```typescript
+function Counter() {
+  const { count, increment, decrement, reset } = useExampleStore();
+
+  return (
+    <div>
+      <p>{count}</p>
+      <Button onClick={decrement}>-</Button>
+      <Button onClick={increment}>+</Button>
+      <Button variant="outline" onClick={reset}>Reset</Button>
+    </div>
+  );
+}
+```
+
+## Creating Custom Components
+
+Follow this pattern for new components:
+
+```typescript
+import React from 'react';
+import { cn } from '../utils';
+
+interface MyComponentProps {
+  className?: string;
+  children: React.ReactNode;
+  variant?: 'default' | 'outlined';
+}
+
+export function MyComponent({
+  className,
+  children,
+  variant = 'default'
+}: MyComponentProps) {
+  return (
+    <div
+      className={cn(
+        'base-styles',
+        variant === 'outlined' && 'border',
+        className
+      )}
+    >
+      {children}
+    </div>
+  );
+}
+```
+
+### Guidelines
+
+1. Accept `className` prop for customization
+2. Use `cn()` for class merging
+3. Define TypeScript interfaces for props
+4. Use Radix UI primitives for accessibility
+5. Follow Tailwind CSS patterns for styling

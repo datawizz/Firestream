@@ -1,0 +1,83 @@
+# API Reference
+
+Complete API documentation for the multi-platform app shared library.
+
+## Package Exports
+
+The `@multi-platform-app/shared` package exports the following subpaths:
+
+| Export | Description |
+|--------|-------------|
+| `@multi-platform-app/shared` | Main library exports |
+| `@multi-platform-app/shared/components` | React components |
+| `@multi-platform-app/shared/stores` | Zustand stores |
+| `@multi-platform-app/shared/hooks` | Custom React hooks |
+| `@multi-platform-app/shared/services` | Service factory |
+| `@multi-platform-app/shared/utils` | Utility functions |
+| `@multi-platform-app/shared/styles` | CSS styles |
+
+## Quick Examples
+
+### Using Components
+
+```typescript
+import { Button, Counter } from '@multi-platform-app/shared/components';
+
+function App() {
+  return (
+    <div>
+      <Button variant="default" size="lg">Click me</Button>
+      <Counter />
+    </div>
+  );
+}
+```
+
+### Using Hooks
+
+```typescript
+import { usePlatform } from '@multi-platform-app/shared/hooks';
+import { useExampleStore } from '@multi-platform-app/shared/stores';
+
+function App() {
+  const { isTauri, isWeb } = usePlatform();
+  const { count, increment } = useExampleStore();
+
+  return (
+    <div>
+      <p>Platform: {isTauri ? 'Desktop' : 'Web'}</p>
+      <p>Count: {count}</p>
+      <button onClick={increment}>+</button>
+    </div>
+  );
+}
+```
+
+### Using Services
+
+```typescript
+import { ServiceFactory } from '@multi-platform-app/shared/services';
+
+async function saveData(key: string, value: string) {
+  const storage = await ServiceFactory.getStorageService();
+  await storage.setItem(key, value);
+}
+```
+
+### Using Utilities
+
+```typescript
+import { cn } from '@multi-platform-app/shared/utils';
+
+function MyComponent({ className, active }) {
+  return (
+    <div className={cn(
+      'p-4 rounded',
+      active && 'bg-blue-500',
+      className
+    )}>
+      Content
+    </div>
+  );
+}
+```

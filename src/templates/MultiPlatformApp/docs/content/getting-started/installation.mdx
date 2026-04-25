@@ -1,0 +1,69 @@
+# Installation
+
+Step-by-step installation guide for the multi-platform app template.
+
+## Setup
+
+### 1. Initialize Project
+
+```bash
+cd multi_platform_app
+make init
+```
+
+This creates configuration files including `.env` and workspace settings.
+
+### 2. Install Dependencies
+
+```bash
+make install
+```
+
+This installs all pnpm workspace dependencies across packages.
+
+### 3. Build Shared Libraries
+
+```bash
+make build-libs
+```
+
+Compiles the shared TypeScript library that all platforms depend on.
+
+## Verify Installation
+
+Start the web development server to verify everything works:
+
+```bash
+make run-web-dev
+```
+
+Open http://localhost:3000 in your browser.
+
+## Troubleshooting
+
+### Port already in use
+
+```bash
+lsof -ti:3000 | xargs kill -9  # Web
+lsof -ti:1420 | xargs kill -9  # Desktop
+```
+
+### Types not found
+
+```bash
+make build-libs  # Rebuild shared library
+```
+
+### Rust compilation errors
+
+```bash
+cd src/app/desktop/src-tauri
+cargo clean
+cargo build
+```
+
+### Proto generation fails
+
+- Ensure protoc is installed
+- Check proto file syntax
+- Run `make clean` and try again
