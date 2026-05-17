@@ -1646,6 +1646,7 @@ dependencies = [
  "k8s-manager",
  "k8s-openapi",
  "kube",
+ "nix-container-builder",
  "once_cell",
  "ratatui",
  "regex",

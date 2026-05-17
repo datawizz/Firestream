@@ -27,6 +27,9 @@ pub enum FirestreamError {
     
     /// General error with message
     GeneralError(String),
+
+    /// Container build error
+    BuildError(String),
 }
 
 impl fmt::Display for FirestreamError {
@@ -39,6 +42,7 @@ impl fmt::Display for FirestreamError {
             FirestreamError::KubernetesError(msg) => write!(f, "Kubernetes error: {}", msg),
             FirestreamError::IoError(msg) => write!(f, "IO error: {}", msg),
             FirestreamError::GeneralError(msg) => write!(f, "Error: {}", msg),
+            FirestreamError::BuildError(msg) => write!(f, "Build error: {}", msg),
         }
     }
 }
@@ -101,6 +105,12 @@ impl From<k8s_manager::K8sManagerError> for FirestreamError {
     }
 }
 
+impl From<nix_container_builder::NixContainerError> for FirestreamError {
+    fn from(err: nix_container_builder::NixContainerError) -> Self {
+        FirestreamError::BuildError(err.to_string())
+    }
+}
+
 /// Result type alias for Firestream operations
 pub type Result<T> = std::result::Result<T, FirestreamError>;
 
@@ -111,6 +121,40 @@ pub fn error_to_exit_code(error: &FirestreamError) -> i32 {
         FirestreamError::ServiceNotFound(_) => 3,
         FirestreamError::DependencyError(_) => 4,
         FirestreamError::ResourceConstraint(_) => 5,
+        FirestreamError::BuildError(_) => 6,
         _ => 1, // General error
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_from_nix_container_error() {
+        let nix_err = nix_container_builder::NixContainerError::BuildFailed {
+            container: "odoo-15".to_string(),
+            message: "build failed".to_string(),
+        };
+        let fs_err: FirestreamError = nix_err.into();
+        match &fs_err {
+            FirestreamError::BuildError(msg) => {
+                assert!(msg.contains("odoo-15"));
+                assert!(msg.contains("build failed"));
+            }
+            _ => panic!("Expected BuildError, got {:?}", fs_err),
+        }
+    }
+
+    #[test]
+    fn test_build_error_exit_code() {
+        let err = FirestreamError::BuildError("test".to_string());
+        assert_eq!(error_to_exit_code(&err), 6);
+    }
+
+    #[test]
+    fn test_build_error_display() {
+        let err = FirestreamError::BuildError("something went wrong".to_string());
+        assert_eq!(format!("{}", err), "Build error: something went wrong");
     }
 }
