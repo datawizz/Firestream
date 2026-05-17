@@ -19,7 +19,7 @@ use tokio::sync::Mutex;
 use tracing::{info, warn};
 
 /// Result of a successful container build
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize)]
 pub struct BuildResult {
     /// Container name
     pub container: String,
@@ -34,10 +34,15 @@ pub struct BuildResult {
     pub image_id: Option<String>,
 
     /// Build duration
+    #[serde(serialize_with = "serialize_duration")]
     pub duration: Duration,
 
     /// Build strategy used
     pub strategy: BuildStrategy,
+}
+
+fn serialize_duration<S: serde::Serializer>(duration: &Duration, s: S) -> std::result::Result<S::Ok, S::Error> {
+    s.serialize_f64(duration.as_secs_f64())
 }
 
 impl BuildResult {

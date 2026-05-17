@@ -41,7 +41,7 @@ pub enum BuildMode {
 }
 
 /// Build strategy enumeration
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize)]
 pub enum BuildStrategy {
     /// Native Nix build (Linux only)
     NativeNix,
