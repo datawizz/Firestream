@@ -236,12 +236,45 @@ cat "$image_path"
 
         let container_output_dir = format!("/build/{}", package_name);
 
+        // Collect safe.directory paths (repo root + any path inputs from flake.lock)
+        let mut safe_dirs = vec![repo_root.display().to_string()];
+        let lock_path = repo_root.join("flake.lock");
+        if lock_path.exists() {
+            if let Ok(content) = std::fs::read_to_string(&lock_path) {
+                if let Ok(lock) = serde_json::from_str::<serde_json::Value>(&content) {
+                    if let Some(nodes) = lock.get("nodes").and_then(|n| n.as_object()) {
+                        for (_name, node) in nodes {
+                            let is_path = node.get("locked")
+                                .and_then(|l| l.get("type"))
+                                .and_then(|t| t.as_str()) == Some("path");
+                            if is_path {
+                                if let Some(p) = node.get("locked").and_then(|l| l.get("path")).and_then(|p| p.as_str()) {
+                                    let abs = if p.starts_with('/') {
+                                        PathBuf::from(p)
+                                    } else {
+                                        repo_root.join(p).canonicalize().unwrap_or_else(|_| repo_root.join(p))
+                                    };
+                                    if abs.exists() && abs != repo_root {
+                                        safe_dirs.push(abs.display().to_string());
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        let safe_dir_cmds: String = safe_dirs.iter()
+            .map(|d| format!(r#"git config --global --add safe.directory "{}" 2>/dev/null || true"#, d))
+            .collect::<Vec<_>>()
+            .join("\n");
+
         // Build the nix script (matches container-images.sh inner script)
         let nix_script = format!(
             r#"set -euo pipefail
 
 echo "experimental-features = nix-command flakes" >> /etc/nix/nix.conf
-git config --global --add safe.directory "{repo_root}" 2>/dev/null || true
+{safe_dir_cmds}
 
 echo ">>> Building {pkg}..."
 nix build ".#{pkg}" -o /tmp/result -L --no-update-lock-file
@@ -257,7 +290,7 @@ fi
 
 echo ">>> Build successful: {pkg}"
 "#,
-            repo_root = repo_root.display(),
+            safe_dir_cmds = safe_dir_cmds,
             pkg = package_name,
             out_dir = container_output_dir,
         );
@@ -287,6 +320,10 @@ echo ">>> Build successful: {pkg}"
         // Add git worktree mounts if needed
         let worktree_mounts = self.resolve_git_worktree_mounts(&repo_root)?;
         docker_args.extend(worktree_mounts);
+
+        // Add path input mounts from flake.lock (local dev support)
+        let path_input_mounts = self.resolve_path_input_mounts(&repo_root)?;
+        docker_args.extend(path_input_mounts);
 
         // Add resource limits
         if let Some(limits) = Self::detect_docker_resource_limits().await {
@@ -395,6 +432,101 @@ echo ">>> Build successful: {pkg}"
             "-v".to_string(),
             format!("{}:{}:ro", main_git_dir.display(), main_git_dir.display()),
         ])
+    }
+
+    /// Parse flake.lock for `path:` inputs and return Docker volume mount args.
+    ///
+    /// When a consumer flake has `firestream.url = "path:../Firestream"`, the
+    /// flake.lock records the resolved path. We need to mount these paths into
+    /// the Docker container so that `nix build` can resolve them.
+    fn resolve_path_input_mounts(&self, repo_root: &Path) -> Result<Vec<String>> {
+        let lock_path = repo_root.join("flake.lock");
+        if !lock_path.exists() {
+            debug!("No flake.lock found at {}, skipping path input discovery", lock_path.display());
+            return Ok(vec![]);
+        }
+
+        let lock_content: serde_json::Value = serde_json::from_str(
+            &std::fs::read_to_string(&lock_path)
+                .map_err(|e| NixContainerError::Other(format!("Failed to read flake.lock: {}", e)))?
+        ).map_err(|e| NixContainerError::Other(format!("Failed to parse flake.lock: {}", e)))?;
+
+        let mut mounts = vec![];
+        let mut safe_dirs = vec![];
+
+        let nodes = match lock_content.get("nodes").and_then(|n| n.as_object()) {
+            Some(nodes) => nodes,
+            None => return Ok(vec![]),
+        };
+
+        for (name, node) in nodes {
+            // Check locked.type == "path" (resolved inputs)
+            let is_path = node.get("locked")
+                .and_then(|l| l.get("type"))
+                .and_then(|t| t.as_str()) == Some("path");
+
+            // Also check original.type == "path" (some lock formats)
+            let is_original_path = !is_path && node.get("original")
+                .and_then(|o| o.get("type"))
+                .and_then(|t| t.as_str()) == Some("path");
+
+            if !is_path && !is_original_path {
+                continue;
+            }
+
+            // Get the path from locked (preferred) or original
+            let path_str = node.get("locked")
+                .and_then(|l| l.get("path"))
+                .and_then(|p| p.as_str())
+                .or_else(|| node.get("original")
+                    .and_then(|o| o.get("path"))
+                    .and_then(|p| p.as_str()));
+
+            let path_str = match path_str {
+                Some(p) => p,
+                None => continue,
+            };
+
+            // Resolve to absolute path
+            let path = if path_str.starts_with('/') {
+                PathBuf::from(path_str)
+            } else {
+                match repo_root.join(path_str).canonicalize() {
+                    Ok(p) => p,
+                    Err(e) => {
+                        warn!("Cannot resolve path input '{}' ({}): {}", name, path_str, e);
+                        continue;
+                    }
+                }
+            };
+
+            // Skip if same as repo root (already mounted) or doesn't exist
+            if path == repo_root {
+                continue;
+            }
+            if !path.exists() {
+                warn!("Path input '{}' points to non-existent path: {}", name, path.display());
+                continue;
+            }
+
+            info!("Mounting path input '{}': {}", name, path.display());
+            mounts.push("-v".to_string());
+            mounts.push(format!("{}:{}:ro", path.display(), path.display()));
+            safe_dirs.push(path.display().to_string());
+
+            // Also resolve git worktree mounts for this path input
+            if let Ok(wt_mounts) = self.resolve_git_worktree_mounts(&path) {
+                mounts.extend(wt_mounts);
+            }
+        }
+
+        // Store safe_dirs for use in the nix script (attached to self via the mounts)
+        // We embed them as environment variable mounts
+        if !safe_dirs.is_empty() {
+            debug!("Path input safe directories: {:?}", safe_dirs);
+        }
+
+        Ok(mounts)
     }
 
     /// Detect Docker resource limits (CPUs, memory).
@@ -565,9 +697,9 @@ impl ContainerBuildStrategy for DockerNixStrategy {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::io::Write;
 
-    #[test]
-    fn test_docker_strategy_name() {
+    fn make_strategy() -> DockerNixStrategy {
         let platform = PlatformInfo {
             platform: crate::platform::Platform::Darwin,
             arch: crate::platform::Architecture::Aarch64,
@@ -575,8 +707,105 @@ mod tests {
             docker_available: true,
             in_container: false,
         };
-        let strategy = DockerNixStrategy::new(platform, "test-volume".to_string());
+        DockerNixStrategy::new(platform, "test-volume".to_string())
+    }
+
+    #[test]
+    fn test_docker_strategy_name() {
+        let strategy = make_strategy();
         assert_eq!(strategy.name(), "Docker Nix");
         assert_eq!(strategy.strategy_type(), BuildStrategy::DockerNix);
+    }
+
+    #[test]
+    fn test_resolve_path_input_mounts_no_lockfile() {
+        let strategy = make_strategy();
+        let tmp = tempfile::tempdir().unwrap();
+        // No flake.lock => empty result
+        let mounts = strategy.resolve_path_input_mounts(tmp.path()).unwrap();
+        assert!(mounts.is_empty());
+    }
+
+    #[test]
+    fn test_resolve_path_input_mounts_no_path_inputs() {
+        let strategy = make_strategy();
+        let tmp = tempfile::tempdir().unwrap();
+        let lock = serde_json::json!({
+            "nodes": {
+                "nixpkgs": {
+                    "locked": {
+                        "type": "github",
+                        "owner": "NixOS",
+                        "repo": "nixpkgs",
+                        "rev": "abc123"
+                    }
+                },
+                "root": {}
+            },
+            "root": "root",
+            "version": 7
+        });
+        let mut f = std::fs::File::create(tmp.path().join("flake.lock")).unwrap();
+        f.write_all(serde_json::to_string(&lock).unwrap().as_bytes()).unwrap();
+
+        let mounts = strategy.resolve_path_input_mounts(tmp.path()).unwrap();
+        assert!(mounts.is_empty());
+    }
+
+    #[test]
+    fn test_resolve_path_input_mounts_with_path_input() {
+        let strategy = make_strategy();
+        let tmp = tempfile::tempdir().unwrap();
+        // Create a directory to act as the path input target
+        let input_dir = tempfile::tempdir().unwrap();
+        let input_path = input_dir.path().to_str().unwrap().to_string();
+
+        let lock = serde_json::json!({
+            "nodes": {
+                "firestream": {
+                    "locked": {
+                        "type": "path",
+                        "path": input_path
+                    }
+                },
+                "root": {}
+            },
+            "root": "root",
+            "version": 7
+        });
+        let mut f = std::fs::File::create(tmp.path().join("flake.lock")).unwrap();
+        f.write_all(serde_json::to_string(&lock).unwrap().as_bytes()).unwrap();
+
+        let mounts = strategy.resolve_path_input_mounts(tmp.path()).unwrap();
+        // Should have at least -v and the mount spec
+        assert!(mounts.len() >= 2, "Expected mount args, got: {:?}", mounts);
+        assert_eq!(mounts[0], "-v");
+        assert!(mounts[1].contains(&input_path));
+        assert!(mounts[1].ends_with(":ro"));
+    }
+
+    #[test]
+    fn test_resolve_path_input_mounts_skips_nonexistent() {
+        let strategy = make_strategy();
+        let tmp = tempfile::tempdir().unwrap();
+
+        let lock = serde_json::json!({
+            "nodes": {
+                "missing": {
+                    "locked": {
+                        "type": "path",
+                        "path": "/nonexistent/path/that/should/not/exist"
+                    }
+                },
+                "root": {}
+            },
+            "root": "root",
+            "version": 7
+        });
+        let mut f = std::fs::File::create(tmp.path().join("flake.lock")).unwrap();
+        f.write_all(serde_json::to_string(&lock).unwrap().as_bytes()).unwrap();
+
+        let mounts = strategy.resolve_path_input_mounts(tmp.path()).unwrap();
+        assert!(mounts.is_empty(), "Should skip non-existent paths");
     }
 }
