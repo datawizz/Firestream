@@ -15,6 +15,6 @@
   "database_name": "firestream_odoo",
   "database_user": "firestream",
   "database_password": "firestream",
-  "firestream_ref": "github:Cogent-Creation-Co/Firestream",
+  "firestream_ref": "github:Cogent-Creation-Co/Firestream/nightly",
   "demo_data": false
 }

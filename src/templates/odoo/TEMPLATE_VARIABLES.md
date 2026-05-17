@@ -25,7 +25,7 @@
 | `database_name` | String | `"firestream_odoo"` | PostgreSQL database name |
 | `database_user` | String | `"firestream"` | PostgreSQL user |
 | `database_password` | String | `"firestream"` | PostgreSQL password |
-| `firestream_ref` | String | `"github:Cogent-Creation-Co/Firestream"` | Nix flake input URL for Firestream |
+| `firestream_ref` | String | `"github:Cogent-Creation-Co/Firestream/nightly"` | Nix flake input URL for Firestream |
 | `demo_data` | bool | `false` | Whether to load Odoo demo data on init |
 
 ## Derived Fields (Computed Automatically)

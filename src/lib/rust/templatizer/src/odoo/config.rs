@@ -129,7 +129,7 @@ fn default_database_password() -> String {
     "firestream".to_string()
 }
 fn default_firestream_ref() -> String {
-    "github:Cogent-Creation-Co/Firestream".to_string()
+    "github:Cogent-Creation-Co/Firestream/nightly".to_string()
 }
 
 impl Default for OdooConfig {
