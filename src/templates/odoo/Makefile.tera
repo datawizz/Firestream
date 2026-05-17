@@ -38,11 +38,16 @@ setup: ## Initial project setup (init git, build images, create .env)
 
 .PHONY: build
 build: ## Build Firestream container images via Nix
-	@echo "$(GREEN)Building Odoo $(IMAGE_TAG) image...$(NC)"
-	nix build .#odoo -L && docker load < result
-	@echo "$(GREEN)Building PostgreSQL image...$(NC)"
-	nix build .#postgresql -L && docker load < result
-	@echo "$(GREEN)Images built and loaded.$(NC)"
+	@if [ "$$(uname -s)" = "Linux" ] && command -v nix >/dev/null 2>&1; then \
+		echo "$(GREEN)Building Odoo $(IMAGE_TAG) image...$(NC)"; \
+		nix build .#odoo -L && docker load < result; \
+		echo "$(GREEN)Building PostgreSQL image...$(NC)"; \
+		nix build .#postgresql -L && docker load < result; \
+		echo "$(GREEN)Images built and loaded.$(NC)"; \
+	else \
+		echo "$(GREEN)Building via Firestream (Docker-based Nix)...$(NC)"; \
+		nix run firestream#firestream -- build odoo-{{ odoo_version }} postgresql-{{ postgresql_version }}; \
+	fi
 
 # ─── Services ───────────────────────────────────────────
 
