@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright Firestream. Apache-2.0 License.
+# Copyright Firestream. MIT License.
 # Post-initialization script
 #
 # This script runs after JupyterHub initialization but before the service starts.

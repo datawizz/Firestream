@@ -8,7 +8,7 @@ use crate::discovery::ContainerInfo;
 use crate::error::{NixContainerError, Result};
 use crate::platform::PlatformInfo;
 use crate::progress::{BuildPhase, BuildProgress};
-use crate::strategy::{BoxedProgressCallback, BuildStrategy, ContainerBuildStrategy};
+use crate::strategy::{find_repo_root, BoxedProgressCallback, BuildMode, BuildStrategy, ContainerBuildStrategy};
 use async_trait::async_trait;
 use std::path::PathBuf;
 use tokio::process::Command;
@@ -139,6 +139,69 @@ impl ContainerBuildStrategy for NativeNixStrategy {
 
         result
     }
+
+    async fn build_with_mode(
+        &self,
+        mode: &BuildMode,
+        config: &BuildConfig,
+    ) -> Result<PathBuf> {
+        match mode {
+            BuildMode::RootFlake { package_name } => {
+                let repo_root = find_repo_root()?;
+                info!("Building with native Nix (root flake): .#{}", package_name);
+                self.run_nix_build(&repo_root, package_name).await
+            }
+            BuildMode::SubdirFlake { container_dir, attribute } => {
+                let container = ContainerInfo::new(
+                    container_dir.file_name()
+                        .map(|n| n.to_string_lossy().to_string())
+                        .unwrap_or_else(|| "unknown".to_string()),
+                    container_dir,
+                );
+                let config = BuildConfig {
+                    nix_attribute: attribute.clone(),
+                    ..config.clone()
+                };
+                self.build(&container, &config).await
+            }
+        }
+    }
+
+    async fn build_with_mode_and_progress(
+        &self,
+        mode: &BuildMode,
+        config: &BuildConfig,
+        mut progress: BoxedProgressCallback,
+    ) -> Result<PathBuf> {
+        let label = match mode {
+            BuildMode::RootFlake { package_name } => package_name.clone(),
+            BuildMode::SubdirFlake { container_dir, .. } => container_dir
+                .file_name()
+                .map(|n| n.to_string_lossy().to_string())
+                .unwrap_or_else(|| "unknown".to_string()),
+        };
+
+        progress(BuildProgress::new(
+            &label,
+            BuildPhase::Resolving,
+            "Resolving flake inputs...",
+        ));
+
+        progress(BuildProgress::new(
+            &label,
+            BuildPhase::Building { current: 1, total: 1 },
+            format!("Building .#{}...", label),
+        ));
+
+        let result = self.build_with_mode(mode, config).await;
+
+        match &result {
+            Ok(path) => progress(BuildProgress::complete(&label, format!("Built: {}", path.display()))),
+            Err(e) => progress(BuildProgress::failed(&label, e.to_string())),
+        }
+
+        result
+    }
 }
 
 #[cfg(test)]
@@ -157,5 +220,35 @@ mod tests {
         let strategy = NativeNixStrategy::new(platform);
         assert_eq!(strategy.name(), "Native Nix");
         assert_eq!(strategy.strategy_type(), BuildStrategy::NativeNix);
+    }
+
+    #[test]
+    fn test_build_mode_root_flake_variant_accepted() {
+        // Verify RootFlake mode is a valid BuildMode variant
+        // (the actual build would require Nix, but we verify the dispatch path compiles)
+        let mode = BuildMode::RootFlake {
+            package_name: "odoo-15".to_string(),
+        };
+        match &mode {
+            BuildMode::RootFlake { package_name } => {
+                assert_eq!(package_name, "odoo-15");
+            }
+            _ => panic!("Expected RootFlake"),
+        }
+    }
+
+    #[test]
+    fn test_build_mode_subdir_flake_variant_accepted() {
+        let mode = BuildMode::SubdirFlake {
+            container_dir: PathBuf::from("/tmp/test"),
+            attribute: "dockerImage".to_string(),
+        };
+        match &mode {
+            BuildMode::SubdirFlake { container_dir, attribute } => {
+                assert_eq!(container_dir, &PathBuf::from("/tmp/test"));
+                assert_eq!(attribute, "dockerImage");
+            }
+            _ => panic!("Expected SubdirFlake"),
+        }
     }
 }

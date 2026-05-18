@@ -3,12 +3,12 @@ use ratatui::{
     layout::{Alignment, Constraint, Direction, Layout, Rect},
     style::{Color, Modifier, Style},
     text::{Line, Span},
-    widgets::{Block, Borders, Paragraph, Widget},
+    widgets::{Block, Borders, Widget},
 };
 
 use crate::app::App;
 use crate::views::{
-    ResourcesPane, DetailsPane, LogsPane, HelpView, CommandPalette, SearchView, SplashView, View
+    DetailsPane, HelpView, LogsPane, ResourcesPane, SplashView, View,
 };
 
 impl Widget for &App {
@@ -17,43 +17,24 @@ impl Widget for &App {
         let chunks = Layout::default()
             .direction(Direction::Vertical)
             .constraints([
-                Constraint::Length(3),  // Status bar at top
-                Constraint::Min(0),     // Main content
+                Constraint::Length(3), // Status bar at top
+                Constraint::Min(0),   // Main content
             ])
             .split(area);
 
         // Draw main content based on current view
         match &self.current_view {
             View::Splash => {
-                // Splash view takes full area, no status bar
                 SplashView::new().render(area, buf);
                 return; // Skip status bar for splash
             }
             View::Main => self.render_main_view(chunks[1], buf),
             View::Help => HelpView.render(chunks[1], buf),
-            View::NewDeployment => self.render_new_deployment_view(chunks[1], buf),
-            View::Search(_) => SearchView::new(self).render(chunks[1], buf),
-            View::CommandPalette => {
-                // Render main view underneath
-                self.render_main_view(chunks[1], buf);
-                // Then render command palette on top
-                CommandPalette::new(self).render(chunks[1], buf);
-            }
-            View::IcebergConfig => {
-                // Render Iceberg configuration view
-                crate::views::IcebergConfigView::new(self).render(chunks[1], buf);
-            }
+            _ => self.render_main_view(chunks[1], buf),
         }
 
         // Always draw status bar at top
         self.render_status_bar(chunks[0], buf);
-
-        // Draw overlays
-        if self.command_mode {
-            CommandPalette::new(self).render(chunks[1], buf);
-        } else if self.search_mode {
-            SearchView::new(self).render(chunks[1], buf);
-        }
     }
 }
 
@@ -63,8 +44,8 @@ impl App {
         let main_chunks = Layout::default()
             .direction(Direction::Horizontal)
             .constraints([
-                Constraint::Length(30),  // Resources pane
-                Constraint::Min(0),      // Details pane
+                Constraint::Length(30), // Resources pane
+                Constraint::Min(0),    // Details pane
             ])
             .split(area);
 
@@ -75,8 +56,8 @@ impl App {
         let right_chunks = Layout::default()
             .direction(Direction::Vertical)
             .constraints([
-                Constraint::Percentage(70),  // Details pane
-                Constraint::Percentage(30),  // Logs pane
+                Constraint::Percentage(70), // Details pane
+                Constraint::Percentage(30), // Logs pane
             ])
             .split(main_chunks[1]);
 
@@ -87,187 +68,93 @@ impl App {
         LogsPane::new(self).render(right_chunks[1], buf);
     }
 
-    fn render_new_deployment_view(&self, area: Rect, buf: &mut Buffer) {
-        let block = Block::default()
-            .borders(Borders::ALL)
-            .title(" New Deployment ")
-            .title_alignment(Alignment::Center);
-
-        let chunks = Layout::default()
-            .direction(Direction::Vertical)
-            .margin(1)
-            .constraints([
-                Constraint::Length(3),   // Template selection
-                Constraint::Length(3),   // Name input
-                Constraint::Length(1),   // Spacer
-                Constraint::Length(3),   // Configuration header
-                Constraint::Length(3),   // Replicas
-                Constraint::Length(3),   // CPU
-                Constraint::Length(3),   // Memory
-                Constraint::Length(3),   // GPU
-                Constraint::Length(1),   // Spacer
-                Constraint::Length(3),   // Input configuration header
-                Constraint::Length(3),   // Input topic
-                Constraint::Length(3),   // Output table
-                Constraint::Length(3),   // Batch size
-                Constraint::Length(3),   // Window
-                Constraint::Min(0),      // Spacer
-                Constraint::Length(3),   // Actions
-            ])
-            .split(block.inner(area));
-
-        block.render(area, buf);
-
-        // Template field
-        let template_block = Block::default()
-            .borders(Borders::ALL)
-            .title("Template");
-        let template_text = vec![Line::from("pyspark/stream-processor")];
-        Paragraph::new(template_text).block(template_block).render(chunks[0], buf);
-
-        // Name field
-        let name_block = Block::default()
-            .borders(Borders::ALL)
-            .title("Name");
-        let name_text = vec![Line::from("stream-proc-prod")];
-        Paragraph::new(name_text).block(name_block).render(chunks[1], buf);
-
-        // Configuration section
-        let config_text = vec![Line::from(Span::styled(
-            "Configuration",
-            Style::default().add_modifier(Modifier::BOLD),
-        ))];
-        Paragraph::new(config_text).render(chunks[3], buf);
-
-        // Replicas
-        self.render_field("Replicas", "3", chunks[4], buf);
-        
-        // CPU
-        self.render_field("CPU", "4 cores", chunks[5], buf);
-        
-        // Memory
-        self.render_field("Memory", "8 GB", chunks[6], buf);
-        
-        // GPU
-        self.render_field("GPU", "[ ] enabled", chunks[7], buf);
-
-        // Input Configuration section
-        let input_config_text = vec![Line::from(Span::styled(
-            "Input Configuration",
-            Style::default().add_modifier(Modifier::BOLD),
-        ))];
-        Paragraph::new(input_config_text).render(chunks[9], buf);
-
-        // Input fields
-        self.render_field("Input Topic", "raw-events", chunks[10], buf);
-        self.render_field("Output Table", "processed", chunks[11], buf);
-        self.render_field("Batch Size", "1000 messages", chunks[12], buf);
-        self.render_field("Window", "5 minutes", chunks[13], buf);
-
-        // Actions
-        let actions = vec![Line::from(vec![
-            Span::styled("[Validate]", Style::default().fg(Color::Yellow)),
-            Span::raw("  "),
-            Span::styled("[Deploy]", Style::default().fg(Color::Green)),
-            Span::raw("  "),
-            Span::styled("[Cancel]", Style::default().fg(Color::Red)),
-        ])];
-        Paragraph::new(actions)
-            .alignment(Alignment::Center)
-            .render(chunks[15], buf);
-    }
-
-    fn render_field(&self, label: &str, value: &str, area: Rect, buf: &mut Buffer) {
-        let chunks = Layout::default()
-            .direction(Direction::Horizontal)
-            .constraints([
-                Constraint::Length(20),
-                Constraint::Min(0),
-            ])
-            .split(area);
-
-        let label_text = vec![Line::from(format!("{}:", label))];
-        Paragraph::new(label_text).render(chunks[0], buf);
-
-        let value_block = Block::default()
-            .borders(Borders::ALL);
-        let value_text = vec![Line::from(value)];
-        Paragraph::new(value_text).block(value_block).render(chunks[1], buf);
-    }
-
     fn render_status_bar(&self, area: Rect, buf: &mut Buffer) {
-        // Create block with borders
         let block = Block::default()
             .borders(Borders::ALL)
             .border_style(Style::default().fg(Color::Rgb(60, 60, 80)))
             .title(" Firestream ")
             .title_alignment(Alignment::Left)
-            .title_style(Style::default()
-                .fg(Color::Rgb(239, 200, 131))
-                .add_modifier(Modifier::BOLD));
-            
-        // Calculate inner area before rendering
+            .title_style(
+                Style::default()
+                    .fg(Color::Rgb(239, 200, 131))
+                    .add_modifier(Modifier::BOLD),
+            );
+
         let inner = block.inner(area);
-        
-        // Render the block
         block.render(area, buf);
-        
-        // Create two sections: left for system info, right for context hints
+
+        // Two sections: left for system info, right for context hints
         let main_chunks = Layout::default()
             .direction(Direction::Horizontal)
             .constraints([
-                Constraint::Percentage(60),  // System info
-                Constraint::Percentage(40),  // Context hints
+                Constraint::Percentage(60), // System info
+                Constraint::Percentage(40), // Context hints
             ])
             .split(inner);
-        
-        // Left section - system info
-        let sys_chunks = Layout::default()
-            .direction(Direction::Horizontal)
-            .constraints([
-                Constraint::Length(10),  // Version
-                Constraint::Length(15),  // Environment
-                Constraint::Length(15),  // Status
-                Constraint::Length(15),  // Uptime
-                Constraint::Min(0),      // Resource usage
-            ])
-            .split(main_chunks[0]);
 
-        // Version info
-        let version_info = Line::from(vec![
-            Span::styled(format!("v{}", env!("CARGO_PKG_VERSION")), Style::default().fg(Color::Rgb(150, 150, 170))),
-        ]);
-        buf.set_line(sys_chunks[0].x, sys_chunks[0].y, &version_info, sys_chunks[0].width);
+        // Left section - real system info from bootstrap
+        let mut sys_spans: Vec<Span> = vec![
+            Span::styled(
+                format!("v{}", env!("CARGO_PKG_VERSION")),
+                Style::default().fg(Color::Rgb(150, 150, 170)),
+            ),
+        ];
 
-        // Environment
-        let env_info = Line::from(vec![
-            Span::raw("| "),
-            Span::raw("local-k3d"),
-        ]);
-        buf.set_line(sys_chunks[1].x, sys_chunks[1].y, &env_info, sys_chunks[1].width);
+        if self.bootstrap.docker_available {
+            let docker_ver = self
+                .bootstrap
+                .docker_version
+                .as_deref()
+                .unwrap_or("unknown");
+            let health_color = if self.bootstrap.docker_healthy {
+                Color::Green
+            } else {
+                Color::Yellow
+            };
+            sys_spans.push(Span::raw(" | Docker "));
+            sys_spans.push(Span::raw(docker_ver));
+            sys_spans.push(Span::raw(" "));
+            sys_spans.push(Span::styled("●", Style::default().fg(health_color)));
 
-        // Connection status
-        let status_info = Line::from(vec![
-            Span::raw("| "),
-            Span::styled("● connected", Style::default().fg(Color::Green)),
-        ]);
-        buf.set_line(sys_chunks[2].x, sys_chunks[2].y, &status_info, sys_chunks[2].width);
+            // Image count
+            let built = self.bootstrap.built_images.len();
+            let total = self.bootstrap.available_containers.len();
+            sys_spans.push(Span::raw(format!(" | {}/{} built", built, total)));
 
-        // Uptime
-        let uptime_info = Line::from(vec![
-            Span::raw("| ↑ "),
-            Span::raw("15d 3h"),
-        ]);
-        buf.set_line(sys_chunks[3].x, sys_chunks[3].y, &uptime_info, sys_chunks[3].width);
+            // Running count
+            let running = self.bootstrap.running_containers.values()
+                .filter(|s| s.as_str() == "running")
+                .count();
+            if running > 0 {
+                sys_spans.push(Span::raw(" | "));
+                sys_spans.push(Span::styled(
+                    format!("{} running", running),
+                    Style::default().fg(Color::Green),
+                ));
+            }
 
-        // Resource usage
-        let resource_info = Line::from(vec![
-            Span::raw("| cpu: "),
-            Span::styled("42%", Style::default().fg(Color::Yellow)),
-            Span::raw(" mem: "),
-            Span::styled("71%", Style::default().fg(Color::Yellow)),
-        ]);
-        buf.set_line(sys_chunks[4].x, sys_chunks[4].y, &resource_info, sys_chunks[4].width);
+            // Nix cache
+            let cache_status = if self.bootstrap.nix_volume_exists {
+                "ready"
+            } else {
+                "cold"
+            };
+            sys_spans.push(Span::raw(format!(" | Nix: {}", cache_status)));
+        } else {
+            sys_spans.push(Span::raw(" | "));
+            sys_spans.push(Span::styled(
+                "Demo Mode (no Docker)",
+                Style::default().fg(Color::Yellow),
+            ));
+        }
+
+        let sys_line = Line::from(sys_spans);
+        buf.set_line(
+            main_chunks[0].x,
+            main_chunks[0].y,
+            &sys_line,
+            main_chunks[0].width,
+        );
 
         // Right section - context hints or status message
         if let Some(msg) = &self.status_message {
@@ -275,19 +162,27 @@ impl App {
                 Span::raw("│ "),
                 Span::styled(msg, Style::default().fg(Color::Rgb(239, 200, 131))),
             ]);
-            buf.set_line(main_chunks[1].x, main_chunks[1].y, &status, main_chunks[1].width);
+            buf.set_line(
+                main_chunks[1].x,
+                main_chunks[1].y,
+                &status,
+                main_chunks[1].width,
+            );
         } else {
-            // Show context-specific hints
             let hints = match self.focused_pane {
                 crate::app::Pane::Resources => {
                     vec![
                         Span::raw("│ "),
-                        Span::styled("Spacebar", Style::default().fg(Color::Cyan)),
-                        Span::raw(": toggle │ "),
-                        Span::styled("*", Style::default().fg(Color::Cyan)),
-                        Span::raw(": expand all │ "),
-                        Span::styled("Tab", Style::default().fg(Color::Cyan)),
-                        Span::raw(": next pane │ "),
+                        Span::styled("●", Style::default().fg(Color::Green)),
+                        Span::raw("built "),
+                        Span::styled("○", Style::default().fg(Color::DarkGray)),
+                        Span::raw("not "),
+                        Span::styled("▶", Style::default().fg(Color::Green)),
+                        Span::raw("up "),
+                        Span::styled("■", Style::default().fg(Color::DarkGray)),
+                        Span::raw("down │ "),
+                        Span::styled("B", Style::default().fg(Color::Cyan)),
+                        Span::raw(": build │ "),
                         Span::styled("^C", Style::default().fg(Color::Cyan)),
                         Span::raw(": quit"),
                     ]
@@ -295,8 +190,10 @@ impl App {
                 crate::app::Pane::Details => {
                     vec![
                         Span::raw("│ "),
+                        Span::styled("B", Style::default().fg(Color::Cyan)),
+                        Span::raw(": build │ "),
                         Span::styled("Tab", Style::default().fg(Color::Cyan)),
-                        Span::raw(": next pane │ "),
+                        Span::raw(": next │ "),
                         Span::styled("^C", Style::default().fg(Color::Cyan)),
                         Span::raw(": quit"),
                     ]
@@ -305,14 +202,19 @@ impl App {
                     vec![
                         Span::raw("│ "),
                         Span::styled("Tab", Style::default().fg(Color::Cyan)),
-                        Span::raw(": next pane │ "),
+                        Span::raw(": next │ "),
                         Span::styled("^C", Style::default().fg(Color::Cyan)),
                         Span::raw(": quit"),
                     ]
                 }
             };
             let hint_line = Line::from(hints);
-            buf.set_line(main_chunks[1].x, main_chunks[1].y, &hint_line, main_chunks[1].width);
+            buf.set_line(
+                main_chunks[1].x,
+                main_chunks[1].y,
+                &hint_line,
+                main_chunks[1].width,
+            );
         }
     }
 }

@@ -2,8 +2,11 @@
 
 Pure Nix-based Apache Superset container, replacing Bitnami Stacksmith dependencies with reproducible builds using `uv2nix` and the Firestream module system.
 
+Supports multiple Superset versions (4.x and 5.x) with version-specific directories.
+
 ## Features
 
+- **Multi-version support**: Superset 4.x and 5.x available side-by-side
 - **Reproducible builds**: All dependencies managed via Nix flake and uv.lock
 - **Multi-role support**: webserver, celery-worker, celery-beat, celery-flower, init
 - **Docker secrets support**: All sensitive variables support the `_FILE` suffix pattern
@@ -14,8 +17,17 @@ Pure Nix-based Apache Superset container, replacing Bitnami Stacksmith dependenc
 ### Building
 
 ```bash
-# Build the Docker image
+# Build the default (v5) Docker image
 nix build .#dockerImage
+
+# Build a specific version
+nix build .#superset-4
+nix build .#superset-5
+
+# Or from the project root
+nix build .#superset          # default (v5)
+nix build .#superset-4        # version 4.x
+nix build .#superset-5        # version 5.x
 
 # Load into Docker
 docker load < result
@@ -24,7 +36,12 @@ docker load < result
 ### Running with Docker Compose
 
 ```bash
-# Start all services
+# For Superset 4.x
+cd 4/
+docker compose up -d
+
+# For Superset 5.x
+cd 5/
 docker compose up -d
 
 # Access Superset
@@ -36,12 +53,26 @@ open http://localhost:8088
 ### Development Shell
 
 ```bash
-# Enter development environment
+# Enter development environment (default v5)
 nix develop
 
-# Or use make
+# Version-specific shells
+nix develop .#v4
+nix develop .#v5
+
+# Or use make in version directory
+cd 5/
 make dev
 ```
+
+## Version Selection
+
+| Version | Directory | Build Command | Image Tag |
+|---------|-----------|---------------|-----------|
+| 4.x | `4/` | `nix build .#superset-4` | `firestream-superset:4.1.1` |
+| 5.x (default) | `5/` | `nix build .#superset-5` | `firestream-superset:5` |
+
+The default version is 5.x. Use explicit version targets when you need a specific version.
 
 ## Environment Variables
 
@@ -154,19 +185,25 @@ Celery monitoring UI. Optional, useful for debugging async tasks.
 
 ```
 superset/
-├── flake.nix          # Nix flake with uv2nix integration
-├── flake.lock         # Locked Nix dependencies
-├── module.nix         # Firestream container module
-├── pyproject.toml     # Python dependencies
-├── uv.lock            # Locked Python dependencies
-├── docker-compose.yml # Local development setup
-├── Makefile           # Build shortcuts
-├── README.md          # This file
-└── scripts/
-    ├── validate.sh    # Configuration validation
-    ├── init.sh        # Database initialization
-    ├── config.sh      # Runtime configuration
-    └── secrets.sh     # Secrets documentation
+├── flake.nix              # Root flake for version selection
+├── README.md              # This file
+├── 4/                     # Superset 4.x
+│   ├── flake.nix          # Nix flake with uv2nix integration
+│   ├── flake.lock         # Locked Nix dependencies
+│   ├── module.nix         # Firestream container module
+│   ├── pyproject.toml     # Python dependencies (apache-superset==4.1.1)
+│   ├── uv.lock            # Locked Python dependencies
+│   ├── docker-compose.yml # Local development setup
+│   ├── Makefile           # Build shortcuts
+│   └── scripts/           # Runtime scripts
+└── 5/                     # Superset 5.x
+    ├── flake.nix          # Nix flake with uv2nix integration
+    ├── module.nix         # Firestream container module
+    ├── pyproject.toml     # Python dependencies (apache-superset>=5.0.0,<6.0.0)
+    ├── uv.lock            # Locked Python dependencies (generate with uv lock)
+    ├── docker-compose.yml # Local development setup
+    ├── Makefile           # Build shortcuts
+    └── scripts/           # Runtime scripts
 ```
 
 ## Building from Source
@@ -180,6 +217,9 @@ superset/
 ### Updating Dependencies
 
 ```bash
+# In the version directory (e.g., 5/)
+cd 5/
+
 # Update uv.lock
 uv lock
 
@@ -189,7 +229,7 @@ nix build .#dockerImage
 
 ### Adding Database Drivers
 
-Edit `pyproject.toml` to add additional database drivers:
+Edit `pyproject.toml` in the appropriate version directory to add additional database drivers:
 
 ```toml
 dependencies = [
@@ -205,6 +245,18 @@ Then regenerate the lock file:
 uv lock
 nix build .#dockerImage
 ```
+
+## Version Differences
+
+### Superset 4.x
+- Python 3.11 required
+- Marshmallow 3.x pinned (incompatible with 4.x)
+- Stable, production-tested
+
+### Superset 5.x
+- Python 3.10-3.12 supported
+- Uses `uv` package manager instead of `pip`
+- Latest features and security updates
 
 ## Troubleshooting
 
@@ -226,6 +278,15 @@ nix build .#dockerImage
 2. Delete database volume: `docker volume rm firestream-superset_postgresql_data`
 3. Restart: `docker compose up -d`
 
+### Version 5 uv.lock missing
+
+The `5/uv.lock` file must be generated on Linux:
+
+```bash
+cd 5/
+uv lock
+```
+
 ## License
 
-Apache-2.0
+MIT

@@ -77,7 +77,7 @@ pub use embedded::{extract_embedded, ExtractedWorkspace};
 pub use error::{NixContainerError, Result};
 pub use platform::{Architecture, Platform, PlatformInfo};
 pub use progress::{BuildPhase, BuildProgress, MultiProgress, ProgressCallback};
-pub use strategy::{create_strategy_with_workspace, BuildStrategy, ContainerBuildStrategy};
+pub use strategy::{create_strategy_with_workspace, BuildMode, BuildStrategy, ContainerBuildStrategy};
 
 /// Crate version
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");

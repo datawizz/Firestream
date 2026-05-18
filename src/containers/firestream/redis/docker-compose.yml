@@ -1,5 +1,5 @@
 # Firestream Redis - Docker Compose for Development
-# Copyright Firestream. Apache-2.0 License.
+# Copyright Firestream. MIT License.
 #
 # Usage:
 #   1. Build with Nix: nix build .#dockerImage

@@ -4,7 +4,7 @@
 # This template is processed during container startup.
 # Variables with {{VAR_NAME}} syntax are replaced with environment variable values.
 #
-# Copyright Firestream. Apache-2.0 License.
+# Copyright Firestream. MIT License.
 
 c = get_config()
 

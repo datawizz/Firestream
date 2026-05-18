@@ -2,6 +2,10 @@
 //!
 //! This module provides the strategy pattern for building containers,
 //! with different implementations for native Nix builds and Docker-based builds.
+//!
+//! Two orthogonal concerns are separated:
+//! - **BuildStrategy**: The execution environment (native Nix vs Docker-based Nix)
+//! - **BuildMode**: The build topology (per-container flake vs root flake)
 
 mod docker;
 mod native;
@@ -11,14 +15,33 @@ pub use native::NativeNixStrategy;
 
 use crate::config::BuildConfig;
 use crate::discovery::ContainerInfo;
-use crate::error::Result;
+use crate::error::{NixContainerError, Result};
 use crate::platform::PlatformInfo;
 use crate::progress::BuildProgress;
 use async_trait::async_trait;
 use std::path::PathBuf;
 
+/// Where to find the flake and what attribute to build.
+///
+/// Separates build topology from execution environment (strategy).
+#[derive(Debug, Clone)]
+pub enum BuildMode {
+    /// Build from a container's own flake.nix subdirectory (legacy per-container flakes).
+    /// Used by containers that have their own flake.nix (e.g., redis, postgresql).
+    SubdirFlake {
+        container_dir: PathBuf,
+        attribute: String,
+    },
+    /// Build from the repo root flake with a package name.
+    /// Used by containers that are only defined in the root flake.nix
+    /// (e.g., airflow, jupyterhub, odoo, superset).
+    RootFlake {
+        package_name: String,
+    },
+}
+
 /// Build strategy enumeration
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize)]
 pub enum BuildStrategy {
     /// Native Nix build (Linux only)
     NativeNix,
@@ -93,6 +116,72 @@ pub trait ContainerBuildStrategy: Send + Sync {
         config: &BuildConfig,
         progress: BoxedProgressCallback,
     ) -> Result<PathBuf>;
+
+    /// Build using a specific BuildMode (root flake or subdir flake).
+    ///
+    /// This method separates build topology from the execution environment.
+    /// Default implementation dispatches SubdirFlake to the existing `build()` method
+    /// and returns an error for RootFlake (strategies must opt-in to root flake support).
+    async fn build_with_mode(
+        &self,
+        mode: &BuildMode,
+        config: &BuildConfig,
+    ) -> Result<PathBuf> {
+        match mode {
+            BuildMode::SubdirFlake { container_dir, attribute } => {
+                // Create a minimal ContainerInfo for the legacy path
+                let container = ContainerInfo::new(
+                    container_dir.file_name()
+                        .map(|n| n.to_string_lossy().to_string())
+                        .unwrap_or_else(|| "unknown".to_string()),
+                    container_dir,
+                );
+                let config = BuildConfig {
+                    nix_attribute: attribute.clone(),
+                    ..config.clone()
+                };
+                self.build(&container, &config).await
+            }
+            BuildMode::RootFlake { package_name } => {
+                Err(NixContainerError::UnsupportedPlatform(format!(
+                    "Strategy '{}' does not support root flake builds (package: {})",
+                    self.name(),
+                    package_name,
+                )))
+            }
+        }
+    }
+
+    /// Build using a specific BuildMode with progress reporting.
+    async fn build_with_mode_and_progress(
+        &self,
+        mode: &BuildMode,
+        config: &BuildConfig,
+        progress: BoxedProgressCallback,
+    ) -> Result<PathBuf> {
+        match mode {
+            BuildMode::SubdirFlake { container_dir, attribute } => {
+                let container = ContainerInfo::new(
+                    container_dir.file_name()
+                        .map(|n| n.to_string_lossy().to_string())
+                        .unwrap_or_else(|| "unknown".to_string()),
+                    container_dir,
+                );
+                let config = BuildConfig {
+                    nix_attribute: attribute.clone(),
+                    ..config.clone()
+                };
+                self.build_with_progress(&container, &config, progress).await
+            }
+            BuildMode::RootFlake { package_name } => {
+                Err(NixContainerError::UnsupportedPlatform(format!(
+                    "Strategy '{}' does not support root flake builds with progress (package: {})",
+                    self.name(),
+                    package_name,
+                )))
+            }
+        }
+    }
 }
 
 /// Create a build strategy based on platform information and configuration

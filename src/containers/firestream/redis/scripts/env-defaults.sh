@@ -1,5 +1,5 @@
 # Redis Environment Variable Defaults
-# Copyright Firestream. Apache-2.0 License.
+# Copyright Firestream. MIT License.
 # This file is sourced, not executed directly
 #
 # Documents all environment variables with their default values.

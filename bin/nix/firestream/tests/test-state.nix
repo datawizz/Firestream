@@ -1,5 +1,5 @@
 # Tests for the state module (lib/state.nix)
-# Copyright Firestream. Apache-2.0 License.
+# Copyright Firestream. MIT License.
 { pkgs, firestream }:
 
 let

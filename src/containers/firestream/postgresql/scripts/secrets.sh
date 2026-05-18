@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Load _FILE variables - compatible with Bitnami pattern
-# Copyright Firestream. Apache-2.0 License.
+# Copyright Firestream. MIT License.
 
 postgresql_env_vars=(
   POSTGRESQL_PASSWORD

@@ -1,0 +1,135 @@
+# Firestream Superset - Docker Compose for Local Development
+# Copyright Firestream. MIT License.
+#
+# Usage:
+#   1. Build the Docker image: nix build .#dockerImage && docker load < result
+#   2. Start all services: docker compose up -d
+#   3. Access Superset at http://localhost:8088
+#   4. Access Flower (Celery monitor) at http://localhost:5555
+#
+# Default credentials: admin / admin
+
+name: firestream-superset
+
+x-superset-common: &superset-common
+  image: firestream-superset:4.1.1
+  environment: &superset-env
+    SUPERSET_SECRET_KEY: ${SUPERSET_SECRET_KEY:-your-secret-key-here-must-be-at-least-42-chars-long}
+    SUPERSET_DATABASE_HOST: postgresql
+    SUPERSET_DATABASE_PORT_NUMBER: "5432"
+    SUPERSET_DATABASE_NAME: superset
+    SUPERSET_DATABASE_USERNAME: superset
+    SUPERSET_DATABASE_PASSWORD: superset
+    REDIS_HOST: redis
+    REDIS_PORT_NUMBER: "6379"
+    BITNAMI_DEBUG: "false"
+  depends_on:
+    postgresql:
+      condition: service_healthy
+    redis:
+      condition: service_healthy
+
+services:
+  # PostgreSQL - Metadata database
+  # Note: Build image first with: cd ../postgresql && nix build .#dockerImage && docker load < result
+  postgresql:
+    image: firestream-postgresql:17
+    volumes:
+      - postgresql_data:/firestream/postgresql
+    environment:
+      - POSTGRESQL_DATABASE=superset
+      - POSTGRESQL_USERNAME=superset
+      - POSTGRESQL_PASSWORD=superset
+      - ALLOW_EMPTY_PASSWORD=no
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U superset -d superset"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Redis - Cache and Celery broker
+  # Note: Build image first with: cd ../redis && nix build .#dockerImage && docker load < result
+  redis:
+    image: firestream-redis:7
+    volumes:
+      - redis_data:/firestream/redis/data
+    environment:
+      - ALLOW_EMPTY_PASSWORD=yes
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Superset Init - One-time database initialization
+  superset-init:
+    <<: *superset-common
+    environment:
+      <<: *superset-env
+      SUPERSET_ROLE: init
+      SUPERSET_USERNAME: admin
+      SUPERSET_PASSWORD: admin
+      SUPERSET_EMAIL: admin@superset.local
+      SUPERSET_LOAD_EXAMPLES: "${SUPERSET_LOAD_EXAMPLES:-true}"  # Env var with default true
+    restart: "no"
+
+  # Superset Webserver - Main application
+  superset:
+    <<: *superset-common
+    environment:
+      <<: *superset-env
+      SUPERSET_ROLE: webserver
+      SUPERSET_WEBSERVER_WORKERS: "4"
+    ports:
+      - "8088:8088"
+    depends_on:
+      superset-init:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8088/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+    restart: unless-stopped
+
+  # Superset Celery Worker - Async query processing
+  superset-worker:
+    <<: *superset-common
+    environment:
+      <<: *superset-env
+      SUPERSET_ROLE: celery-worker
+    depends_on:
+      superset-init:
+        condition: service_completed_successfully
+    restart: unless-stopped
+
+  # Superset Celery Beat - Scheduled tasks
+  superset-beat:
+    <<: *superset-common
+    environment:
+      <<: *superset-env
+      SUPERSET_ROLE: celery-beat
+    depends_on:
+      superset-init:
+        condition: service_completed_successfully
+    restart: unless-stopped
+
+  # Superset Celery Flower - Task monitoring UI
+  superset-flower:
+    <<: *superset-common
+    environment:
+      <<: *superset-env
+      SUPERSET_ROLE: celery-flower
+      # Uncomment to enable basic auth: FLOWER_BASIC_AUTH: user:password
+    ports:
+      - "5555:5555"
+    depends_on:
+      - superset-worker
+    restart: unless-stopped
+
+volumes:
+  postgresql_data:
+    driver: local
+  redis_data:
+    driver: local

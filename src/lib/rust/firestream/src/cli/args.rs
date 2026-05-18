@@ -176,6 +176,29 @@ pub enum Command {
         command: ClusterCommand,
     },
     
+    /// Build container images via Nix (auto-detects native vs Docker strategy)
+    Build {
+        /// Package names to build (e.g., "odoo-15", "postgresql-17")
+        #[arg(required = true)]
+        packages: Vec<String>,
+
+        /// Force native Nix build (Linux with Nix only)
+        #[arg(long)]
+        native: bool,
+
+        /// Force Docker-based build
+        #[arg(long)]
+        docker: bool,
+
+        /// Max parallel builds (default: number of CPUs)
+        #[arg(long, short = 'j')]
+        parallel: Option<usize>,
+
+        /// Build timeout in seconds
+        #[arg(long, default_value = "600")]
+        timeout: u64,
+    },
+
     /// Generate a new project from templates
     Template {
         /// Project name
@@ -363,7 +386,57 @@ pub enum StateCommand {
     
     /// Pull remote state
     Pull,
-    
+
     /// Push local state to remote
     Push,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use clap::Parser;
+
+    #[test]
+    fn test_build_command_parse() {
+        let cli = Cli::try_parse_from(["firestream", "build", "odoo-15", "postgresql-17"]).unwrap();
+        match cli.command {
+            Some(Command::Build { packages, native, docker, parallel, timeout }) => {
+                assert_eq!(packages, vec!["odoo-15", "postgresql-17"]);
+                assert!(!native);
+                assert!(!docker);
+                assert!(parallel.is_none());
+                assert_eq!(timeout, 600);
+            }
+            _ => panic!("Expected Build command"),
+        }
+    }
+
+    #[test]
+    fn test_build_command_with_flags() {
+        let cli = Cli::try_parse_from([
+            "firestream", "build", "--docker", "--timeout", "300", "-j", "2", "airflow"
+        ]).unwrap();
+        match cli.command {
+            Some(Command::Build { packages, native, docker, parallel, timeout }) => {
+                assert_eq!(packages, vec!["airflow"]);
+                assert!(!native);
+                assert!(docker);
+                assert_eq!(parallel, Some(2));
+                assert_eq!(timeout, 300);
+            }
+            _ => panic!("Expected Build command"),
+        }
+    }
+
+    #[test]
+    fn test_build_command_requires_packages() {
+        let result = Cli::try_parse_from(["firestream", "build"]);
+        assert!(result.is_err(), "build with no packages should fail");
+    }
+
+    #[test]
+    fn test_no_command_defaults_to_none() {
+        let cli = Cli::try_parse_from(["firestream"]).unwrap();
+        assert!(cli.command.is_none());
+    }
 }

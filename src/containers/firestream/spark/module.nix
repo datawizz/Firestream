@@ -1,5 +1,5 @@
 # Spark Container Module - Using Firestream Java Factory
-# Copyright Firestream. Apache-2.0 License.
+# Copyright Firestream. MIT License.
 #
 # This module defines the Apache Spark container using mkJavaContainerModule.
 # The Java factory provides automatic JDK configuration, JVM tuning options,

@@ -1,0 +1,34 @@
+# Environment
+.env
+.env.local
+
+# Nix
+result
+result-*
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.eggs/
+*.egg
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Docker
+docker-compose.override.yml
+
+# Backups
+backups/
+*.sql.gz
+*.tar.gz

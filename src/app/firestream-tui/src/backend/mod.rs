@@ -1,9 +1,17 @@
-// Backend API clients with placeholders
+// Backend API clients and local Docker backend
 
 pub mod api_client;
+pub mod bootstrap;
+pub mod build_queue;
+pub mod local_backend;
+pub mod manifest;
 pub mod mock_client;
 
 pub use api_client::ApiClient;
+pub use bootstrap::{BootstrapChecker, BootstrapState};
+pub use build_queue::BuildQueue;
+pub use local_backend::LocalBackend;
+pub use manifest::{ContainerManifest, ManifestRegistry};
 pub use mock_client::MockClient;
 
 use std::future::Future;
@@ -27,6 +35,15 @@ pub enum ApiError {
 
     #[error("Bad request: {0}")]
     BadRequest(String),
+
+    #[error("Docker not available: {0}")]
+    DockerNotAvailable(String),
+
+    #[error("Build failed: {0}")]
+    BuildFailed(String),
+
+    #[error("Build cancelled: {0}")]
+    BuildCancelled(String),
 
     #[error("Unknown error: {0}")]
     Unknown(String),

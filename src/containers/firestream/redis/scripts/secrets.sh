@@ -1,5 +1,5 @@
 # Redis Docker Secrets Loading
-# Copyright Firestream. Apache-2.0 License.
+# Copyright Firestream. MIT License.
 # This file is sourced, not executed directly
 #
 # Loads environment variables from Docker secrets (_FILE pattern)

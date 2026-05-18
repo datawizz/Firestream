@@ -1,0 +1,98 @@
+# {{ project_name }}
+
+{{ description }}
+
+## Overview
+
+This project contains custom Odoo {{ odoo_version_full }} addons built on [Firestream]({{ firestream_ref }}) containers. Local addons in `src/addons/` are bind-mounted into the running Odoo container for live development.
+
+## Prerequisites
+
+- [Nix](https://nixos.org/download/) with flakes enabled
+- [Docker](https://docs.docker.com/get-docker/) and Docker Compose
+
+## Quick Start
+
+```bash
+# Initial setup: build images and create .env
+make setup
+
+# Start Odoo and PostgreSQL
+make up
+
+# Open http://localhost:{{ odoo_http_port }}
+# Login: {{ odoo_admin_email }} / (password from .env)
+```
+
+## Project Structure
+
+```
+.
+├── flake.nix              # Nix flake (imports Firestream)
+├── docker-compose.yml     # Service orchestration
+├── Makefile               # Development commands
+├── .env                   # Environment variables (gitignored)
+├── .env.example           # Environment variable defaults
+├── scripts/
+│   ├── scaffold.sh        # Addon scaffolding
+│   └── backup.sh          # Database backup
+└── src/
+    └── addons/            # Custom Odoo addons (bind-mounted)
+        └── my_addon/
+            ├── __init__.py
+            ├── __manifest__.py
+            ├── models/
+            ├── views/
+            └── security/
+```
+
+## Creating a New Addon
+
+```bash
+make scaffold NAME=my_addon
+```
+
+This creates a minimal addon skeleton in `src/addons/my_addon/` with:
+- `__init__.py` and `__manifest__.py`
+- `models/`, `views/`, `security/` directories
+- Boilerplate model, view, and access control files
+
+After scaffolding, restart Odoo and install the module from the Apps menu (enable "Update Apps List" first).
+
+## Common Commands
+
+| Command | Description |
+|---|---|
+| `make setup` | Initial setup (build images, create .env) |
+| `make build` | Rebuild container images from Firestream |
+| `make up` | Start all services |
+| `make down` | Stop all services |
+| `make restart` | Restart all services |
+| `make logs` | Follow Odoo logs |
+| `make scaffold NAME=x` | Scaffold a new addon |
+| `make update-addon NAME=x` | Update a specific addon |
+| `make update-all` | Update all addons |
+| `make shell` | Open Odoo interactive shell |
+| `make psql` | Open PostgreSQL shell |
+| `make backup` | Backup database and filestore |
+| `make clean` | Stop services and remove volumes |
+
+## Environment Variables
+
+See `.env.example` for all available variables. Key settings:
+
+| Variable | Default | Description |
+|---|---|---|
+| `ODOO_EMAIL` | `{{ odoo_admin_email }}` | Admin login email |
+| `ODOO_PASSWORD` | `{{ odoo_admin_password }}` | Admin password |
+| `POSTGRESQL_PASSWORD` | `{{ database_password }}` | Database password |
+
+## Architecture
+
+- **Odoo {{ odoo_version_full }}** — Python {{ python_version }}, running on Firestream's Nix-based container
+- **PostgreSQL {{ postgresql_version }}** — Firestream's Nix-based container
+- **Addons** — Bind-mounted from `./src/addons` to `/opt/odoo/addons` in the container
+
+## License
+
+{{ license }}

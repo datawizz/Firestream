@@ -1,117 +1,280 @@
-# Firestream
+<!-- Firestream README -->
 
-<picture width="500">
-  <img
-    src="assets/images/firestream_banner.png"
-    alt="Firestream Logo"
-  />
-</picture>
+<p align="center">
+  <img src="assets/images/firestream-banner.png" alt="Firestream" width="800" />
+</p>
 
-## The Data Warehouse That Runs Anywhere
+<p align="center">
+  <strong>Nix-built, reproducible containers for open-source data infrastructure. Managed from a TUI.</strong>
+</p>
 
-Firestream is a complete data warehouse that runs on your laptop and deploys seamlessly to the cloud. Think of it as "create-react-app" for data engineering but with more batteries included.
+<p align="center">
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="License" /></a>
+  <a href="https://github.com/Cogent-Creation-Co/Firestream/actions"><img src="https://github.com/Cogent-Creation-Co/Firestream/actions/workflows/build.yaml/badge.svg" alt="CI" /></a>
+</p>
 
-Firestream is composed of services from [Bitnami Helm Charts](https://github.com/bitnami/charts) including:
+---
 
-- ✅ Apache Spark via the [Spark Operator]([https://github.com/kubeflow/spark-operator) by Kubeflow
-- ✅ Apache Kafka for streaming source / sink
-- ✅ Apache Airflow for orchestration of Spark and other ETL pipelines
-- ✅ MinIO for S3-compatible storage locally
-- ✅ PostgreSQL for deployment metadata
-- [ ] TODO Project Nessie for Git Ops on Data
-- [ ] TODO Apache Iceberg for standardized Table abstraction
-- [ ] TODO More Templates!
+Firestream packages popular open-source projects — Airflow, Kafka, Spark, Superset, PostgreSQL, Redis, JupyterHub, and Odoo — as fully reproducible [Nix](https://nixos.wiki/wiki/Flakes)-built Docker containers. Every container ships with CycloneDX 1.5 and SPDX 2.3 SBOMs for complete supply chain transparency. Install, run `firestream`, and the TUI auto-detects Docker, discovers available containers, and lets you build, configure, and launch them interactively.
 
-Firesteam uses template rendering to create Apache Spark Apps in Scala and Python. These rendered templates cross reference the environment driven configuration to that everything points to coherent source and target datasets.
+Works on Linux, macOS, and Windows (WSL). Only requires Docker.
 
-### TLDR
+<p align="center">
+  <img src="assets/images/firestream-tui.gif" alt="Firestream TUI" width="800" />
+</p>
 
-**Problem**: Setting up a modern data stack requires configuring and integrating dozens of tools. Even "simple" tasks like ingesting streaming data or setting up a Spark cluster can take days of configuration.
+---
 
-**Solution**: Firestream provides a pre-configured, deployment-ready data stack that works out of the box with a single command.
+## Table of Contents
 
-## Why Firestream?
+- [Quick Start](#quick-start)
+- [Containers](#containers)
+- [Supply Chain Security](#supply-chain-security)
+- [TUI](#tui)
+- [Make Commands](#make-commands)
+- [Application Templates](#application-templates)
+- [Architecture](#architecture)
+- [Development](#development)
 
-- **Zero to Data Warehouse in 5 Minutes**: No more spending days configuring Kafka, Spark, Airflow, and storage systems
-- **Truly Portable**: Develop on your laptop, deploy to any cloud without changing a single line of code
-- **Batteries Included**: Everything you need for modern data engineering pre-configured and ready
-- **100% Open Source**: Built entirely on proven open-source technologies with business compatible licenses like Apache 2.0 and MIT.
+---
 
 ## Quick Start
 
-The only prerequisite is `docker` available on the `PATH` with a MacOS or Linux host.
+### Prerequisites
+
+- [Docker](https://docs.docker.com/get-docker/) (Docker Desktop on macOS/Windows, or Docker Engine on Linux)
+
+### Install and Run
 
 ```bash
-git clone https://github.com/datawizz/Firestream.git && \
-cd Firestream && \
-bash docker/firestream/docker_preinit.sh && \
-docker compose -f docker/firestream/docker-compose.devcontainer.yml exec devcontainer bash -l -c "cd /workspace && cargo run"
+cargo install firestream-tui
+firestream
 ```
 
-You can configure Firestream from the Terminal User Interface.
+The TUI boots, detects your Docker environment, and shows all available containers. Select a container and press `B` to build it.
 
-<picture width="500">
-  <img
-    src="assets/images/firestream-tui.gif"
-    alt="Firestream Logo"
-  />
-</picture>
+Or use `make` directly:
 
+```bash
+git clone https://github.com/Cogent-Creation-Co/Firestream.git && cd Firestream
+make airflow-start    # Builds (if needed) and starts Airflow at http://localhost:8090
+```
 
+---
 
+## Containers
 
-## Key Features
+Every container is built from a Nix flake, producing a bit-for-bit reproducible image with a full software bill of materials.
 
-### **Instant Deployment**
-Deploy a complete data warehouse faster than you can brew coffee. No DevOps expertise required.
+| Container | Version(s) | Category | Default Port |
+|-----------|-----------|----------|------|
+| [Apache Airflow](https://airflow.apache.org/) | 3.0.3 | Orchestration | `8090` |
+| [Apache Kafka](https://kafka.apache.org/) | 4.0 (KRaft, no ZooKeeper) | Streaming | `9092` |
+| [Apache Spark](https://spark.apache.org/) | 4.0.0 | Processing | `8080` |
+| [Apache Superset](https://superset.apache.org/) | 4.x, 5.x | BI / Analytics | `8088` |
+| [PostgreSQL](https://www.postgresql.org/) | 16, 17 | Database | `5432` |
+| [Redis](https://redis.io/) | 7, 8 | Cache | `6379` |
+| [JupyterHub](https://jupyter.org/hub) | 5.3.0 | Notebooks | `8000` |
+| [Odoo](https://www.odoo.com/) | 18.0 | ERP | `8069` |
 
-### **Deployment-Ready Components**
-- **Stream Processing**: Kafka + Spark Structured Streaming
-- **Batch Processing**: Spark with automatic job submission
-- **Orchestration**: Airflow with pre-configured DAGs
-- **Storage**: S3-compatible MinIO with automatic partitioning
+---
 
-### **True Portability**
-Develop locally, deploy anywhere:
-- Local development on Docker/Podman
-- One-command deployment to AWS, GCP, or Azure
-- Consistent environment across all platforms
+## Supply Chain Security
 
-### **Extensible Architecture**
-- Write ETL jobs in Python using simple classes
-- Have Airflow orchastrate the execution of ETL Jobs
-- Scale up your cluster as your needs grow
-- Change out Minio for AWS S3 by changing the environment varibles
+Every Firestream container embeds four metadata files at `/opt/firestream/` generated at build time:
 
-## How It Compares
+| File | Format | Contents |
+|------|--------|----------|
+| `sbom-cyclonedx.json` | CycloneDX 1.5 | Full software bill of materials |
+| `sbom-spdx.json` | SPDX 2.3 | Full software bill of materials |
+| `metadata.json` | Custom | Build provenance — Nix store paths, flake revision, build timestamp |
+| `closure.json` | Custom | Complete Nix dependency graph |
 
-The best way to understand Firestream is to compare it to the landscape of Data Tools and Cloud Providers
+SBOMs are generated by `firestream-vib`, a Rust tool that reads the Nix closure graph (`exportReferencesGraph`) at build time and produces industry-standard SBOM documents. Every dependency — including transitive ones — is traced with its exact hash, name, and version from the Nix store.
 
-| Platform | Deployment Options | Local Development | Auto-Scaling | Custom ETL | Streaming Input | Streaming Output | Open Source | Identity & Access | Interface | Kubernetes Support | BI Integration |
-|---|---|---|---|---|---|---|---|---|---|---|---|
-| **Firestream** | Any VM, Any Cloud | Yes | Yes | Yes | Webhooks, WebSocket, REST | Webhooks, WebSocket, REST | 100% | Coming Soon | CLI, VSCode, Web UI | Native | Apache Hive 2.0 API |
-| **Snowflake** | Cloud Only | No | Yes | Yes | No | No | Proprietary | Yes | Web UI | No | Industry Standard |
-| **Databricks** | Cloud Only | No | Yes | Yes | Limited | No | 90% (Apache Spark) | Yes | Web UI, Notebooks | No | Industry Standard |
-| **Amazon Redshift** | AWS Only | No | Yes | Yes | No | No | ~90% (PostgreSQL) | Yes | Web UI | No | Industry Standard |
-| **Google BigQuery** | GCP Only | No | Yes | Yes | No | No | Proprietary | Yes | Web UI | No | Industry Standard |
-| **Azure Synapse** | Azure Only | No | Yes | Yes | No | No | Proprietary | Yes | Web UI | No | Multiple Standards |
-| **AWS** | AWS Infrastructure | No | Yes | Yes | Via Kinesis/MSK | Via Kinesis/MSK | Mixed | Yes | Web Console | EKS Service | N/A (Platform) |
-| **GCP** | GCP Infrastructure | No | Yes | Yes | Via Pub/Sub/Dataflow | Via Pub/Sub/Dataflow | Mixed | Yes | Web Console | GKE Service | N/A (Platform) |
+```bash
+# Verify SBOMs are present in any Firestream container
+docker run --rm firestream-airflow:3.0.3 cat /opt/firestream/sbom-cyclonedx.json | jq .bomFormat
+# → "CycloneDX"
+```
 
-## Architecture Overview
+Containers can also be scanned with [Trivy](https://trivy.dev/) and [Grype](https://github.com/anchore/grype), and validated at runtime via [Goss](https://github.com/goss-org/goss)-based health checks.
 
-<picture>
-  <img src="assets/images/stack.png" alt="Firestream Architecture" />
-</picture>
+---
 
+## TUI
 
-All services are pre-configured to work together seamlessly.
+The TUI provides a three-pane interface for managing Firestream containers:
+
+- **Resources** (left) — tree view of available containers with build status and run state
+- **Details** (top right) — image tag, ports, dependencies, and credentials for the selected container
+- **Logs** (bottom right) — real-time build output and container logs
+
+### Bootstrap
+
+On startup, Firestream automatically detects:
+- Docker availability and version
+- Builder image (`nixos/nix`) presence
+- Nix store cache volume (architecture-specific, persisted across builds)
+- Existing Firestream images and running containers
+- Disk space and stale build locks
+
+If Docker is not available, the TUI enters demo mode.
+
+### Container Management
+
+Browse containers in the resource tree. Each shows its build status (built/not built) and run state (running/stopped). Select a container to see its full metadata — image tag, port mappings, service dependencies, and default credentials.
+
+Builds are queued with dependency ordering (topological sort). For example, building Airflow will ensure Redis and PostgreSQL are built first. Build output streams in real time to the logs pane, and builds can be cancelled.
+
+### Keyboard Shortcuts
+
+| Key | Action |
+|-----|--------|
+| `j/k` or arrows | Navigate |
+| `Space` / `Enter` | Expand / collapse |
+| `Tab` / `Shift+Tab` | Switch panes |
+| `B` | Build selected container |
+| `?` | Help |
+| `Ctrl+C` | Quit |
+
+---
+
+## Make Commands
+
+Every container follows the `<service>-<action>` pattern:
+
+```bash
+make <service>-build         # Build the container image via Nix
+make <service>-start         # Start (auto-builds if image is missing)
+make <service>-stop          # Stop
+make <service>-restart       # Restart
+make <service>-logs          # Tail logs
+make <service>-status        # Show container status
+make <service>-credentials   # Print connection info and default credentials
+make <service>-clean         # Stop, remove images, and delete volumes
+```
+
+```bash
+# Examples
+make airflow-start           # Airflow at http://localhost:8090
+make postgres-17-start       # PostgreSQL 17 at localhost:5432
+make kafka-start             # Kafka at localhost:9092
+make redis-8-start           # Redis 8 at localhost:6379
+```
+
+```bash
+# Batch operations
+make containers-build-all    # Build all containers
+make containers-status       # Status of everything
+make containers-clean-all    # Clean everything
+```
+
+---
+
+## Application Templates
+
+Firestream includes a code generation engine that scaffolds complete, deployable projects from interactive prompts or config files. Templates are embedded in the binary — no network access needed.
+
+| Template | Output | Key Features |
+|----------|--------|-------------|
+| **PySpark Application** | Python Spark job + K8s manifests | S3, Delta Lake, Kafka; pytest |
+| **Scala Spark Application** | Scala Spark job + SBT build | Structured Streaming, MLlib, Delta Lake |
+| **Puppeteer DOM Scraper** | TypeScript web scraper | Auth, retry, S3 upload, rate limiting |
+| **Puppeteer Functional Scraper** | TypeScript + Effect-TS | ADT-based DSL with interpreter pattern |
+| **Superset Dashboard** | YAML export bundle | Database connections, datasets, charts, layouts |
+| **Multi-Platform App** | Next.js 15 + Tauri v2 + SwiftUI | Full monorepo with shared TypeScript libs |
+| **Standard Puppeteer** | TypeScript + Docker | Production scraper with retry and S3 |
+| **Standard Project** | Python 3.11 + uv | Modern tooling (black, mypy, ruff) |
+
+```bash
+# Generate a PySpark application
+cargo run -p templatizer -- spark -n my-etl-job -l python -o ./output
+
+# Generate from a config file
+cargo run -p templatizer -- spark -n my-app -l python -o ./output --config my-config.yaml
+
+# List all available templates
+cargo run -p templatizer -- list --detailed
+```
+
+---
+
+## Architecture
+
+### Why Nix?
+
+Dockerfiles are non-deterministic — the same `Dockerfile` produces different images depending on when and where you build it. Base images shift, package mirrors update, and `apt-get install` resolves to different versions daily. Nix flakes pin every dependency to an exact content hash, guaranteeing the same inputs always produce the same output. This is what makes per-package SBOM generation possible: every dependency is known and traced at build time, not guessed at scan time.
+
+On macOS and WSL, Nix builds run inside Docker transparently using a `nixos/nix` builder container with a persistent, architecture-specific Nix store volume for fast rebuilds.
+
+### Container Build System
+
+Firestream provides composable Nix factory functions for building containers:
+
+| Factory | Use Case |
+|---------|----------|
+| `mkContainerModule` | Base container with entrypoint, env, and health checks |
+| `mkPythonWorkspaceContainer` | Python apps via uv2nix for deterministic pip |
+| `mkJavaContainerModule` | JVM apps (Temurin JDK) |
+| `mkNodeContainerModule` | Node.js apps |
+
+Each container definition in `src/containers/firestream/<name>/` includes a `module.nix` (using these factories), an `overrides.nix` (for Python package overrides), and a `docker-compose.yml` (for local development).
+
+### Rust Workspace
+
+| Crate | Purpose |
+|-------|---------|
+| `firestream` | Main library aggregating all tools |
+| `firestream-tui` | Terminal UI ([ratatui](https://ratatui.rs/)) |
+| `templatizer` | Code generation engine |
+| `nix-container-builder` | Cross-platform Nix container builder |
+| `docker-manager` | Docker API client via [bollard](https://github.com/fussybeaver/bollard) |
+| `firestream-vib` | SBOM generation and container verification |
+| `helm-manager` | Helm chart deployment |
+| `k8s-manager` | K3D cluster lifecycle |
+
+---
+
+## Development
+
+### Option A: Just Docker
+
+Only requires Docker and Make. Nix builds run inside Docker automatically:
+
+```bash
+make airflow-start   # Works on macOS, Linux, WSL
+```
+
+### Option B: DevContainer (VS Code / GitHub Codespaces)
+
+Open in VS Code and click "Reopen in Container", or launch via GitHub Codespaces. Minimum: 4 CPUs, 8 GB RAM, 32 GB storage.
+
+### Option C: Nix + direnv
+
+```bash
+direnv allow   # Activates the Nix flake dev environment
+```
+
+### Build and Test
+
+```bash
+cargo build --workspace     # Build all crates
+cargo test --workspace      # Run all tests
+```
+
+### Contributing
+
+Contributions are welcome. See the [Contributing Guide](src/app/firestream-docs/content/docs/development/contributing.mdx).
+
+---
 
 ## License
 
-Firestream is licensed under the MIT License. See [LICENSE](LICENSE) for details.
+[MIT License](LICENSE)
 
-Firestream is alpha software. Expect bugs and broken workflows while the API stabalizes.
 ---
 
-Built by data engineers, for data engineers.
+<p align="center">
+  Built by <a href="https://github.com/Cogent-Creation-Co">Cogent Creation Co.</a>
+</p>

@@ -1,5 +1,5 @@
 # firestream-vib Nix package
-# Copyright Firestream. Apache-2.0 License.
+# Copyright Firestream. MIT License.
 #
 # Builds the Rust firestream-vib binary for container verification and metadata generation.
 # This tool provides:

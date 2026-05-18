@@ -1,0 +1,26 @@
+#!/usr/bin/env bash
+# {{ project_name }} — Database Backup
+# Creates a timestamped backup of the PostgreSQL database and Odoo filestore
+
+set -euo pipefail
+
+PROJECT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
+BACKUP_DIR="${PROJECT_DIR}/backups"
+TIMESTAMP="$(date +%Y%m%d_%H%M%S)"
+
+mkdir -p "${BACKUP_DIR}"
+
+echo "Backing up database..."
+docker compose exec -T postgresql \
+    pg_dump -U {{ database_user }} -d {{ database_name }} \
+    | gzip > "${BACKUP_DIR}/db_${TIMESTAMP}.sql.gz"
+
+echo "Backing up filestore..."
+docker compose exec -T odoo \
+    tar czf - -C /opt/odoo data \
+    > "${BACKUP_DIR}/filestore_${TIMESTAMP}.tar.gz"
+
+echo ""
+echo "Backups saved to ${BACKUP_DIR}/"
+echo "  db_${TIMESTAMP}.sql.gz"
+echo "  filestore_${TIMESTAMP}.tar.gz"

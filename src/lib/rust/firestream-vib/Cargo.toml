@@ -3,7 +3,7 @@ name = "firestream-vib"
 version = "0.1.0"
 edition = "2024"
 description = "Container verification harness for Nix-built containers"
-license = "Apache-2.0"
+license = "MIT"
 
 [dependencies]
 # CLI
@@ -51,6 +51,12 @@ uuid = { workspace = true, features = ["v5"] }
 
 # Regex for parsing store paths
 regex = "1"
+
+# SHA256 hashing for source deduplication
+sha2 = "0.10"
+
+# Directory traversal for hashing directories
+walkdir = "2"
 
 [dev-dependencies]
 tempfile = { workspace = true }

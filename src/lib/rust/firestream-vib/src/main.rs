@@ -10,6 +10,8 @@ use firestream_vib::{
     NixHashCache,
     ClosureGraph,
     MetadataConfig,
+    OutputFormat,
+    SbomMerger,
     generator::GossYamlGenerator,
     runner::{DockerRunner, TrivyRunner, GrypeRunner, TestResult},
     report::{JsonReporter, JUnitReporter, SarifReporter},
@@ -100,6 +102,57 @@ enum Commands {
         config: String,
 
         /// Output directory for generated files
+        #[arg(short, long)]
+        output: String,
+    },
+
+    /// Archive source code from a fleet-level source map
+    ///
+    /// Reads a source map JSON (generated at Nix eval time) containing
+    /// package source paths and metadata, then creates deduplicated
+    /// source tarballs with a source_index.json index file.
+    ///
+    /// Output:
+    /// - source_index.json: Index with coverage stats and per-package entries
+    /// - sources/: Directory of deduplicated .tar.gz source archives
+    ArchiveSources {
+        /// Path to source map JSON (generated at Nix eval time)
+        #[arg(long)]
+        source_map: String,
+
+        /// Output directory for source archives
+        #[arg(short, long)]
+        output: String,
+    },
+
+    /// Merge multiple SBOMs into a fleet SBOM
+    ///
+    /// This command aggregates individual container/artifact SBOMs into a
+    /// unified fleet SBOM. Components are deduplicated by purl, with source
+    /// containers tracked in properties.
+    ///
+    /// Supports output formats:
+    /// - cyclonedx: CycloneDX 1.5 JSON (spec-compliant)
+    /// - spdx: SPDX 2.3 JSON (spec-compliant)
+    /// - manifest: Fleet inventory manifest (custom format)
+    MergeSboms {
+        /// Output format (cyclonedx, spdx, manifest)
+        #[arg(short, long, default_value = "cyclonedx")]
+        format: String,
+
+        /// Fleet name
+        #[arg(long)]
+        fleet_name: String,
+
+        /// Fleet version
+        #[arg(long)]
+        fleet_version: String,
+
+        /// Input directories containing SBOM files (can be specified multiple times)
+        #[arg(short, long, action = clap::ArgAction::Append)]
+        input: Vec<String>,
+
+        /// Output file path
         #[arg(short, long)]
         output: String,
     },
@@ -414,9 +467,86 @@ async fn main() -> anyhow::Result<()> {
 
             // Generate all metadata files
             let output_path = std::path::Path::new(&output);
-            closure_graph::generate_metadata(&graph, &metadata_config, output_path)?;
+            closure_graph::generate_metadata(
+                &graph,
+                &metadata_config,
+                output_path,
+            )?;
 
             tracing::info!("Metadata generation complete");
+        }
+        Commands::ArchiveSources {
+            source_map,
+            output,
+        } => {
+            tracing::info!("Archiving fleet sources");
+            tracing::info!("Source map: {}", source_map);
+            tracing::info!("Output: {}", output);
+
+            // Parse source map
+            let sm = firestream_vib::source_archive::parse_source_map(
+                std::path::Path::new(&source_map)
+            ).map_err(|e| anyhow::anyhow!("Failed to parse source map: {}", e))?;
+            tracing::info!("Loaded source map with {} entries", sm.len());
+
+            // Archive sources
+            let output_path = std::path::Path::new(&output);
+            let source_index = firestream_vib::source_archive::archive_sources(&sm, output_path)
+                .map_err(|e| anyhow::anyhow!("Failed to archive sources: {}", e))?;
+
+            // Write source_index.json
+            let index_path = output_path.join("source_index.json");
+            source_index.write_to_file(&index_path)
+                .map_err(|e| anyhow::anyhow!("Failed to write source index: {}", e))?;
+
+            tracing::info!(
+                "Archived {} sources ({} bytes total)",
+                source_index.coverage.archived_count,
+                source_index.coverage.archived_bytes,
+            );
+        }
+        Commands::MergeSboms {
+            format,
+            fleet_name,
+            fleet_version,
+            input,
+            output,
+        } => {
+            tracing::info!("Merging SBOMs into fleet manifest");
+            tracing::info!("Fleet: {} v{}", fleet_name, fleet_version);
+            tracing::info!("Output format: {}", format);
+            tracing::info!("Input directories: {:?}", input);
+
+            // Parse output format
+            let output_format = OutputFormat::from_str(&format)
+                .ok_or_else(|| anyhow::anyhow!(
+                    "Unknown format '{}'. Use: cyclonedx, spdx, or manifest",
+                    format
+                ))?;
+
+            // Create merger
+            let mut merger = SbomMerger::new(&fleet_name, &fleet_version, output_format);
+
+            // Add all input directories
+            for input_dir in &input {
+                let path = std::path::Path::new(input_dir);
+                tracing::info!("Adding input: {}", input_dir);
+                merger.add_input(path)
+                    .map_err(|e| anyhow::anyhow!("Failed to add input '{}': {}", input_dir, e))?;
+            }
+
+            if input.is_empty() {
+                anyhow::bail!("No input directories specified. Use --input <dir> to add inputs.");
+            }
+
+            // Perform merge
+            tracing::info!("Merging {} inputs...", input.len());
+            let result = merger.merge()
+                .map_err(|e| anyhow::anyhow!("Merge failed: {}", e))?;
+
+            // Write output
+            std::fs::write(&output, &result)?;
+            tracing::info!("Wrote merged SBOM to {} ({} bytes)", output, result.len());
         }
     }
 

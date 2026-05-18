@@ -34,7 +34,7 @@ impl<'a> Widget for LogsPane<'a> {
             let items = vec![
                 ListItem::new(Line::from("No logs available")),
                 ListItem::new(Line::from("")),
-                ListItem::new(Line::from("Select a deployment and press 'l' to view logs")),
+                ListItem::new(Line::from("Select a container and press [B] to build")),
             ];
             
             let list = List::new(items).block(block);
@@ -60,11 +60,7 @@ impl<'a> Widget for LogsPane<'a> {
         
         // Show control hints when focused
         if is_focused && area.height > 2 {
-            let hint = if self.app.logs.is_empty() {
-                "[l] load logs"
-            } else {
-                "[f] follow  [ctrl+c] stop"
-            };
+            let hint = "Build logs appear here automatically";
             
             let hint_line = Line::from(hint).style(Style::default().fg(Color::DarkGray));
             buf.set_line(area.x + 2, area.y + area.height - 2, &hint_line, area.width - 4);

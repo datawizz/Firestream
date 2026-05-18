@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright Firestream. Apache-2.0 License.
+# Copyright Firestream. MIT License.
 # Post-init script: Shell environment setup
 #
 # This script sets up shell-related configuration after JupyterHub initialization.

@@ -10,11 +10,11 @@ services:
     volumes:
       - 'postgresql_data:/var/lib/postgresql/data'
     environment:
-      - POSTGRES_USER=bn_jupyterhub
-      - POSTGRES_PASSWORD=bitnami
-      - POSTGRES_DB=bitnami_jupyterhub
+      - POSTGRES_USER=jupyterhub
+      - POSTGRES_PASSWORD=jupyterhub
+      - POSTGRES_DB=jupyterhub
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U bn_jupyterhub -d bitnami_jupyterhub"]
+      test: ["CMD-SHELL", "pg_isready -U jupyterhub -d jupyterhub"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -29,22 +29,22 @@ services:
       - '8000:8000'
       - '8081:8081'
     volumes:
-      - 'jupyterhub_data:/bitnami/jupyterhub'
+      - 'jupyterhub_data:/firestream/jupyterhub'
       - './docker-entrypoint-init.d:/docker-entrypoint-init.d:ro'
     depends_on:
       postgresql:
         condition: service_healthy
     environment:
       - JUPYTERHUB_USERNAME=admin
-      - JUPYTERHUB_PASSWORD=admin123
+      - JUPYTERHUB_PASSWORD=admin
       - JUPYTERHUB_DATABASE_TYPE=postgresql
       - JUPYTERHUB_DATABASE_HOST=postgresql
       - JUPYTERHUB_DATABASE_PORT_NUMBER=5432
-      - JUPYTERHUB_DATABASE_NAME=bitnami_jupyterhub
-      - JUPYTERHUB_DATABASE_USER=bn_jupyterhub
-      - JUPYTERHUB_DATABASE_PASSWORD=bitnami
+      - JUPYTERHUB_DATABASE_NAME=jupyterhub
+      - JUPYTERHUB_DATABASE_USER=jupyterhub
+      - JUPYTERHUB_DATABASE_PASSWORD=jupyterhub
       - JUPYTERHUB_SPAWNER=localprocess
-      - JUPYTERHUB_AUTHENTICATOR=pam
+      - JUPYTERHUB_AUTHENTICATOR=dummy
       - BITNAMI_DEBUG=true
     restart: unless-stopped
 

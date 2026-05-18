@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright Firestream. Apache-2.0 License.
+# Copyright Firestream. MIT License.
 # JupyterHub container entrypoint
 #
 # shellcheck disable=SC1091

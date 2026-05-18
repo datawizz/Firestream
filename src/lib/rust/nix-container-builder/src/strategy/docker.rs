@@ -2,15 +2,19 @@
 //!
 //! This strategy builds containers by running Nix inside a Docker container.
 //! It works on all platforms (including macOS) and in container environments.
+//!
+//! Supports two build modes:
+//! - **SubdirFlake**: Build from a container's own flake.nix (legacy per-container flakes)
+//! - **RootFlake**: Build from the repo root flake with `nix build .#<package>` (matches container-images.sh)
 
 use crate::config::BuildConfig;
 use crate::discovery::ContainerInfo;
 use crate::error::{NixContainerError, Result};
 use crate::platform::PlatformInfo;
 use crate::progress::{BuildPhase, BuildProgress};
-use crate::strategy::{find_repo_root, BoxedProgressCallback, BuildStrategy, ContainerBuildStrategy};
+use crate::strategy::{find_repo_root, BoxedProgressCallback, BuildMode, BuildStrategy, ContainerBuildStrategy};
 use async_trait::async_trait;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use tokio::process::Command;
 use tracing::{debug, info, warn};
 
@@ -204,6 +208,368 @@ cat "$image_path"
 
         Ok(permanent_path)
     }
+
+    /// Build from the repo root flake using `nix build .#<package_name>`.
+    ///
+    /// This matches the behavior of `bin/build/container-images.sh`:
+    /// - Mounts repo at its original path (read-only)
+    /// - Mounts _build/ separately for writable output
+    /// - Mounts Docker socket for `docker load`
+    /// - Uses `cp -L` to dereference Nix symlinks
+    /// - Adds `git config --global --add safe.directory`
+    /// - Passes `--no-update-lock-file` to prevent flake.lock modifications
+    async fn run_root_flake_build(
+        &self,
+        package_name: &str,
+        _config: &BuildConfig,
+    ) -> Result<PathBuf> {
+        let repo_root = self.get_repo_root()?;
+
+        info!(
+            "Building with Docker Nix (root flake): .#{}",
+            package_name
+        );
+
+        // Create output directory under repo (matches container-images.sh _build/ pattern)
+        let build_output_dir = repo_root.join("_build").join(package_name);
+        std::fs::create_dir_all(&build_output_dir)?;
+
+        let container_output_dir = format!("/build/{}", package_name);
+
+        // Collect safe.directory paths (repo root + any path inputs from flake.lock)
+        let mut safe_dirs = vec![repo_root.display().to_string()];
+        let lock_path = repo_root.join("flake.lock");
+        if lock_path.exists() {
+            if let Ok(content) = std::fs::read_to_string(&lock_path) {
+                if let Ok(lock) = serde_json::from_str::<serde_json::Value>(&content) {
+                    if let Some(nodes) = lock.get("nodes").and_then(|n| n.as_object()) {
+                        for (_name, node) in nodes {
+                            let is_path = node.get("locked")
+                                .and_then(|l| l.get("type"))
+                                .and_then(|t| t.as_str()) == Some("path");
+                            if is_path {
+                                if let Some(p) = node.get("locked").and_then(|l| l.get("path")).and_then(|p| p.as_str()) {
+                                    let abs = if p.starts_with('/') {
+                                        PathBuf::from(p)
+                                    } else {
+                                        repo_root.join(p).canonicalize().unwrap_or_else(|_| repo_root.join(p))
+                                    };
+                                    if abs.exists() && abs != repo_root {
+                                        safe_dirs.push(abs.display().to_string());
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        let safe_dir_cmds: String = safe_dirs.iter()
+            .map(|d| format!(r#"git config --global --add safe.directory "{}" 2>/dev/null || true"#, d))
+            .collect::<Vec<_>>()
+            .join("\n");
+
+        // Build the nix script (matches container-images.sh inner script)
+        let nix_script = format!(
+            r#"set -euo pipefail
+
+echo "experimental-features = nix-command flakes" >> /etc/nix/nix.conf
+{safe_dir_cmds}
+
+echo ">>> Building {pkg}..."
+nix build ".#{pkg}" -o /tmp/result -L --no-update-lock-file
+
+# Dereference symlink (-L) to copy actual file, not symlink
+cp -L /tmp/result "{out_dir}/{pkg}.tar.gz"
+
+# Verify file exists and has content
+if [ ! -s "{out_dir}/{pkg}.tar.gz" ]; then
+    echo "ERROR: Output file empty or missing" >&2
+    exit 1
+fi
+
+echo ">>> Build successful: {pkg}"
+"#,
+            safe_dir_cmds = safe_dir_cmds,
+            pkg = package_name,
+            out_dir = container_output_dir,
+        );
+
+        let mut docker_args: Vec<String> = vec![
+            "run".to_string(),
+            "--rm".to_string(),
+            "--platform".to_string(),
+            self.platform.docker_platform().to_string(),
+            // Mount repo at its original path (read-only)
+            "-v".to_string(),
+            format!("{}:{}:ro", repo_root.display(), repo_root.display()),
+            // Mount build output directory separately (writable)
+            "-v".to_string(),
+            format!("{}:/build", repo_root.join("_build").display()),
+            // Mount Docker socket
+            "-v".to_string(),
+            "/var/run/docker.sock:/var/run/docker.sock".to_string(),
+            // Persistent Nix store volume
+            "--mount".to_string(),
+            format!("type=volume,source={},target=/nix", self.nix_store_volume),
+            // Working directory is repo root
+            "-w".to_string(),
+            repo_root.display().to_string(),
+        ];
+
+        // Add git worktree mounts if needed
+        let worktree_mounts = self.resolve_git_worktree_mounts(&repo_root)?;
+        docker_args.extend(worktree_mounts);
+
+        // Add path input mounts from flake.lock (local dev support)
+        let path_input_mounts = self.resolve_path_input_mounts(&repo_root)?;
+        docker_args.extend(path_input_mounts);
+
+        // Add resource limits
+        if let Some(limits) = Self::detect_docker_resource_limits().await {
+            docker_args.push("--cpus".to_string());
+            docker_args.push(limits.cpus.to_string());
+            docker_args.push("--memory".to_string());
+            docker_args.push(limits.memory.clone());
+        }
+
+        // Image and command
+        docker_args.push("nixos/nix:latest".to_string());
+        docker_args.push("sh".to_string());
+        docker_args.push("-c".to_string());
+        docker_args.push(nix_script);
+
+        let mut cmd = Command::new("docker");
+        cmd.args(&docker_args);
+
+        debug!("Running Docker root flake build: docker {}", docker_args.join(" "));
+
+        let output = cmd.output().await?;
+
+        if !output.status.success() {
+            let stderr = String::from_utf8_lossy(&output.stderr);
+            let stdout = String::from_utf8_lossy(&output.stdout);
+            warn!("Docker root flake build failed: {}", stderr);
+            return Err(NixContainerError::BuildFailed {
+                container: package_name.to_string(),
+                message: format!("{}\n{}", stdout, stderr),
+            });
+        }
+
+        // Verify the output file on host
+        let tarball_path = build_output_dir.join(format!("{}.tar.gz", package_name));
+        if !tarball_path.exists() || std::fs::metadata(&tarball_path).map(|m| m.len()).unwrap_or(0) == 0 {
+            let stdout = String::from_utf8_lossy(&output.stdout);
+            return Err(NixContainerError::BuildFailed {
+                container: package_name.to_string(),
+                message: format!(
+                    "Build reported success but output file missing or empty: {}\nBuild output: {}",
+                    tarball_path.display(),
+                    stdout,
+                ),
+            });
+        }
+
+        info!("Root flake build successful: {}", tarball_path.display());
+        Ok(tarball_path)
+    }
+
+    /// Detect git worktree and return Docker volume mount args if needed.
+    ///
+    /// Mirrors the logic from bin/build/_common.sh resolve_git_mounts().
+    /// When .git is a file (worktree), it contains `gitdir: /path/to/.git/worktrees/name`.
+    /// We need to mount both the worktree gitdir and the main .git directory
+    /// so that absolute paths in the gitdir pointer resolve correctly inside the container.
+    fn resolve_git_worktree_mounts(&self, repo_root: &Path) -> Result<Vec<String>> {
+        let git_path = repo_root.join(".git");
+
+        if !git_path.is_file() {
+            // Regular repo (not a worktree) — no extra mounts needed
+            return Ok(vec![]);
+        }
+
+        // Parse gitdir from .git file: "gitdir: /path/to/main/.git/worktrees/name"
+        let content = std::fs::read_to_string(&git_path)
+            .map_err(|e| NixContainerError::Other(format!("Failed to read .git file: {}", e)))?;
+        let gitdir_str = content
+            .strip_prefix("gitdir: ")
+            .map(|s| s.trim())
+            .ok_or_else(|| NixContainerError::Other("Invalid .git file format".to_string()))?;
+
+        // Make absolute if relative
+        let gitdir = if gitdir_str.starts_with('/') {
+            PathBuf::from(gitdir_str)
+        } else {
+            repo_root.join(gitdir_str)
+        };
+        let gitdir = gitdir.canonicalize().unwrap_or(gitdir);
+
+        // Read commondir to find main .git directory
+        let commondir_path = gitdir.join("commondir");
+        let main_git_dir = if commondir_path.exists() {
+            let commondir_content = std::fs::read_to_string(&commondir_path)
+                .map_err(|e| NixContainerError::Other(format!("Failed to read commondir: {}", e)))?;
+            let main = gitdir.join(commondir_content.trim());
+            main.canonicalize().unwrap_or(main)
+        } else {
+            // Fallback: worktrees dir is inside main .git
+            // /path/to/.git/worktrees/name -> /path/to/.git
+            gitdir.parent()
+                .and_then(|p| p.parent())
+                .map(|p| p.to_path_buf())
+                .unwrap_or_else(|| gitdir.clone())
+        };
+
+        info!(
+            "Git worktree detected - mounting gitdir {} and main git {}",
+            gitdir.display(),
+            main_git_dir.display()
+        );
+
+        Ok(vec![
+            "-v".to_string(),
+            format!("{}:{}:ro", gitdir.display(), gitdir.display()),
+            "-v".to_string(),
+            format!("{}:{}:ro", main_git_dir.display(), main_git_dir.display()),
+        ])
+    }
+
+    /// Parse flake.lock for `path:` inputs and return Docker volume mount args.
+    ///
+    /// When a consumer flake has `firestream.url = "path:../Firestream"`, the
+    /// flake.lock records the resolved path. We need to mount these paths into
+    /// the Docker container so that `nix build` can resolve them.
+    fn resolve_path_input_mounts(&self, repo_root: &Path) -> Result<Vec<String>> {
+        let lock_path = repo_root.join("flake.lock");
+        if !lock_path.exists() {
+            debug!("No flake.lock found at {}, skipping path input discovery", lock_path.display());
+            return Ok(vec![]);
+        }
+
+        let lock_content: serde_json::Value = serde_json::from_str(
+            &std::fs::read_to_string(&lock_path)
+                .map_err(|e| NixContainerError::Other(format!("Failed to read flake.lock: {}", e)))?
+        ).map_err(|e| NixContainerError::Other(format!("Failed to parse flake.lock: {}", e)))?;
+
+        let mut mounts = vec![];
+        let mut safe_dirs = vec![];
+
+        let nodes = match lock_content.get("nodes").and_then(|n| n.as_object()) {
+            Some(nodes) => nodes,
+            None => return Ok(vec![]),
+        };
+
+        for (name, node) in nodes {
+            // Check locked.type == "path" (resolved inputs)
+            let is_path = node.get("locked")
+                .and_then(|l| l.get("type"))
+                .and_then(|t| t.as_str()) == Some("path");
+
+            // Also check original.type == "path" (some lock formats)
+            let is_original_path = !is_path && node.get("original")
+                .and_then(|o| o.get("type"))
+                .and_then(|t| t.as_str()) == Some("path");
+
+            if !is_path && !is_original_path {
+                continue;
+            }
+
+            // Get the path from locked (preferred) or original
+            let path_str = node.get("locked")
+                .and_then(|l| l.get("path"))
+                .and_then(|p| p.as_str())
+                .or_else(|| node.get("original")
+                    .and_then(|o| o.get("path"))
+                    .and_then(|p| p.as_str()));
+
+            let path_str = match path_str {
+                Some(p) => p,
+                None => continue,
+            };
+
+            // Resolve to absolute path
+            let path = if path_str.starts_with('/') {
+                PathBuf::from(path_str)
+            } else {
+                match repo_root.join(path_str).canonicalize() {
+                    Ok(p) => p,
+                    Err(e) => {
+                        warn!("Cannot resolve path input '{}' ({}): {}", name, path_str, e);
+                        continue;
+                    }
+                }
+            };
+
+            // Skip if same as repo root (already mounted) or doesn't exist
+            if path == repo_root {
+                continue;
+            }
+            if !path.exists() {
+                warn!("Path input '{}' points to non-existent path: {}", name, path.display());
+                continue;
+            }
+
+            info!("Mounting path input '{}': {}", name, path.display());
+            mounts.push("-v".to_string());
+            mounts.push(format!("{}:{}:ro", path.display(), path.display()));
+            safe_dirs.push(path.display().to_string());
+
+            // Also resolve git worktree mounts for this path input
+            if let Ok(wt_mounts) = self.resolve_git_worktree_mounts(&path) {
+                mounts.extend(wt_mounts);
+            }
+        }
+
+        // Store safe_dirs for use in the nix script (attached to self via the mounts)
+        // We embed them as environment variable mounts
+        if !safe_dirs.is_empty() {
+            debug!("Path input safe directories: {:?}", safe_dirs);
+        }
+
+        Ok(mounts)
+    }
+
+    /// Detect Docker resource limits (CPUs, memory).
+    /// Mirrors bin/build/_common.sh _detect_docker_cpus() and _detect_docker_memory().
+    async fn detect_docker_resource_limits() -> Option<DockerResourceLimits> {
+        let cpu_output = Command::new("docker")
+            .args(["info", "--format", "{{.NCPU}}"])
+            .output()
+            .await
+            .ok()?;
+        let cpus: u32 = String::from_utf8_lossy(&cpu_output.stdout)
+            .trim()
+            .parse()
+            .unwrap_or(4);
+
+        let mem_output = Command::new("docker")
+            .args(["info", "--format", "{{.MemTotal}}"])
+            .output()
+            .await
+            .ok()?;
+        let mem_bytes: u64 = String::from_utf8_lossy(&mem_output.stdout)
+            .trim()
+            .parse()
+            .unwrap_or(0);
+
+        let mem_gb = if mem_bytes > 0 {
+            let gb = mem_bytes / 1_073_741_824;
+            if gb > 1 { gb - 1 } else { 1 } // Reserve 1GB overhead
+        } else {
+            8
+        };
+
+        Some(DockerResourceLimits {
+            cpus,
+            memory: format!("{}g", mem_gb),
+        })
+    }
+}
+
+/// Docker resource limits detected from the daemon.
+struct DockerResourceLimits {
+    cpus: u32,
+    memory: String,
 }
 
 #[async_trait]
@@ -265,14 +631,75 @@ impl ContainerBuildStrategy for DockerNixStrategy {
 
         result
     }
+
+    async fn build_with_mode(
+        &self,
+        mode: &BuildMode,
+        config: &BuildConfig,
+    ) -> Result<PathBuf> {
+        match mode {
+            BuildMode::RootFlake { package_name } => {
+                self.run_root_flake_build(package_name, config).await
+            }
+            BuildMode::SubdirFlake { container_dir, attribute } => {
+                let container = ContainerInfo::new(
+                    container_dir.file_name()
+                        .map(|n| n.to_string_lossy().to_string())
+                        .unwrap_or_else(|| "unknown".to_string()),
+                    container_dir,
+                );
+                let config = BuildConfig {
+                    nix_attribute: attribute.clone(),
+                    ..config.clone()
+                };
+                self.run_docker_nix_build(&container, &config).await
+            }
+        }
+    }
+
+    async fn build_with_mode_and_progress(
+        &self,
+        mode: &BuildMode,
+        config: &BuildConfig,
+        mut progress: BoxedProgressCallback,
+    ) -> Result<PathBuf> {
+        let label = match mode {
+            BuildMode::RootFlake { package_name } => package_name.clone(),
+            BuildMode::SubdirFlake { container_dir, .. } => container_dir
+                .file_name()
+                .map(|n| n.to_string_lossy().to_string())
+                .unwrap_or_else(|| "unknown".to_string()),
+        };
+
+        progress(BuildProgress::new(
+            &label,
+            BuildPhase::Resolving,
+            format!("Preparing Docker build with volume {}...", self.nix_store_volume),
+        ));
+
+        progress(BuildProgress::new(
+            &label,
+            BuildPhase::Building { current: 1, total: 1 },
+            format!("Building in Docker container (platform: {})...", self.platform.docker_platform()),
+        ));
+
+        let result = self.build_with_mode(mode, config).await;
+
+        match &result {
+            Ok(path) => progress(BuildProgress::complete(&label, format!("Built: {}", path.display()))),
+            Err(e) => progress(BuildProgress::failed(&label, e.to_string())),
+        }
+
+        result
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::io::Write;
 
-    #[test]
-    fn test_docker_strategy_name() {
+    fn make_strategy() -> DockerNixStrategy {
         let platform = PlatformInfo {
             platform: crate::platform::Platform::Darwin,
             arch: crate::platform::Architecture::Aarch64,
@@ -280,8 +707,105 @@ mod tests {
             docker_available: true,
             in_container: false,
         };
-        let strategy = DockerNixStrategy::new(platform, "test-volume".to_string());
+        DockerNixStrategy::new(platform, "test-volume".to_string())
+    }
+
+    #[test]
+    fn test_docker_strategy_name() {
+        let strategy = make_strategy();
         assert_eq!(strategy.name(), "Docker Nix");
         assert_eq!(strategy.strategy_type(), BuildStrategy::DockerNix);
+    }
+
+    #[test]
+    fn test_resolve_path_input_mounts_no_lockfile() {
+        let strategy = make_strategy();
+        let tmp = tempfile::tempdir().unwrap();
+        // No flake.lock => empty result
+        let mounts = strategy.resolve_path_input_mounts(tmp.path()).unwrap();
+        assert!(mounts.is_empty());
+    }
+
+    #[test]
+    fn test_resolve_path_input_mounts_no_path_inputs() {
+        let strategy = make_strategy();
+        let tmp = tempfile::tempdir().unwrap();
+        let lock = serde_json::json!({
+            "nodes": {
+                "nixpkgs": {
+                    "locked": {
+                        "type": "github",
+                        "owner": "NixOS",
+                        "repo": "nixpkgs",
+                        "rev": "abc123"
+                    }
+                },
+                "root": {}
+            },
+            "root": "root",
+            "version": 7
+        });
+        let mut f = std::fs::File::create(tmp.path().join("flake.lock")).unwrap();
+        f.write_all(serde_json::to_string(&lock).unwrap().as_bytes()).unwrap();
+
+        let mounts = strategy.resolve_path_input_mounts(tmp.path()).unwrap();
+        assert!(mounts.is_empty());
+    }
+
+    #[test]
+    fn test_resolve_path_input_mounts_with_path_input() {
+        let strategy = make_strategy();
+        let tmp = tempfile::tempdir().unwrap();
+        // Create a directory to act as the path input target
+        let input_dir = tempfile::tempdir().unwrap();
+        let input_path = input_dir.path().to_str().unwrap().to_string();
+
+        let lock = serde_json::json!({
+            "nodes": {
+                "firestream": {
+                    "locked": {
+                        "type": "path",
+                        "path": input_path
+                    }
+                },
+                "root": {}
+            },
+            "root": "root",
+            "version": 7
+        });
+        let mut f = std::fs::File::create(tmp.path().join("flake.lock")).unwrap();
+        f.write_all(serde_json::to_string(&lock).unwrap().as_bytes()).unwrap();
+
+        let mounts = strategy.resolve_path_input_mounts(tmp.path()).unwrap();
+        // Should have at least -v and the mount spec
+        assert!(mounts.len() >= 2, "Expected mount args, got: {:?}", mounts);
+        assert_eq!(mounts[0], "-v");
+        assert!(mounts[1].contains(&input_path));
+        assert!(mounts[1].ends_with(":ro"));
+    }
+
+    #[test]
+    fn test_resolve_path_input_mounts_skips_nonexistent() {
+        let strategy = make_strategy();
+        let tmp = tempfile::tempdir().unwrap();
+
+        let lock = serde_json::json!({
+            "nodes": {
+                "missing": {
+                    "locked": {
+                        "type": "path",
+                        "path": "/nonexistent/path/that/should/not/exist"
+                    }
+                },
+                "root": {}
+            },
+            "root": "root",
+            "version": 7
+        });
+        let mut f = std::fs::File::create(tmp.path().join("flake.lock")).unwrap();
+        f.write_all(serde_json::to_string(&lock).unwrap().as_bytes()).unwrap();
+
+        let mounts = strategy.resolve_path_input_mounts(tmp.path()).unwrap();
+        assert!(mounts.is_empty(), "Should skip non-existent paths");
     }
 }

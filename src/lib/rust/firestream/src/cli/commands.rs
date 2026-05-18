@@ -170,6 +170,10 @@ pub async fn execute_command(cli: Cli) -> Result<()> {
             execute_cluster_command(command, &state_dir).await?;
         }
         
+        Some(Command::Build { ref packages, native, docker, parallel: _, timeout }) => {
+            execute_build(packages, native, docker, timeout, cli.quiet, cli.json).await?;
+        }
+
         Some(Command::Template { name, project_type, output, non_interactive, values }) => {
             crate::template::execute_template(name, &project_type, &output, non_interactive, values.as_ref()).await?;
         }
@@ -808,6 +812,105 @@ async fn execute_cluster_logs(
         }
     }
     
+    Ok(())
+}
+
+/// Execute build command - builds container images via Nix
+async fn execute_build(
+    packages: &[String],
+    native: bool,
+    docker: bool,
+    timeout: u64,
+    quiet: bool,
+    json: bool,
+) -> Result<()> {
+    use nix_container_builder::{BuildConfig, NixContainerBuilder, BuildProgress, BuildPhase};
+    use std::time::Duration;
+
+    let config = BuildConfig::default()
+        .with_force_native(native)
+        .with_force_docker(docker)
+        .with_timeout(Duration::from_secs(timeout));
+
+    let builder = NixContainerBuilder::with_config(config).await
+        .map_err(|e| FirestreamError::BuildError(format!("Failed to initialize builder: {}", e)))?;
+
+    let platform = builder.platform();
+    let strategy = builder.recommended_strategy();
+
+    if !quiet && !json {
+        eprintln!("Platform: {} {} | Strategy: {}", platform.platform, platform.arch, strategy);
+        eprintln!("Building {} package(s)...\n", packages.len());
+    }
+
+    let mut results = Vec::new();
+    let mut failures = Vec::new();
+
+    for (i, package) in packages.iter().enumerate() {
+        if !quiet && !json {
+            eprintln!("[{}/{}] Building .#{}...", i + 1, packages.len(), package);
+        }
+
+        let result = if quiet || json {
+            builder.build_package(package).await
+        } else {
+            builder.build_package_with_progress(package, |progress: BuildProgress| {
+                match &progress.phase {
+                    BuildPhase::Resolving => eprintln!("  Resolving flake inputs..."),
+                    BuildPhase::Building { .. } => eprintln!("  Building (this may take a while)..."),
+                    BuildPhase::Loading => eprintln!("  Loading image into Docker..."),
+                    BuildPhase::Complete => eprintln!("  Done: {}", progress.message),
+                    BuildPhase::Failed => eprintln!("  FAILED: {}", progress.message),
+                    _ => {}
+                }
+            }).await
+        };
+
+        match result {
+            Ok(build_result) => {
+                if !quiet && !json {
+                    eprintln!("  ✓ {} -> {} ({:.1}s)\n",
+                        package, build_result.full_ref(), build_result.duration.as_secs_f64());
+                }
+                results.push(build_result);
+            }
+            Err(e) => {
+                if !quiet && !json {
+                    eprintln!("  ✗ {} failed: {}\n", package, e);
+                }
+                failures.push((package.clone(), e.to_string()));
+            }
+        }
+    }
+
+    // Output
+    if json {
+        let output = serde_json::json!({
+            "succeeded": results.iter().map(|r| {
+                serde_json::json!({
+                    "package": r.container,
+                    "image": r.full_ref(),
+                    "duration_secs": r.duration.as_secs_f64(),
+                    "strategy": r.strategy.to_string(),
+                })
+            }).collect::<Vec<_>>(),
+            "failed": failures.iter().map(|(pkg, err)| {
+                serde_json::json!({ "package": pkg, "error": err })
+            }).collect::<Vec<_>>(),
+        });
+        println!("{}", serde_json::to_string_pretty(&output)?);
+    } else if !quiet {
+        eprintln!("Build complete: {} succeeded, {} failed", results.len(), failures.len());
+    }
+
+    if !failures.is_empty() {
+        return Err(FirestreamError::BuildError(format!(
+            "{} build(s) failed: {}",
+            failures.len(),
+            failures.iter().map(|(p, _)| p.as_str()).collect::<Vec<_>>().join(", ")
+        )));
+    }
+
     Ok(())
 }
 
