@@ -1,5 +1,5 @@
 # test-volumes.nix - Test suite for the volumes module
-# Copyright Firestream. Apache-2.0 License.
+# Copyright Firestream. MIT License.
 #
 # Run tests with: nix-build test-volumes.nix
 # Or evaluate: nix eval -f test-volumes.nix

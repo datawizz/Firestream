@@ -1,5 +1,5 @@
 # Tests for the Java container module factory
-# Copyright Firestream. Apache-2.0 License.
+# Copyright Firestream. MIT License.
 { pkgs, firestream }:
 
 let

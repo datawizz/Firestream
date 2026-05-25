@@ -13,18 +13,23 @@
 //! - `report`: Output formatting (JSON, JUnit, SARIF)
 //! - `cache`: Result caching by Nix hash
 //! - `metadata`: Container metadata reading and validation
+//! - `merge`: SBOM merging for fleet manifests
 
 pub mod cache;
 pub mod generator;
+pub mod merge;
 pub mod metadata;
 pub mod nix;
 pub mod report;
 pub mod runner;
+pub mod source_archive;
 pub mod spec;
 
 pub use cache::NixHashCache;
+pub use merge::{MergeError, OutputFormat, SbomMerger};
 pub use metadata::{MetadataReader, MetadataValidator};
 pub use nix::{ClosureGraph, MetadataConfig};
+pub use source_archive::{SourceArchiver, SourceIndex, SourceMap, SourceType};
 pub use spec::{ContainerSpec, GossSpec, SecuritySpec};
 
 /// Result type alias for firestream-vib operations

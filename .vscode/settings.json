@@ -19,5 +19,6 @@
         "activityBar.background": "#a00909",
         "activityBar.foreground": "#000000",
         "activityBar.inactiveForeground": "#000000"
-    }
+    },
+    "git.ignoreLimitWarning": true
 }

@@ -1,8 +1,12 @@
-{ pkgs }:
+{ pkgs, fenix, crane, system ? pkgs.system or "x86_64-linux" }:
 
 let
   lib = pkgs.lib;
-  firestream = import ../. { inherit pkgs; };
+  # Firestream module needs fenix and crane for Rust builds
+  firestream = import ../. {
+    inherit pkgs system fenix crane;
+    # Python inputs are optional, omit for tests
+  };
 
   # Import individual test modules
   logTests = import ./test-log.nix { inherit pkgs firestream; };
@@ -17,18 +21,19 @@ let
   configTests = import ./test-config.nix { inherit pkgs firestream; };
   containerTests = import ./test-containers.nix { inherit pkgs firestream; };
   stateTests = import ./test-state.nix { inherit pkgs firestream; };
+  sourceTests = import ./test-sources.nix { inherit pkgs firestream; };
 
 in {
   # Individual test derivations
   inherit logTests validationsTests fsTests osTests netTests serviceTests fileTests persistenceTests integrationTests;
-  inherit configTests containerTests stateTests;
+  inherit configTests containerTests stateTests sourceTests;
 
   # All tests combined
   all = pkgs.runCommand "firestream-all-tests" {
     buildInputs = [
       logTests validationsTests fsTests osTests netTests serviceTests
       fileTests persistenceTests integrationTests configTests containerTests
-      stateTests
+      stateTests sourceTests
     ];
   } ''
     echo "================================================"
@@ -46,6 +51,7 @@ in {
     echo "Config tests:       PASSED"
     echo "Container tests:    PASSED"
     echo "State tests:        PASSED"
+    echo "Source tests:       PASSED"
     echo "================================================"
     touch $out
   '';

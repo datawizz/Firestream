@@ -26,7 +26,7 @@ help:
 	@echo ""
 	@echo "  Applications:"
 	@echo "    jupyterhub   - JupyterHub notebook server"
-	@echo "    odoo         - Odoo ERP system"
+	@echo "    odoo         - Odoo ERP system (use odoo-15-*, odoo-16-*, odoo-17-*, or odoo-18-*)"
 	@echo "    superset     - Apache Superset BI dashboards"
 	@echo "    supabase     - Supabase Backend-as-a-Service"
 	@echo ""
@@ -37,6 +37,8 @@ help:
 	@echo "  make postgres-17-start   # Start PostgreSQL 17"
 	@echo "  make redis-7-start       # Start Redis 7"
 	@echo "  make superset-start      # Start Superset"
+	@echo "  make odoo-15-start       # Start Odoo 15"
+	@echo "  make odoo-18-start       # Start Odoo 18 (default)"
 	@echo "  make odoo-credentials    # Show Odoo login info"
 	@echo ""
 	@echo "=== Convenience ==="
@@ -52,6 +54,15 @@ help:
 	@echo "  make docker-reset        # Clean all Docker resources"
 	@echo "  make nix-up              # Build Nix flake"
 	@echo "  make nix-fix             # Garbage collect Nix"
+	@echo "  make builder-cache-stats # Show Nix cache volume usage"
+	@echo "  make builder-cache-clean # Remove Nix cache volumes"
+	@echo ""
+	@echo "=== SBOM / Fleet Manifest ==="
+	@echo ""
+	@echo "  make manifest            # Build fleet SBOM (CycloneDX + SPDX)"
+	@echo "  make sbom-airflow        # Build individual container SBOM"
+	@echo "  make manifest-validate   # Validate CycloneDX compliance"
+	@echo "  make manifest-clean      # Clean manifest build artifacts"
 	@echo ""
 	@echo "=== Documentation ==="
 	@echo ""
@@ -82,18 +93,48 @@ container-build-%:
 	@$(BUILD_CONTAINER) $*
 
 # ==============================================================================
+# Shared Dependency Targets
+# ==============================================================================
+build-dep-redis:
+	@if ! docker image inspect firestream-redis:7 >/dev/null 2>&1; then \
+		echo "Building Redis..."; \
+		$(BUILD_CONTAINER) redis; \
+	else \
+		echo "Redis image already exists"; \
+	fi
+
+build-dep-postgresql:
+	@if ! docker image inspect firestream-postgresql:17 >/dev/null 2>&1; then \
+		echo "Building PostgreSQL..."; \
+		$(BUILD_CONTAINER) postgresql; \
+	else \
+		echo "PostgreSQL image already exists"; \
+	fi
+
+# ==============================================================================
 # Airflow (Nix-based container)
 # ==============================================================================
 AIRFLOW_DIR := src/containers/firestream/airflow
 AIRFLOW_COMPOSE := $(AIRFLOW_DIR)/docker-compose.yml
 
-airflow-build:
+airflow-build-deps: build-dep-redis build-dep-postgresql
+	@echo "==> Airflow dependencies ready"
+
+airflow-build: airflow-build-deps
 	@$(BUILD_CONTAINER) airflow
 
 airflow-start:
 	@if ! docker image inspect firestream-airflow:3.0.3 >/dev/null 2>&1; then \
-		echo "Image not found, building..."; \
+		echo "Airflow image not found, building..."; \
 		$(MAKE) airflow-build; \
+	fi
+	@if ! docker image inspect firestream-redis:7 >/dev/null 2>&1; then \
+		echo "Redis image not found, building..."; \
+		$(BUILD_CONTAINER) redis; \
+	fi
+	@if ! docker image inspect firestream-postgresql:17 >/dev/null 2>&1; then \
+		echo "PostgreSQL image not found, building..."; \
+		$(BUILD_CONTAINER) postgresql; \
 	fi
 	docker compose -f $(AIRFLOW_COMPOSE) up -d
 	@echo "Airflow is running at http://localhost:8090"
@@ -244,37 +285,142 @@ ODOO_COMPOSE := $(ODOO_DIR)/docker-compose.yml
 odoo-build:
 	@$(BUILD_CONTAINER) odoo
 
-odoo-start:
+odoo-build-%:
+	@$(BUILD_CONTAINER) odoo --version $*
+
+# Odoo 15
+odoo-15-start:
+	@if ! docker image inspect firestream-odoo:15.0 >/dev/null 2>&1; then \
+		echo "Image not found, building..."; \
+		$(MAKE) odoo-build-15; \
+	fi
+	ODOO_VERSION=15 docker compose -f $(ODOO_COMPOSE) up -d
+	@echo "Odoo 15 is running at http://localhost:8069"
+
+odoo-15-stop:
+	ODOO_VERSION=15 docker compose -f $(ODOO_COMPOSE) down
+
+odoo-15-restart: odoo-15-stop odoo-15-start
+
+odoo-15-logs:
+	ODOO_VERSION=15 docker compose -f $(ODOO_COMPOSE) logs -f
+
+odoo-15-status:
+	ODOO_VERSION=15 docker compose -f $(ODOO_COMPOSE) ps
+
+odoo-15-clean: odoo-15-stop
+	docker rmi firestream-odoo:15.0 2>/dev/null || true
+	ODOO_VERSION=15 docker compose -f $(ODOO_COMPOSE) down -v
+
+odoo-15-credentials:
+	@echo "=== Odoo 15 Credentials ==="
+	@echo "URL:      http://localhost:8069"
+	@echo "Database: firestream_odoo"
+	@echo "Email:    admin"
+	@echo "Password: admin"
+
+# Odoo 16
+odoo-16-start:
+	@if ! docker image inspect firestream-odoo:16.0 >/dev/null 2>&1; then \
+		echo "Image not found, building..."; \
+		$(MAKE) odoo-build-16; \
+	fi
+	ODOO_VERSION=16 docker compose -f $(ODOO_COMPOSE) up -d
+	@echo "Odoo 16 is running at http://localhost:8069"
+
+odoo-16-stop:
+	ODOO_VERSION=16 docker compose -f $(ODOO_COMPOSE) down
+
+odoo-16-restart: odoo-16-stop odoo-16-start
+
+odoo-16-logs:
+	ODOO_VERSION=16 docker compose -f $(ODOO_COMPOSE) logs -f
+
+odoo-16-status:
+	ODOO_VERSION=16 docker compose -f $(ODOO_COMPOSE) ps
+
+odoo-16-clean: odoo-16-stop
+	docker rmi firestream-odoo:16.0 2>/dev/null || true
+	ODOO_VERSION=16 docker compose -f $(ODOO_COMPOSE) down -v
+
+odoo-16-credentials:
+	@echo "=== Odoo 16 Credentials ==="
+	@echo "URL:      http://localhost:8069"
+	@echo "Database: firestream_odoo"
+	@echo "Email:    admin"
+	@echo "Password: admin"
+
+# Odoo 17
+odoo-17-start:
+	@if ! docker image inspect firestream-odoo:17.0 >/dev/null 2>&1; then \
+		echo "Image not found, building..."; \
+		$(MAKE) odoo-build-17; \
+	fi
+	ODOO_VERSION=17 docker compose -f $(ODOO_COMPOSE) up -d
+	@echo "Odoo 17 is running at http://localhost:8069"
+
+odoo-17-stop:
+	ODOO_VERSION=17 docker compose -f $(ODOO_COMPOSE) down
+
+odoo-17-restart: odoo-17-stop odoo-17-start
+
+odoo-17-logs:
+	ODOO_VERSION=17 docker compose -f $(ODOO_COMPOSE) logs -f
+
+odoo-17-status:
+	ODOO_VERSION=17 docker compose -f $(ODOO_COMPOSE) ps
+
+odoo-17-clean: odoo-17-stop
+	docker rmi firestream-odoo:17.0 2>/dev/null || true
+	ODOO_VERSION=17 docker compose -f $(ODOO_COMPOSE) down -v
+
+odoo-17-credentials:
+	@echo "=== Odoo 17 Credentials ==="
+	@echo "URL:      http://localhost:8069"
+	@echo "Database: firestream_odoo"
+	@echo "Email:    admin"
+	@echo "Password: admin"
+
+# Odoo 18
+odoo-18-start:
 	@if ! docker image inspect firestream-odoo:18.0 >/dev/null 2>&1; then \
 		echo "Image not found, building..."; \
-		$(MAKE) odoo-build; \
+		$(MAKE) odoo-build-18; \
 	fi
-	docker compose -f $(ODOO_COMPOSE) up -d
-	@echo "Odoo is running at http://localhost:8069"
+	ODOO_VERSION=18 docker compose -f $(ODOO_COMPOSE) up -d
+	@echo "Odoo 18 is running at http://localhost:8069"
 
-odoo-up: odoo-start
+odoo-18-stop:
+	ODOO_VERSION=18 docker compose -f $(ODOO_COMPOSE) down
 
-odoo-stop:
-	docker compose -f $(ODOO_COMPOSE) down
+odoo-18-restart: odoo-18-stop odoo-18-start
 
-odoo-restart: odoo-stop odoo-start
+odoo-18-logs:
+	ODOO_VERSION=18 docker compose -f $(ODOO_COMPOSE) logs -f
 
-odoo-logs:
-	docker compose -f $(ODOO_COMPOSE) logs -f
+odoo-18-status:
+	ODOO_VERSION=18 docker compose -f $(ODOO_COMPOSE) ps
 
-odoo-status:
-	docker compose -f $(ODOO_COMPOSE) ps
-
-odoo-clean: odoo-stop
+odoo-18-clean: odoo-18-stop
 	docker rmi firestream-odoo:18.0 2>/dev/null || true
-	docker compose -f $(ODOO_COMPOSE) down -v
+	ODOO_VERSION=18 docker compose -f $(ODOO_COMPOSE) down -v
 
-odoo-credentials:
-	@echo "=== Odoo Credentials ==="
+odoo-18-credentials:
+	@echo "=== Odoo 18 Credentials ==="
 	@echo "URL:      http://localhost:8069"
-	@echo "Database: odoo"
-	@echo "Email:    admin@example.com"
+	@echo "Database: firestream_odoo"
+	@echo "Email:    admin"
 	@echo "Password: admin"
+
+# Default Odoo version aliases (18)
+odoo-start: odoo-18-start
+odoo-stop: odoo-18-stop
+odoo-restart: odoo-18-restart
+odoo-logs: odoo-18-logs
+odoo-status: odoo-18-status
+odoo-clean: odoo-18-clean
+odoo-credentials: odoo-18-credentials
+odoo-up: odoo-start
 
 # ==============================================================================
 # PostgreSQL (Nix-based container)
@@ -542,30 +688,25 @@ supabase-credentials:
 # ==============================================================================
 # Superset (Nix-based container)
 # ==============================================================================
-SUPERSET_DIR := src/containers/firestream/superset
+SUPERSET_VERSION ?= 5
+SUPERSET_DIR := src/containers/firestream/superset/$(SUPERSET_VERSION)
 SUPERSET_COMPOSE := $(SUPERSET_DIR)/docker-compose.yml
+
+ifeq ($(SUPERSET_VERSION),4)
+  SUPERSET_IMAGE_TAG := 4.1.1
+else
+  SUPERSET_IMAGE_TAG := $(SUPERSET_VERSION)
+endif
 
 superset-build: superset-build-deps
 	@$(BUILD_CONTAINER) superset
 
 # Build superset dependencies (redis and postgresql)
-superset-build-deps:
-	@echo "==> Building Superset dependencies..."
-	@if ! docker image inspect firestream-redis:7 >/dev/null 2>&1; then \
-		echo "Building Redis..."; \
-		$(BUILD_CONTAINER) redis; \
-	else \
-		echo "Redis image already exists"; \
-	fi
-	@if ! docker image inspect firestream-postgresql:17 >/dev/null 2>&1; then \
-		echo "Building PostgreSQL..."; \
-		$(BUILD_CONTAINER) postgresql; \
-	else \
-		echo "PostgreSQL image already exists"; \
-	fi
+superset-build-deps: build-dep-redis build-dep-postgresql
+	@echo "==> Superset dependencies ready"
 
 superset-start:
-	@if ! docker image inspect firestream-superset:4.1.1 >/dev/null 2>&1; then \
+	@if ! docker image inspect firestream-superset:$(SUPERSET_IMAGE_TAG) >/dev/null 2>&1; then \
 		echo "Superset image not found, building..."; \
 		$(MAKE) superset-build; \
 	fi
@@ -603,7 +744,7 @@ superset-status:
 	docker compose -f $(SUPERSET_COMPOSE) ps
 
 superset-clean: superset-stop
-	docker rmi firestream-superset:4.1.1-nix 2>/dev/null || true
+	docker rmi firestream-superset:$(SUPERSET_IMAGE_TAG) 2>/dev/null || true
 	docker compose -f $(SUPERSET_COMPOSE) down -v
 
 superset-credentials:
@@ -619,17 +760,10 @@ superset-credentials:
 # ==============================================================================
 
 # Build all Nix-based containers (excludes supabase which uses official compose)
+# Uses batch mode for efficient serial builds with shared Nix cache
 containers-build-all:
-	@echo "Building all Firestream Nix containers..."
-	$(MAKE) airflow-build
-	$(MAKE) jupyterhub-build
-	$(MAKE) kafka-build
-	$(MAKE) odoo-build
-	$(MAKE) postgres-build
-	$(MAKE) redis-build
-	$(MAKE) spark-build
-	$(MAKE) superset-build
-	@echo "All containers built successfully!"
+	@echo "Building all Firestream Nix containers (batch mode)..."
+	@$(BUILD_CONTAINER) postgresql redis airflow kafka spark jupyterhub --version 15 odoo --version 16 odoo --version 17 odoo --version 18 odoo superset
 
 # Clean all containers
 containers-clean-all:
@@ -637,7 +771,10 @@ containers-clean-all:
 	-$(MAKE) airflow-clean
 	-$(MAKE) jupyterhub-clean
 	-$(MAKE) kafka-clean
-	-$(MAKE) odoo-clean
+	-$(MAKE) odoo-15-clean
+	-$(MAKE) odoo-16-clean
+	-$(MAKE) odoo-17-clean
+	-$(MAKE) odoo-18-clean
 	-$(MAKE) postgres-clean
 	-$(MAKE) redis-clean
 	-$(MAKE) spark-clean
@@ -700,6 +837,57 @@ nix-fix:
 
 docker-reset:
 	bash bin/commands/delete.sh
+
+# ==============================================================================
+# Builder Cache Management
+# ==============================================================================
+
+# Show Nix store cache usage (volume-based caching)
+builder-cache-stats:
+	@echo "=== Nix Store Cache Volumes ==="
+	@docker volume ls --filter name=firestream-nix-store
+	@echo ""
+	@for vol in $$(docker volume ls -q --filter name=firestream-nix-store); do \
+		echo "  $$vol"; \
+	done
+
+# Clean Nix store cache (reclaim disk space)
+builder-cache-clean:
+	@echo "Removing Nix store cache volumes..."
+	-docker volume rm firestream-nix-store-amd64 2>/dev/null || true
+	-docker volume rm firestream-nix-store-arm64 2>/dev/null || true
+	@echo "Cache cleared. Next build will be slower (cold cache)."
+
+# ==============================================================================
+# SBOM / Fleet Manifest
+# ==============================================================================
+
+# Build script (handles git worktrees, Docker resources, etc.)
+MANIFEST_SCRIPT := bin/build/manifest.sh
+
+# Build fleet manifest in a Linux container (required for macOS)
+# Produces: sbom-cyclonedx.json, sbom-spdx.json, manifest.json
+manifest:
+	@$(MANIFEST_SCRIPT)
+
+# Build individual container SBOM in a Linux container
+# Usage: make sbom-airflow, make sbom-spark, etc.
+sbom-%:
+	@$(MANIFEST_SCRIPT) $*
+
+# Validate CycloneDX SBOM compliance
+manifest-validate: manifest
+	@echo "Validating CycloneDX SBOM..."
+	@if command -v cyclonedx &>/dev/null; then \
+		cyclonedx validate --input-file _build/manifest/sbom-cyclonedx.json; \
+	else \
+		echo "cyclonedx-cli not found. Install with: nix run nixpkgs#cyclonedx-cli"; \
+		echo "Alternatively, check online at: https://cyclonedx.org/validator"; \
+	fi
+
+# Clean manifest build artifacts
+manifest-clean:
+	rm -rf _build/manifest _build/sbom
 
 # ==============================================================================
 # Documentation

@@ -213,7 +213,7 @@ EOF
       meta = {
         description = args.description or "Firestream ${pname}";
         homepage = args.homepage or "https://github.com/Cogent-Creation-Co/Firestream";
-        license = lib.licenses.asl20;
+        license = lib.licenses.mit;
         maintainers = [ "Firestream Team" ];
         mainProgram = finalBinName;
         platforms = lib.platforms.unix;

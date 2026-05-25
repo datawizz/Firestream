@@ -28,6 +28,8 @@ pub enum TemplateType {
     Spark,
     /// Superset dashboard templates
     Superset,
+    /// Odoo addons project templates
+    Odoo,
 }
 
 impl TemplateType {
@@ -37,6 +39,7 @@ impl TemplateType {
             TemplateType::Puppeteer => "src/templates/puppeteer",
             TemplateType::Spark => "src/templates/spark",
             TemplateType::Superset => "src/templates/superset",
+            TemplateType::Odoo => "src/templates/odoo",
         }
     }
 
@@ -46,6 +49,7 @@ impl TemplateType {
             TemplateType::Puppeteer => "puppeteer",
             TemplateType::Spark => "spark",
             TemplateType::Superset => "superset",
+            TemplateType::Odoo => "odoo",
         }
     }
 }
@@ -159,6 +163,7 @@ mod tests {
         assert_eq!(TemplateType::Puppeteer.prefix(), "src/templates/puppeteer");
         assert_eq!(TemplateType::Spark.prefix(), "src/templates/spark");
         assert_eq!(TemplateType::Superset.prefix(), "src/templates/superset");
+        assert_eq!(TemplateType::Odoo.prefix(), "src/templates/odoo");
     }
 
     #[test]
@@ -166,6 +171,7 @@ mod tests {
         assert_eq!(TemplateType::Puppeteer.name(), "puppeteer");
         assert_eq!(TemplateType::Spark.name(), "spark");
         assert_eq!(TemplateType::Superset.name(), "superset");
+        assert_eq!(TemplateType::Odoo.name(), "odoo");
     }
 
     #[test]

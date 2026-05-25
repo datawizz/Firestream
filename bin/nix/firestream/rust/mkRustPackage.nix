@@ -1,5 +1,5 @@
 # Crane-based Rust Package Builder
-# Copyright Firestream. Apache-2.0 License.
+# Copyright Firestream. MIT License.
 #
 # Provides incremental Rust builds with dependency caching via Crane.
 # Uses buildDepsOnly to create a cached dependency layer that is
@@ -51,11 +51,18 @@ in {
     nativeBuildInputs ? [],
     env ? {},
     meta ? {},
+    sourceFilter ? null,
     ...
   }@args:
     let
-      # Filter source to only Rust-relevant files
-      cleanedSrc = craneLib.cleanCargoSource src;
+      # Filter source: Rust files + optional extra files (templates, configs, etc.)
+      cleanedSrc = if sourceFilter != null
+        then lib.cleanSourceWith {
+          inherit src;
+          filter = path: type:
+            (sourceFilter path type) || (craneLib.filterCargoSources path type);
+        }
+        else craneLib.cleanCargoSource src;
 
       # Common arguments for both deps and final build
       commonArgs = {
@@ -71,9 +78,8 @@ in {
       } // env;
 
       # Build only the dependencies (cached layer)
-      cargoArtifacts = craneLib.buildDepsOnly (commonArgs // {
-        pname = "${name}-deps";
-      });
+      # Note: Crane automatically appends "-deps" to pname internally
+      cargoArtifacts = craneLib.buildDepsOnly commonArgs;
 
     in craneLib.buildPackage (commonArgs // {
       inherit cargoArtifacts cargoExtraArgs;
@@ -81,7 +87,7 @@ in {
       meta = {
         description = args.description or "Firestream ${name}";
         homepage = "https://github.com/Cogent-Creation-Co/Firestream";
-        license = lib.licenses.asl20;
+        license = lib.licenses.mit;
         maintainers = [ "Firestream Team" ];
         mainProgram = args.mainProgram or name;
       } // meta;

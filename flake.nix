@@ -302,60 +302,169 @@
       '';
 
       # Import Firestream with Rust module (Fenix + Crane)
-      firestreamWithRust = import ./bin/nix/firestream {
+      # Also pass Python packaging inputs for mkPythonWorkspaceContainer
+      firestreamLib = import ./bin/nix/firestream {
         inherit pkgs system;
         inherit fenix crane;
+        inherit pyproject-nix uv2nix pyproject-build-systems;
       };
+
+      # Backward compatibility alias
+      firestreamWithRust = firestreamLib;
 
       # Import PostgreSQL module directly for top-level access
       mkPostgresql = version: let
-        firestream = import ./bin/nix/firestream { inherit pkgs; };
+        firestream = import ./bin/nix/firestream {
+          inherit pkgs system;
+          inherit fenix crane;
+        };
         mod = import ./src/containers/firestream/postgresql/module.nix {
           inherit pkgs firestream version;
           lib = pkgs.lib;
         };
       in mod.dockerImage;
 
-      # Import Airflow (requires Python packaging inputs)
-      mkAirflow = let
-        repoSrc = filteredRepoSource pkgs;
-        airflowFlake = import "${repoSrc}/src/containers/firestream/airflow/flake.nix";
-        airflowOutputs = airflowFlake.outputs {
-          inherit self nixpkgs flake-utils pyproject-nix uv2nix pyproject-build-systems;
-        };
-      in airflowOutputs.packages.${system}.dockerImage;
+      # Import Airflow using mkPythonWorkspaceContainer
+      # Returns full module for fleet manifest access, use .dockerImage for container
+      airflowModule = let
+        containerPath = ./src/containers/firestream/airflow;
+        overrides = import (containerPath + "/overrides.nix") { inherit pkgs; lib = pkgs.lib; };
+      in firestreamLib.mkPythonWorkspaceContainer {
+        workspacePath = containerPath;
+        name = "airflow";
+        version = "3.0.3";
+        python = pkgs.python312;
+        inherit overrides;
+      };
+      mkAirflow = airflowModule.dockerImage;
 
-      # Import Odoo (requires Python packaging inputs)
-      mkOdoo = let
-        repoSrc = filteredRepoSource pkgs;
-        odooFlake = import "${repoSrc}/src/containers/firestream/odoo/flake.nix";
-        odooOutputs = odooFlake.outputs {
-          inherit self nixpkgs flake-utils pyproject-nix uv2nix pyproject-build-systems;
-        };
-      in odooOutputs.packages.${system}.dockerImage;
+      # Import Odoo using mkPythonWorkspaceContainer (multi-version)
+      # Returns full module for fleet manifest access, use .dockerImage for container
+      # Supported versions: 15, 16, 17, 18
+      odooModule = version: let
+        containerPath = ./src/containers/firestream/odoo + "/${version}";
+        overrides = import (containerPath + "/overrides.nix") { inherit pkgs; lib = pkgs.lib; };
 
-      # Import JupyterHub (requires Python packaging inputs)
-      mkJupyterhub = let
-        repoSrc = filteredRepoSource pkgs;
-        jupyterhubFlake = import "${repoSrc}/src/containers/firestream/jupyterhub/flake.nix";
-        jupyterhubOutputs = jupyterhubFlake.outputs {
-          inherit self nixpkgs flake-utils pyproject-nix uv2nix pyproject-build-systems;
+        # Python version per Odoo release
+        pythonForVersion = {
+          "15" = pkgs.python310;
+          "16" = pkgs.python310;
+          "17" = pkgs.python311;
+          "18" = pkgs.python312;
+        }.${version};
+
+        # Pinned source commits per Odoo branch
+        odooSrc = pkgs.fetchFromGitHub {
+          owner = "odoo";
+          repo = "odoo";
+          rev = {
+            "15" = "3a28e5b0adbb36bdb1155a6854cdfbe4e7f9b187";  # 15.0 branch
+            "16" = "f28eb1478fe47c4627fc3377fa505c78a6a7ea82";  # 16.0 branch
+            "17" = "92e49e9c5087a4adedf89ff0fbf9462e8487a8da";  # 17.0 branch
+            "18" = "f9e25ebf2f22b75ee74742a38182366a3b6a732c";  # 18.0 branch as of 2025-12-23
+          }.${version};
+          sha256 = {
+            "15" = "sha256-nfdElQQIkV/zTVzozRt2CUaGmNPw2G3Zza+feTsBxTs=";
+            "16" = "sha256-cXb7TEomwhe0zTEmDhoTy1UcDlQ5mTeyFAdsnhvhBlE=";
+            "17" = "sha256-lc1mlEwK3Pgh9bD7lfIHqJ4zjUIheL7DCM8C7tdpf20=";
+            "18" = "sha256-XK2+FwV9UDapbl037RR9wRhJZXGIKoHl/1gtB40+g1M=";
+          }.${version};
         };
-      in jupyterhubOutputs.packages.${system}.dockerImage;
+
+        # Package Odoo source for installation
+        odooSource = pkgs.stdenv.mkDerivation {
+          pname = "odoo-source";
+          version = "${version}.0";
+          src = odooSrc;
+
+          installPhase = ''
+            mkdir -p $out/opt/odoo
+            cp -r . $out/opt/odoo/
+            chmod +x $out/opt/odoo/odoo-bin
+          '';
+
+          dontBuild = true;
+          dontConfigure = true;
+          dontFixup = true;
+        };
+      in firestreamLib.mkPythonWorkspaceContainer {
+        workspacePath = containerPath;
+        name = "odoo";
+        version = "${version}.0";
+        python = pythonForVersion;
+        inherit overrides odooSource;
+      };
+      mkOdoo = version: (odooModule version).dockerImage;
+
+      # Import JupyterHub using mkPythonWorkspaceContainer
+      # Returns full module for fleet manifest access, use .dockerImage for container
+      jupyterhubModule = let
+        containerPath = ./src/containers/firestream/jupyterhub;
+        overrides = import (containerPath + "/overrides.nix") { inherit pkgs; lib = pkgs.lib; };
+      in firestreamLib.mkPythonWorkspaceContainer {
+        workspacePath = containerPath;
+        name = "jupyterhub";
+        version = "5.3.0";
+        python = pkgs.python312;
+        inherit overrides;
+      };
+      mkJupyterhub = jupyterhubModule.dockerImage;
+
+      # Import Superset using mkPythonWorkspaceContainer (supports versions 4 and 5)
+      # Returns full module for fleet manifest access, use .dockerImage for container
+      supersetModule = version: let
+        containerPath = ./src/containers/firestream/superset + "/${version}";
+        overrides = import (containerPath + "/overrides.nix") { inherit pkgs; lib = pkgs.lib; };
+        # Superset uses Python 3.11
+      in firestreamLib.mkPythonWorkspaceContainer {
+        workspacePath = containerPath;
+        name = "superset";
+        version = if version == "4" then "4.1.1" else "5";
+        python = pkgs.python311;
+        inherit overrides;
+        # Superset module needs waitForPortPkg
+        waitForPortPkg = firestreamLib.waitForPortPkg;
+      };
+      mkSuperset = version: (supersetModule version).dockerImage;
 
       # Import Redis module directly for top-level access
       mkRedis = redisVersion: let
-        firestream = import ./bin/nix/firestream { inherit pkgs; };
+        firestream = import ./bin/nix/firestream {
+          inherit pkgs system;
+          inherit fenix crane;
+        };
         mod = import ./src/containers/firestream/redis/module.nix {
           inherit pkgs firestream redisVersion;
           lib = pkgs.lib;
         };
       in mod.dockerImage;
 
+      # Import Kafka module directly for top-level access
+      # Returns full module for fleet manifest access, use .dockerImage for container
+      kafkaModule = import ./src/containers/firestream/kafka/module.nix {
+        inherit pkgs;
+        lib = pkgs.lib;
+        firestream = firestreamLib;
+        version = "4.0";
+      };
+      mkKafka = kafkaModule.dockerImage;
+
+      # Import Spark module directly for top-level access
+      # Returns full module for fleet manifest access, use .dockerImage for container
+      sparkModule = import ./src/containers/firestream/spark/module.nix {
+        inherit pkgs;
+        lib = pkgs.lib;
+        firestream = firestreamLib;
+        sparkVersion = "4.0.0";
+        jdk = pkgs.temurin-bin-17;
+        python = pkgs.python312;
+      };
+      mkSpark = sparkModule.dockerImage;
+
       config = mkContainerConfig system;
     in {
       container = config.container;
-      default = config.container;
+      default = pkgs.callPackage ./nix/package.nix {};
 
       # VIB (Validation, Inspection, Build) Tools bundle
       # Collection of tools for container testing and vulnerability scanning
@@ -378,8 +487,21 @@
       redis-7 = if isLinux then mkRedis "7" else unavailable "redis-7";
       redis-8 = if isLinux then mkRedis "8" else unavailable "redis-8";
       airflow = if isLinux then mkAirflow else unavailable "airflow";
-      odoo = if isLinux then mkOdoo else unavailable "odoo";
+      airflow-3 = if isLinux then mkAirflow else unavailable "airflow-3";
+      odoo = if isLinux then mkOdoo "18" else unavailable "odoo";
+      odoo-15 = if isLinux then mkOdoo "15" else unavailable "odoo-15";
+      odoo-16 = if isLinux then mkOdoo "16" else unavailable "odoo-16";
+      odoo-17 = if isLinux then mkOdoo "17" else unavailable "odoo-17";
+      odoo-18 = if isLinux then mkOdoo "18" else unavailable "odoo-18";
       jupyterhub = if isLinux then mkJupyterhub else unavailable "jupyterhub";
+      jupyterhub-5 = if isLinux then mkJupyterhub else unavailable "jupyterhub-5";
+      superset = if isLinux then mkSuperset "5" else unavailable "superset";
+      superset-4 = if isLinux then mkSuperset "4" else unavailable "superset-4";
+      superset-5 = if isLinux then mkSuperset "5" else unavailable "superset-5";
+      kafka = if isLinux then mkKafka else unavailable "kafka";
+      kafka-4 = if isLinux then mkKafka else unavailable "kafka-4";
+      spark = if isLinux then mkSpark else unavailable "spark";
+      spark-4 = if isLinux then mkSpark else unavailable "spark-4";
 
       # ====================================================================
       # Container images namespace (backward compatible)
@@ -387,21 +509,91 @@
       # ====================================================================
       containers = {
         airflow = if isLinux then mkAirflow else unavailable "airflow";
-        odoo = if isLinux then mkOdoo else unavailable "odoo";
+        airflow-3 = if isLinux then mkAirflow else unavailable "airflow-3";
+        odoo = if isLinux then mkOdoo "18" else unavailable "odoo";
+        odoo-15 = if isLinux then mkOdoo "15" else unavailable "odoo-15";
+        odoo-16 = if isLinux then mkOdoo "16" else unavailable "odoo-16";
+        odoo-17 = if isLinux then mkOdoo "17" else unavailable "odoo-17";
+        odoo-18 = if isLinux then mkOdoo "18" else unavailable "odoo-18";
         jupyterhub = if isLinux then mkJupyterhub else unavailable "jupyterhub";
+        jupyterhub-5 = if isLinux then mkJupyterhub else unavailable "jupyterhub-5";
+        superset = if isLinux then mkSuperset "5" else unavailable "superset";
+        superset-4 = if isLinux then mkSuperset "4" else unavailable "superset-4";
+        superset-5 = if isLinux then mkSuperset "5" else unavailable "superset-5";
         postgresql = if isLinux then mkPostgresql "17" else unavailable "postgresql";
         postgresql-16 = if isLinux then mkPostgresql "16" else unavailable "postgresql-16";
         postgresql-17 = if isLinux then mkPostgresql "17" else unavailable "postgresql-17";
         redis = if isLinux then mkRedis "7" else unavailable "redis";
         redis-7 = if isLinux then mkRedis "7" else unavailable "redis-7";
         redis-8 = if isLinux then mkRedis "8" else unavailable "redis-8";
+        kafka = if isLinux then mkKafka else unavailable "kafka";
+        kafka-4 = if isLinux then mkKafka else unavailable "kafka-4";
+        spark = if isLinux then mkSpark else unavailable "spark";
+        spark-4 = if isLinux then mkSpark else unavailable "spark-4";
       };
 
       # ====================================================================
-      # RUST PACKAGES (built with Crane)
+      # RUST PACKAGES
+      # Usage: nix build .#firestream
       # Usage: nix build .#wait-for-port
       # ====================================================================
+      firestream = pkgs.callPackage ./nix/package.nix {};
       wait-for-port = firestreamWithRust.packages.wait-for-port;
+      firestream-vib = firestreamWithRust.packages.firestream-vib;
+
+      # ====================================================================
+      # FLEET MANIFEST - Aggregated SBOM and source archives for all containers and artifacts
+      # Usage: nix build .#manifest
+      # Outputs: sbom-cyclonedx.json, sbom-spdx.json, manifest.json, source_index.json, sources/
+      # ====================================================================
+      manifest = if isLinux then
+        let
+          # Dynamically collect all artifacts tagged for inclusion
+          # This includes containers (isFirestreamContainer) and CLI tools (isFirestreamArtifact)
+          allArtifacts = firestreamLib.manifest.collectArtifacts {
+            # Container modules with metadata
+            airflow = airflowModule;
+            odoo = odooModule "18";
+            odoo-15 = odooModule "15";
+            odoo-16 = odooModule "16";
+            odoo-17 = odooModule "17";
+            jupyterhub = jupyterhubModule;
+            superset = supersetModule "5";
+            kafka = kafkaModule;
+            spark = sparkModule;
+            # Rust CLI tools (already wrapped with metadata in packages)
+            firestream-tui = firestreamWithRust.packages.firestream;
+            wait-for-port = firestreamWithRust.packages.wait-for-port;
+            firestream-vib = firestreamWithRust.packages.firestream-vib;
+          };
+        in firestreamLib.manifest.mkFleetManifest {
+          artifacts = allArtifacts;
+          fleetName = "firestream";
+          version = self.rev or self.dirtyRev or "dev";
+          archiveSources = true;
+        }
+      else unavailable "manifest";
+
+      # ====================================================================
+      # INDIVIDUAL SBOM ACCESS
+      # Usage: nix build .#sbom.airflow
+      # Outputs: metadata.json, sbom-cyclonedx.json, sbom-spdx.json, closure.json
+      # ====================================================================
+      sbom = if isLinux then {
+        airflow = airflowModule.metadata;
+        odoo = (odooModule "18").metadata;
+        odoo-15 = (odooModule "15").metadata;
+        odoo-16 = (odooModule "16").metadata;
+        odoo-17 = (odooModule "17").metadata;
+        odoo-18 = (odooModule "18").metadata;
+        jupyterhub = jupyterhubModule.metadata;
+        superset = (supersetModule "5").metadata;
+        kafka = kafkaModule.metadata;
+        spark = sparkModule.metadata;
+        firestream-tui = firestreamWithRust.packages.firestream.metadata;
+        wait-for-port = firestreamWithRust.packages.wait-for-port.metadata;
+        firestream-vib = firestreamWithRust.packages.firestream-vib.metadata;
+      } else {};
     });
 
     # Development shells with Darwin-specific configuration
@@ -425,11 +617,12 @@
     # Provides core library functions, environment generation, and application factory
     lib = forAllSystems (system: let
       pkgs = pkgsForSystem system;
-      firestream = import ./bin/nix/firestream { inherit pkgs; };
-      firestreamWithRust = import ./bin/nix/firestream {
+      firestream = import ./bin/nix/firestream {
         inherit pkgs system;
         inherit fenix crane;
+        inherit pyproject-nix uv2nix pyproject-build-systems;
       };
+      firestreamWithRust = firestream;
     in {
       # Complete Firestream module system
       firestream = firestream;
@@ -438,6 +631,7 @@
       mkAppModule = firestream.mkAppModule;
       mkContainerModule = firestream.mkContainerModule;
       mkPythonContainerModule = firestream.mkPythonContainerModule;
+      mkPythonWorkspaceContainer = firestream.mkPythonWorkspaceContainer;
 
       # Core libraries for custom modules
       coreLibs = firestream.coreLibs;
@@ -461,12 +655,20 @@
       };
     };
 
+    # Home Manager module for Firestream CLI/TUI
+    # Usage: imports = [ inputs.firestream.homeManagerModules.default ];
+    homeManagerModules.default = import ./bin/nix/firestream/home-manager/firestream.nix;
+    homeModules.default = import ./bin/nix/firestream/home-manager/firestream.nix;
+
     # Test suite for the Firestream module system
     # Build with: nix build .#checks.x86_64-linux.firestream-tests
     # Or run all checks: nix flake check
     checks = forAllSystems (system: let
       pkgs = pkgsForSystem system;
-      tests = import ./bin/nix/firestream/tests { inherit pkgs; };
+      tests = import ./bin/nix/firestream/tests {
+        inherit pkgs system;
+        inherit fenix crane;
+      };
     in {
       firestream-tests = tests.all;
 
@@ -497,6 +699,7 @@
     firestreamModules = { pkgs, system }: import ./bin/nix/firestream {
       inherit pkgs system;
       inherit fenix crane;
+      inherit pyproject-nix uv2nix pyproject-build-systems;
     };
 
     # Container modules - expose container flake paths for external use
@@ -514,13 +717,29 @@
 
     # Helper to import container modules from this flake
     # Usage: firestream.mkContainerFromPath { inherit pkgs system; path = firestream.containerModulePaths.airflow; }
+    # NOTE: This is deprecated in favor of using mkPythonWorkspaceContainer directly
+    # Kept for backward compatibility
     mkContainerFromPath = { pkgs, system, path }:
       let
-        repoSrc = filteredRepoSource pkgs;
-        containerFlake = import "${repoSrc}/${path}/flake.nix";
-        outputs = containerFlake.outputs {
-          inherit self nixpkgs flake-utils pyproject-nix uv2nix pyproject-build-systems;
+        lib = pkgs.lib;
+        fs = import ./bin/nix/firestream {
+          inherit pkgs system;
+          inherit fenix crane;
+          inherit pyproject-nix uv2nix pyproject-build-systems;
         };
-      in outputs.packages.${system} or {};
+        # Extract container name from path
+        containerName = builtins.baseNameOf path;
+        containerPath = ./. + "/${path}";
+        overridesPath = containerPath + "/overrides.nix";
+        hasOverrides = builtins.pathExists overridesPath;
+        overrides = if hasOverrides then import overridesPath { inherit pkgs lib; } else {};
+        module = fs.mkPythonWorkspaceContainer {
+          workspacePath = containerPath;
+          name = containerName;
+          version = "latest";
+          python = pkgs.python312;
+          inherit overrides;
+        };
+      in { inherit (module) dockerImage; default = module.dockerImage; };
   };
 }

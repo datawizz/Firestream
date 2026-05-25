@@ -1,5 +1,5 @@
 # Docker Compose for JupyterHub development/testing
-# Copyright Firestream. Apache-2.0 License.
+# Copyright Firestream. MIT License.
 #
 # Usage:
 #   docker compose up -d

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Kafka secrets loading logic - compatible with Bitnami _FILE pattern
-# Copyright Firestream. Apache-2.0 License.
+# Copyright Firestream. MIT License.
 # This file is sourced, not executed directly
 
 # List of environment variables that support _FILE suffix for secret loading

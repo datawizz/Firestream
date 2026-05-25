@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Load _FILE variables - compatible with Bitnami pattern
-# Copyright Firestream. Apache-2.0 License.
+# Copyright Firestream. MIT License.
 
 airflow_env_vars=(
   AIRFLOW_USERNAME

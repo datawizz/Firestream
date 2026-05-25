@@ -116,6 +116,7 @@ pub mod config;
 pub mod embedded;
 pub mod engine;
 pub mod error;
+pub mod odoo;
 pub mod puppeteer;
 pub mod spark;
 pub mod superset;
@@ -131,6 +132,7 @@ pub use engine::TemplateEngine;
 pub use error::{Result, TemplatizerError};
 
 // Re-export generators for convenient access
+pub use odoo::OdooGenerator;
 pub use puppeteer::PuppeteerGenerator;
 pub use spark::SparkGenerator;
 pub use superset::SupersetGenerator;
@@ -157,5 +159,6 @@ mod tests {
         assert_eq!(TemplateType::Spark.name(), "spark");
         assert_eq!(TemplateType::Puppeteer.name(), "puppeteer");
         assert_eq!(TemplateType::Superset.name(), "superset");
+        assert_eq!(TemplateType::Odoo.name(), "odoo");
     }
 }

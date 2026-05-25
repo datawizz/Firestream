@@ -1,5 +1,5 @@
 # metadata.nix - Container metadata and SBOM generation
-# Copyright Firestream. Apache-2.0 License.
+# Copyright Firestream. MIT License.
 #
 # This module provides functions for generating container metadata at Nix build time:
 # - metadata.json: Core container and build information
@@ -23,7 +23,7 @@
 #       flakeUri = "github:Cogent-Creation-Co/Firestream";
 #       flakeRevision = "def456...";
 #     };
-#   in metadata  # Derivation containing all 4 JSON files
+#   in metadata  # Derivation containing all metadata files
 
 { pkgs, lib, firestreamVibPkg }:
 
@@ -100,7 +100,7 @@ let
       cp opt/firestream/sbom-spdx.json $out/opt/firestream/
       cp opt/firestream/closure.json $out/opt/firestream/
 
-      # Verify all files were created
+      # Verify all base files were created
       for f in metadata.json sbom-cyclonedx.json sbom-spdx.json closure.json; do
         if [ ! -f "$out/opt/firestream/$f" ]; then
           echo "ERROR: Failed to generate $f"
@@ -114,7 +114,7 @@ let
 
     meta = with lib; {
       description = "Container metadata and SBOMs for ${name}";
-      license = licenses.asl20;
+      license = licenses.mit;
       maintainers = [ ];
     };
   };

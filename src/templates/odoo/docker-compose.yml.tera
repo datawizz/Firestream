@@ -1,0 +1,55 @@
+# {{ project_name }} — Docker Compose
+# Odoo {{ odoo_version_full }} with Firestream containers
+
+services:
+  postgresql:
+    image: firestream-postgresql:{{ postgresql_version }}
+    volumes:
+      - postgresql_data:/firestream/postgresql
+    environment:
+      POSTGRESQL_USERNAME: {{ database_user }}
+      POSTGRESQL_PASSWORD: ${POSTGRESQL_PASSWORD:-{{ database_password }}}
+      POSTGRESQL_DATABASE: {{ database_name }}
+      ALLOW_EMPTY_PASSWORD: "no"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U {{ database_user }} -d {{ database_name }}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    ports:
+      - "{{ postgresql_port }}:5432"
+
+  odoo:
+    image: firestream-odoo:{{ odoo_version_full }}
+    ports:
+      - '{{ odoo_http_port }}:8069'
+      - '{{ odoo_longpolling_port }}:8072'
+    volumes:
+      - odoo_data:/opt/odoo/data
+      - odoo_config:/opt/odoo/conf
+      - ./src/addons:/opt/odoo/addons
+    depends_on:
+      postgresql:
+        condition: service_healthy
+    environment:
+      - ODOO_DATABASE_HOST=postgresql
+      - ODOO_DATABASE_PORT_NUMBER=5432
+      - ODOO_DATABASE_USER={{ database_user }}
+      - ODOO_DATABASE_PASSWORD=${POSTGRESQL_PASSWORD:-{{ database_password }}}
+      - ODOO_DATABASE_NAME={{ database_name }}
+      - ODOO_EMAIL=${ODOO_EMAIL:-{{ odoo_admin_email }}}
+      - ODOO_PASSWORD=${ODOO_PASSWORD:-{{ odoo_admin_password }}}
+{% if demo_data %}
+      - ODOO_LOAD_DEMO_DATA=yes
+{% else %}
+      - ODOO_LOAD_DEMO_DATA=no
+{% endif %}
+      - ALLOW_EMPTY_PASSWORD=no
+
+volumes:
+  postgresql_data:
+    driver: local
+  odoo_data:
+    driver: local
+  odoo_config:
+    driver: local

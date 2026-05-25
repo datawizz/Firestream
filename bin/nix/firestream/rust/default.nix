@@ -1,5 +1,5 @@
 # Firestream Rust Module System
-# Copyright Firestream. Apache-2.0 License.
+# Copyright Firestream. MIT License.
 #
 # Orchestrates Fenix toolchain and Crane build system for Rust packages.
 # Provides deterministic, incremental Rust builds with dependency caching.

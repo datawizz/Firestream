@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Kafka validation logic - KRaft mode only (Kafka 4.0+)
-# Copyright Firestream. Apache-2.0 License.
+# Copyright Firestream. MIT License.
 # This file is sourced, not executed directly
 
 info "Validating settings in KAFKA_* env vars..."

@@ -36,6 +36,7 @@ pub enum ResourceType {
     Data,
     Build,
     Secret,
+    Container,
 }
 
 impl std::fmt::Display for ResourceType {
@@ -47,6 +48,7 @@ impl std::fmt::Display for ResourceType {
             ResourceType::Data => write!(f, "data"),
             ResourceType::Build => write!(f, "build"),
             ResourceType::Secret => write!(f, "secret"),
+            ResourceType::Container => write!(f, "container"),
         }
     }
 }

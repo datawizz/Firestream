@@ -1,5 +1,5 @@
 # Airflow initialization logic
-# Copyright Firestream. Apache-2.0 License.
+# Copyright Firestream. MIT License.
 # This file is sourced, not executed directly
 
 # Helper function for retry_while - checks if admin user exists
@@ -53,7 +53,7 @@ case "$AIRFLOW_COMPONENT_TYPE" in
     if is_boolean_yes "$AIRFLOW_SKIP_DB_SETUP"; then
       info "Skipping DB setup, waiting for migrations..."
       retry_while "airflow db check-migrations --migration-wait-timeout=$AIRFLOW_DB_MIGRATE_TIMEOUT" --tries 30 --sleep 10
-    elif ! airflow db check-migrations --migration-wait-timeout=0 2>&1 | grep -v DEBUG; then
+    elif ! airflow db check-migrations --migration-wait-timeout=0 >/dev/null 2>&1; then
       info "Initializing database..."
       airflow db $db_init_cmd
 

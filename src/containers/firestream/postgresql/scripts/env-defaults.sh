@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # PostgreSQL environment variable defaults - matching Bitnami exactly
-# Copyright Firestream. Apache-2.0 License.
+# Copyright Firestream. MIT License.
 
 # Base directories
 export POSTGRESQL_BASE_DIR="${POSTGRESQL_BASE_DIR:-/opt/firestream/postgresql}"

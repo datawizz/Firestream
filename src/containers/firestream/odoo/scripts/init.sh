@@ -1,5 +1,5 @@
 # Odoo initialization logic
-# Copyright Firestream. Apache-2.0 License.
+# Copyright Firestream. MIT License.
 # This file is sourced, not executed directly
 #
 # Handles database initialization, module installation, and admin user setup

@@ -1,5 +1,5 @@
 # Odoo Container Module - Using Firestream Factories
-# Copyright Firestream. Apache-2.0 License.
+# Copyright Firestream. MIT License.
 #
 # This module defines the Odoo container using mkPythonContainerModule.
 # Much simpler than manual implementation - the factory handles:
@@ -110,8 +110,8 @@ let
       local sql="''${1:?SQL statement required}"
       local host="''${ODOO_DATABASE_HOST:-postgresql}"
       local port="''${ODOO_DATABASE_PORT_NUMBER:-5432}"
-      local db="''${ODOO_DATABASE_NAME:-bitnami_odoo}"
-      local user="''${ODOO_DATABASE_USER:-bn_odoo}"
+      local db="''${ODOO_DATABASE_NAME:-firestream_odoo}"
+      local user="''${ODOO_DATABASE_USER:-firestream}"
 
       PGPASSWORD="''${ODOO_DATABASE_PASSWORD:-}" ${pkgs.postgresql}/bin/psql \
         -h "$host" \
@@ -128,7 +128,7 @@ let
     #   $@ - Arguments to pass to odoo-bin
     #########################
     odoo_execute() {
-      local config="''${ODOO_CONF_FILE:-/opt/bitnami/odoo/conf/odoo.conf}"
+      local config="''${ODOO_CONF_FILE:-/opt/odoo/conf/odoo.conf}"
 
       debug "Executing: python /opt/odoo/odoo-bin --config=$config --logfile= --pidfile= --stop-after-init $*"
       python /opt/odoo/odoo-bin \
@@ -148,7 +148,7 @@ let
     odoo_conf_set() {
       local key="''${1:?key required}"
       local value="''${2:?value required}"
-      local conf_file="''${ODOO_CONF_FILE:-/opt/bitnami/odoo/conf/odoo.conf}"
+      local conf_file="''${ODOO_CONF_FILE:-/opt/odoo/conf/odoo.conf}"
 
       debug "Setting $key = $value in $conf_file"
 
@@ -175,7 +175,7 @@ let
     #########################
     odoo_conf_get() {
       local key="''${1:?key required}"
-      local conf_file="''${ODOO_CONF_FILE:-/opt/bitnami/odoo/conf/odoo.conf}"
+      local conf_file="''${ODOO_CONF_FILE:-/opt/odoo/conf/odoo.conf}"
 
       grep "^[[:space:]]*$key[[:space:]]*=" "$conf_file" 2>/dev/null | \
         ${pkgs.gnused}/bin/sed "s|^[[:space:]]*$key[[:space:]]*=[[:space:]]*||" | \
@@ -258,6 +258,7 @@ let
     nodePackages.rtlcss
     nodePackages.less
     fontconfig
+    firestream.waitForPortPkg  # Required by init scripts for database readiness checks
   ];
 
   # Odoo config template with {{PLACEHOLDER}} syntax
@@ -304,30 +305,30 @@ in firestream.mkPythonContainerModule {
   version = odooVersion;
   inherit pythonEnv python;
 
-  # Paths configuration (Bitnami compatibility)
+  # Paths configuration
   paths = {
-    base = "/opt/bitnami/odoo";
-    conf = "/opt/bitnami/odoo/conf";
-    data = "/bitnami/odoo/data";
-    logs = "/opt/bitnami/odoo/log";
+    base = "/opt/odoo";
+    conf = "/opt/odoo/conf";
+    data = "/opt/odoo/data";
+    logs = "/opt/odoo/log";
   };
 
   # Environment variables with defaults
   envVars = {
     # Paths
-    ODOO_BASE_DIR = "/opt/bitnami/odoo";
-    ODOO_BIN_DIR = "/opt/bitnami/odoo/bin";
-    ODOO_CONF_DIR = "/opt/bitnami/odoo/conf";
-    ODOO_CONF_FILE = "/opt/bitnami/odoo/conf/odoo.conf";
-    ODOO_DATA_DIR = "/opt/bitnami/odoo/data";
-    ODOO_ADDONS_DIR = "/opt/bitnami/odoo/addons";
-    ODOO_TMP_DIR = "/opt/bitnami/odoo/tmp";
-    ODOO_PID_FILE = "/opt/bitnami/odoo/tmp/odoo.pid";
-    ODOO_LOGS_DIR = "/opt/bitnami/odoo/log";
-    ODOO_LOG_FILE = "/opt/bitnami/odoo/log/odoo-server.log";
+    ODOO_BASE_DIR = "/opt/odoo";
+    ODOO_BIN_DIR = "/opt/odoo/bin";
+    ODOO_CONF_DIR = "/opt/odoo/conf";
+    ODOO_CONF_FILE = "/opt/odoo/conf/odoo.conf";
+    ODOO_DATA_DIR = "/opt/odoo/data";
+    ODOO_ADDONS_DIR = "/opt/odoo/addons";
+    ODOO_TMP_DIR = "/opt/odoo/tmp";
+    ODOO_PID_FILE = "/opt/odoo/tmp/odoo.pid";
+    ODOO_LOGS_DIR = "/opt/odoo/log";
+    ODOO_LOG_FILE = "/opt/odoo/log/odoo-server.log";
 
     # Volume paths
-    ODOO_VOLUME_DIR = "/bitnami/odoo";
+    ODOO_VOLUME_DIR = "/opt/odoo";
 
     # User/group
     ODOO_DAEMON_USER = "odoo";
@@ -344,8 +345,8 @@ in firestream.mkPythonContainerModule {
     ODOO_LIST_DB = "no";
 
     # Odoo credentials
-    ODOO_EMAIL = "user@example.com";
-    ODOO_PASSWORD = "bitnami";
+    ODOO_EMAIL = "admin";
+    ODOO_PASSWORD = "admin";
 
     # SMTP configuration
     ODOO_SMTP_HOST = "";
@@ -357,8 +358,8 @@ in firestream.mkPythonContainerModule {
     # Database configuration
     ODOO_DATABASE_HOST = "postgresql";
     ODOO_DATABASE_PORT_NUMBER = "5432";
-    ODOO_DATABASE_NAME = "bitnami_odoo";
-    ODOO_DATABASE_USER = "bn_odoo";
+    ODOO_DATABASE_NAME = "firestream_odoo";
+    ODOO_DATABASE_USER = "firestream";
     ODOO_DATABASE_PASSWORD = "";
     ODOO_DATABASE_FILTER = "";
 
@@ -399,7 +400,7 @@ in firestream.mkPythonContainerModule {
   # Runtime directories with declarative schema
   runtimeDirs = {
     home = {
-      path = "/opt/bitnami/odoo";
+      path = "/opt/odoo";
       type = "conf";
       persistence = "ephemeral";
       mode = "0755";
@@ -408,7 +409,7 @@ in firestream.mkPythonContainerModule {
       description = "Odoo home directory";
     };
     conf = {
-      path = "/opt/bitnami/odoo/conf";
+      path = "/opt/odoo/conf";
       type = "conf";
       persistence = "persistent";
       mode = "0755";
@@ -417,7 +418,7 @@ in firestream.mkPythonContainerModule {
       description = "Odoo configuration directory";
     };
     data = {
-      path = "/opt/bitnami/odoo/data";
+      path = "/opt/odoo/data";
       type = "data";
       persistence = "persistent";
       mode = "0755";
@@ -426,7 +427,7 @@ in firestream.mkPythonContainerModule {
       description = "Odoo data/filestore directory";
     };
     addons = {
-      path = "/opt/bitnami/odoo/addons";
+      path = "/opt/odoo/addons";
       type = "data";
       persistence = "persistent";
       mode = "0755";
@@ -435,7 +436,7 @@ in firestream.mkPythonContainerModule {
       description = "Custom Odoo addons/modules";
     };
     logs = {
-      path = "/opt/bitnami/odoo/log";
+      path = "/opt/odoo/log";
       type = "logs";
       persistence = "ephemeral";
       mode = "0755";
@@ -444,20 +445,20 @@ in firestream.mkPythonContainerModule {
       description = "Odoo log files";
     };
     tmp = {
-      path = "/opt/bitnami/odoo/tmp";
+      path = "/opt/odoo/tmp";
       type = "tmp";
       persistence = "ephemeral";
       mode = "1777";
       description = "Temporary files";
     };
     volume = {
-      path = "/bitnami/odoo";
+      path = "/opt/odoo";
       type = "data";
       persistence = "persistent";
       mode = "0755";
       owner = 1001;
       group = 1001;
-      description = "Bitnami volume mount point";
+      description = "Odoo volume mount point";
     };
     bitnamiPython = {
       path = "/bitnami/python";
@@ -481,7 +482,7 @@ in firestream.mkPythonContainerModule {
 
   # Build-time: Static config templates
   prepopulateFiles = {
-    "/opt/bitnami/odoo/conf/odoo.conf.template" = odooConfigTemplate;
+    "/opt/odoo/conf/odoo.conf.template" = odooConfigTemplate;
   };
 
   # Validation function
@@ -504,21 +505,21 @@ in firestream.mkPythonContainerModule {
     log_level_val="$(is_boolean_yes "$BITNAMI_DEBUG" && echo 'debug' || echo 'info')"
 
     # Process config template if exists
-    local conf_dir="''${ODOO_CONF_DIR:-/opt/bitnami/odoo/conf}"
+    local conf_dir="''${ODOO_CONF_DIR:-/opt/odoo/conf}"
     local conf_file="''${ODOO_CONF_FILE:-$conf_dir/odoo.conf}"
 
     if [[ -f "$conf_dir/odoo.conf.template" ]] && [[ ! -f "$conf_file" ]]; then
       info "Generating odoo.conf from template..."
       ${pkgs.gnused}/bin/sed \
-        -e "s|{{ODOO_ADDONS_DIR}}|''${ODOO_ADDONS_DIR:-/opt/bitnami/odoo/addons}|g" \
-        -e "s|{{ODOO_PASSWORD}}|''${ODOO_PASSWORD:-bitnami}|g" \
-        -e "s|{{ODOO_DATA_DIR}}|''${ODOO_DATA_DIR:-/opt/bitnami/odoo/data}|g" \
-        -e "s|{{ODOO_LOG_FILE}}|''${ODOO_LOG_FILE:-/opt/bitnami/odoo/log/odoo-server.log}|g" \
+        -e "s|{{ODOO_ADDONS_DIR}}|''${ODOO_ADDONS_DIR:-/opt/odoo/addons}|g" \
+        -e "s|{{ODOO_PASSWORD}}|''${ODOO_PASSWORD:-admin}|g" \
+        -e "s|{{ODOO_DATA_DIR}}|''${ODOO_DATA_DIR:-/opt/odoo/data}|g" \
+        -e "s|{{ODOO_LOG_FILE}}|''${ODOO_LOG_FILE:-/opt/odoo/log/odoo-server.log}|g" \
         -e "s|{{ODOO_DATABASE_HOST}}|''${ODOO_DATABASE_HOST:-postgresql}|g" \
-        -e "s|{{ODOO_DATABASE_NAME}}|''${ODOO_DATABASE_NAME:-bitnami_odoo}|g" \
+        -e "s|{{ODOO_DATABASE_NAME}}|''${ODOO_DATABASE_NAME:-firestream_odoo}|g" \
         -e "s|{{ODOO_DATABASE_PASSWORD}}|''${ODOO_DATABASE_PASSWORD:-}|g" \
         -e "s|{{ODOO_DATABASE_PORT_NUMBER}}|''${ODOO_DATABASE_PORT_NUMBER:-5432}|g" \
-        -e "s|{{ODOO_DATABASE_USER}}|''${ODOO_DATABASE_USER:-bn_odoo}|g" \
+        -e "s|{{ODOO_DATABASE_USER}}|''${ODOO_DATABASE_USER:-firestream}|g" \
         -e "s|{{ODOO_PORT_NUMBER}}|''${ODOO_PORT_NUMBER:-8069}|g" \
         -e "s|{{ODOO_LONGPOLLING_PORT_NUMBER}}|''${ODOO_LONGPOLLING_PORT_NUMBER:-8072}|g" \
         -e "s|{{ODOO_LIST_DB}}|''${list_db_val}|g" \
@@ -546,8 +547,8 @@ in firestream.mkPythonContainerModule {
 
     info "Starting Odoo ${odooVersion}..."
 
-    local conf_file="''${ODOO_CONF_FILE:-/opt/bitnami/odoo/conf/odoo.conf}"
-    local pid_file="''${ODOO_PID_FILE:-/opt/bitnami/odoo/tmp/odoo.pid}"
+    conf_file="''${ODOO_CONF_FILE:-/opt/odoo/conf/odoo.conf}"
+    pid_file="''${ODOO_PID_FILE:-/opt/odoo/tmp/odoo.pid}"
 
     # Run Odoo
     exec python /opt/odoo/odoo-bin \
@@ -558,7 +559,7 @@ in firestream.mkPythonContainerModule {
   inherit systemDeps runtimeBinDeps;
 
   exposedPorts = [ 8069 8072 ];
-  volumes = [ "/bitnami/odoo" "/bitnami/python" "/docker-entrypoint-init.d" ];
+  volumes = [ "/opt/odoo/data" "/opt/odoo/addons" "/bitnami/python" "/docker-entrypoint-init.d" ];
 
   user = {
     name = "odoo";

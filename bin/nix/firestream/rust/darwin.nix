@@ -1,5 +1,5 @@
 # Darwin-specific Rust Configuration
-# Copyright Firestream. Apache-2.0 License.
+# Copyright Firestream. MIT License.
 #
 # Provides macOS SDK configuration for Rust builds on Darwin.
 #

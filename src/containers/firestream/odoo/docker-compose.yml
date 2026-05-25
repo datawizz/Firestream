@@ -1,43 +1,43 @@
 # Firestream Odoo - Docker Compose
-# Uses Nix-based Odoo container with official PostgreSQL
+# Uses Nix-based Odoo container with Firestream PostgreSQL
+# Set ODOO_VERSION to select version (default: 18)
 
 services:
   postgresql:
-    image: postgres:16
+    image: firestream-postgresql:17
     volumes:
-      - 'postgresql_data:/var/lib/postgresql/data'
+      - 'postgresql_data:/firestream/postgresql'
     environment:
-      - POSTGRES_USER=bn_odoo
-      - POSTGRES_PASSWORD=odoo
-      - POSTGRES_DB=bitnami_odoo
+      POSTGRESQL_USERNAME: firestream
+      POSTGRESQL_PASSWORD: firestream
+      POSTGRESQL_DATABASE: firestream_odoo
+      ALLOW_EMPTY_PASSWORD: "no"
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U bn_odoo -d bitnami_odoo"]
+      test: ["CMD-SHELL", "pg_isready -U firestream -d firestream_odoo"]
       interval: 10s
       timeout: 5s
       retries: 5
 
   odoo:
-    build:
-      context: ../../../..
-      dockerfile: src/containers/firestream/odoo/18/debian-12/Dockerfile
-    image: firestream-odoo:18
+    image: firestream-odoo:${ODOO_VERSION:-18}.0
+    container_name: firestream-odoo-${ODOO_VERSION:-18}
     ports:
       - '8069:8069'
       - '8072:8072'
     volumes:
-      - 'odoo_data:/var/odoo/data'
-      - 'odoo_addons:/var/odoo/custom-addons'
-      - 'odoo_config:/var/odoo/config'
+      - 'odoo_data:/opt/odoo/data'
+      - 'odoo_addons:/opt/odoo/addons'
+      - 'odoo_config:/opt/odoo/conf'
     depends_on:
       postgresql:
         condition: service_healthy
     environment:
       - ODOO_DATABASE_HOST=postgresql
       - ODOO_DATABASE_PORT_NUMBER=5432
-      - ODOO_DATABASE_USER=bn_odoo
-      - ODOO_DATABASE_PASSWORD=odoo
-      - ODOO_DATABASE_NAME=bitnami_odoo
-      - ODOO_EMAIL=admin@example.com
+      - ODOO_DATABASE_USER=firestream
+      - ODOO_DATABASE_PASSWORD=firestream
+      - ODOO_DATABASE_NAME=firestream_odoo
+      - ODOO_EMAIL=admin
       - ODOO_PASSWORD=admin
 
 volumes:

@@ -3,19 +3,23 @@ name = "firestream-tui"
 version = "0.1.0"
 description = "Terminal User Interface for Firestream"
 authors = ["Datawizz <36938650+datawizz@users.noreply.github.com>"]
-license = ""
+license = "MIT"
 edition = "2024"
 
 [lib]
 name = "firestream_tui"
 
 [[bin]]
-name = "firestream-tui"
+name = "firestream"
 path = "src/main.rs"
 
 [dependencies]
 # Main library - TUI imports all functionality through firestream
 firestream = { workspace = true }
+
+# Container build and management
+nix-container-builder = { workspace = true }
+docker-manager = { workspace = true }
 
 # TUI-specific dependencies
 crossterm = { workspace = true }
@@ -25,6 +29,7 @@ tokio = { workspace = true }
 color-eyre = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
+serde_yaml = { workspace = true }
 chrono = { workspace = true }
 thiserror = { workspace = true }
 uuid = { workspace = true }
@@ -32,4 +37,5 @@ tracing = { workspace = true }
 tracing-subscriber = { workspace = true }
 dirs = { workspace = true }
 tera = { workspace = true }
+tokio-util = "0.7"
 keyring = "2.0"

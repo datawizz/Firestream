@@ -1,7 +1,7 @@
 # Firestream JupyterHub Container
 # Multi-stage build: Nix -> Debian minimal runtime
 #
-# Copyright Firestream. Apache-2.0 License.
+# Copyright Firestream. MIT License.
 
 # =============================================================================
 # Stage 1: Nix builder
@@ -57,55 +57,50 @@ ENV LANG=en_US.UTF-8 \
 # Copy Nix store from builder
 COPY --from=builder /nix-export/nix /nix
 
-# Create jupyterhub user (Bitnami compatible UID 1001)
+# Create jupyterhub user (Firestream UID 1001)
 RUN groupadd -r -g 1001 jupyterhub && \
-    useradd -r -u 1001 -g jupyterhub -d /opt/bitnami/jupyterhub -s /bin/bash jupyterhub
+    useradd -r -u 1001 -g jupyterhub -d /opt/jupyterhub -s /bin/bash jupyterhub
 
-# Create directory structure (matching Bitnami conventions)
+# Create directory structure (Firestream convention)
 RUN mkdir -p \
-    /opt/bitnami/jupyterhub/etc \
-    /opt/bitnami/jupyterhub/data \
-    /opt/bitnami/jupyterhub/log \
-    /opt/bitnami/jupyterhub/tmp \
-    /opt/bitnami/scripts/jupyterhub \
-    /opt/bitnami/scripts/jupyterhub/bitnami-templates \
-    /bitnami/jupyterhub \
-    /docker-entrypoint-init.d \
-    /firestream/jupyterhub/.state
+    /opt/jupyterhub/config \
+    /opt/jupyterhub/logs \
+    /opt/jupyterhub/tmp \
+    /opt/firestream/scripts/jupyterhub \
+    /firestream/jupyterhub/data \
+    /firestream/jupyterhub/.state \
+    /docker-entrypoint-init.d
 
 # Copy rootfs (scripts, templates, etc.)
 COPY src/containers/firestream/jupyterhub/5/debian-12/rootfs/ /
 
 # Set up symlink to Nix runtime (single glob to find the runtime env)
 RUN ln -s /nix/store/*-jupyterhub-runtime-env /opt/nix-env && \
-    chmod +x /opt/bitnami/scripts/jupyterhub/*.sh \
-             /opt/bitnami/scripts/*.sh \
+    chmod +x /opt/firestream/scripts/jupyterhub/*.sh \
              /post-init.sh 2>/dev/null || true
 
 # Set ownership
 RUN chown -R 1001:1001 \
-    /opt/bitnami/jupyterhub \
-    /bitnami/jupyterhub \
-    /docker-entrypoint-init.d \
-    /firestream && \
-    chmod -R 775 /opt/bitnami/jupyterhub /bitnami/jupyterhub
+    /opt/jupyterhub \
+    /firestream/jupyterhub \
+    /docker-entrypoint-init.d && \
+    chmod -R 775 /opt/jupyterhub /firestream/jupyterhub
 
 # Environment
 ENV PATH="/opt/nix-env/bin:$PATH" \
-    BITNAMI_APP_NAME="jupyterhub" \
     APP_VERSION="5.3.0" \
-    JUPYTERHUB_BASE_DIR="/opt/bitnami/jupyterhub" \
-    JUPYTERHUB_CONF_DIR="/opt/bitnami/jupyterhub/etc" \
-    JUPYTERHUB_DATA_DIR="/opt/bitnami/jupyterhub/data" \
-    JUPYTERHUB_LOGS_DIR="/opt/bitnami/jupyterhub/log" \
-    JUPYTERHUB_TMP_DIR="/opt/bitnami/jupyterhub/tmp"
+    JUPYTERHUB_BASE_DIR="/opt/jupyterhub" \
+    JUPYTERHUB_CONF_DIR="/opt/jupyterhub/config" \
+    JUPYTERHUB_DATA_DIR="/firestream/jupyterhub/data" \
+    JUPYTERHUB_LOGS_DIR="/opt/jupyterhub/logs" \
+    JUPYTERHUB_TMP_DIR="/opt/jupyterhub/tmp"
 
-WORKDIR /opt/bitnami/jupyterhub
+WORKDIR /opt/jupyterhub
 USER 1001
 
 EXPOSE 8000 8081
 
-VOLUME ["/bitnami/jupyterhub", "/docker-entrypoint-init.d"]
+VOLUME ["/firestream/jupyterhub", "/docker-entrypoint-init.d"]
 
-ENTRYPOINT ["/opt/bitnami/scripts/jupyterhub/entrypoint.sh"]
-CMD ["/opt/bitnami/scripts/jupyterhub/run.sh"]
+ENTRYPOINT ["/opt/firestream/scripts/jupyterhub/entrypoint.sh"]
+CMD ["/opt/firestream/scripts/jupyterhub/run.sh"]

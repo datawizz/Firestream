@@ -1,72 +1,98 @@
-# Copyright Broadcom, Inc. All Rights Reserved.
-# SPDX-License-Identifier: APACHE-2.0
+# Firestream Airflow - Docker Compose for Local Development
+# Copyright Firestream. MIT License.
+#
+# Usage:
+#   1. Build images: make airflow-build
+#   2. Start all services: make airflow-start
+#   3. Access Airflow at http://localhost:8090
+#
+# Default credentials: admin / admin
 
-name: firestream
+name: firestream-airflow
+
+x-airflow-env: &airflow-env
+  AIRFLOW_DATABASE_NAME: airflow
+  AIRFLOW_DATABASE_USERNAME: airflow
+  AIRFLOW_DATABASE_PASSWORD: airflow
+  AIRFLOW_EXECUTOR: CeleryExecutor
+  AIRFLOW_APISERVER_HOST: airflow
+  AIRFLOW_STANDALONE_DAG_PROCESSOR: "yes"
+  AIRFLOW_USERNAME: admin
+  AIRFLOW_PASSWORD: admin
+  # Shared secrets - all services must use the same keys
+  AIRFLOW_FERNET_KEY: ZmlyZXN0cmVhbS1kZXYtZmVybmV0LWtleQ==
+  AIRFLOW_WEBSERVER_SECRET_KEY: firestream-dev-webserver
+  AIRFLOW_APISERVER_SECRET_KEY: firestream-dev-apiserver
+  AIRFLOW_JWT_SECRET_KEY: firestream-dev-jwt-secret
+
+x-airflow-common: &airflow-common
+  image: firestream-airflow:3.0.3
+  depends_on:
+    postgresql:
+      condition: service_healthy
+    redis:
+      condition: service_healthy
 
 services:
   postgresql:
-    image: docker.io/bitnami/postgresql:latest
+    image: firestream-postgresql:17
     volumes:
-      - 'postgresql_data:/bitnami/postgresql'
+      - postgresql_data:/firestream/postgresql
     environment:
-      - POSTGRESQL_DATABASE=bitnami_airflow
-      - POSTGRESQL_USERNAME=bn_airflow
-      - POSTGRESQL_PASSWORD=bitnami1
-      # ALLOW_EMPTY_PASSWORD is recommended only for development.
-      - ALLOW_EMPTY_PASSWORD=yes
+      POSTGRESQL_DATABASE: airflow
+      POSTGRESQL_USERNAME: airflow
+      POSTGRESQL_PASSWORD: airflow
+      ALLOW_EMPTY_PASSWORD: "no"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U airflow -d airflow"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
   redis:
-    image: docker.io/bitnami/redis:latest
+    image: firestream-redis:7
     volumes:
-      - 'redis_data:/bitnami'
+      - redis_data:/firestream/redis/data
     environment:
-      # ALLOW_EMPTY_PASSWORD is recommended only for development.
-      - ALLOW_EMPTY_PASSWORD=yes
+      ALLOW_EMPTY_PASSWORD: "yes"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
   airflow-scheduler:
-    image: firestream-airflow:3.0.3
+    <<: *airflow-common
     environment:
-      - AIRFLOW_COMPONENT_TYPE=scheduler
-      - AIRFLOW_DATABASE_NAME=bitnami_airflow
-      - AIRFLOW_DATABASE_USERNAME=bn_airflow
-      - AIRFLOW_DATABASE_PASSWORD=bitnami1
-      - AIRFLOW_EXECUTOR=CeleryExecutor
-      - AIRFLOW_APISERVER_HOST=airflow
+      <<: *airflow-env
+      AIRFLOW_COMPONENT_TYPE: scheduler
+
   airflow-triggerer:
-    image: firestream-airflow:3.0.3
+    <<: *airflow-common
     environment:
-      - AIRFLOW_COMPONENT_TYPE=triggerer
-      - AIRFLOW_DATABASE_NAME=bitnami_airflow
-      - AIRFLOW_DATABASE_USERNAME=bn_airflow
-      - AIRFLOW_DATABASE_PASSWORD=bitnami1
-      - AIRFLOW_EXECUTOR=CeleryExecutor
-      - AIRFLOW_APISERVER_HOST=airflow
+      <<: *airflow-env
+      AIRFLOW_COMPONENT_TYPE: triggerer
+
   airflow-dag-processor:
-    image: firestream-airflow:3.0.3
+    <<: *airflow-common
     environment:
-      - AIRFLOW_COMPONENT_TYPE=dag-processor
-      - AIRFLOW_DATABASE_NAME=bitnami_airflow
-      - AIRFLOW_DATABASE_USERNAME=bn_airflow
-      - AIRFLOW_DATABASE_PASSWORD=bitnami1
-      - AIRFLOW_EXECUTOR=CeleryExecutor
-      - AIRFLOW_APISERVER_HOST=airflow
+      <<: *airflow-env
+      AIRFLOW_COMPONENT_TYPE: dag-processor
+
   airflow-worker:
-    image: firestream-airflow:3.0.3
+    <<: *airflow-common
     environment:
-      - AIRFLOW_COMPONENT_TYPE=worker
-      - AIRFLOW_DATABASE_NAME=bitnami_airflow
-      - AIRFLOW_DATABASE_USERNAME=bn_airflow
-      - AIRFLOW_DATABASE_PASSWORD=bitnami1
-      - AIRFLOW_EXECUTOR=CeleryExecutor
-      - AIRFLOW_APISERVER_HOST=airflow
+      <<: *airflow-env
+      AIRFLOW_COMPONENT_TYPE: worker
+
   airflow:
-    image: firestream-airflow:3.0.3
+    <<: *airflow-common
     environment:
-      - AIRFLOW_DATABASE_NAME=bitnami_airflow
-      - AIRFLOW_DATABASE_USERNAME=bn_airflow
-      - AIRFLOW_DATABASE_PASSWORD=bitnami1
-      - AIRFLOW_EXECUTOR=CeleryExecutor
-      - AIRFLOW_APISERVER_HOST=0.0.0.0
+      <<: *airflow-env
+      AIRFLOW_APISERVER_HOST: "0.0.0.0"
     ports:
       - '8090:8080'
+
 volumes:
   postgresql_data:
     driver: local

@@ -1,5 +1,5 @@
 # Container Module Factory
-# Copyright Firestream. Apache-2.0 License.
+# Copyright Firestream. MIT License.
 #
 # This module provides mkContainerModule - a factory function that generates
 # complete container modules with Docker image building capabilities.
@@ -106,6 +106,7 @@ in
     # Development shell extras
     devShellPackages ? [],    # Extra packages for dev shell
     devShellHook ? "",        # Additional shell hook for dev shell
+
   }:
   let
     # Create the application module
@@ -117,7 +118,8 @@ in
       extraDeps = extraDeps ++ runtimeBinDeps;
     };
 
-    # Combine all runtime dependencies
+    # MUST KEEP: allRuntimeDeps is used by devShell (line 343)
+    # devShell doesn't need passwdFile/groupFile/shadowFile
     allRuntimeDeps = lib.lists.unique (
       appModule.runtimeDeps ++ systemDeps ++ runtimeBinDeps ++ [
         pkgs.bashInteractive
@@ -127,11 +129,86 @@ in
       ]
     );
 
+    # Create /etc/passwd as a proper Nix derivation (idiomatic approach)
+    passwdFile = pkgs.writeTextDir "etc/passwd" ''
+root:x:0:0:root:/root:/bin/bash
+nobody:x:65534:65534:nobody:/nonexistent:/usr/sbin/nologin
+${user.name}:x:${toString user.uid}:${toString user.gid}:${user.name}:/home/${user.name}:/bin/bash
+'';
+
+    # Create /etc/group as a proper Nix derivation
+    groupFile = pkgs.writeTextDir "etc/group" ''
+root:x:0:
+nobody:x:65534:
+${user.group}:x:${toString user.gid}:
+'';
+
+    # Create /etc/shadow for completeness (locked passwords)
+    shadowFile = pkgs.writeTextDir "etc/shadow" ''
+root:!x:::::::
+nobody:!x:::::::
+${user.name}:!:::::::
+'';
+
+    # Get the entrypoint, optionally wrapped
+    finalEntrypoint =
+      if entrypointWrapper != null
+      then entrypointWrapper appModule.scripts.entrypoint
+      else appModule.scripts.entrypoint;
+
+    # Build custom scripts
+    customScriptPackages = lib.mapAttrsToList (
+      scriptName: scriptContent:
+        pkgs.writeScriptBin scriptName scriptContent
+    ) customScripts;
+
+    # ========================================================================
+    # SINGLE SOURCE OF TRUTH: imageContents
+    # ========================================================================
+    # All packages that go into the container, EXCLUDING containerMetadata
+    # (added separately to avoid circular dependency).
+    #
+    # ORDER MATTERS: buildLayeredImage uses list order for layer assignment
+    # Keep grouping: system fundamentals → deps → app scripts → config
+    imageContents = [
+      # Layer group 1: System fundamentals (rarely change)
+      passwdFile
+      groupFile
+      shadowFile
+      pkgs.bashInteractive
+      pkgs.cacert
+      pkgs.stdenv.cc.cc.lib
+      waitForPortPkg
+    ] ++ systemDeps ++ runtimeBinDeps ++ extraDeps ++ [
+      # Layer group 2: App scripts (change with code updates)
+      appModule.scripts.envDefaults
+      appModule.scripts.fileLoader
+      appModule.scripts.lib
+      finalEntrypoint           # CRITICAL: was missing from metadataEnv
+      appModule.scripts.setup
+      appModule.scripts.run
+    ] ++ customScriptPackages   # CRITICAL: was missing from metadataEnv
+    ++ [
+      # Layer group 3: Config templates (change frequently)
+      appModule.prepopulatedEnv
+    ];
+
+    # symlinkJoin is lighter-weight than buildEnv
+    # Only purpose: give exportReferencesGraph a single derivation whose closure = imageContents
+    contentsForMetadata = pkgs.symlinkJoin {
+      name = "${name}-metadata-source";
+      paths = imageContents;
+    };
+
     # Generate container metadata files (SBOM, closure, etc.)
     # These are generated at Nix build time and included in the container image
+    #
+    # NOTE: We use contentsForMetadata as mainDrv to capture the FULL container closure,
+    # including all system dependencies, libraries, and runtime tools.
+    # This ensures SBOM accurately reflects actual container contents.
     containerMetadata = metadataLib.mkContainerMetadata {
       inherit name version;
-      mainDrv = appModule.prepopulatedEnv;  # Use prepopulated env as representative derivation
+      mainDrv = contentsForMetadata;  # Uses same packages as container
       exposedPorts = exposedPorts;
       user = "${toString user.uid}:${toString user.gid}";
       workdir = paths.base;
@@ -155,50 +232,13 @@ in
       }) ([ paths.data paths.logs ] ++ volumes)
     );
 
-    # Get the entrypoint, optionally wrapped
-    finalEntrypoint =
-      if entrypointWrapper != null
-      then entrypointWrapper appModule.scripts.entrypoint
-      else appModule.scripts.entrypoint;
-
-    # Build custom scripts
-    customScriptPackages = lib.mapAttrsToList (
-      scriptName: scriptContent:
-        pkgs.writeScriptBin scriptName scriptContent
-    ) customScripts;
-
-    # Create /etc/passwd as a proper Nix derivation (idiomatic approach)
-    passwdFile = pkgs.writeTextDir "etc/passwd" ''
-root:x:0:0:root:/root:/bin/bash
-nobody:x:65534:65534:nobody:/nonexistent:/usr/sbin/nologin
-${user.name}:x:${toString user.uid}:${toString user.gid}:${user.name}:/home/${user.name}:/bin/bash
-'';
-
-    # Create /etc/group as a proper Nix derivation
-    groupFile = pkgs.writeTextDir "etc/group" ''
-root:x:0:
-nobody:x:65534:
-${user.group}:x:${toString user.gid}:
-'';
-
-    # Create /etc/shadow for completeness (locked passwords)
-    shadowFile = pkgs.writeTextDir "etc/shadow" ''
-root:!x:::::::
-nobody:!x:::::::
-${user.name}:!:::::::
-'';
-
-    # Complete runtime environment
+    # MUST KEEP: runtimeEnv is exported and used by:
+    # - test-containers.nix:84-88 (test asserts testModule ? runtimeEnv)
+    # - metadata.nix:136 (mkMetadataForContainer uses containerModule.runtimeEnv)
+    # - Referenced in module return value
     runtimeEnv = pkgs.buildEnv {
       name = "${name}-runtime-env";
-      paths = [
-        appModule.scripts.envDefaults
-        appModule.scripts.fileLoader
-        appModule.scripts.lib
-        finalEntrypoint
-        appModule.scripts.setup
-        appModule.scripts.run
-      ] ++ customScriptPackages ++ allRuntimeDeps;
+      paths = imageContents;
       pathsToLink = [ "/bin" "/lib" "/lib64" "/opt" "/share" "/etc" ];
     };
 
@@ -208,30 +248,10 @@ ${user.name}:!:::::::
       tag = version;
       maxLayers = 100;  # Modern Docker supports 128, use 100 for fine-grained caching
 
-      # Pass as flat list for automatic layer optimization by buildLayeredImage
-      # Order: base system → runtime deps → app scripts → config (most to least stable)
-      contents = [
-        # Layer group 1: System fundamentals (rarely change)
-        passwdFile
-        groupFile
-        shadowFile
-        pkgs.bashInteractive
-        pkgs.cacert
-        pkgs.stdenv.cc.cc.lib
-      ] ++ systemDeps ++ runtimeBinDeps ++ [
-        # Layer group 2: App scripts (change with code updates)
-        appModule.scripts.envDefaults
-        appModule.scripts.fileLoader
-        appModule.scripts.lib
-        finalEntrypoint
-        appModule.scripts.setup
-        appModule.scripts.run
-      ] ++ customScriptPackages ++ [
-        # Layer group 3: Config templates (change frequently)
-        appModule.prepopulatedEnv
-        # Layer group 4: Metadata files (SBOM, closure info - regenerated on each build)
-        containerMetadata
-      ];
+      # Contents = imageContents + metadata
+      # imageContents is the single source of truth for what goes in the container
+      # containerMetadata is added separately (depends on imageContents, so can't be part of it)
+      contents = imageContents ++ [ containerMetadata ];
 
       # Fix ownership for non-root user (runs as fakeroot during image build)
       # Create all runtime directories at build time so container can run as non-root
@@ -342,7 +362,7 @@ ${user.name}:!:::::::
       inherit name version;
       description = "Firestream ${name} container module";
       maintainer = "Firestream Contributors";
-      license = "Apache-2.0";
+      license = "MIT";
     };
 
     # All runtime dependencies
@@ -376,5 +396,23 @@ ${user.name}:!:::::::
 
     # Expose app module for advanced usage
     inherit appModule;
+
+    # ========================================================================
+    # Fleet Manifest Support
+    # ========================================================================
+
+    # Expose container metadata derivation for fleet SBOM aggregation
+    # This is the derivation containing metadata.json, sbom-cyclonedx.json, etc.
+    metadata = containerMetadata;
+
+    # Expose package list for fleet-level source introspection
+    # Uses allRuntimeDeps (real Nix packages with .src attributes),
+    # NOT imageContents (which includes generated passwd/script derivations
+    # that can't be interpolated into string contexts)
+    packageList = allRuntimeDeps;
+
+    # Tag for dynamic filtering in fleet manifest collection
+    # Used by collectArtifacts to identify containers without hardcoding names
+    isFirestreamContainer = true;
   };
 }

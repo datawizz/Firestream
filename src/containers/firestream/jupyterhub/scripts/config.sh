@@ -1,5 +1,5 @@
 # JupyterHub configuration generation
-# Copyright Firestream. Apache-2.0 License.
+# Copyright Firestream. MIT License.
 # This file is sourced, not executed directly
 #
 # Generates jupyterhub_config.py from template or defaults

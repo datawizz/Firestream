@@ -1,5 +1,5 @@
 # PostgreSQL configuration generation logic
-# Copyright Firestream. Apache-2.0 License.
+# Copyright Firestream. MIT License.
 # This file is sourced, not executed directly
 #
 # NOTE: All configuration functions (postgresql_create_config, postgresql_set_property, etc.)

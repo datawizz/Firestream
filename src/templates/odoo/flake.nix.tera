@@ -1,0 +1,42 @@
+{% raw %}{
+  description = "{% endraw %}{{ project_name }}{% raw %}";
+
+  inputs = {
+    firestream.url = "{% endraw %}{{ firestream_ref }}{% raw %}";
+    nixpkgs.follows = "firestream/nixpkgs";
+    flake-utils.url = "github:numtide/flake-utils";
+  };
+
+  outputs = { self, firestream, nixpkgs, flake-utils }:
+    flake-utils.lib.eachDefaultSystem (system:
+      let
+        pkgs = import nixpkgs { inherit system; config.allowUnfree = true; };
+        isLinux = pkgs.stdenv.isLinux;
+      in {
+        packages = {
+          odoo = firestream.packages.${system}.odoo-{% endraw %}{{ odoo_version }}{% raw %};
+          postgresql = firestream.packages.${system}.postgresql-{% endraw %}{{ postgresql_version }}{% raw %};
+        };
+
+        devShells.default = pkgs.mkShell {
+          buildInputs = with pkgs; [
+            docker
+            docker-compose
+            python{% endraw %}{{ python_version | replace(from=".", to="") }}{% raw %}
+          ];
+          shellHook = ''
+            echo "{% endraw %}{{ project_name }}{% raw %} — Odoo {% endraw %}{{ odoo_version_full }}{% raw %} Development"
+            echo ""
+            echo "Commands:"
+            echo "  make setup    — Initial setup (build images, create .env)"
+            echo "  make up       — Start services"
+            echo "  make down     — Stop services"
+            echo "  make scaffold — Scaffold a new addon"
+            echo "  make logs     — Follow Odoo logs"
+            echo "  make shell    — Open Odoo shell"
+            echo "  make psql     — Open PostgreSQL shell"
+          '';
+        };
+      }
+    );
+}{% endraw %}
