@@ -32,6 +32,10 @@
     name,
     version ? "1.0.0",
 
+    # Docker image naming (parity-preserving defaults match the historical literals)
+    imageName ? "firestream-${name}",
+    imageTag ? version,
+
     # Java configuration
     jdk ? pkgs.temurin-bin-17,   # Default JDK (Eclipse Temurin 17 LTS)
     javaHome ? null,             # Override JAVA_HOME (defaults to jdk package path)
@@ -261,6 +265,7 @@
     # Create the container module
     containerModule = mkContainerModule {
       inherit name version paths user;
+      inherit imageName imageTag;
       envVars = javaEnvVars;
       inherit envVarsWithSecrets;
 

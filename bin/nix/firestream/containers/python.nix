@@ -33,6 +33,10 @@
     name,
     version ? "1.0.0",
 
+    # Docker image naming (parity-preserving defaults match the historical literals)
+    imageName ? "firestream-${name}",
+    imageTag ? version,
+
     # Python configuration (required)
     pythonEnv,               # The virtual environment from uv2nix/pyproject-nix
     python ? pkgs.python312, # Python interpreter
@@ -160,6 +164,7 @@
     # Create the container module
     containerModule = mkContainerModule {
       inherit name version envVars envVarsWithSecrets paths user;
+      inherit imageName imageTag;
       inherit validateFn configFn runCmd;
       initFn = pythonInitFn;
 

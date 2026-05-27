@@ -13,12 +13,116 @@
 { pkgs
 , lib
 , firestream
-, sparkVersion ? "4.0.0"
+# Canonical version arg (matches eval-container's java runtime contract).
+# `sparkVersion` is derived below so the body logic is unchanged.
+, version ? "4.0.0"
 , jdk ? pkgs.temurin-bin-17
 , python ? pkgs.python312
+
+# Externalized core-surface config. Defaults below are EXACTLY today's literals
+# so the legacy flake.nix path (which does not pass these) and evalContainer
+# (which passes the same values from options.nix) yield identical factory args.
+
+# Paths configuration
+, paths ? {
+    base = "/opt/spark";
+    conf = "/opt/spark/conf";
+    data = "/firestream/spark/data";
+    logs = "/opt/spark/logs";
+  }
+
+# Environment variables with defaults
+, envVars ? {
+    # Paths (Bitnami compatibility)
+    BITNAMI_ROOT_DIR = "/opt/bitnami";
+    BITNAMI_VOLUME_DIR = "/bitnami";
+
+    # Firestream paths
+    FIRESTREAM_ROOT_DIR = "/opt/firestream";
+    FIRESTREAM_VOLUME_DIR = "/firestream";
+
+    # Spark paths
+    SPARK_HOME = "/opt/spark";
+    SPARK_BASE_DIR = "/opt/spark";
+    SPARK_CONF_DIR = "/opt/spark/conf";
+    SPARK_DEFAULT_CONF_DIR = "/opt/spark/conf.default";
+    SPARK_CONF_FILE = "/opt/spark/conf/spark-defaults.conf";
+    SPARK_WORK_DIR = "/opt/spark/work";
+    SPARK_LOG_DIR = "/opt/spark/logs";
+    SPARK_TMP_DIR = "/opt/spark/tmp";
+    SPARK_JARS_DIR = "/opt/spark/jars";
+    SPARK_USER_JARS_DIR = "/firestream/spark/jars";
+    SPARK_DATA_DIR = "/firestream/spark/data";
+    SPARK_INITSCRIPTS_DIR = "/docker-entrypoint-initdb.d";
+
+    # Spark mode
+    SPARK_MODE = "master";
+    SPARK_MASTER_URL = "spark://spark-master:7077";
+    SPARK_NO_DAEMONIZE = "true";
+
+    # User configuration
+    SPARK_USER = "spark";
+    SPARK_DAEMON_USER = "spark";
+    SPARK_DAEMON_GROUP = "spark";
+
+    # Security defaults (disabled)
+    SPARK_RPC_AUTHENTICATION_ENABLED = "no";
+    SPARK_RPC_ENCRYPTION_ENABLED = "no";
+    SPARK_LOCAL_STORAGE_ENCRYPTION_ENABLED = "no";
+    SPARK_SSL_ENABLED = "no";
+    SPARK_SSL_NEED_CLIENT_AUTH = "yes";
+    SPARK_SSL_PROTOCOL = "TLSv1.2";
+    SPARK_METRICS_ENABLED = "false";
+
+    # Note: JAVA_HOME is auto-set by mkJavaContainerModule
+
+    # Python configuration
+    PYTHONPATH = "/opt/spark/python:/opt/spark/python/lib/py4j-0.10.9.7-src.zip";
+    PYSPARK_PYTHON = "${python}/bin/python3";
+    PYSPARK_DRIVER_PYTHON = "${python}/bin/python3";
+
+    # Debug mode
+    BITNAMI_DEBUG = "false";
+    MODULE = "spark";
+  }
+
+# Variables that support Docker secrets (_FILE suffix)
+, envVarsWithSecrets ? [
+    "SPARK_MODE"
+    "SPARK_MASTER_URL"
+    "SPARK_RPC_AUTHENTICATION_ENABLED"
+    "SPARK_RPC_AUTHENTICATION_SECRET"
+    "SPARK_RPC_ENCRYPTION_ENABLED"
+    "SPARK_LOCAL_STORAGE_ENCRYPTION_ENABLED"
+    "SPARK_SSL_ENABLED"
+    "SPARK_SSL_KEY_PASSWORD"
+    "SPARK_SSL_KEYSTORE_PASSWORD"
+    "SPARK_SSL_KEYSTORE_FILE"
+    "SPARK_SSL_TRUSTSTORE_PASSWORD"
+    "SPARK_SSL_TRUSTSTORE_FILE"
+    "SPARK_SSL_NEED_CLIENT_AUTH"
+    "SPARK_SSL_PROTOCOL"
+    "SPARK_WEBUI_SSL_PORT"
+    "SPARK_METRICS_ENABLED"
+  ]
+
+, exposedPorts ? [
+    7077   # Spark master
+    8080   # Spark master UI
+    8081   # Spark worker UI
+    4040   # Spark application UI
+    6066   # Spark REST submission port
+  ]
+
+# Image naming passthrough (parity defaults).
+, imageName ? "firestream-spark"
+, imageTag ? version
 }:
 
 let
+  # Alias to keep the body logic identical to the legacy sparkVersion-based code.
+  sparkVersion = version;
+
   # Read external script files
   validateScript = builtins.readFile ./scripts/validate.sh;
   configScript = builtins.readFile ./scripts/config.sh;
@@ -126,13 +230,14 @@ in firestream.mkJavaContainerModule {
   # Classpath: Spark JAR directories
   jarDirs = [ "/opt/spark/jars" "/firestream/spark/jars" ];
 
-  # Paths configuration
-  paths = {
-    base = "/opt/spark";
-    conf = "/opt/spark/conf";
-    data = "/firestream/spark/data";
-    logs = "/opt/spark/logs";
-  };
+  # Paths, environment variables, and secret-aware variables are externalized
+  # as function arguments (defaults equal to the historical literals). The
+  # legacy flake.nix path uses the defaults; evalContainer passes the same
+  # values from options.nix, yielding identical factory args.
+  inherit paths envVars envVarsWithSecrets;
+
+  # Image naming passthrough.
+  inherit imageName imageTag;
 
   # User configuration (UID 1001 for Bitnami compatibility)
   user = {
@@ -141,81 +246,6 @@ in firestream.mkJavaContainerModule {
     uid = 1001;
     gid = 1001;
   };
-
-  # Environment variables with defaults
-  envVars = {
-    # Paths (Bitnami compatibility)
-    BITNAMI_ROOT_DIR = "/opt/bitnami";
-    BITNAMI_VOLUME_DIR = "/bitnami";
-
-    # Firestream paths
-    FIRESTREAM_ROOT_DIR = "/opt/firestream";
-    FIRESTREAM_VOLUME_DIR = "/firestream";
-
-    # Spark paths
-    SPARK_HOME = "/opt/spark";
-    SPARK_BASE_DIR = "/opt/spark";
-    SPARK_CONF_DIR = "/opt/spark/conf";
-    SPARK_DEFAULT_CONF_DIR = "/opt/spark/conf.default";
-    SPARK_CONF_FILE = "/opt/spark/conf/spark-defaults.conf";
-    SPARK_WORK_DIR = "/opt/spark/work";
-    SPARK_LOG_DIR = "/opt/spark/logs";
-    SPARK_TMP_DIR = "/opt/spark/tmp";
-    SPARK_JARS_DIR = "/opt/spark/jars";
-    SPARK_USER_JARS_DIR = "/firestream/spark/jars";
-    SPARK_DATA_DIR = "/firestream/spark/data";
-    SPARK_INITSCRIPTS_DIR = "/docker-entrypoint-initdb.d";
-
-    # Spark mode
-    SPARK_MODE = "master";
-    SPARK_MASTER_URL = "spark://spark-master:7077";
-    SPARK_NO_DAEMONIZE = "true";
-
-    # User configuration
-    SPARK_USER = "spark";
-    SPARK_DAEMON_USER = "spark";
-    SPARK_DAEMON_GROUP = "spark";
-
-    # Security defaults (disabled)
-    SPARK_RPC_AUTHENTICATION_ENABLED = "no";
-    SPARK_RPC_ENCRYPTION_ENABLED = "no";
-    SPARK_LOCAL_STORAGE_ENCRYPTION_ENABLED = "no";
-    SPARK_SSL_ENABLED = "no";
-    SPARK_SSL_NEED_CLIENT_AUTH = "yes";
-    SPARK_SSL_PROTOCOL = "TLSv1.2";
-    SPARK_METRICS_ENABLED = "false";
-
-    # Note: JAVA_HOME is auto-set by mkJavaContainerModule
-
-    # Python configuration
-    PYTHONPATH = "/opt/spark/python:/opt/spark/python/lib/py4j-0.10.9.7-src.zip";
-    PYSPARK_PYTHON = "${python}/bin/python3";
-    PYSPARK_DRIVER_PYTHON = "${python}/bin/python3";
-
-    # Debug mode
-    BITNAMI_DEBUG = "false";
-    MODULE = "spark";
-  };
-
-  # Variables that support Docker secrets (_FILE suffix)
-  envVarsWithSecrets = [
-    "SPARK_MODE"
-    "SPARK_MASTER_URL"
-    "SPARK_RPC_AUTHENTICATION_ENABLED"
-    "SPARK_RPC_AUTHENTICATION_SECRET"
-    "SPARK_RPC_ENCRYPTION_ENABLED"
-    "SPARK_LOCAL_STORAGE_ENCRYPTION_ENABLED"
-    "SPARK_SSL_ENABLED"
-    "SPARK_SSL_KEY_PASSWORD"
-    "SPARK_SSL_KEYSTORE_PASSWORD"
-    "SPARK_SSL_KEYSTORE_FILE"
-    "SPARK_SSL_TRUSTSTORE_PASSWORD"
-    "SPARK_SSL_TRUSTSTORE_FILE"
-    "SPARK_SSL_NEED_CLIENT_AUTH"
-    "SPARK_SSL_PROTOCOL"
-    "SPARK_WEBUI_SSL_PORT"
-    "SPARK_METRICS_ENABLED"
-  ];
 
   # Runtime directories with declarative schema
   runtimeDirs = {
@@ -430,13 +460,7 @@ in firestream.mkJavaContainerModule {
   inherit systemDeps runtimeBinDeps;
 
   # Exposed ports
-  exposedPorts = [
-    7077   # Spark master
-    8080   # Spark master UI
-    8081   # Spark worker UI
-    4040   # Spark application UI
-    6066   # Spark REST submission port
-  ];
+  inherit exposedPorts;
 
   # Volume paths
   volumes = [

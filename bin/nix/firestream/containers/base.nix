@@ -51,6 +51,10 @@ in
     name,
     version ? "1.0.0",
 
+    # Docker image naming (parity-preserving defaults match the historical literals)
+    imageName ? "firestream-${name}",
+    imageTag ? version,
+
     # Environment configuration (passed to mkAppModule)
     envVars ? {},
     envVarsWithSecrets ? [],
@@ -244,8 +248,8 @@ ${user.name}:!:::::::
 
     # Docker image
     dockerImage = pkgs.dockerTools.buildLayeredImage {
-      name = "firestream-${name}";
-      tag = version;
+      name = imageName;
+      tag = imageTag;
       maxLayers = 100;  # Modern Docker supports 128, use 100 for fine-grained caching
 
       # Contents = imageContents + metadata
