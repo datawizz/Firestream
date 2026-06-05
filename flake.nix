@@ -62,6 +62,8 @@
         ./nix/flake-modules/checks.nix
         ./nix/flake-modules/registry.nix
         ./nix/flake-modules/aggregate.nix
+        ./nix/flake-modules/docker-build.nix
+        ./nix/flake-modules/compose.nix
         ./nix/flake-modules/containers/airflow.nix
         ./nix/flake-modules/containers/jupyterhub.nix
         ./nix/flake-modules/containers/superset.nix
@@ -70,6 +72,16 @@
         ./nix/flake-modules/containers/redis.nix
         ./nix/flake-modules/containers/kafka.nix
         ./nix/flake-modules/containers/spark.nix
+        ./nix/flake-modules/charts/airflow.nix
+        ./nix/flake-modules/charts/postgresql.nix
+        ./nix/flake-modules/charts/redis.nix
+        ./nix/flake-modules/charts/kafka.nix
+        ./nix/flake-modules/charts/spark.nix
+        ./nix/flake-modules/charts/jupyterhub.nix
+        ./nix/flake-modules/charts/superset.nix
+        ./nix/flake-modules/charts/odoo.nix
+        ./nix/flake-modules/charts/aggregate.nix
+        ./nix/flake-modules/charts/checks.nix
       ];
 
       # System-independent and cross-system flake outputs.
@@ -101,8 +113,24 @@
               else null;
 
             # NEW: consumer override API. The per-system registry of images, each
-            # with { dockerImage; eval; options; }.
-            images = config.firestreamImages;
+            # with { dockerImage; eval; options; } enriched with the deployment
+            # surface added in this phase:
+            #   imageRef  - "firestream-<name>:<tag>" (matches what the flake builds)
+            #   compose   - packages.<name>-compose derivation (docker-compose.yml)
+            #   buildApp  - apps.<name>-image (Docker-based Linux build, runs on Darwin)
+            images = builtins.mapAttrs
+              (name: entry: entry // {
+                imageRef = (entry.eval (_: { })).imageRef;
+                compose = config.packages.${name + "-compose"} or null;
+                buildApp = config.apps.${name + "-image"} or null;
+              })
+              config.firestreamImages;
+
+            # NEW (Phase 4): consumer-facing chart surface. The per-system
+            # registry of chart override APIs, each with
+            # { chartBundle; render; eval; options; }. Exposed bare (no
+            # enrichment) mirroring `images` above.
+            charts = config.firestreamChartImages;
           }));
 
         # Overlay for nixpkgs integration

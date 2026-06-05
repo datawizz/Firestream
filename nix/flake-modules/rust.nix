@@ -2,7 +2,7 @@
 # Copyright Firestream. MIT License.
 #
 # Ports the legacy flake's non-container packages 1:1:
-#   container, default, vib-tools, firestream, wait-for-port, firestream-vib
+#   container, default, vib-tools, firestream, wait-for-port, firestream-vib, firestream-healthd
 { inputs, ... }: {
   perSystem = { pkgs, system, firestreamLib, ... }:
     let
@@ -33,5 +33,6 @@
       packages.firestream = pkgs.callPackage ../package.nix { };
       packages.wait-for-port = firestreamLib.packages.wait-for-port;
       packages.firestream-vib = firestreamLib.packages.firestream-vib;
+      packages.firestream-healthd = firestreamLib.packages.firestream-healthd;
     };
 }

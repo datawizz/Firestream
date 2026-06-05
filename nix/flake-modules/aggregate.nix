@@ -27,6 +27,7 @@
         firestream-tui = firestreamLib.packages.firestream;
         wait-for-port = firestreamLib.packages.wait-for-port;
         firestream-vib = firestreamLib.packages.firestream-vib;
+        firestream-healthd = firestreamLib.packages.firestream-healthd;
       };
     in
     {
@@ -64,6 +65,7 @@
             firestream-tui = firestreamLib.packages.firestream.metadata;
             wait-for-port = firestreamLib.packages.wait-for-port.metadata;
             firestream-vib = firestreamLib.packages.firestream-vib.metadata;
+            firestream-healthd = firestreamLib.packages.firestream-healthd.metadata;
           }
         );
     };

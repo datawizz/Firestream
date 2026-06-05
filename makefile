@@ -832,6 +832,42 @@ nix-fix:
 	nix-collect-garbage -d
 
 # ==============================================================================
+# Flake-native container builds & deploys (Docker-based, works on macOS)
+#
+# These drive the first-class flake apps:
+#   apps.<name>-image  - build a Linux image via Docker and load it locally
+#   apps.<name>-up     - build+load the stack's images, then `docker compose up -d`
+#   apps.<name>-down   - `docker compose down`
+#   packages.<name>-compose - the generated docker-compose.yml
+#
+# Examples:
+#   make flake-image-airflow            # build+load firestream-airflow image
+#   make flake-image-postgresql ARCH=x86_64
+#   make flake-up-airflow               # deploy the full Airflow stack
+#   make flake-down-airflow
+#   make flake-compose-airflow          # render docker-compose.yml only
+# ==============================================================================
+
+ARCH ?=
+
+# Build + load a single container image (override target arch with ARCH=x86_64).
+flake-image-%:
+	nix run .#$*-image -- --load $(if $(ARCH),--target $(ARCH),)
+
+# Deploy a stack: build+load its images, then docker compose up -d.
+flake-up-%:
+	nix run .#$*-up
+
+# Tear a stack down.
+flake-down-%:
+	nix run .#$*-down
+
+# Render the generated docker-compose.yml (no build/deploy).
+flake-compose-%:
+	nix build .#$*-compose -o result-$*-compose
+	@echo "Compose written to: result-$*-compose/docker-compose.yml"
+
+# ==============================================================================
 # Docker Utilities
 # ==============================================================================
 
@@ -919,3 +955,44 @@ docs-clean:
 
 docs-install:
 	cd $(DOCS_DIR) && pnpm install
+
+# ==============================================================================
+# Rust Workspace (CI entry points)
+#
+# Invoked by .github/workflows/build.yaml. Pure Rust — no Nix install required
+# on the runner. e2e/container builds live in later phases.
+# ==============================================================================
+
+.PHONY: test
+test:
+	cargo test --workspace
+
+.PHONY: build
+build:
+	cargo build --workspace
+
+# ==============================================================================
+# E2E (Phase 1)
+#
+# Drives `nix run .#<stack>-up` / `-down` against canonical stacks under Docker.
+# Opt-in: each test is #[ignore]'d, so plain `make test` never invokes them.
+# Serialised on a process-wide Mutex AND -j1 (--test-threads=1) so output is
+# readable. A cold canonical run is measured in HOURS and explicitly stays out
+# of CI; the targets here are for local validation and incident reproduction.
+#
+# Env contract (see src/lib/rust/firestream/tests/e2e/harness.rs):
+#   FIRESTREAM_E2E_STACKS=all|csv      Subset filter (default: canonical set)
+#   FIRESTREAM_E2E_KEEP=1              Skip teardown (leave stack running)
+#   FIRESTREAM_E2E_STRICT=1            Skip-gate failure becomes hard fail
+#   FIRESTREAM_E2E_TIMEOUT_SECS=300    Per-stack readiness timeout (not build)
+#   FIRESTREAM_E2E_PREBUILD=1          Pre-warm images outside the lock
+#   FIRESTREAM_E2E_HTTP=0              Skip HTTP probes (TCP/protocol still run)
+# ==============================================================================
+
+.PHONY: test-e2e
+test-e2e:
+	cargo test -p firestream --test e2e -- --ignored --test-threads=1 --nocapture
+
+.PHONY: test-e2e-%
+test-e2e-%:
+	FIRESTREAM_E2E_STACKS=$* cargo test -p firestream --test e2e -- --ignored --test-threads=1 --nocapture
