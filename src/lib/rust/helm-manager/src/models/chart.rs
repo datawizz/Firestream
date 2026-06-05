@@ -101,13 +101,6 @@ pub struct ChartDependency {
 }
 
 impl Chart {
-    /// Check if this is a Bitnami chart
-    pub fn is_bitnami(&self) -> bool {
-        self.metadata.sources.as_ref()
-            .map(|sources| sources.iter().any(|s| s.contains("bitnami")))
-            .unwrap_or(false)
-    }
-    
     /// Get the common dependency if it exists
     pub fn get_common_dependency(&self) -> Option<&ChartDependency> {
         self.dependencies.iter().find(|d| d.name == "common")
