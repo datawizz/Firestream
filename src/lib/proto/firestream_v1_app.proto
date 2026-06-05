@@ -1,0 +1,284 @@
+syntax = "proto3";
+
+package firestream_v1;
+
+import "common.proto";
+import "google/protobuf/duration.proto";
+
+// Application deployment composition proto.
+// Defines how containers are composed into deployable applications.
+//
+// Relationship to existing protos:
+//   AppSpec vs Deployment (firestream_v1.proto):
+//     AppSpec defines build-time composition. Deployment is runtime state.
+//     A deployed AppSpec becomes a Deployment.
+//   DeploymentTarget vs Provider (common.proto):
+//     DeploymentTarget is more specific (DOCKER_COMPOSE, K3D, GKE).
+//     Provider is infrastructure-level. AppSpec.provider references
+//     common.proto Provider; target is separate.
+//   ComposeService.ports vs Endpoint (firestream_v1.proto):
+//     ComposeService is build-time config. Endpoint is runtime service
+//     discovery. Generator can produce Endpoint from ComposeService.
+//   KubernetesConfig vs InfrastructureConfig (firestream_v1.proto):
+//     KubernetesConfig is deployment-target-specific.
+//     InfrastructureConfig is cluster-level. Different scopes.
+
+// =============================================================================
+// Enums
+// =============================================================================
+
+// Deployment target — more specific than common.proto Provider.
+enum DeploymentTarget {
+  DEPLOYMENT_TARGET_UNSPECIFIED = 0;
+  DEPLOYMENT_TARGET_DOCKER_COMPOSE = 1;
+  DEPLOYMENT_TARGET_K3D = 2;
+  DEPLOYMENT_TARGET_GKE = 3;
+  DEPLOYMENT_TARGET_EKS = 4;
+  DEPLOYMENT_TARGET_AKS = 5;
+}
+
+// Docker Compose service dependency condition.
+enum DependencyCondition {
+  DEPENDENCY_CONDITION_UNSPECIFIED = 0;
+  DEPENDENCY_CONDITION_SERVICE_STARTED = 1;
+  DEPENDENCY_CONDITION_SERVICE_HEALTHY = 2;
+  DEPENDENCY_CONDITION_SERVICE_COMPLETED_SUCCESSFULLY = 3;
+}
+
+// Container restart policy.
+enum RestartPolicy {
+  RESTART_POLICY_UNSPECIFIED = 0;
+  RESTART_POLICY_NO = 1;
+  RESTART_POLICY_ALWAYS = 2;
+  RESTART_POLICY_ON_FAILURE = 3;
+  RESTART_POLICY_UNLESS_STOPPED = 4;
+}
+
+// =============================================================================
+// Top-level application specification
+// =============================================================================
+
+// Application deployment composition.
+message AppSpec {
+  // Application name.
+  string name = 1;
+
+  // Application version.
+  string version = 2;
+
+  // Human-readable description.
+  string description = 3;
+
+  // Infrastructure provider (references common.proto Provider enum).
+  Provider provider = 4;
+
+  // Template used to scaffold this app (if applicable).
+  string template_name = 5;
+
+  // Template variable values used during scaffolding.
+  map<string, string> template_values = 6;
+
+  // Container references that make up this application.
+  repeated ContainerRef containers = 7;
+
+  // Deployment configurations for different targets/environments.
+  repeated DeploymentConfig deployments = 8;
+
+  // Version orchestration for multi-version support.
+  VersionOrchestration versioning = 9;
+}
+
+// Reference to a container module.
+message ContainerRef {
+  // Container name (e.g., "superset", "postgresql", "redis").
+  string name = 1;
+
+  // Container version.
+  string version = 2;
+
+  // Relative path to the container module.nix or proto spec.
+  string module_path = 3;
+}
+
+// =============================================================================
+// Deployment configuration
+// =============================================================================
+
+// Deployment configuration for a specific target and environment.
+message DeploymentConfig {
+  // Deployment target.
+  DeploymentTarget target = 1;
+
+  // Environment (references common.proto Environment enum).
+  Environment environment = 2;
+
+  // Docker Compose service definitions.
+  repeated ComposeService services = 3;
+
+  // Kubernetes-specific configuration.
+  KubernetesConfig kubernetes = 4;
+
+  // Port forwarding rules (for local development).
+  repeated PortForward port_forwards = 5;
+
+  // Named volumes.
+  repeated NamedVolume volumes = 6;
+}
+
+// Docker Compose service definition.
+message ComposeService {
+  // Service name in docker-compose.yml.
+  string name = 1;
+
+  // Docker image reference.
+  string image = 2;
+
+  // Container role (e.g., "webserver", "celery-worker").
+  string role = 3;
+
+  // Environment variables for this service instance.
+  map<string, string> environment = 4;
+
+  // Port mappings.
+  repeated PortMapping ports = 5;
+
+  // Volume mounts.
+  repeated string volume_mounts = 6;
+
+  // Service dependencies.
+  repeated ServiceDependency depends_on = 7;
+
+  // Health check.
+  ComposeHealthCheck health_check = 8;
+
+  // Restart policy.
+  RestartPolicy restart_policy = 9;
+
+  // Override command.
+  string command = 10;
+}
+
+// Port mapping (host:container).
+message PortMapping {
+  // Host port.
+  int32 host_port = 1;
+
+  // Container port.
+  int32 container_port = 2;
+
+  // Protocol ("tcp", "udp").
+  string protocol = 3;
+}
+
+// Service dependency with condition.
+message ServiceDependency {
+  // Name of the service depended upon.
+  string service = 1;
+
+  // Condition that must be met.
+  DependencyCondition condition = 2;
+}
+
+// Docker Compose health check.
+message ComposeHealthCheck {
+  // Test command.
+  repeated string test = 1;
+
+  // Interval between checks.
+  google.protobuf.Duration interval = 2;
+
+  // Timeout for each check.
+  google.protobuf.Duration timeout = 3;
+
+  // Number of retries.
+  int32 retries = 4;
+
+  // Start period grace time.
+  google.protobuf.Duration start_period = 5;
+}
+
+// Port forwarding rule for local development.
+message PortForward {
+  // Local port to listen on.
+  int32 local_port = 1;
+
+  // Remote service port.
+  int32 remote_port = 2;
+
+  // Service name to forward to.
+  string service = 3;
+}
+
+// Named volume definition.
+message NamedVolume {
+  // Volume name.
+  string name = 1;
+
+  // Volume driver (e.g., "local").
+  string driver = 2;
+
+  // Driver-specific options.
+  map<string, string> driver_opts = 3;
+}
+
+// =============================================================================
+// Kubernetes configuration
+// =============================================================================
+
+// Kubernetes-specific deployment configuration.
+message KubernetesConfig {
+  // Kubernetes namespace.
+  string namespace = 1;
+
+  // Helm chart reference (if using Helm).
+  string chart_path = 2;
+
+  // Helm values overrides.
+  map<string, string> values = 3;
+
+  // Number of replicas.
+  int32 replicas = 4;
+
+  // Resource requests and limits.
+  KubernetesResources resources = 5;
+}
+
+// Kubernetes resource requests and limits.
+message KubernetesResources {
+  // CPU request (e.g., "100m", "1").
+  string cpu_request = 1;
+
+  // CPU limit.
+  string cpu_limit = 2;
+
+  // Memory request (e.g., "256Mi", "1Gi").
+  string memory_request = 3;
+
+  // Memory limit.
+  string memory_limit = 4;
+}
+
+// =============================================================================
+// Version orchestration
+// =============================================================================
+
+// Multi-version support for the application.
+message VersionOrchestration {
+  // Default version to use.
+  string default_version = 1;
+
+  // Available versions.
+  repeated VersionedComponent versions = 2;
+}
+
+// A specific version of a component.
+message VersionedComponent {
+  // Version string (e.g., "4.1.1", "5.0.0").
+  string version = 1;
+
+  // Path to the module for this version.
+  string module_path = 2;
+
+  // Description of this version.
+  string description = 3;
+}
