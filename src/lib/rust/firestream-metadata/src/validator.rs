@@ -2,8 +2,8 @@
 //!
 //! Validates the structure and content of container metadata files.
 
-use super::reader::MetadataReader;
-use super::Error;
+use crate::Error;
+use crate::reader::MetadataReader;
 
 /// Result of a validation run
 #[derive(Debug, Clone)]
@@ -470,13 +470,14 @@ mod tests {
         let reader = MetadataReader::new(temp_dir.path());
         let validator = MetadataValidator::new(reader);
 
-        // Test with packages that exist
-        let missing = validator.validate_packages(&["openssl", "zlib"]).unwrap();
+        // Test with packages that exist. Explicit `[..]` slice (instead of
+        // relying on `&[T; N]` → `&[T]` coercion) keeps rust-analyzer happy.
+        let missing = validator.validate_packages(&["openssl", "zlib"][..]).unwrap();
         assert!(missing.is_empty());
 
         // Test with packages that don't exist
         let missing = validator
-            .validate_packages(&["openssl", "curl", "nonexistent"])
+            .validate_packages(&["openssl", "curl", "nonexistent"][..])
             .unwrap();
         assert_eq!(missing.len(), 2);
         assert!(missing.contains(&"curl".to_string()));

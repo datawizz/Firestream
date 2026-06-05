@@ -5,16 +5,16 @@
 use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
 
-use super::Error;
+use crate::Error;
 
 /// Default base path for metadata files in containers
-const DEFAULT_METADATA_PATH: &str = "/opt/firestream";
+pub const DEFAULT_METADATA_PATH: &str = "/opt/firestream";
 
 /// Metadata file names
-const METADATA_FILE: &str = "metadata.json";
-const CYCLONEDX_SBOM_FILE: &str = "sbom-cyclonedx.json";
-const SPDX_SBOM_FILE: &str = "sbom-spdx.json";
-const CLOSURE_FILE: &str = "closure.json";
+pub const METADATA_FILE: &str = "metadata.json";
+pub const CYCLONEDX_SBOM_FILE: &str = "sbom-cyclonedx.json";
+pub const SPDX_SBOM_FILE: &str = "sbom-spdx.json";
+pub const CLOSURE_FILE: &str = "closure.json";
 
 /// Container metadata from metadata.json
 #[derive(Debug, Clone, Serialize, Deserialize)]
