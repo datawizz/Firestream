@@ -34,10 +34,10 @@ impl std::fmt::Display for PortState {
     }
 }
 
-/// Default poll interval (500ms, matching Bitnami behavior)
+/// Default poll interval (500 ms).
 pub const DEFAULT_POLL_INTERVAL: Duration = Duration::from_millis(500);
 
-/// Default timeout (30 seconds, matching Bitnami behavior)
+/// Default timeout (30 seconds).
 pub const DEFAULT_TIMEOUT: Duration = Duration::from_secs(30);
 
 /// Configuration for waiting on a port
