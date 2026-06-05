@@ -150,5 +150,95 @@
     ];
 
     exposedPorts = lib.mkDefault [ 8088 5555 ];  # 8088=webserver, 5555=flower
+
+    # Phase 4: enable in-image firestream-healthd. Superset exposes /health.
+    # `SUPERSET_WEBSERVER_PORT_NUMBER` defaults to 8088 (see env defaults).
+    health = {
+      enable = lib.mkDefault true;
+      readinessCmd = lib.mkDefault
+        ''curl -fsS "http://localhost:''${SUPERSET_WEBSERVER_PORT_NUMBER:-8088}/health" > /dev/null'';
+    };
+
+    # Superset always needs a metadata DB and a celery broker/cache; embed
+    # postgres + redis as dependency sub-services so `.#superset-up` is a
+    # working out-of-the-box stack. Mirrors the airflow pattern (see
+    # ../../airflow/options.nix). Whole-block mkDefault: a consumer override
+    # supplies its own complete topology.
+    compose = lib.mkDefault {
+      projectName = "firestream-superset";
+      dependencies = [ "postgresql" "redis" ];
+
+      # +20000 host-port offset so the embedded postgres/redis don't collide
+      # with a standalone .#postgresql-up / .#redis-up.
+      #   postgresql 5432 -> host 25432
+      #   redis      6379 -> host 26379
+      #   superset   8088 -> host 28088
+      #   flower     5555 -> host 25555
+      #   healthd    9180 -> host 29180
+      hostPortOffset = 20000;
+
+      sharedEnv = {
+        SUPERSET_DATABASE_HOST = "postgresql";
+        SUPERSET_DATABASE_NAME = "superset";
+        SUPERSET_DATABASE_USERNAME = "superset";
+        SUPERSET_DATABASE_PASSWORD = "superset";
+        REDIS_HOST = "redis";
+      };
+
+      volumes = {
+        postgresql_data = { };
+        redis_data = { };
+      };
+
+      services = {
+        postgresql = {
+          image = "@postgresql";
+          env = {
+            POSTGRESQL_DATABASE = "superset";
+            POSTGRESQL_USERNAME = "superset";
+            POSTGRESQL_PASSWORD = "superset";
+            ALLOW_EMPTY_PASSWORD = "no";
+          };
+          ports = [ "5432:5432" ];
+          volumes = [ "postgresql_data:/firestream/postgresql" ];
+          healthcheck = {
+            test = [
+              "CMD"
+              "bash"
+              "-c"
+              "exec 3<>/dev/tcp/127.0.0.1/9180 && printf 'GET /readyz HTTP/1.0\\r\\n\\r\\n' >&3 && head -n 1 <&3 | grep -q ' 200'"
+            ];
+            interval = "10s";
+            timeout = "5s";
+            retries = 5;
+            start_period = "30s";
+          };
+        };
+        redis = {
+          image = "@redis";
+          env.ALLOW_EMPTY_PASSWORD = "yes";
+          ports = [ "6379:6379" ];
+          volumes = [ "redis_data:/firestream/redis/data" ];
+          healthcheck = {
+            test = [
+              "CMD"
+              "bash"
+              "-c"
+              "exec 3<>/dev/tcp/127.0.0.1/9180 && printf 'GET /readyz HTTP/1.0\\r\\n\\r\\n' >&3 && head -n 1 <&3 | grep -q ' 200'"
+            ];
+            interval = "10s";
+            timeout = "5s";
+            retries = 5;
+            start_period = "30s";
+          };
+        };
+        superset = {
+          # Own firestream-superset image (image = null inferred when omitted);
+          # publish webserver + flower + healthd so the e2e harness can probe.
+          ports = [ "8088:8088" "5555:5555" "9180:9180" ];
+          dependsOn = [ "postgresql" "redis" ];
+        };
+      };
+    };
   };
 }

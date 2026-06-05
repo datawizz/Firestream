@@ -59,7 +59,9 @@ in
       JUPYTERHUB_PASSWORD = "admin";
 
       # Database configuration
-      JUPYTERHUB_DATABASE_TYPE = "postgresql";
+      # Default to sqlite so the standalone image runs out of the box; prod /
+      # multi-node overrides via env to "postgresql" with HOST/USER/PASSWORD.
+      JUPYTERHUB_DATABASE_TYPE = "sqlite";
       JUPYTERHUB_DATABASE_HOST = "postgresql";
       JUPYTERHUB_DATABASE_PORT_NUMBER = "5432";
       JUPYTERHUB_DATABASE_NAME = "jupyterhub";
@@ -75,8 +77,9 @@ in
       # Timeouts
       JUPYTERHUB_DB_WAIT_TIMEOUT = "120";
 
-      # Empty password flag
-      ALLOW_EMPTY_PASSWORD = "no";
+      # Empty password flag — default to yes for out-of-the-box local/dev/e2e
+      # use; production overrides via the standard mkDefault seam.
+      ALLOW_EMPTY_PASSWORD = "yes";
 
       # Debug mode
       BITNAMI_DEBUG = "false";
@@ -99,5 +102,16 @@ in
     ];
 
     exposedPorts = lib.mkDefault [ 8000 8081 ];
+
+    # Phase 4: enable in-image firestream-healthd. JupyterHub does not ship
+    # a dedicated /health endpoint; /hub/ returns 200 (login) or 302
+    # (redirect to login) once the hub process is serving.
+    # `JUPYTERHUB_PROXY_PORT_NUMBER` defaults to 8000. We capture the
+    # response code without --fail so 3xx is not treated as an error.
+    health = {
+      enable = lib.mkDefault true;
+      readinessCmd = lib.mkDefault
+        ''curl -sS -o /dev/null -w '%{http_code}' "http://localhost:''${JUPYTERHUB_PROXY_PORT_NUMBER:-8000}/hub/" | grep -qE '^(200|302)$' '';
+    };
   };
 }

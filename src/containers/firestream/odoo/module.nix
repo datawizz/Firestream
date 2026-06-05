@@ -86,8 +86,9 @@
     # Timeouts
     ODOO_DB_WAIT_TIMEOUT = "120";
 
-    # Empty password flag
-    ALLOW_EMPTY_PASSWORD = "no";
+    # Empty password flag — default to yes for out-of-the-box local/dev/e2e
+    # use; production overrides via the standard envVars override seam.
+    ALLOW_EMPTY_PASSWORD = "yes";
 
     # Debug mode
     BITNAMI_DEBUG = "false";
@@ -118,6 +119,11 @@
   ]
 
 , exposedPorts ? [ 8069 8072 ]
+
+# In-image health/SBOM service configuration (Phase 4). Forwarded to
+# mkPythonContainerModule (which forwards to mkContainerModule). Default-off
+# preserves byte-identical legacy-flake behaviour.
+, health ? { enable = false; port = 9180; readinessCmd = null; }
 
 # Image naming passthrough (parity defaults).
 , imageName ? "firestream-odoo"
@@ -578,6 +584,7 @@ in firestream.mkPythonContainerModule {
   inherit systemDeps runtimeBinDeps;
 
   inherit exposedPorts;
+  inherit health;
   volumes = [ "/opt/odoo/data" "/opt/odoo/addons" "/bitnami/python" "/docker-entrypoint-init.d" ];
 
   user = {

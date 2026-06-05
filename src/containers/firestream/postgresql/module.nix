@@ -63,11 +63,14 @@
     POSTGRESQL_INIT_MAX_TIMEOUT = "60";
 
     # Authentication
+    # Default to ALLOW_EMPTY_PASSWORD=yes so the out-of-the-box image runs
+    # in local/dev/e2e environments without a password override. Production
+    # callers override these via the standard envVars override seam.
     POSTGRESQL_PASSWORD = "";
     POSTGRESQL_USERNAME = "postgres";
     POSTGRESQL_DATABASE = "";
     POSTGRESQL_POSTGRES_PASSWORD = "";
-    ALLOW_EMPTY_PASSWORD = "no";
+    ALLOW_EMPTY_PASSWORD = "yes";
 
     # Replication
     POSTGRESQL_REPLICATION_MODE = "";
@@ -139,6 +142,11 @@
   ]
 
 , exposedPorts ? [ 5432 ]
+
+# In-image health/SBOM service configuration (Phase 3). Forwarded to
+# mkContainerModule, which wraps the entrypoint with a healthd launcher when
+# enabled. Default-off preserves byte-identical legacy-flake behaviour.
+, health ? { enable = false; port = 9180; readinessCmd = null; }
 
 # Image naming passthrough (parity defaults).
 , imageName ? "firestream-postgresql"
@@ -657,6 +665,7 @@ in firestream.mkContainerModule {
   inherit systemDeps runtimeBinDeps;
 
   inherit exposedPorts;
+  inherit health;
   volumes = [ "/firestream/postgresql" "/docker-entrypoint-initdb.d" "/docker-entrypoint-preinitdb.d" ];
 
   user = { name = "postgres"; group = "postgres"; uid = 1001; gid = 1001; };

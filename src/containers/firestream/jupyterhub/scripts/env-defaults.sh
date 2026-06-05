@@ -35,7 +35,10 @@ export JUPYTERHUB_USERNAME="${JUPYTERHUB_USERNAME:-user}"
 export JUPYTERHUB_PASSWORD="${JUPYTERHUB_PASSWORD:-}"
 
 # Database configuration
-export JUPYTERHUB_DATABASE_TYPE="${JUPYTERHUB_DATABASE_TYPE:-postgresql}"
+# Default to sqlite so the standalone image runs out of the box without an
+# external postgres. Production / multi-node deployments override via env to
+# JUPYTERHUB_DATABASE_TYPE=postgresql (with HOST/USER/PASSWORD).
+export JUPYTERHUB_DATABASE_TYPE="${JUPYTERHUB_DATABASE_TYPE:-sqlite}"
 export JUPYTERHUB_DATABASE_HOST="${JUPYTERHUB_DATABASE_HOST:-postgresql}"
 export JUPYTERHUB_DATABASE_PORT_NUMBER="${JUPYTERHUB_DATABASE_PORT_NUMBER:-5432}"
 export JUPYTERHUB_DATABASE_NAME="${JUPYTERHUB_DATABASE_NAME:-jupyterhub}"

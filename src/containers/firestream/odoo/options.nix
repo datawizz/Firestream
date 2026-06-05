@@ -84,8 +84,9 @@
       # Timeouts
       ODOO_DB_WAIT_TIMEOUT = "120";
 
-      # Empty password flag
-      ALLOW_EMPTY_PASSWORD = "no";
+      # Empty password flag — default to yes for out-of-the-box local/dev/e2e
+      # use; production overrides via the standard mkDefault seam.
+      ALLOW_EMPTY_PASSWORD = "yes";
 
       # Debug mode
       BITNAMI_DEBUG = "false";
@@ -117,5 +118,73 @@
     ];
 
     exposedPorts = lib.mkDefault [ 8069 8072 ];
+
+    # Phase 4: enable in-image firestream-healthd. Odoo's /web/database/selector
+    # is publicly available once the http worker is up; we use curl --fail to
+    # treat any non-2xx as not-yet-ready. `ODOO_PORT_NUMBER` defaults to 8069.
+    health = {
+      enable = lib.mkDefault true;
+      readinessCmd = lib.mkDefault
+        ''curl -fsS -o /dev/null "http://localhost:''${ODOO_PORT_NUMBER:-8069}/web/database/selector"'';
+    };
+
+    # Odoo requires a postgres metadata DB; embed it as a dependency sub-service
+    # so `.#odoo-up` is a working out-of-the-box stack. Mirrors the airflow /
+    # superset pattern. Whole-block mkDefault: a consumer override supplies its
+    # own complete topology.
+    compose = lib.mkDefault {
+      projectName = "firestream-odoo";
+      dependencies = [ "postgresql" ];
+
+      # +20000 host-port offset so the embedded postgres doesn't collide with
+      # a standalone .#postgresql-up.
+      #   postgresql 5432 -> host 25432
+      #   odoo       8069 -> host 28069
+      #   odoo gevent 8072 -> host 28072
+      #   healthd    9180 -> host 29180
+      hostPortOffset = 20000;
+
+      sharedEnv = {
+        ODOO_DATABASE_HOST = "postgresql";
+        ODOO_DATABASE_NAME = "firestream_odoo";
+        ODOO_DATABASE_USER = "odoo";
+        ODOO_DATABASE_PASSWORD = "odoo";
+      };
+
+      volumes = {
+        postgresql_data = { };
+      };
+
+      services = {
+        postgresql = {
+          image = "@postgresql";
+          env = {
+            POSTGRESQL_DATABASE = "firestream_odoo";
+            POSTGRESQL_USERNAME = "odoo";
+            POSTGRESQL_PASSWORD = "odoo";
+            ALLOW_EMPTY_PASSWORD = "no";
+          };
+          ports = [ "5432:5432" ];
+          volumes = [ "postgresql_data:/firestream/postgresql" ];
+          healthcheck = {
+            test = [
+              "CMD"
+              "bash"
+              "-c"
+              "exec 3<>/dev/tcp/127.0.0.1/9180 && printf 'GET /readyz HTTP/1.0\\r\\n\\r\\n' >&3 && head -n 1 <&3 | grep -q ' 200'"
+            ];
+            interval = "10s";
+            timeout = "5s";
+            retries = 5;
+            start_period = "30s";
+          };
+        };
+        odoo = {
+          # Own firestream-odoo image; publish web + longpolling + healthd.
+          ports = [ "8069:8069" "8072:8072" "9180:9180" ];
+          dependsOn = [ "postgresql" ];
+        };
+      };
+    };
   };
 }

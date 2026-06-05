@@ -117,5 +117,17 @@ in
       4040   # Spark application UI
       6066   # Spark REST submission port
     ];
+
+    # Phase 4: enable in-image firestream-healthd. The master and worker UIs
+    # default to 8080 (master) / 8081 (worker). Bitnami's spark image
+    # honours `SPARK_MASTER_WEBUI_PORT` / `SPARK_WORKER_WEBUI_PORT` if set,
+    # both falling back to 8080 by default in master mode; the curl probe
+    # `?` short-circuits a non-200 with `--fail`. spark has `curl` in
+    # systemDeps so this is in PATH.
+    health = {
+      enable = lib.mkDefault true;
+      readinessCmd = lib.mkDefault
+        ''curl -fsS "http://localhost:''${SPARK_MASTER_WEBUI_PORT:-8080}/" > /dev/null'';
+    };
   };
 }

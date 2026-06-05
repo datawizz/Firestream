@@ -60,8 +60,10 @@
     REDIS_EXTRA_FLAGS = "";
 
     # Authentication
+    # Default ALLOW_EMPTY_PASSWORD=yes for out-of-the-box local/dev/e2e use;
+    # production overrides via the standard envVars override seam.
     REDIS_PASSWORD = "";
-    ALLOW_EMPTY_PASSWORD = "no";
+    ALLOW_EMPTY_PASSWORD = "yes";
 
     # Persistence
     REDIS_AOF_ENABLED = "yes";
@@ -112,6 +114,11 @@
   ]
 
 , exposedPorts ? [ 6379 ]
+
+# In-image health/SBOM service configuration (Phase 4). Forwarded to
+# mkContainerModule, which wraps the entrypoint with a healthd launcher when
+# enabled. Default-off preserves byte-identical legacy-flake behaviour.
+, health ? { enable = false; port = 9180; readinessCmd = null; }
 
 # Image naming passthrough (parity defaults).
 , imageName ? "firestream-redis"
@@ -507,6 +514,7 @@ in firestream.mkContainerModule {
   inherit systemDeps runtimeBinDeps;
 
   inherit exposedPorts;
+  inherit health;
   volumes = [ "/firestream/redis" ];
 
   user = { name = "redis"; group = "redis"; uid = 1001; gid = 1001; };

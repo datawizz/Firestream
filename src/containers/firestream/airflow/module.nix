@@ -162,6 +162,11 @@
 
 , exposedPorts ? [ 8080 8125 8793 8794 ]
 
+# In-image health/SBOM service configuration (Phase 4). Forwarded to
+# mkPythonContainerModule (which forwards to mkContainerModule). Default-off
+# preserves byte-identical legacy-flake behaviour.
+, health ? { enable = false; port = 9180; readinessCmd = null; }
+
 # Image naming passthrough (parity defaults).
 , imageName ? "firestream-airflow"
 , imageTag ? airflowVersion
@@ -672,6 +677,7 @@ in firestream.mkPythonContainerModule {
   inherit systemDeps runtimeBinDeps;
 
   inherit exposedPorts;
+  inherit health;
   volumes = [ "/opt/airflow/dags" "/opt/airflow/logs" "/opt/airflow/plugins" ];
 
   # Python-specific options

@@ -151,6 +151,11 @@
 
 , exposedPorts ? [ 8088 5555 ]  # 8088=webserver, 5555=flower
 
+# In-image health/SBOM service configuration (Phase 4). Forwarded to
+# mkPythonContainerModule (which forwards to mkContainerModule). Default-off
+# preserves byte-identical legacy-flake behaviour.
+, health ? { enable = false; port = 9180; readinessCmd = null; }
+
 # Image naming passthrough (parity defaults).
 , imageName ? "firestream-superset"
 , imageTag ? supersetVersion
@@ -608,6 +613,7 @@ in firestream.mkPythonContainerModule {
   inherit systemDeps runtimeBinDeps;
 
   inherit exposedPorts;
+  inherit health;
   volumes = [ "/opt/superset/superset_home" "/opt/superset/logs" ];
 
   # Python-specific options

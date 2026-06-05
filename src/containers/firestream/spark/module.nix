@@ -114,6 +114,11 @@
     6066   # Spark REST submission port
   ]
 
+# In-image health/SBOM service configuration (Phase 4). Forwarded to
+# mkJavaContainerModule (which forwards to mkContainerModule). Default-off
+# preserves byte-identical legacy-flake behaviour.
+, health ? { enable = false; port = 9180; readinessCmd = null; }
+
 # Image naming passthrough (parity defaults).
 , imageName ? "firestream-spark"
 , imageTag ? version
@@ -406,6 +411,13 @@ in firestream.mkJavaContainerModule {
 
     info "Starting Spark in ''${SPARK_MODE:-master} mode..."
 
+    # The env-defaults set SPARK_HOME=/opt/spark for bitnami compatibility, but
+    # /opt/spark only holds writable runtime dirs (conf/, jars/, logs/, work/).
+    # The spark-class wrapper sources $SPARK_HOME/bin/load-spark-env.sh, which
+    # only exists under the nix-store spark package — override SPARK_HOME to
+    # point there before exec.
+    export SPARK_HOME=${pkgs.spark}
+
     case "''${SPARK_MODE:-master}" in
       master)
         info "Starting Spark Master..."
@@ -461,6 +473,9 @@ in firestream.mkJavaContainerModule {
 
   # Exposed ports
   inherit exposedPorts;
+
+  # In-image firestream-healthd (Phase 4).
+  inherit health;
 
   # Volume paths
   volumes = [

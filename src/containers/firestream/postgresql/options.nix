@@ -55,11 +55,14 @@
       POSTGRESQL_INIT_MAX_TIMEOUT = "60";
 
       # Authentication
+      # Default to ALLOW_EMPTY_PASSWORD=yes so the out-of-the-box image runs
+      # in any local/dev/e2e environment without requiring a password override.
+      # Production deployers override these via the standard mkDefault seam.
       POSTGRESQL_PASSWORD = "";
       POSTGRESQL_USERNAME = "postgres";
       POSTGRESQL_DATABASE = "";
       POSTGRESQL_POSTGRES_PASSWORD = "";
-      ALLOW_EMPTY_PASSWORD = "no";
+      ALLOW_EMPTY_PASSWORD = "yes";
 
       # Replication
       POSTGRESQL_REPLICATION_MODE = "";
@@ -132,5 +135,24 @@
     ];
 
     exposedPorts = lib.mkDefault [ 5432 ];
+
+    # Phase 3 pilot / Phase 4 generalisation: enable the in-image
+    # firestream-healthd service for postgresql. The entrypoint wrapper
+    # (base.nix) launches healthd in the background; /readyz invokes
+    # `pg_isready` to track real serviceability, not just listener-bound.
+    #
+    # The readinessCmd is passed verbatim to `firestream-healthd
+    # --readiness-cmd ...`, which evaluates it via `sh -c` at probe time —
+    # so `${POSTGRESQL_USERNAME:-postgres}` expands at runtime against the
+    # container's own env. This is required for the airflow-embedded
+    # postgres, which overrides POSTGRESQL_USERNAME=airflow and
+    # POSTGRESQL_DATABASE=airflow; a hard-coded `-U postgres -d postgres`
+    # would fail on that deployment. The `:-postgres` defaults keep the
+    # standalone case working even if those vars are unset.
+    health = {
+      enable = lib.mkDefault true;
+      readinessCmd = lib.mkDefault
+        ''pg_isready -U "''${POSTGRESQL_USERNAME:-postgres}" -d "''${POSTGRESQL_DATABASE:-postgres}"'';
+    };
   };
 }

@@ -54,8 +54,10 @@
       REDIS_EXTRA_FLAGS = "";
 
       # Authentication
+      # Default ALLOW_EMPTY_PASSWORD=yes for out-of-the-box local/dev/e2e use;
+      # production overrides via the standard mkDefault seam.
       REDIS_PASSWORD = "";
-      ALLOW_EMPTY_PASSWORD = "no";
+      ALLOW_EMPTY_PASSWORD = "yes";
 
       # Persistence
       REDIS_AOF_ENABLED = "yes";
@@ -107,5 +109,15 @@
     ];
 
     exposedPorts = lib.mkDefault [ 6379 ];
+
+    # Phase 4: enable in-image firestream-healthd. The readinessCmd is passed
+    # to healthd as a single string and evaluated via `sh -c` at probe time,
+    # so `${REDIS_PORT_NUMBER:-6379}` expands at runtime against the
+    # container's env (Bitnami's standard env var; see env defaults above).
+    health = {
+      enable = lib.mkDefault true;
+      readinessCmd = lib.mkDefault
+        ''redis-cli -p "''${REDIS_PORT_NUMBER:-6379}" ping | grep -q PONG'';
+    };
   };
 }

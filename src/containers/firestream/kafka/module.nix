@@ -58,19 +58,22 @@
     KAFKA_CONTROLLER_PORT_NUMBER = "9093";
 
     # KRaft configuration (required for Kafka 4.0+)
-    KAFKA_CFG_NODE_ID = "";
-    KAFKA_CFG_PROCESS_ROLES = "";
-    KAFKA_CFG_CONTROLLER_QUORUM_VOTERS = "";
+    # Defaults for single-node combined-mode (broker + controller) so the
+    # bare image runs out of the box for local/dev/e2e. Production / multi-node
+    # callers override these via the standard envVars override seam.
+    KAFKA_CFG_NODE_ID = "0";
+    KAFKA_CFG_PROCESS_ROLES = "controller,broker";
+    KAFKA_CFG_CONTROLLER_QUORUM_VOTERS = "0@localhost:9093";
     KAFKA_CFG_CONTROLLER_LISTENER_NAMES = "CONTROLLER";
     KAFKA_CLUSTER_ID = "";
     KAFKA_INITIAL_CONTROLLERS = "";
     KAFKA_KRAFT_BOOTSTRAP_SCRAM_USERS = "false";
 
-    # Listeners
-    KAFKA_CFG_LISTENERS = "";
-    KAFKA_CFG_ADVERTISED_LISTENERS = "";
-    KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP = "";
-    KAFKA_CFG_INTER_BROKER_LISTENER_NAME = "";
+    # Listeners — PLAINTEXT for client + CONTROLLER for KRaft on the standard ports.
+    KAFKA_CFG_LISTENERS = "PLAINTEXT://:9092,CONTROLLER://:9093";
+    KAFKA_CFG_ADVERTISED_LISTENERS = "PLAINTEXT://localhost:9092";
+    KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP = "CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT";
+    KAFKA_CFG_INTER_BROKER_LISTENER_NAME = "PLAINTEXT";
     KAFKA_CLIENT_LISTENER_NAME = "CLIENT";
 
     # SASL configuration
@@ -131,6 +134,11 @@
   ]
 
 , exposedPorts ? [ 9092 9093 ]
+
+# In-image health/SBOM service configuration (Phase 4). Forwarded to
+# mkJavaContainerModule (which forwards to mkContainerModule). Default-off
+# preserves byte-identical legacy-flake behaviour.
+, health ? { enable = false; port = 9180; readinessCmd = null; }
 
 # Image naming passthrough (parity defaults).
 , imageName ? "firestream-kafka"
@@ -518,6 +526,7 @@ in firestream.mkJavaContainerModule {
   inherit systemDeps runtimeBinDeps;
 
   inherit exposedPorts;
+  inherit health;
   volumes = [ "/bitnami/kafka" "/docker-entrypoint-initdb.d" ];
 
   user = { name = "kafka"; group = "kafka"; uid = 1001; gid = 1001; };

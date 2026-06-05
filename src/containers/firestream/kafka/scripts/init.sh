@@ -75,9 +75,18 @@ kafka_kraft_storage_initialize() {
     fi
   fi
 
-  # For Kafka 4.0+, controller role requires kraft.version feature
+  # For Kafka 4.0+, controller role requires kraft.version feature, and
+  # `kafka-storage format --feature=kraft.version=1` additionally requires one
+  # of --standalone / --initial-controllers / --no-initial-controllers (Kafka
+  # 4.x dynamic-controllers contract). Pick --standalone when the quorum has a
+  # single voter, otherwise --no-initial-controllers (multi-node bootstrap).
   if [[ "${KAFKA_CFG_PROCESS_ROLES:-}" =~ "controller" ]]; then
     args+=("--feature=kraft.version=1")
+    if [[ "${KAFKA_CFG_CONTROLLER_QUORUM_VOTERS:-}" != *,* ]]; then
+      args+=("--standalone")
+    else
+      args+=("--no-initial-controllers")
+    fi
   fi
 
   info "Formatting storage directories to add metadata..."

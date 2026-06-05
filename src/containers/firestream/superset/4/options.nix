@@ -150,5 +150,13 @@
     ];
 
     exposedPorts = lib.mkDefault [ 8088 5555 ];  # 8088=webserver, 5555=flower
+
+    # Phase 4: enable in-image firestream-healthd. Superset exposes /health.
+    # `SUPERSET_WEBSERVER_PORT_NUMBER` defaults to 8088 (see env defaults).
+    health = {
+      enable = lib.mkDefault true;
+      readinessCmd = lib.mkDefault
+        ''curl -fsS "http://localhost:''${SUPERSET_WEBSERVER_PORT_NUMBER:-8088}/health" > /dev/null'';
+    };
   };
 }

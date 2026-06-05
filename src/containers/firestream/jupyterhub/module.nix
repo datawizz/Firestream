@@ -62,7 +62,9 @@
     JUPYTERHUB_PASSWORD = "admin";
 
     # Database configuration
-    JUPYTERHUB_DATABASE_TYPE = "postgresql";
+    # Default to sqlite so the standalone image runs out of the box; prod /
+    # multi-node overrides via env to "postgresql" with HOST/USER/PASSWORD.
+    JUPYTERHUB_DATABASE_TYPE = "sqlite";
     JUPYTERHUB_DATABASE_HOST = "postgresql";
     JUPYTERHUB_DATABASE_PORT_NUMBER = "5432";
     JUPYTERHUB_DATABASE_NAME = "jupyterhub";
@@ -78,8 +80,9 @@
     # Timeouts
     JUPYTERHUB_DB_WAIT_TIMEOUT = "120";
 
-    # Empty password flag
-    ALLOW_EMPTY_PASSWORD = "no";
+    # Empty password flag — default to yes for out-of-the-box local/dev/e2e
+    # use; production overrides via the standard envVars override seam.
+    ALLOW_EMPTY_PASSWORD = "yes";
 
     # Debug mode
     BITNAMI_DEBUG = "false";
@@ -101,6 +104,11 @@
   ]
 
 , exposedPorts ? [ 8000 8081 ]
+
+# In-image health/SBOM service configuration (Phase 4). Forwarded to
+# mkPythonContainerModule (which forwards to mkContainerModule). Default-off
+# preserves byte-identical legacy-flake behaviour.
+, health ? { enable = false; port = 9180; readinessCmd = null; }
 
 # Image naming passthrough (parity defaults).
 , imageName ? "firestream-jupyterhub"
@@ -475,6 +483,7 @@ in firestream.mkPythonContainerModule {
   inherit systemDeps runtimeBinDeps;
 
   inherit exposedPorts;
+  inherit health;
   volumes = [ "/firestream/jupyterhub" "/docker-entrypoint-init.d" ];
 
   user = {

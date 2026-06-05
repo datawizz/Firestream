@@ -51,19 +51,22 @@
       KAFKA_CONTROLLER_PORT_NUMBER = "9093";
 
       # KRaft configuration (required for Kafka 4.0+)
-      KAFKA_CFG_NODE_ID = "";
-      KAFKA_CFG_PROCESS_ROLES = "";
-      KAFKA_CFG_CONTROLLER_QUORUM_VOTERS = "";
+      # Defaults for single-node combined-mode (broker + controller) so the
+      # bare image runs out of the box for local/dev/e2e. Production / multi-node
+      # callers override these via the standard mkDefault seam.
+      KAFKA_CFG_NODE_ID = "0";
+      KAFKA_CFG_PROCESS_ROLES = "controller,broker";
+      KAFKA_CFG_CONTROLLER_QUORUM_VOTERS = "0@localhost:9093";
       KAFKA_CFG_CONTROLLER_LISTENER_NAMES = "CONTROLLER";
       KAFKA_CLUSTER_ID = "";
       KAFKA_INITIAL_CONTROLLERS = "";
       KAFKA_KRAFT_BOOTSTRAP_SCRAM_USERS = "false";
 
-      # Listeners
-      KAFKA_CFG_LISTENERS = "";
-      KAFKA_CFG_ADVERTISED_LISTENERS = "";
-      KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP = "";
-      KAFKA_CFG_INTER_BROKER_LISTENER_NAME = "";
+      # Listeners — PLAINTEXT for client + CONTROLLER for KRaft on the standard ports.
+      KAFKA_CFG_LISTENERS = "PLAINTEXT://:9092,CONTROLLER://:9093";
+      KAFKA_CFG_ADVERTISED_LISTENERS = "PLAINTEXT://localhost:9092";
+      KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP = "CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT";
+      KAFKA_CFG_INTER_BROKER_LISTENER_NAME = "PLAINTEXT";
       KAFKA_CLIENT_LISTENER_NAME = "CLIENT";
 
       # SASL configuration
@@ -125,5 +128,17 @@
     ];
 
     exposedPorts = lib.mkDefault [ 9092 9093 ];
+
+    # Phase 4: enable in-image firestream-healthd. The readinessCmd asks the
+    # broker for its API versions over the configured client listener — this
+    # proves metadata is serviceable, not just that the listener has bound.
+    # `KAFKA_PORT_NUMBER` is the Bitnami client-listener env var (see env
+    # defaults above; defaults to 9092). The `.sh` suffix is the actual
+    # binary name in pkgs.apacheKafka/bin.
+    health = {
+      enable = lib.mkDefault true;
+      readinessCmd = lib.mkDefault
+        ''kafka-broker-api-versions.sh --bootstrap-server "localhost:''${KAFKA_PORT_NUMBER:-9092}"'';
+    };
   };
 }

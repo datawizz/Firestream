@@ -290,9 +290,20 @@ kafka_configure() {
   if [[ ! -f "${KAFKA_MOUNTED_CONF_DIR}/server.properties" ]]; then
     info "No injected configuration files found, creating default config files"
 
-    # Restore original server.properties but remove conflicting settings
+    # Restore original server.properties but remove conflicting settings.
+    # The firestream nix-based image ships the Apache Kafka default at
+    # /config/server.properties (symlink into the kafka nix-package) rather
+    # than the legacy bitnami `.original` next to $KAFKA_CONF_FILE — so fall
+    # back to it when the bitnami-style original isn't present.
     if [[ -f "${KAFKA_CONF_DIR}/server.properties.original" ]]; then
       cp "${KAFKA_CONF_DIR}/server.properties.original" "$KAFKA_CONF_FILE"
+      kafka_server_unify_conf
+    elif [[ -f /config/server.properties ]]; then
+      # /config/server.properties is a symlink into the read-only nix store,
+      # so we cp -L the content and force-write +w mode so the subsequent
+      # in-place env-var rewrites can modify it.
+      cp -L /config/server.properties "$KAFKA_CONF_FILE"
+      chmod u+w "$KAFKA_CONF_FILE"
       kafka_server_unify_conf
     fi
 

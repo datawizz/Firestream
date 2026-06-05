@@ -18,6 +18,7 @@ let
   };
   waitForPortPkg = packages.wait-for-port;
   firestreamVibPkg = packages.firestream-vib;
+  firestreamHealthdPkg = packages.firestream-healthd;
 
   # Import core library modules with dependency injection
   # Each module receives only the dependencies it needs
@@ -69,7 +70,7 @@ let
 
   # Import container factories
   containerBase = import ./containers/base.nix {
-    inherit pkgs lib coreLibs waitForPortPkg firestreamVibPkg;
+    inherit pkgs lib coreLibs waitForPortPkg firestreamVibPkg firestreamHealthdPkg;
     mkAppModule = appBase.mkAppModule;
   };
   containerPython = import ./containers/python.nix {
@@ -92,7 +93,7 @@ let
   # Self-reference for passing to python-workspace.nix
   # This is a recursive definition that works because Nix is lazy
   firestreamLib = rec {
-    inherit packages waitForPortPkg;
+    inherit packages waitForPortPkg firestreamHealthdPkg;
     mkPythonContainerModule = containerPython.mkPythonContainerModule;
   };
 
@@ -130,6 +131,7 @@ in {
   # Usage: firestream.packages.wait-for-port
   inherit packages;
   inherit waitForPortPkg;
+  inherit firestreamHealthdPkg;
 
   # Core library modules (for direct access)
   # Usage: firestream.lib.log.functions

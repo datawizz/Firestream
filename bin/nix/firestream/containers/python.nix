@@ -77,6 +77,12 @@
     exposedPorts ? [],
     volumes ? [],
 
+    # In-image firestream-healthd configuration (Phase 4). Forwarded verbatim
+    # to mkContainerModule, which wraps the entrypoint with a healthd launcher
+    # when `enable = true`. Default-off preserves byte-identical pre-Phase-3
+    # behaviour for any container that does not opt in.
+    health ? { enable = false; port = 9180; readinessCmd = null; },
+
     # Python-specific options
     requirementsPath ? "/bitnami/python/requirements.txt",  # Runtime requirements
     enablePip ? true,        # Allow pip install at runtime
@@ -186,6 +192,12 @@
       volumes = volumes ++ [
         (builtins.dirOf requirementsPath)  # Allow mounting requirements
       ];
+
+      # Forward health config so the base entrypoint wrapper can layer
+      # firestream-healthd onto the python entrypoint wrapper. base.nix wraps
+      # finalEntrypoint = if health.enable then healthWrapper else
+      # innerEntrypoint, where innerEntrypoint already includes pythonEntrypointWrapper.
+      inherit health;
 
       entrypointWrapper = pythonEntrypointWrapper;
 
