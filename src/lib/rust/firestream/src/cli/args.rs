@@ -31,6 +31,17 @@ pub struct Cli {
     #[arg(long, global = true)]
     pub json: bool,
 
+    /// Path to the Firestream chart bundle (the symlink farm produced by
+    /// `nix build .#firestream-charts-bundle`). Mirrors the
+    /// `firestream-healthd` pattern of a clap-level default + env override.
+    #[arg(
+        long,
+        global = true,
+        env = "FIRESTREAM_CHARTS_DIR",
+        default_value = "/opt/firestream/charts"
+    )]
+    pub charts_dir: PathBuf,
+
     #[command(subcommand)]
     pub command: Option<Command>,
 }
@@ -199,6 +210,17 @@ pub enum Command {
         timeout: u64,
     },
 
+    /// Deploy Helm charts driven by the Nix-emitted chart bundle.
+    ///
+    /// `helm deploy <chart>` resolves a single chart manifest via
+    /// `FIRESTREAM_CHARTS_DIR` and runs it through the lifecycle executor.
+    /// `helm deploy-stack <stack>` does the same for every chart in a named
+    /// stack (e.g. `dev`), skipping entries that aren't yet registered.
+    Helm {
+        #[command(subcommand)]
+        command: HelmCommand,
+    },
+
     /// Generate a new project from templates
     Template {
         /// Project name
@@ -330,6 +352,41 @@ pub enum ClusterCommand {
         /// Namespace (use "all" for all namespaces)
         #[arg(short, long, default_value = "all")]
         namespace: String,
+    },
+}
+
+#[derive(Subcommand, Debug)]
+pub enum HelmCommand {
+    /// Deploy a single chart by Firestream name (from the index).
+    Deploy {
+        /// Chart name as registered in `index.json` (e.g. `airflow`).
+        chart: String,
+
+        /// Kubernetes namespace override. Falls back to the manifest's
+        /// `release.namespace`, then to `default`.
+        #[arg(long)]
+        namespace: Option<String>,
+
+        /// Pass `--dry-run` to the underlying `helm upgrade --install`.
+        #[arg(long)]
+        dry_run: bool,
+    },
+
+    /// Deploy every chart in a named stack, in declaration order.
+    DeployStack {
+        /// Stack name as registered in `index.json` (e.g. `dev`).
+        stack: String,
+
+        /// Kubernetes namespace override applied to every chart in the
+        /// stack. Falls back to per-chart `release.namespace` then to
+        /// `default`.
+        #[arg(long)]
+        namespace: Option<String>,
+
+        /// Pass `--dry-run` to the underlying `helm upgrade --install` for
+        /// each chart.
+        #[arg(long)]
+        dry_run: bool,
     },
 }
 

@@ -21,13 +21,6 @@ pub struct HelmRepo {
 }
 
 impl HelmRepo {
-    pub fn bitnami() -> Self {
-        Self {
-            name: "bitnami".to_string(),
-            url: "https://charts.bitnami.com/bitnami".to_string(),
-        }
-    }
-    
     pub fn prometheus_community() -> Self {
         Self {
             name: "prometheus-community".to_string(),
@@ -312,7 +305,6 @@ async fn check_helm_installed() -> Result<()> {
 /// Add Helm repositories
 async fn add_repositories() -> Result<()> {
     let repos = vec![
-        HelmRepo::bitnami(),
         HelmRepo::prometheus_community(),
         HelmRepo::ingress_nginx(),
         HelmRepo::strimzi(),

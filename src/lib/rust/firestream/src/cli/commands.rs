@@ -2,7 +2,7 @@
 //!
 //! This module implements the actual command execution for the CLI.
 
-use super::args::{Cli, Command, ConfigCommand, StateCommand, ClusterCommand};
+use super::args::{Cli, Command, ConfigCommand, StateCommand, ClusterCommand, HelmCommand};
 use crate::services::ServiceManager;
 use crate::config::{ConfigManager, ServiceState, ServiceStatus, ResourceUsage};
 use crate::state::{StateManager, ResourceType, K3dClusterConfig, FirestreamState};
@@ -172,6 +172,10 @@ pub async fn execute_command(cli: Cli) -> Result<()> {
         
         Some(Command::Build { ref packages, native, docker, parallel: _, timeout }) => {
             execute_build(packages, native, docker, timeout, cli.quiet, cli.json).await?;
+        }
+
+        Some(Command::Helm { ref command }) => {
+            execute_helm_command(command, &cli.charts_dir).await?;
         }
 
         Some(Command::Template { name, project_type, output, non_interactive, values }) => {
@@ -1046,10 +1050,85 @@ async fn execute_cluster_diagnostics(
         .args(&["cluster-info"])
         .output()
         .await?;
-    
+
     if output.status.success() {
         println!("{}", String::from_utf8_lossy(&output.stdout));
     }
-    
+
+    Ok(())
+}
+
+/// Execute `firestream helm <subcommand>`.
+///
+/// Wires the Nix-emitted chart bundle (`firestream-charts-bundle`) through
+/// the existing helm lifecycle executor. The bundle is opened once via
+/// `Charts::open(charts_dir)`; per-chart manifests are parsed lazily.
+async fn execute_helm_command(command: &HelmCommand, charts_dir: &PathBuf) -> Result<()> {
+    use crate::deploy::helm_lifecycle::{chart_info_from_manifest, CommonChart};
+    use crate::deploy::helm::deploy_chart_lifecycle;
+    use firestream_charts::Charts;
+
+    let charts = Charts::open(charts_dir).map_err(|e| {
+        FirestreamError::ConfigError(format!(
+            "Failed to open chart bundle at {:?}: {}. Set FIRESTREAM_CHARTS_DIR or run `nix build .#firestream-charts-bundle --out-link <dir>` and pass --charts-dir.",
+            charts_dir, e
+        ))
+    })?;
+
+    match command {
+        HelmCommand::Deploy { chart, namespace, dry_run } => {
+            let manifest = charts.get(chart).map_err(|e| {
+                FirestreamError::ConfigError(format!(
+                    "Chart `{}` not found in {:?}: {}",
+                    chart, charts_dir, e
+                ))
+            })?;
+
+            let mut info = chart_info_from_manifest(&manifest);
+            if let Some(ns) = namespace {
+                info.custom_namespace = Some(ns.clone());
+            }
+            info.dry_run = *dry_run;
+
+            info!(
+                "Deploying chart `{}` (version {}) from {:?}",
+                info.name, manifest.version, manifest.bundle.chart_path
+            );
+
+            let common = CommonChart::new(info);
+            deploy_chart_lifecycle(Box::new(common), None).await?;
+        }
+        HelmCommand::DeployStack { stack, namespace, dry_run } => {
+            let manifests = charts.stack(stack).map_err(|e| {
+                FirestreamError::ConfigError(format!(
+                    "Stack `{}` not found in {:?}: {}",
+                    stack, charts_dir, e
+                ))
+            })?;
+
+            if manifests.is_empty() {
+                info!("Stack `{}` resolved to zero registered charts; nothing to deploy.", stack);
+                return Ok(());
+            }
+
+            info!("Deploying stack `{}`: {} chart(s)", stack, manifests.len());
+            for manifest in manifests {
+                let mut info = chart_info_from_manifest(&manifest);
+                if let Some(ns) = namespace {
+                    info.custom_namespace = Some(ns.clone());
+                }
+                info.dry_run = *dry_run;
+
+                info!(
+                    "  -> {} (version {}) from {:?}",
+                    info.name, manifest.version, manifest.bundle.chart_path
+                );
+
+                let common = CommonChart::new(info);
+                deploy_chart_lifecycle(Box::new(common), None).await?;
+            }
+        }
+    }
+
     Ok(())
 }
