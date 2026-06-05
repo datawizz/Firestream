@@ -33,7 +33,8 @@ Firestream is a serverless data warehouse designed as "create-react-app for data
   - `macros/`: Test macros
 - `tools/`: Infrastructure management utilities
   - `k8s-manager`: Kubernetes resource operations
-  - `helm-manager`: Helm chart deployment
+  - `helm-manager`: helm-CLI execution layer (helm/kubectl shell-out + values resolver; no embedded charts)
+  - `firestream-charts`: chart registry — reads the flake-emitted index at `/opt/firestream/charts`
   - `docker-manager`: Container management
   - `templatizer-spark`: Spark application templating
   - `templatizer-puppeteer`: Node.js app templating
@@ -278,6 +279,37 @@ The project maintains a fork of Bitnami charts in `src/charts/` and containers i
 - Ensures version stability
 - Bitnami charts commit hash in Nix flake: `9bc801b4caa0b2fff6ae3392f6b417877a056965`
 
+### Helm Chart Contract (Nix -> JSON -> Rust)
+The flake is the source of truth for helm. Each chart at `src/charts/firestream/<name>/nix/` is a typed-options overlay using `lib.evalModules`. The shared option types live in `bin/nix/firestream/charts/lib/types/`; the per-chart evaluator is `bin/nix/firestream/charts/eval-chart.nix`.
+
+**Manifest emission (schema v1):**
+- Each chart emits a `chart-manifest.json` (chart name, version, repo, vendored subchart paths, default `values.yaml`, and a `_meta` block).
+- `_meta.containerRefs` is the per-chart image-injection seam. Only `airflow` is wired today; the other 7 charts still render Bitnami's bundled images.
+- Subchart vendoring helper: `bin/nix/firestream/charts/lib/vendor-subcharts.nix`. Values rendering helper: `bin/nix/firestream/charts/lib/to-values-yaml.nix`.
+
+**Aggregate bundle:**
+- `packages.firestream-charts-bundle` (see `nix/flake-modules/charts/`) is a symlink farm with a top-level `index.json` listing every chart and the `firestreamStacks.dev` composition.
+- Default deploy path: `/opt/firestream/charts/`. Dev-shell sets `FIRESTREAM_CHARTS_DIR=$PWD/.firestream/charts` and best-effort builds the bundle on shell entry.
+- 8 charts have typed overlays and are in `firestreamCharts` + `firestreamStacks.dev`: `airflow`, `postgresql`, `redis`, `kafka`, `spark`, `jupyterhub`, `superset`, `odoo`.
+
+**Rust consumers:**
+- `firestream-charts` crate (`src/lib/rust/firestream-charts/`): reader for the bundle (`index.json` + per-chart `chart-manifest.json`).
+- `helm_lifecycle` module in the `firestream` crate consumes manifests via `chart_info_from_manifest`.
+- `helm-manager` crate is strictly the helm/kubectl CLI execution layer (`helm_client`, `kubectl_client`, `values_resolver`, `deployment`); chart embedding (`embedded_charts.rs`, `include_dir`, the `HelmManager` aggregator) is gone.
+
+**CLI:**
+```bash
+firestream helm deploy <chart>          # deploy a single chart from the bundle
+firestream helm deploy-stack <stack>    # deploy a named stack (e.g. dev)
+# Override the bundle location:
+firestream helm deploy <chart> --charts-dir /custom/path
+# or:  FIRESTREAM_CHARTS_DIR=/custom/path firestream helm deploy <chart>
+```
+
+**Gotchas:**
+- Chart option modules MUST mirror the actual `values.yaml` hierarchy. Bitnami uses both flat (`odoo`) and hub-and-spoke (`superset`, `jupyterhub`) shapes — do not flatten/un-flatten arbitrarily.
+- Random-secret normalisation for parity tests lives in `nix/flake-modules/charts/checks.nix` and covers every Bitnami chart family.
+
 ### Docker-from-Docker Pattern
 Rather than Docker-in-Docker, the devcontainer binds to `/var/run/docker.sock`:
 - Shares host's Docker Engine
@@ -341,5 +373,6 @@ In devcontainer: `/home/firestream/.python` (symlinked from Nix environment)
 1. **Running Outside Container**: `bootstrap.sh` detects if running outside Docker and auto-launches via `docker compose`
 2. **Rust Analyzer**: Uses `--target-dir=target-ra` to avoid conflicts with main build
 3. **CPU Architecture**: Build scripts auto-detect and adapt to x86_64 or ARM64
-4. **Helm Charts**: Use the local fork in `src/charts/`, not upstream Bitnami
+4. **Helm Charts**: Use the local fork in `src/charts/`, not upstream Bitnami. Chart deploys go through the flake-emitted bundle at `/opt/firestream/charts/` (see "Helm Chart Contract" above), not directly via `helm install` against `src/charts/firestream/<name>/`.
 5. **Workspace Default Member**: `cargo run` at root runs the TUI, not the API server
+6. **`helm-manager` is not a chart store**: it is a helm/kubectl CLI wrapper. Callers must pass `values.yaml` explicitly via `values_files` (no defaults sourced from embedded charts).
