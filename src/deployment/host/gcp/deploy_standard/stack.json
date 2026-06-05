@@ -1,0 +1,1829 @@
+{
+    "version": 3,
+    "deployment": {
+        "manifest": {
+            "time": "2024-12-18T20:21:10.625254954Z",
+            "magic": "9d7fdcbd2f592806bea5d40a1dad102d82da12e38cbaa516ad69c5253488d16d",
+            "version": "v3.143.0"
+        },
+        "secrets_providers": {
+            "type": "passphrase",
+            "state": {
+                "salt": "v1:+Z0tc2F9XMA=:v1:VoQDlWQ8OQepMuAr:ZyJLA1MKTO4p1/48JJBUTxX3KGobFg=="
+            }
+        },
+        "resources": [
+            {
+                "urn": "urn:pulumi:main::deploy_standard::pulumi:pulumi:Stack::deploy_standard-main",
+                "custom": false,
+                "type": "pulumi:pulumi:Stack",
+                "outputs": {
+                    "app_bucket": "gs://app_bucket-1addd34",
+                    "gce_image_name": "nixos-image",
+                    "gce_image_self_link": "https://www.googleapis.com/compute/v1/projects/pleasantrees-dwh/global/images/nixos-image",
+                    "image_info": {
+                        "gcs_url": "https://www.googleapis.com/storage/v1/b/machine_images-2af651d/o/nixos-images%2Fnixos-image-x86_64-linux.raw.tar.gz",
+                        "hostname": "prodbox",
+                        "image_hash": "30c6df2ea597fe0c2881052aef4c944c4a564f61cb58d6c2880735a1bfd95006",
+                        "image_name": "nixos-image-x86_64-linux.raw.tar.gz",
+                        "image_path": "/workspace/build/out/nixos-image-x86_64-linux.raw.tar.gz",
+                        "image_size": 1520414648
+                    },
+                    "machine_images_bucket": "gs://machine_images-2af651d",
+                    "machines_images": "gs://machine_images-2af651d",
+                    "nixos_hostname": "prodbox",
+                    "nixos_image_url": "https://www.googleapis.com/storage/v1/b/machine_images-2af651d/o/nixos-images%2Fnixos-image-x86_64-linux.raw.tar.gz",
+                    "service_account_email": "nodeone@pleasantrees-dwh.iam.gserviceaccount.com",
+                    "tunnel_id": "4ec4f433-bcf4-4724-82c0-6c0cd8475fda",
+                    "tunnel_info": {
+                        "credentials": "{\n  \"AccountTag\": \"eb7122e7cd9a9ef517a0e977dedda371\",\n  \"TunnelID\": \"4ec4f433-bcf4-4724-82c0-6c0cd8475fda\",\n  \"TunnelSecret\": \"SOOeUJGV4ZSmPQ5PXy6YmUOmZv0yypC5\"\n}",
+                        "tunnel_id": "4ec4f433-bcf4-4724-82c0-6c0cd8475fda"
+                    },
+                    "vm_instance_external_ip": "34.42.219.31",
+                    "vm_instance_name": "nixos-vm",
+                    "vm_instance_self_link": "https://www.googleapis.com/compute/v1/projects/pleasantrees-dwh/zones/us-central1-a/instances/nixos-vm"
+                },
+                "created": "2024-12-18T18:23:36.237456245Z",
+                "modified": "2024-12-18T18:23:36.237456245Z",
+                "sourcePosition": "project:///venv/lib/python3.9/site-packages/pulumi/runtime/stack.py#140"
+            },
+            {
+                "urn": "urn:pulumi:main::deploy_standard::pulumi:providers:gcp::default_8_11_0",
+                "custom": true,
+                "id": "90f7bfc7-17fa-4143-b64e-fd04e999553f",
+                "type": "pulumi:providers:gcp",
+                "inputs": {
+                    "__internal": {},
+                    "project": "pleasantrees-dwh",
+                    "version": "8.11.0"
+                },
+                "outputs": {
+                    "project": "pleasantrees-dwh",
+                    "version": "8.11.0"
+                },
+                "created": "2024-12-18T18:23:36.915505999Z",
+                "modified": "2024-12-18T18:23:36.915505999Z"
+            },
+            {
+                "urn": "urn:pulumi:main::deploy_standard::pulumi:providers:cloudflare::cloudflare-provider=access",
+                "custom": true,
+                "id": "82027398-b0ac-4684-8c19-d06730f39c4d",
+                "type": "pulumi:providers:cloudflare",
+                "inputs": {
+                    "__internal": {},
+                    "apiClientLogging": "false",
+                    "apiToken": {
+                        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+                        "plaintext": "\"RbosNk9ZorfoWfOr81mQde0caVzsI0vx8qUjMXIy\""
+                    },
+                    "maxBackoff": "30",
+                    "minBackoff": "1",
+                    "retries": "3",
+                    "rps": "4",
+                    "version": "5.45.0"
+                },
+                "outputs": {
+                    "apiClientLogging": "false",
+                    "apiToken": {
+                        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+                        "plaintext": "\"RbosNk9ZorfoWfOr81mQde0caVzsI0vx8qUjMXIy\""
+                    },
+                    "maxBackoff": "30",
+                    "minBackoff": "1",
+                    "retries": "3",
+                    "rps": "4",
+                    "version": "5.45.0"
+                },
+                "parent": "urn:pulumi:main::deploy_standard::pulumi:pulumi:Stack::deploy_standard-main",
+                "propertyDependencies": {
+                    "apiClientLogging": [],
+                    "apiToken": [],
+                    "maxBackoff": [],
+                    "minBackoff": [],
+                    "retries": [],
+                    "rps": []
+                },
+                "created": "2024-12-18T18:23:37.051941065Z",
+                "modified": "2024-12-18T18:23:37.051941065Z",
+                "sourcePosition": "project:///venv/lib/python3.9/site-packages/pulumi_cloudflare/provider.py#375"
+            },
+            {
+                "urn": "urn:pulumi:main::deploy_standard::pulumi:providers:cloudflare::cloudflare-provider-tunnel",
+                "custom": true,
+                "id": "a6a01ca8-97fd-42f2-89c7-aa2fbbd518a2",
+                "type": "pulumi:providers:cloudflare",
+                "inputs": {
+                    "__internal": {},
+                    "apiClientLogging": "false",
+                    "apiToken": {
+                        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+                        "plaintext": "\"RbosNk9ZorfoWfOr81mQde0caVzsI0vx8qUjMXIy\""
+                    },
+                    "maxBackoff": "30",
+                    "minBackoff": "1",
+                    "retries": "3",
+                    "rps": "4",
+                    "version": "5.45.0"
+                },
+                "outputs": {
+                    "apiClientLogging": "false",
+                    "apiToken": {
+                        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+                        "plaintext": "\"RbosNk9ZorfoWfOr81mQde0caVzsI0vx8qUjMXIy\""
+                    },
+                    "maxBackoff": "30",
+                    "minBackoff": "1",
+                    "retries": "3",
+                    "rps": "4",
+                    "version": "5.45.0"
+                },
+                "parent": "urn:pulumi:main::deploy_standard::pulumi:pulumi:Stack::deploy_standard-main",
+                "propertyDependencies": {
+                    "apiClientLogging": [],
+                    "apiToken": [],
+                    "maxBackoff": [],
+                    "minBackoff": [],
+                    "retries": [],
+                    "rps": []
+                },
+                "created": "2024-12-18T18:23:36.988756442Z",
+                "modified": "2024-12-18T18:23:36.988756442Z",
+                "sourcePosition": "project:///venv/lib/python3.9/site-packages/pulumi_cloudflare/provider.py#375"
+            },
+            {
+                "urn": "urn:pulumi:main::deploy_standard::gcp:storage/bucket:Bucket::app_bucket",
+                "custom": true,
+                "id": "app_bucket-1addd34",
+                "type": "gcp:storage/bucket:Bucket",
+                "inputs": {
+                    "__defaults": [
+                        "name",
+                        "storageClass"
+                    ],
+                    "forceDestroy": false,
+                    "location": "US",
+                    "name": "app_bucket-1addd34",
+                    "storageClass": "STANDARD"
+                },
+                "outputs": {
+                    "__meta": "{\"e2bfb730-ecaa-11e6-8f88-34363bc7c4c0\":{\"create\":600000000000,\"read\":240000000000,\"update\":240000000000},\"schema_version\":\"3\"}",
+                    "autoclass": null,
+                    "cors": [],
+                    "customPlacementConfig": null,
+                    "defaultEventBasedHold": false,
+                    "effectiveLabels": {
+                        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+                        "plaintext": "{\"goog-pulumi-provisioned\":\"true\"}"
+                    },
+                    "enableObjectRetention": false,
+                    "encryption": null,
+                    "forceDestroy": false,
+                    "hierarchicalNamespace": {
+                        "enabled": false
+                    },
+                    "id": "app_bucket-1addd34",
+                    "labels": {},
+                    "lifecycleRules": [],
+                    "location": "US",
+                    "logging": null,
+                    "name": "app_bucket-1addd34",
+                    "project": "pleasantrees-dwh",
+                    "projectNumber": 367658546539,
+                    "publicAccessPrevention": "inherited",
+                    "pulumiLabels": {
+                        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+                        "plaintext": "{\"goog-pulumi-provisioned\":\"true\"}"
+                    },
+                    "requesterPays": false,
+                    "retentionPolicy": null,
+                    "rpo": "DEFAULT",
+                    "selfLink": "https://www.googleapis.com/storage/v1/b/app_bucket-1addd34",
+                    "softDeletePolicy": {
+                        "effectiveTime": "2024-12-18T18:23:37.848Z",
+                        "retentionDurationSeconds": 604800
+                    },
+                    "storageClass": "STANDARD",
+                    "uniformBucketLevelAccess": false,
+                    "url": "gs://app_bucket-1addd34",
+                    "versioning": null,
+                    "website": null
+                },
+                "parent": "urn:pulumi:main::deploy_standard::pulumi:pulumi:Stack::deploy_standard-main",
+                "provider": "urn:pulumi:main::deploy_standard::pulumi:providers:gcp::default_8_11_0::90f7bfc7-17fa-4143-b64e-fd04e999553f",
+                "propertyDependencies": {
+                    "forceDestroy": [],
+                    "location": []
+                },
+                "additionalSecretOutputs": [
+                    "effectiveLabels",
+                    "pulumiLabels"
+                ],
+                "created": "2024-12-18T18:23:38.825244974Z",
+                "modified": "2024-12-18T20:18:51.242792552Z",
+                "sourcePosition": "project:///venv/lib/python3.9/site-packages/pulumi_gcp/storage/bucket.py#1225"
+            },
+            {
+                "urn": "urn:pulumi:main::deploy_standard::gcp:storage/bucket:Bucket::machine_images",
+                "custom": true,
+                "id": "machine_images-2af651d",
+                "type": "gcp:storage/bucket:Bucket",
+                "inputs": {
+                    "__defaults": [
+                        "name",
+                        "storageClass"
+                    ],
+                    "forceDestroy": true,
+                    "location": "US",
+                    "name": "machine_images-2af651d",
+                    "storageClass": "STANDARD"
+                },
+                "outputs": {
+                    "__meta": "{\"e2bfb730-ecaa-11e6-8f88-34363bc7c4c0\":{\"create\":600000000000,\"read\":240000000000,\"update\":240000000000},\"schema_version\":\"3\"}",
+                    "autoclass": null,
+                    "cors": [],
+                    "customPlacementConfig": null,
+                    "defaultEventBasedHold": false,
+                    "effectiveLabels": {
+                        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+                        "plaintext": "{\"goog-pulumi-provisioned\":\"true\"}"
+                    },
+                    "enableObjectRetention": false,
+                    "encryption": null,
+                    "forceDestroy": true,
+                    "hierarchicalNamespace": {
+                        "enabled": false
+                    },
+                    "id": "machine_images-2af651d",
+                    "labels": {},
+                    "lifecycleRules": [],
+                    "location": "US",
+                    "logging": null,
+                    "name": "machine_images-2af651d",
+                    "project": "pleasantrees-dwh",
+                    "projectNumber": 367658546539,
+                    "publicAccessPrevention": "inherited",
+                    "pulumiLabels": {
+                        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+                        "plaintext": "{\"goog-pulumi-provisioned\":\"true\"}"
+                    },
+                    "requesterPays": false,
+                    "retentionPolicy": null,
+                    "rpo": "DEFAULT",
+                    "selfLink": "https://www.googleapis.com/storage/v1/b/machine_images-2af651d",
+                    "softDeletePolicy": {
+                        "effectiveTime": "2024-12-18T18:23:37.847Z",
+                        "retentionDurationSeconds": 604800
+                    },
+                    "storageClass": "STANDARD",
+                    "uniformBucketLevelAccess": false,
+                    "url": "gs://machine_images-2af651d",
+                    "versioning": null,
+                    "website": null
+                },
+                "parent": "urn:pulumi:main::deploy_standard::pulumi:pulumi:Stack::deploy_standard-main",
+                "provider": "urn:pulumi:main::deploy_standard::pulumi:providers:gcp::default_8_11_0::90f7bfc7-17fa-4143-b64e-fd04e999553f",
+                "propertyDependencies": {
+                    "forceDestroy": [],
+                    "location": []
+                },
+                "additionalSecretOutputs": [
+                    "effectiveLabels",
+                    "pulumiLabels"
+                ],
+                "created": "2024-12-18T18:23:38.611436936Z",
+                "modified": "2024-12-18T20:18:51.231181661Z",
+                "sourcePosition": "project:///venv/lib/python3.9/site-packages/pulumi_gcp/storage/bucket.py#1225"
+            },
+            {
+                "urn": "urn:pulumi:main::deploy_standard::gcp:projects/service:Service::enable-serviceusage.googleapis.com",
+                "custom": true,
+                "id": "pleasantrees-dwh/serviceusage.googleapis.com",
+                "type": "gcp:projects/service:Service",
+                "inputs": {
+                    "__defaults": [
+                        "checkIfServiceHasUsageOnDestroy"
+                    ],
+                    "checkIfServiceHasUsageOnDestroy": false,
+                    "disableDependentServices": false,
+                    "disableOnDestroy": false,
+                    "project": "pleasantrees-dwh",
+                    "service": "serviceusage.googleapis.com"
+                },
+                "outputs": {
+                    "__meta": "{\"e2bfb730-ecaa-11e6-8f88-34363bc7c4c0\":{\"create\":1200000000000,\"delete\":1200000000000,\"read\":600000000000,\"update\":1200000000000}}",
+                    "checkIfServiceHasUsageOnDestroy": false,
+                    "disableDependentServices": false,
+                    "disableOnDestroy": false,
+                    "id": "pleasantrees-dwh/serviceusage.googleapis.com",
+                    "project": "pleasantrees-dwh",
+                    "service": "serviceusage.googleapis.com"
+                },
+                "parent": "urn:pulumi:main::deploy_standard::pulumi:pulumi:Stack::deploy_standard-main",
+                "provider": "urn:pulumi:main::deploy_standard::pulumi:providers:gcp::default_8_11_0::90f7bfc7-17fa-4143-b64e-fd04e999553f",
+                "propertyDependencies": {
+                    "disableDependentServices": [],
+                    "disableOnDestroy": [],
+                    "project": [],
+                    "service": []
+                },
+                "created": "2024-12-18T18:23:40.633356141Z",
+                "modified": "2024-12-18T18:23:40.633356141Z",
+                "sourcePosition": "project:///venv/lib/python3.9/site-packages/pulumi_gcp/projects/service.py#325"
+            },
+            {
+                "urn": "urn:pulumi:main::deploy_standard::pulumi:providers:random::default_4_16_8",
+                "custom": true,
+                "id": "2e981b56-fc79-4482-a029-263d3dcfad90",
+                "type": "pulumi:providers:random",
+                "inputs": {
+                    "__internal": {},
+                    "version": "4.16.8"
+                },
+                "outputs": {
+                    "version": "4.16.8"
+                },
+                "created": "2024-12-18T18:23:37.079819637Z",
+                "modified": "2024-12-18T18:23:37.079819637Z"
+            },
+            {
+                "urn": "urn:pulumi:main::deploy_standard::cloudflare:index/zeroTrustAccessApplication:ZeroTrustAccessApplication::protected-app",
+                "custom": true,
+                "id": "b991c7af-2889-4751-bb2d-bdcce516ede9",
+                "type": "cloudflare:index/zeroTrustAccessApplication:ZeroTrustAccessApplication",
+                "inputs": {
+                    "__defaults": [
+                        "appLauncherVisible",
+                        "autoRedirectToIdentity",
+                        "enableBindingCookie",
+                        "optionsPreflightBypass",
+                        "serviceAuth401Redirect",
+                        "skipAppLauncherLoginPage",
+                        "skipInterstitial"
+                    ],
+                    "accountId": "eb7122e7cd9a9ef517a0e977dedda371",
+                    "appLauncherVisible": true,
+                    "autoRedirectToIdentity": false,
+                    "domain": "centerpoint.consulting",
+                    "enableBindingCookie": false,
+                    "name": "Protected centerpoint.consulting",
+                    "optionsPreflightBypass": false,
+                    "serviceAuth401Redirect": false,
+                    "sessionDuration": "24h",
+                    "skipAppLauncherLoginPage": false,
+                    "skipInterstitial": false,
+                    "type": "self_hosted"
+                },
+                "outputs": {
+                    "accountId": "eb7122e7cd9a9ef517a0e977dedda371",
+                    "allowAuthenticateViaWarp": false,
+                    "allowedIdps": [],
+                    "appLauncherLogoUrl": "",
+                    "appLauncherVisible": true,
+                    "aud": "21bdbbbbab18cf8ab0ae1062af7f67e663a4adc9f7e7666ff9b4dd009a3439ed",
+                    "autoRedirectToIdentity": false,
+                    "bgColor": "",
+                    "corsHeaders": [],
+                    "customDenyMessage": "",
+                    "customDenyUrl": "",
+                    "customNonIdentityDenyUrl": "",
+                    "customPages": [],
+                    "destinations": [],
+                    "domain": "centerpoint.consulting",
+                    "domainType": null,
+                    "enableBindingCookie": false,
+                    "footerLinks": [],
+                    "headerBgColor": "",
+                    "httpOnlyCookieAttribute": false,
+                    "id": "b991c7af-2889-4751-bb2d-bdcce516ede9",
+                    "landingPageDesign": null,
+                    "logoUrl": "",
+                    "name": "Protected centerpoint.consulting",
+                    "optionsPreflightBypass": false,
+                    "policies": null,
+                    "saasApp": null,
+                    "sameSiteCookieAttribute": "",
+                    "scimConfig": null,
+                    "selfHostedDomains": null,
+                    "serviceAuth401Redirect": false,
+                    "sessionDuration": "24h",
+                    "skipAppLauncherLoginPage": false,
+                    "skipInterstitial": false,
+                    "tags": [],
+                    "targetCriterias": [],
+                    "type": "self_hosted",
+                    "zoneId": null
+                },
+                "parent": "urn:pulumi:main::deploy_standard::pulumi:pulumi:Stack::deploy_standard-main",
+                "provider": "urn:pulumi:main::deploy_standard::pulumi:providers:cloudflare::cloudflare-provider=access::82027398-b0ac-4684-8c19-d06730f39c4d",
+                "propertyDependencies": {
+                    "accountId": [],
+                    "domain": [],
+                    "name": [],
+                    "sessionDuration": [],
+                    "type": []
+                },
+                "created": "2024-12-18T18:23:38.148417972Z",
+                "modified": "2024-12-18T20:18:51.319043086Z",
+                "sourcePosition": "project:///venv/lib/python3.9/site-packages/pulumi_cloudflare/zero_trust_access_application.py#1344"
+            },
+            {
+                "urn": "urn:pulumi:main::deploy_standard::cloudflare:index/zeroTrustAccessGroup:ZeroTrustAccessGroup::whitelisted-emails",
+                "custom": true,
+                "id": "a8372e01-08ec-42d5-81c0-8f0222d8b997",
+                "type": "cloudflare:index/zeroTrustAccessGroup:ZeroTrustAccessGroup",
+                "inputs": {
+                    "__defaults": [],
+                    "accountId": "eb7122e7cd9a9ef517a0e977dedda371",
+                    "includes": [
+                        {
+                            "__defaults": [],
+                            "emails": [
+                                "user1@example.com",
+                                "user2@example.com",
+                                "admin@example.com"
+                            ]
+                        }
+                    ],
+                    "name": "Whitelisted Email Users"
+                },
+                "outputs": {
+                    "accountId": "eb7122e7cd9a9ef517a0e977dedda371",
+                    "excludes": [],
+                    "id": "a8372e01-08ec-42d5-81c0-8f0222d8b997",
+                    "includes": [
+                        {
+                            "anyValidServiceToken": false,
+                            "authContexts": [],
+                            "authMethod": "",
+                            "azures": [],
+                            "certificate": false,
+                            "commonName": "",
+                            "commonNames": [],
+                            "devicePostures": [],
+                            "emailDomains": [],
+                            "emailLists": [],
+                            "emails": [
+                                "user1@example.com",
+                                "user2@example.com",
+                                "admin@example.com"
+                            ],
+                            "everyone": false,
+                            "externalEvaluations": [],
+                            "geos": [],
+                            "githubs": [],
+                            "groups": [],
+                            "gsuites": [],
+                            "ipLists": [],
+                            "ips": [],
+                            "loginMethods": [],
+                            "oktas": [],
+                            "samls": [],
+                            "serviceTokens": []
+                        }
+                    ],
+                    "name": "Whitelisted Email Users",
+                    "requires": [],
+                    "zoneId": null
+                },
+                "parent": "urn:pulumi:main::deploy_standard::pulumi:pulumi:Stack::deploy_standard-main",
+                "provider": "urn:pulumi:main::deploy_standard::pulumi:providers:cloudflare::cloudflare-provider=access::82027398-b0ac-4684-8c19-d06730f39c4d",
+                "propertyDependencies": {
+                    "accountId": [],
+                    "includes": [],
+                    "name": []
+                },
+                "created": "2024-12-18T18:23:37.84414974Z",
+                "modified": "2024-12-18T20:18:51.449996726Z",
+                "sourcePosition": "project:///venv/lib/python3.9/site-packages/pulumi_cloudflare/zero_trust_access_group.py#262"
+            },
+            {
+                "urn": "urn:pulumi:main::deploy_standard::gcp:projects/service:Service::enable-iam.googleapis.com",
+                "custom": true,
+                "id": "pleasantrees-dwh/iam.googleapis.com",
+                "type": "gcp:projects/service:Service",
+                "inputs": {
+                    "__defaults": [
+                        "checkIfServiceHasUsageOnDestroy"
+                    ],
+                    "checkIfServiceHasUsageOnDestroy": false,
+                    "disableDependentServices": false,
+                    "disableOnDestroy": false,
+                    "project": "pleasantrees-dwh",
+                    "service": "iam.googleapis.com"
+                },
+                "outputs": {
+                    "__meta": "{\"e2bfb730-ecaa-11e6-8f88-34363bc7c4c0\":{\"create\":1200000000000,\"delete\":1200000000000,\"read\":600000000000,\"update\":1200000000000}}",
+                    "checkIfServiceHasUsageOnDestroy": false,
+                    "disableDependentServices": false,
+                    "disableOnDestroy": false,
+                    "id": "pleasantrees-dwh/iam.googleapis.com",
+                    "project": "pleasantrees-dwh",
+                    "service": "iam.googleapis.com"
+                },
+                "parent": "urn:pulumi:main::deploy_standard::pulumi:pulumi:Stack::deploy_standard-main",
+                "dependencies": [
+                    "urn:pulumi:main::deploy_standard::gcp:projects/service:Service::enable-serviceusage.googleapis.com"
+                ],
+                "provider": "urn:pulumi:main::deploy_standard::pulumi:providers:gcp::default_8_11_0::90f7bfc7-17fa-4143-b64e-fd04e999553f",
+                "propertyDependencies": {
+                    "disableDependentServices": [],
+                    "disableOnDestroy": [],
+                    "project": [],
+                    "service": []
+                },
+                "created": "2024-12-18T18:23:43.932174301Z",
+                "modified": "2024-12-18T18:23:43.932174301Z",
+                "sourcePosition": "project:///venv/lib/python3.9/site-packages/pulumi_gcp/projects/service.py#325"
+            },
+            {
+                "urn": "urn:pulumi:main::deploy_standard::gcp:projects/service:Service::enable-cloudresourcemanager.googleapis.com",
+                "custom": true,
+                "id": "pleasantrees-dwh/cloudresourcemanager.googleapis.com",
+                "type": "gcp:projects/service:Service",
+                "inputs": {
+                    "__defaults": [
+                        "checkIfServiceHasUsageOnDestroy"
+                    ],
+                    "checkIfServiceHasUsageOnDestroy": false,
+                    "disableDependentServices": false,
+                    "disableOnDestroy": false,
+                    "project": "pleasantrees-dwh",
+                    "service": "cloudresourcemanager.googleapis.com"
+                },
+                "outputs": {
+                    "__meta": "{\"e2bfb730-ecaa-11e6-8f88-34363bc7c4c0\":{\"create\":1200000000000,\"delete\":1200000000000,\"read\":600000000000,\"update\":1200000000000}}",
+                    "checkIfServiceHasUsageOnDestroy": false,
+                    "disableDependentServices": false,
+                    "disableOnDestroy": false,
+                    "id": "pleasantrees-dwh/cloudresourcemanager.googleapis.com",
+                    "project": "pleasantrees-dwh",
+                    "service": "cloudresourcemanager.googleapis.com"
+                },
+                "parent": "urn:pulumi:main::deploy_standard::pulumi:pulumi:Stack::deploy_standard-main",
+                "dependencies": [
+                    "urn:pulumi:main::deploy_standard::gcp:projects/service:Service::enable-serviceusage.googleapis.com"
+                ],
+                "provider": "urn:pulumi:main::deploy_standard::pulumi:providers:gcp::default_8_11_0::90f7bfc7-17fa-4143-b64e-fd04e999553f",
+                "propertyDependencies": {
+                    "disableDependentServices": [],
+                    "disableOnDestroy": [],
+                    "project": [],
+                    "service": []
+                },
+                "created": "2024-12-18T18:23:43.932017594Z",
+                "modified": "2024-12-18T18:23:43.932017594Z",
+                "sourcePosition": "project:///venv/lib/python3.9/site-packages/pulumi_gcp/projects/service.py#325"
+            },
+            {
+                "urn": "urn:pulumi:main::deploy_standard::random:index/randomString:RandomString::tunnel-secret",
+                "custom": true,
+                "id": "SOOeUJGV4ZSmPQ5PXy6YmUOmZv0yypC5",
+                "type": "random:index/randomString:RandomString",
+                "inputs": {
+                    "length": 32,
+                    "numeric": true,
+                    "special": false,
+                    "upper": true
+                },
+                "outputs": {
+                    "__meta": "{\"schema_version\":\"2\"}",
+                    "id": "SOOeUJGV4ZSmPQ5PXy6YmUOmZv0yypC5",
+                    "length": 32,
+                    "lower": true,
+                    "minLower": 0,
+                    "minNumeric": 0,
+                    "minSpecial": 0,
+                    "minUpper": 0,
+                    "number": true,
+                    "numeric": true,
+                    "result": "SOOeUJGV4ZSmPQ5PXy6YmUOmZv0yypC5",
+                    "special": false,
+                    "upper": true
+                },
+                "parent": "urn:pulumi:main::deploy_standard::pulumi:pulumi:Stack::deploy_standard-main",
+                "provider": "urn:pulumi:main::deploy_standard::pulumi:providers:random::default_4_16_8::2e981b56-fc79-4482-a029-263d3dcfad90",
+                "propertyDependencies": {
+                    "length": [],
+                    "numeric": [],
+                    "special": [],
+                    "upper": []
+                },
+                "created": "2024-12-18T18:23:37.085422126Z",
+                "modified": "2024-12-18T18:23:37.085422126Z",
+                "sourcePosition": "project:///venv/lib/python3.9/site-packages/pulumi_random/random_string.py#537"
+            },
+            {
+                "urn": "urn:pulumi:main::deploy_standard::gcp:projects/service:Service::enable-bigquery.googleapis.com",
+                "custom": true,
+                "id": "pleasantrees-dwh/bigquery.googleapis.com",
+                "type": "gcp:projects/service:Service",
+                "inputs": {
+                    "__defaults": [
+                        "checkIfServiceHasUsageOnDestroy"
+                    ],
+                    "checkIfServiceHasUsageOnDestroy": false,
+                    "disableDependentServices": false,
+                    "disableOnDestroy": false,
+                    "project": "pleasantrees-dwh",
+                    "service": "bigquery.googleapis.com"
+                },
+                "outputs": {
+                    "__meta": "{\"e2bfb730-ecaa-11e6-8f88-34363bc7c4c0\":{\"create\":1200000000000,\"delete\":1200000000000,\"read\":600000000000,\"update\":1200000000000}}",
+                    "checkIfServiceHasUsageOnDestroy": false,
+                    "disableDependentServices": false,
+                    "disableOnDestroy": false,
+                    "id": "pleasantrees-dwh/bigquery.googleapis.com",
+                    "project": "pleasantrees-dwh",
+                    "service": "bigquery.googleapis.com"
+                },
+                "parent": "urn:pulumi:main::deploy_standard::pulumi:pulumi:Stack::deploy_standard-main",
+                "dependencies": [
+                    "urn:pulumi:main::deploy_standard::gcp:projects/service:Service::enable-serviceusage.googleapis.com"
+                ],
+                "provider": "urn:pulumi:main::deploy_standard::pulumi:providers:gcp::default_8_11_0::90f7bfc7-17fa-4143-b64e-fd04e999553f",
+                "propertyDependencies": {
+                    "disableDependentServices": [],
+                    "disableOnDestroy": [],
+                    "project": [],
+                    "service": []
+                },
+                "created": "2024-12-18T18:23:43.931877243Z",
+                "modified": "2024-12-18T18:23:43.931877243Z",
+                "sourcePosition": "project:///venv/lib/python3.9/site-packages/pulumi_gcp/projects/service.py#325"
+            },
+            {
+                "urn": "urn:pulumi:main::deploy_standard::gcp:projects/service:Service::enable-secretmanager.googleapis.com",
+                "custom": true,
+                "id": "pleasantrees-dwh/secretmanager.googleapis.com",
+                "type": "gcp:projects/service:Service",
+                "inputs": {
+                    "__defaults": [
+                        "checkIfServiceHasUsageOnDestroy"
+                    ],
+                    "checkIfServiceHasUsageOnDestroy": false,
+                    "disableDependentServices": false,
+                    "disableOnDestroy": false,
+                    "project": "pleasantrees-dwh",
+                    "service": "secretmanager.googleapis.com"
+                },
+                "outputs": {
+                    "__meta": "{\"e2bfb730-ecaa-11e6-8f88-34363bc7c4c0\":{\"create\":1200000000000,\"delete\":1200000000000,\"read\":600000000000,\"update\":1200000000000}}",
+                    "checkIfServiceHasUsageOnDestroy": false,
+                    "disableDependentServices": false,
+                    "disableOnDestroy": false,
+                    "id": "pleasantrees-dwh/secretmanager.googleapis.com",
+                    "project": "pleasantrees-dwh",
+                    "service": "secretmanager.googleapis.com"
+                },
+                "parent": "urn:pulumi:main::deploy_standard::pulumi:pulumi:Stack::deploy_standard-main",
+                "dependencies": [
+                    "urn:pulumi:main::deploy_standard::gcp:projects/service:Service::enable-serviceusage.googleapis.com"
+                ],
+                "provider": "urn:pulumi:main::deploy_standard::pulumi:providers:gcp::default_8_11_0::90f7bfc7-17fa-4143-b64e-fd04e999553f",
+                "propertyDependencies": {
+                    "disableDependentServices": [],
+                    "disableOnDestroy": [],
+                    "project": [],
+                    "service": []
+                },
+                "created": "2024-12-18T18:23:43.932338567Z",
+                "modified": "2024-12-18T18:23:43.932338567Z",
+                "sourcePosition": "project:///venv/lib/python3.9/site-packages/pulumi_gcp/projects/service.py#325"
+            },
+            {
+                "urn": "urn:pulumi:main::deploy_standard::gcp:projects/service:Service::enable-storage.googleapis.com",
+                "custom": true,
+                "id": "pleasantrees-dwh/storage.googleapis.com",
+                "type": "gcp:projects/service:Service",
+                "inputs": {
+                    "__defaults": [
+                        "checkIfServiceHasUsageOnDestroy"
+                    ],
+                    "checkIfServiceHasUsageOnDestroy": false,
+                    "disableDependentServices": false,
+                    "disableOnDestroy": false,
+                    "project": "pleasantrees-dwh",
+                    "service": "storage.googleapis.com"
+                },
+                "outputs": {
+                    "__meta": "{\"e2bfb730-ecaa-11e6-8f88-34363bc7c4c0\":{\"create\":1200000000000,\"delete\":1200000000000,\"read\":600000000000,\"update\":1200000000000}}",
+                    "checkIfServiceHasUsageOnDestroy": false,
+                    "disableDependentServices": false,
+                    "disableOnDestroy": false,
+                    "id": "pleasantrees-dwh/storage.googleapis.com",
+                    "project": "pleasantrees-dwh",
+                    "service": "storage.googleapis.com"
+                },
+                "parent": "urn:pulumi:main::deploy_standard::pulumi:pulumi:Stack::deploy_standard-main",
+                "dependencies": [
+                    "urn:pulumi:main::deploy_standard::gcp:projects/service:Service::enable-serviceusage.googleapis.com"
+                ],
+                "provider": "urn:pulumi:main::deploy_standard::pulumi:providers:gcp::default_8_11_0::90f7bfc7-17fa-4143-b64e-fd04e999553f",
+                "propertyDependencies": {
+                    "disableDependentServices": [],
+                    "disableOnDestroy": [],
+                    "project": [],
+                    "service": []
+                },
+                "created": "2024-12-18T18:23:43.932099828Z",
+                "modified": "2024-12-18T18:23:43.932099828Z",
+                "sourcePosition": "project:///venv/lib/python3.9/site-packages/pulumi_gcp/projects/service.py#325"
+            },
+            {
+                "urn": "urn:pulumi:main::deploy_standard::cloudflare:index/zeroTrustAccessPolicy:ZeroTrustAccessPolicy::deny-policy",
+                "custom": true,
+                "id": "0061f1b1-f45e-4208-aa77-da8a90501df7",
+                "type": "cloudflare:index/zeroTrustAccessPolicy:ZeroTrustAccessPolicy",
+                "inputs": {
+                    "__defaults": [],
+                    "accountId": "eb7122e7cd9a9ef517a0e977dedda371",
+                    "applicationId": "b991c7af-2889-4751-bb2d-bdcce516ede9",
+                    "decision": "deny",
+                    "includes": [
+                        {
+                            "__defaults": [],
+                            "everyone": true
+                        }
+                    ],
+                    "name": "Deny All",
+                    "precedence": 2
+                },
+                "outputs": {
+                    "accountId": "eb7122e7cd9a9ef517a0e977dedda371",
+                    "applicationId": "b991c7af-2889-4751-bb2d-bdcce516ede9",
+                    "approvalGroups": [],
+                    "approvalRequired": false,
+                    "connectionRules": null,
+                    "decision": "deny",
+                    "excludes": [],
+                    "id": "0061f1b1-f45e-4208-aa77-da8a90501df7",
+                    "includes": [
+                        {
+                            "anyValidServiceToken": false,
+                            "authContexts": [],
+                            "authMethod": "",
+                            "azures": [],
+                            "certificate": false,
+                            "commonName": "",
+                            "commonNames": [],
+                            "devicePostures": [],
+                            "emailDomains": [],
+                            "emailLists": [],
+                            "emails": [],
+                            "everyone": true,
+                            "externalEvaluations": [],
+                            "geos": [],
+                            "githubs": [],
+                            "groups": [],
+                            "gsuites": [],
+                            "ipLists": [],
+                            "ips": [],
+                            "loginMethods": [],
+                            "oktas": [],
+                            "samls": [],
+                            "serviceTokens": []
+                        }
+                    ],
+                    "isolationRequired": false,
+                    "name": "Deny All",
+                    "precedence": 2,
+                    "purposeJustificationPrompt": "",
+                    "purposeJustificationRequired": false,
+                    "requires": [],
+                    "sessionDuration": null,
+                    "zoneId": null
+                },
+                "parent": "urn:pulumi:main::deploy_standard::pulumi:pulumi:Stack::deploy_standard-main",
+                "dependencies": [
+                    "urn:pulumi:main::deploy_standard::cloudflare:index/zeroTrustAccessApplication:ZeroTrustAccessApplication::protected-app"
+                ],
+                "provider": "urn:pulumi:main::deploy_standard::pulumi:providers:cloudflare::cloudflare-provider=access::82027398-b0ac-4684-8c19-d06730f39c4d",
+                "propertyDependencies": {
+                    "accountId": [],
+                    "applicationId": [
+                        "urn:pulumi:main::deploy_standard::cloudflare:index/zeroTrustAccessApplication:ZeroTrustAccessApplication::protected-app"
+                    ],
+                    "decision": [],
+                    "includes": [],
+                    "name": [],
+                    "precedence": []
+                },
+                "created": "2024-12-18T18:23:38.474318331Z",
+                "modified": "2024-12-18T20:18:52.016741571Z",
+                "sourcePosition": "project:///venv/lib/python3.9/site-packages/pulumi_cloudflare/zero_trust_access_policy.py#623"
+            },
+            {
+                "urn": "urn:pulumi:main::deploy_standard::cloudflare:index/zeroTrustAccessPolicy:ZeroTrustAccessPolicy::email-auth-policy",
+                "custom": true,
+                "id": "05b9dffc-ce6d-4e56-937c-0eb61c2a8f21",
+                "type": "cloudflare:index/zeroTrustAccessPolicy:ZeroTrustAccessPolicy",
+                "inputs": {
+                    "__defaults": [],
+                    "accountId": "eb7122e7cd9a9ef517a0e977dedda371",
+                    "applicationId": "b991c7af-2889-4751-bb2d-bdcce516ede9",
+                    "decision": "allow",
+                    "includes": [
+                        {
+                            "__defaults": [],
+                            "groups": [
+                                "a8372e01-08ec-42d5-81c0-8f0222d8b997"
+                            ]
+                        }
+                    ],
+                    "name": "Email Authentication",
+                    "precedence": 1
+                },
+                "outputs": {
+                    "accountId": "eb7122e7cd9a9ef517a0e977dedda371",
+                    "applicationId": "b991c7af-2889-4751-bb2d-bdcce516ede9",
+                    "approvalGroups": [],
+                    "approvalRequired": false,
+                    "connectionRules": null,
+                    "decision": "allow",
+                    "excludes": [],
+                    "id": "05b9dffc-ce6d-4e56-937c-0eb61c2a8f21",
+                    "includes": [
+                        {
+                            "anyValidServiceToken": false,
+                            "authContexts": [],
+                            "authMethod": "",
+                            "azures": [],
+                            "certificate": false,
+                            "commonName": "",
+                            "commonNames": [],
+                            "devicePostures": [],
+                            "emailDomains": [],
+                            "emailLists": [],
+                            "emails": [],
+                            "everyone": false,
+                            "externalEvaluations": [],
+                            "geos": [],
+                            "githubs": [],
+                            "groups": [
+                                "a8372e01-08ec-42d5-81c0-8f0222d8b997"
+                            ],
+                            "gsuites": [],
+                            "ipLists": [],
+                            "ips": [],
+                            "loginMethods": [],
+                            "oktas": [],
+                            "samls": [],
+                            "serviceTokens": []
+                        }
+                    ],
+                    "isolationRequired": false,
+                    "name": "Email Authentication",
+                    "precedence": 1,
+                    "purposeJustificationPrompt": "",
+                    "purposeJustificationRequired": false,
+                    "requires": [],
+                    "sessionDuration": null,
+                    "zoneId": null
+                },
+                "parent": "urn:pulumi:main::deploy_standard::pulumi:pulumi:Stack::deploy_standard-main",
+                "dependencies": [
+                    "urn:pulumi:main::deploy_standard::cloudflare:index/zeroTrustAccessApplication:ZeroTrustAccessApplication::protected-app",
+                    "urn:pulumi:main::deploy_standard::cloudflare:index/zeroTrustAccessGroup:ZeroTrustAccessGroup::whitelisted-emails"
+                ],
+                "provider": "urn:pulumi:main::deploy_standard::pulumi:providers:cloudflare::cloudflare-provider=access::82027398-b0ac-4684-8c19-d06730f39c4d",
+                "propertyDependencies": {
+                    "accountId": [],
+                    "applicationId": [
+                        "urn:pulumi:main::deploy_standard::cloudflare:index/zeroTrustAccessApplication:ZeroTrustAccessApplication::protected-app"
+                    ],
+                    "decision": [],
+                    "includes": [
+                        "urn:pulumi:main::deploy_standard::cloudflare:index/zeroTrustAccessGroup:ZeroTrustAccessGroup::whitelisted-emails"
+                    ],
+                    "name": [],
+                    "precedence": []
+                },
+                "created": "2024-12-18T18:23:38.725377159Z",
+                "modified": "2024-12-18T20:18:51.793370149Z",
+                "sourcePosition": "project:///venv/lib/python3.9/site-packages/pulumi_cloudflare/zero_trust_access_policy.py#623"
+            },
+            {
+                "urn": "urn:pulumi:main::deploy_standard::gcp:serviceaccount/account:Account::service-account",
+                "custom": true,
+                "id": "projects/pleasantrees-dwh/serviceAccounts/nodeone@pleasantrees-dwh.iam.gserviceaccount.com",
+                "type": "gcp:serviceaccount/account:Account",
+                "inputs": {
+                    "__defaults": [
+                        "disabled"
+                    ],
+                    "accountId": "nodeone",
+                    "disabled": false,
+                    "displayName": "nodeone Service Account",
+                    "project": "pleasantrees-dwh"
+                },
+                "outputs": {
+                    "__meta": "{\"e2bfb730-ecaa-11e6-8f88-34363bc7c4c0\":{\"create\":300000000000}}",
+                    "accountId": "nodeone",
+                    "createIgnoreAlreadyExists": null,
+                    "description": "",
+                    "disabled": false,
+                    "displayName": "nodeone Service Account",
+                    "email": "nodeone@pleasantrees-dwh.iam.gserviceaccount.com",
+                    "id": "projects/pleasantrees-dwh/serviceAccounts/nodeone@pleasantrees-dwh.iam.gserviceaccount.com",
+                    "member": "serviceAccount:nodeone@pleasantrees-dwh.iam.gserviceaccount.com",
+                    "name": "projects/pleasantrees-dwh/serviceAccounts/nodeone@pleasantrees-dwh.iam.gserviceaccount.com",
+                    "project": "pleasantrees-dwh",
+                    "uniqueId": "102383084542289050469"
+                },
+                "parent": "urn:pulumi:main::deploy_standard::pulumi:pulumi:Stack::deploy_standard-main",
+                "dependencies": [
+                    "urn:pulumi:main::deploy_standard::gcp:projects/service:Service::enable-iam.googleapis.com",
+                    "urn:pulumi:main::deploy_standard::gcp:projects/service:Service::enable-storage.googleapis.com",
+                    "urn:pulumi:main::deploy_standard::gcp:projects/service:Service::enable-secretmanager.googleapis.com",
+                    "urn:pulumi:main::deploy_standard::gcp:projects/service:Service::enable-serviceusage.googleapis.com",
+                    "urn:pulumi:main::deploy_standard::gcp:projects/service:Service::enable-bigquery.googleapis.com",
+                    "urn:pulumi:main::deploy_standard::gcp:projects/service:Service::enable-cloudresourcemanager.googleapis.com"
+                ],
+                "provider": "urn:pulumi:main::deploy_standard::pulumi:providers:gcp::default_8_11_0::90f7bfc7-17fa-4143-b64e-fd04e999553f",
+                "propertyDependencies": {
+                    "accountId": [],
+                    "displayName": [],
+                    "project": []
+                },
+                "created": "2024-12-18T18:23:55.747251981Z",
+                "modified": "2024-12-18T18:23:55.747251981Z",
+                "sourcePosition": "project:///venv/lib/python3.9/site-packages/pulumi_gcp/serviceaccount/account.py#443"
+            },
+            {
+                "urn": "urn:pulumi:main::deploy_standard::cloudflare:index/zeroTrustTunnelCloudflared:ZeroTrustTunnelCloudflared::main-tunnel",
+                "custom": true,
+                "id": "4ec4f433-bcf4-4724-82c0-6c0cd8475fda",
+                "type": "cloudflare:index/zeroTrustTunnelCloudflared:ZeroTrustTunnelCloudflared",
+                "inputs": {
+                    "__defaults": [],
+                    "accountId": "eb7122e7cd9a9ef517a0e977dedda371",
+                    "name": "tunnel-pleasantrees-centerpoint.consulting",
+                    "secret": {
+                        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+                        "plaintext": "\"SOOeUJGV4ZSmPQ5PXy6YmUOmZv0yypC5\""
+                    }
+                },
+                "outputs": {
+                    "accountId": "eb7122e7cd9a9ef517a0e977dedda371",
+                    "cname": "4ec4f433-bcf4-4724-82c0-6c0cd8475fda.cfargotunnel.com",
+                    "configSrc": null,
+                    "id": "4ec4f433-bcf4-4724-82c0-6c0cd8475fda",
+                    "name": "tunnel-pleasantrees-centerpoint.consulting",
+                    "secret": {
+                        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+                        "plaintext": "\"SOOeUJGV4ZSmPQ5PXy6YmUOmZv0yypC5\""
+                    },
+                    "tunnelToken": {
+                        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+                        "plaintext": "\"eyJhIjoiZWI3MTIyZTdjZDlhOWVmNTE3YTBlOTc3ZGVkZGEzNzEiLCJ0IjoiNGVjNGY0MzMtYmNmNC00NzI0LTgyYzAtNmMwY2Q4NDc1ZmRhIiwicyI6IlNPT2VVSkdWNFpTbVBRNVBYeTZZbVVPbVp2MHl5cEM1In0=\""
+                    }
+                },
+                "parent": "urn:pulumi:main::deploy_standard::pulumi:pulumi:Stack::deploy_standard-main",
+                "dependencies": [
+                    "urn:pulumi:main::deploy_standard::random:index/randomString:RandomString::tunnel-secret"
+                ],
+                "provider": "urn:pulumi:main::deploy_standard::pulumi:providers:cloudflare::cloudflare-provider-tunnel::a6a01ca8-97fd-42f2-89c7-aa2fbbd518a2",
+                "propertyDependencies": {
+                    "accountId": [],
+                    "name": [],
+                    "secret": [
+                        "urn:pulumi:main::deploy_standard::random:index/randomString:RandomString::tunnel-secret"
+                    ]
+                },
+                "additionalSecretOutputs": [
+                    "secret",
+                    "tunnelToken"
+                ],
+                "created": "2024-12-18T18:23:38.576807057Z",
+                "modified": "2024-12-18T18:23:38.576807057Z",
+                "sourcePosition": "project:///venv/lib/python3.9/site-packages/pulumi_cloudflare/zero_trust_tunnel_cloudflared.py#271"
+            },
+            {
+                "urn": "urn:pulumi:main::deploy_standard::gcp:serviceaccount/key:Key::service-account-key",
+                "custom": true,
+                "id": "projects/pleasantrees-dwh/serviceAccounts/nodeone@pleasantrees-dwh.iam.gserviceaccount.com/keys/de1b9021b049abebccb22dd8ac6c6269f0bff954",
+                "type": "gcp:serviceaccount/key:Key",
+                "inputs": {
+                    "__defaults": [
+                        "keyAlgorithm"
+                    ],
+                    "keyAlgorithm": "KEY_ALG_RSA_2048",
+                    "privateKeyType": "TYPE_GOOGLE_CREDENTIALS_FILE",
+                    "publicKeyType": "TYPE_X509_PEM_FILE",
+                    "serviceAccountId": "projects/pleasantrees-dwh/serviceAccounts/nodeone@pleasantrees-dwh.iam.gserviceaccount.com"
+                },
+                "outputs": {
+                    "id": "projects/pleasantrees-dwh/serviceAccounts/nodeone@pleasantrees-dwh.iam.gserviceaccount.com/keys/de1b9021b049abebccb22dd8ac6c6269f0bff954",
+                    "keepers": null,
+                    "keyAlgorithm": "KEY_ALG_RSA_2048",
+                    "name": "projects/pleasantrees-dwh/serviceAccounts/nodeone@pleasantrees-dwh.iam.gserviceaccount.com/keys/de1b9021b049abebccb22dd8ac6c6269f0bff954",
+                    "privateKey": {
+                        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+                        "plaintext": "\"ewogICJ0eXBlIjogInNlcnZpY2VfYWNjb3VudCIsCiAgInByb2plY3RfaWQiOiAicGxlYXNhbnRyZWVzLWR3aCIsCiAgInByaXZhdGVfa2V5X2lkIjogImRlMWI5MDIxYjA0OWFiZWJjY2IyMmRkOGFjNmM2MjY5ZjBiZmY5NTQiLAogICJwcml2YXRlX2tleSI6ICItLS0tLUJFR0lOIFBSSVZBVEUgS0VZLS0tLS1cbk1JSUV2UUlCQURBTkJna3Foa2lHOXcwQkFRRUZBQVNDQktjd2dnU2pBZ0VBQW9JQkFRQ3JTT2Vtd0ZobUNXOCtcbkZIWVd0QmVVOUhLTnRjRFh0NVh5ZUsvM1hpbHlhM0RQa3pmNVZzbHRTSHJuZGFheXZ1RDF3YXlPdWYvbk42V3VcbnhmbVF5RzZnZkVteFN5WkxCenZxZ1NOcFpWNkE1NEJXMHNIR05SdE1nVlRPWHIyUEdOSkIrSm8yVHFYNHRXVXNcbllqVkgwTE5lNEZVQnZOMVE1dmRGY2g0RHl2cko0Y1UyQWx4RHR2bE9jK084eitSMFEwSU5HUHg1SGM4cGFnNkNcbmxIeGVRVzZ4VmZaOCszT0NzMTR0MzN4TXRzQ3JTV21YeVpHMWJDdzFJS1FVazRKbnZnYmVmeHF0elo3NW1RZEdcbkRBb2dUQXBvdHZaeGtzcDFMSnhUeXJDYWZjN1RpU2x3L1ZjUkswdWRDQkN4QjY2bnlzRHUraW1PZHZXa0crbVZcblZlV3JsRVVKQWdNQkFBRUNnZ0VBQnpFZHR1anpIVCt1cWREaW4zUHEzSkNDQWRTOGx1SW91K0JZNVI1UlI3SmVcbnIzeUxPRjh1UUhZdllPb1YrSUhld0xyajA2OVlJUjE3U2JJYTF6c3ZOL0pZQnNkMHdXZzVtaEJYakF5YlVmYkdcbmN2N1E3NUZaeHRYVVdZRHRYU1dKNklhM2RPbksrcjBsRlI2L2hYY3NIT0wyOXNaM0ZYZEpNU09JUXBrQ2ZEajZcbnU5QTI3WThrcnVkU01OUFdsMUpINE5Xc1QrWmt1dlZKTWdjMDgrSzVyVFBIZjh0OGZQZWRmYlBjZmNsL3VwczFcbmtPTWcwSXZRNk5ZNU5BUS81ZFQzQndnNU42MXhwMkhWdVV1YXM0c01FVUx1THJvcTFTaTZzaDBTK2plZjlVbVlcbnNGc0lhbG9xbGM4bnUrbStGK2pVMjZrbkI2NzkvYnJoZHZwKzNPMGVQUUtCZ1FEYmtsVk1VSHBORWVmbWpJUnBcbjRwRGR5ZVlWSm0xWjlrS0cxcStZS3VJNklSMTRVTkJnQnFKWlNFdTZIdTc1OThDQjBkcnNvRUQvdVFRQWtIVlZcbkhvVGVLL3EwV0hJTGJMNTFLREJnaWowc2drUmlGL05jM1k1UFR3a3hXSDBTWDN4NHVwTE0vdVBoTGRkcnliVU1cbk5wL2FHRXdHRTJmWHFObWdrOUs2cGhEQmpRS0JnUURIczdxVGNzRHJCMDhkUDF6LzVGZ2I2MnNzbEF4V2QzWWdcbm9nVEJyV1BDRWtLRmcrQVE5QzhlWjRodjV0ZzMwVzFPTVM0QkFVdFNBa1pFUnByazFIc3ppU29jelJNUzUwNFBcblRVd0ZsSytkaEV5Z3RXbWFpdS9oUVlibTVDdS9PcXJNeEI0aWxaWHF4aHNVZlNFWU5NQWZlTzB5UThYY2xURWFcblN6aHVpK3hNYlFLQmdRQ252ZVJDTjkwbkViM2JDSkNFSDkxU1F0THVaM3YwMVVnL29MVm5CNlBxaXEvcjRiay9cbkV2Sm1TTy9wVVlaNkdzYkxwcG1jV2xVdHg1ZUNJdG93Vys5Zmw3T2dvVTBHNDEyaFBVR3dEd3ZxKzkzb0hxb0JcbjBSVE9DL0JXN1dZbmFpRTZUamFtT3plMktJSkJTMGh2K3k4bHU1Z2dzQ1NOd2VYNFlkWUVWNmZIWlFLQmdDK3BcbjdBd3BSWFpUSmtUYXpMMmVxSkR4WFlFa1ROV09hYmxjTWpwdndmR2VIaFp6NVZUbWt5QjBvWkhqelJOMWZ0czhcbnpiZ2JzUGgvNW5tQlNKTDVTL1orOUhndlVqQWUyUGk2QUQwTXdlV2NvQlZ6ZHlNVnFpOWZUbTFwWkMrZU53bnNcbmZTelAreG92OG1Ldmd1aWVIb1RrZmVpVFdIUlBmNHJCRFZVRlBINzVBb0dBYkRsKzlXMFgxMzRqSXJvRGFkeGRcbkJna3E2YnVsc2hCWHJsRlcydVhiQ0l1YWs1QTI5NGI4Vk5CWHQ0QXkvMGZKMVE4dEtnZ0FpeStCVUc5eFpCTXJcbnNZb1d4MlpxUzRCbHZndDdYQ2NmTnJtWG1wSy9iRXg1anJYMUFMaksxZmw5YjgrTzBJVDB3bm93eEZBbTZ2b0NcbklkVUtWM3ZpK2RDaEZQcjVGaDdiellBPVxuLS0tLS1FTkQgUFJJVkFURSBLRVktLS0tLVxuIiwKICAiY2xpZW50X2VtYWlsIjogIm5vZGVvbmVAcGxlYXNhbnRyZWVzLWR3aC5pYW0uZ3NlcnZpY2VhY2NvdW50LmNvbSIsCiAgImNsaWVudF9pZCI6ICIxMDIzODMwODQ1NDIyODkwNTA0NjkiLAogICJhdXRoX3VyaSI6ICJodHRwczovL2FjY291bnRzLmdvb2dsZS5jb20vby9vYXV0aDIvYXV0aCIsCiAgInRva2VuX3VyaSI6ICJodHRwczovL29hdXRoMi5nb29nbGVhcGlzLmNvbS90b2tlbiIsCiAgImF1dGhfcHJvdmlkZXJfeDUwOV9jZXJ0X3VybCI6ICJodHRwczovL3d3dy5nb29nbGVhcGlzLmNvbS9vYXV0aDIvdjEvY2VydHMiLAogICJjbGllbnRfeDUwOV9jZXJ0X3VybCI6ICJodHRwczovL3d3dy5nb29nbGVhcGlzLmNvbS9yb2JvdC92MS9tZXRhZGF0YS94NTA5L25vZGVvbmUlNDBwbGVhc2FudHJlZXMtZHdoLmlhbS5nc2VydmljZWFjY291bnQuY29tIiwKICAidW5pdmVyc2VfZG9tYWluIjogImdvb2dsZWFwaXMuY29tIgp9Cg==\""
+                    },
+                    "privateKeyType": "TYPE_GOOGLE_CREDENTIALS_FILE",
+                    "publicKey": "LS0tLS1CRUdJTiBDRVJUSUZJQ0FURS0tLS0tCk1JSUMvVENDQWVXZ0F3SUJBZ0lKQUx0ZmtaSGo5dGZjTUEwR0NTcUdTSWIzRFFFQkJRVUFNQ0F4SGpBY0JnTlYKQkFNTUZURXdNak00TXpBNE5EVTBNakk0T1RBMU1EUTJPVEFnRncweU5ERXlNVGd4T0RJek5UVmFHQTg1T1RrNQpNVEl6TVRJek5UazFPVm93SURFZU1Cd0dBMVVFQXd3Vk1UQXlNemd6TURnME5UUXlNamc1TURVd05EWTVNSUlCCklqQU5CZ2txaGtpRzl3MEJBUUVGQUFPQ0FROEFNSUlCQ2dLQ0FRRUFxMGpucHNCWVpnbHZQaFIyRnJRWGxQUnkKamJYQTE3ZVY4bml2OTE0cGNtdHd6NU0zK1ZiSmJVaDY1M1dtc3I3ZzljR3Nqcm4vNXplbHJzWDVrTWh1b0h4SgpzVXNtU3djNzZvRWphV1ZlZ09lQVZ0TEJ4alViVElGVXpsNjlqeGpTUWZpYU5rNmwrTFZsTEdJMVI5Q3pYdUJWCkFiemRVT2IzUlhJZUE4cjZ5ZUhGTmdKY1E3YjVUblBqdk0va2RFTkNEUmo4ZVIzUEtXb09ncFI4WGtGdXNWWDIKZlB0emdyTmVMZDk4VExiQXEwbHBsOG1SdFd3c05TQ2tGSk9DWjc0RzNuOGFyYzJlK1prSFJnd0tJRXdLYUxiMgpjWkxLZFN5Y1U4cXdtbjNPMDRrcGNQMVhFU3RMblFnUXNRZXVwOHJBN3ZvcGpuYjFwQnZwbFZYbHE1UkZDUUlECkFRQUJvemd3TmpBTUJnTlZIUk1CQWY4RUFqQUFNQTRHQTFVZER3RUIvd1FFQXdJSGdEQVdCZ05WSFNVQkFmOEUKRERBS0JnZ3JCZ0VGQlFjREFqQU5CZ2txaGtpRzl3MEJBUVVGQUFPQ0FRRUFPcE42ZURhS3lBQkJremo3QW5NYgp5QkcvL2RZQWdxWEh0akI4VHUvZWhjMjFHK1JZek0zNGpOdEJjRkp5T1FmeWUxeStzZHNITnUxeGNwZ3puVWV0ClFjVW41dTRlcTA3SkJwalZEODlzYWZyWld1WENqQkFtNkloUThVcXl5VkF0ajFuUkZpQ0s0Zk53b1lmNElHNjYKdEpEVHFCREhWR2tzZlZjOG0vWTIrdnJMek1YTHJuTWRVUEsrUkY2MWg2SkNrRFROK2Erd1lNTzhTUmZjeHRhcgpBbTFNbU9DY1VZYTV2UFVJajdMVjVuOGp3TkZKN29IMlRtZXJ2eWlTZ0ZsOUdQZ2tPaktwUXlnWjk4REQwV1RlCnZVL2VJYStTMUVlRnEyaUE0MHYzaU5sQ2I0Zzh2RXk3aWZROElsb2t2Q2wxYkx6SjhuYS9WY1FQME5xb2Z3S2MKOFE9PQotLS0tLUVORCBDRVJUSUZJQ0FURS0tLS0tCg==",
+                    "publicKeyData": null,
+                    "publicKeyType": "TYPE_X509_PEM_FILE",
+                    "serviceAccountId": "projects/pleasantrees-dwh/serviceAccounts/nodeone@pleasantrees-dwh.iam.gserviceaccount.com",
+                    "validAfter": "2024-12-18T18:23:55Z",
+                    "validBefore": "9999-12-31T23:59:59Z"
+                },
+                "parent": "urn:pulumi:main::deploy_standard::pulumi:pulumi:Stack::deploy_standard-main",
+                "dependencies": [
+                    "urn:pulumi:main::deploy_standard::gcp:serviceaccount/account:Account::service-account"
+                ],
+                "provider": "urn:pulumi:main::deploy_standard::pulumi:providers:gcp::default_8_11_0::90f7bfc7-17fa-4143-b64e-fd04e999553f",
+                "propertyDependencies": {
+                    "privateKeyType": [],
+                    "publicKeyType": [],
+                    "serviceAccountId": [
+                        "urn:pulumi:main::deploy_standard::gcp:serviceaccount/account:Account::service-account"
+                    ]
+                },
+                "additionalSecretOutputs": [
+                    "privateKey"
+                ],
+                "created": "2024-12-18T18:24:08.328203532Z",
+                "modified": "2024-12-18T18:24:08.328203532Z",
+                "sourcePosition": "project:///venv/lib/python3.9/site-packages/pulumi_gcp/serviceaccount/key.py#513"
+            },
+            {
+                "urn": "urn:pulumi:main::deploy_standard::cloudflare:index/zeroTrustTunnelCloudflaredConfig:ZeroTrustTunnelCloudflaredConfig::tunnel-config",
+                "custom": true,
+                "id": "4ec4f433-bcf4-4724-82c0-6c0cd8475fda",
+                "type": "cloudflare:index/zeroTrustTunnelCloudflaredConfig:ZeroTrustTunnelCloudflaredConfig",
+                "inputs": {
+                    "__defaults": [],
+                    "accountId": "eb7122e7cd9a9ef517a0e977dedda371",
+                    "config": {
+                        "__defaults": [],
+                        "ingressRules": [
+                            {
+                                "__defaults": [],
+                                "hostname": "pleasantrees.centerpoint.consulting",
+                                "service": "http://localhost:8080"
+                            },
+                            {
+                                "__defaults": [],
+                                "service": "http_status:404"
+                            }
+                        ]
+                    },
+                    "tunnelId": "4ec4f433-bcf4-4724-82c0-6c0cd8475fda"
+                },
+                "outputs": {
+                    "accountId": "eb7122e7cd9a9ef517a0e977dedda371",
+                    "config": {
+                        "ingressRules": [
+                            {
+                                "hostname": "pleasantrees.centerpoint.consulting",
+                                "originRequest": null,
+                                "path": "",
+                                "service": "http://localhost:8080"
+                            },
+                            {
+                                "hostname": "",
+                                "originRequest": null,
+                                "path": "",
+                                "service": "http_status:404"
+                            }
+                        ],
+                        "originRequest": null,
+                        "warpRouting": null
+                    },
+                    "id": "4ec4f433-bcf4-4724-82c0-6c0cd8475fda",
+                    "tunnelId": "4ec4f433-bcf4-4724-82c0-6c0cd8475fda"
+                },
+                "parent": "urn:pulumi:main::deploy_standard::pulumi:pulumi:Stack::deploy_standard-main",
+                "dependencies": [
+                    "urn:pulumi:main::deploy_standard::cloudflare:index/zeroTrustTunnelCloudflared:ZeroTrustTunnelCloudflared::main-tunnel"
+                ],
+                "provider": "urn:pulumi:main::deploy_standard::pulumi:providers:cloudflare::cloudflare-provider-tunnel::a6a01ca8-97fd-42f2-89c7-aa2fbbd518a2",
+                "propertyDependencies": {
+                    "accountId": [],
+                    "config": [],
+                    "tunnelId": [
+                        "urn:pulumi:main::deploy_standard::cloudflare:index/zeroTrustTunnelCloudflared:ZeroTrustTunnelCloudflared::main-tunnel"
+                    ]
+                },
+                "created": "2024-12-18T18:23:39.684248435Z",
+                "modified": "2024-12-18T18:23:39.684248435Z",
+                "sourcePosition": "project:///venv/lib/python3.9/site-packages/pulumi_cloudflare/zero_trust_tunnel_cloudflared_config.py#305"
+            },
+            {
+                "urn": "urn:pulumi:main::deploy_standard::gcp:projects/iAMBinding:IAMBinding::iam-binding-bigquery.dataEditor",
+                "custom": true,
+                "id": "pleasantrees-dwh/roles/bigquery.dataEditor",
+                "type": "gcp:projects/iAMBinding:IAMBinding",
+                "inputs": {
+                    "__defaults": [],
+                    "members": [
+                        "serviceAccount:nodeone@pleasantrees-dwh.iam.gserviceaccount.com"
+                    ],
+                    "project": "pleasantrees-dwh",
+                    "role": "roles/bigquery.dataEditor"
+                },
+                "outputs": {
+                    "condition": null,
+                    "etag": "BwYpj4R2kO0=",
+                    "id": "pleasantrees-dwh/roles/bigquery.dataEditor",
+                    "members": [
+                        "serviceAccount:nodeone@pleasantrees-dwh.iam.gserviceaccount.com"
+                    ],
+                    "project": "pleasantrees-dwh",
+                    "role": "roles/bigquery.dataEditor"
+                },
+                "parent": "urn:pulumi:main::deploy_standard::pulumi:pulumi:Stack::deploy_standard-main",
+                "dependencies": [
+                    "urn:pulumi:main::deploy_standard::gcp:projects/service:Service::enable-serviceusage.googleapis.com",
+                    "urn:pulumi:main::deploy_standard::gcp:serviceaccount/account:Account::service-account",
+                    "urn:pulumi:main::deploy_standard::gcp:projects/service:Service::enable-bigquery.googleapis.com",
+                    "urn:pulumi:main::deploy_standard::gcp:projects/service:Service::enable-cloudresourcemanager.googleapis.com",
+                    "urn:pulumi:main::deploy_standard::gcp:projects/service:Service::enable-iam.googleapis.com",
+                    "urn:pulumi:main::deploy_standard::gcp:projects/service:Service::enable-storage.googleapis.com",
+                    "urn:pulumi:main::deploy_standard::gcp:projects/service:Service::enable-secretmanager.googleapis.com"
+                ],
+                "provider": "urn:pulumi:main::deploy_standard::pulumi:providers:gcp::default_8_11_0::90f7bfc7-17fa-4143-b64e-fd04e999553f",
+                "propertyDependencies": {
+                    "members": [
+                        "urn:pulumi:main::deploy_standard::gcp:serviceaccount/account:Account::service-account"
+                    ],
+                    "project": [],
+                    "role": []
+                },
+                "created": "2024-12-18T18:24:04.150664925Z",
+                "modified": "2024-12-18T18:24:04.150664925Z",
+                "sourcePosition": "project:///venv/lib/python3.9/site-packages/pulumi_gcp/projects/iam_binding.py#822"
+            },
+            {
+                "urn": "urn:pulumi:main::deploy_standard::cloudflare:index/record:Record::tunnel-dns",
+                "custom": true,
+                "id": "7ee1b896aa1306310a652217a1ffa673",
+                "type": "cloudflare:index/record:Record",
+                "inputs": {
+                    "__defaults": [
+                        "allowOverwrite"
+                    ],
+                    "allowOverwrite": false,
+                    "content": "4ec4f433-bcf4-4724-82c0-6c0cd8475fda.cfargotunnel.com",
+                    "name": "pleasantrees",
+                    "proxied": true,
+                    "type": "CNAME",
+                    "zoneId": "cab525ddbd3cce184bffe956495cd89d"
+                },
+                "outputs": {
+                    "__meta": "{\"e2bfb730-ecaa-11e6-8f88-34363bc7c4c0\":{\"create\":30000000000,\"update\":30000000000},\"schema_version\":\"3\"}",
+                    "allowOverwrite": false,
+                    "comment": "",
+                    "content": "4ec4f433-bcf4-4724-82c0-6c0cd8475fda.cfargotunnel.com",
+                    "createdOn": "2024-12-18T18:23:39.075409Z",
+                    "data": null,
+                    "hostname": "pleasantrees.centerpoint.consulting",
+                    "id": "7ee1b896aa1306310a652217a1ffa673",
+                    "metadata": {
+                        "auto_added": "false",
+                        "managed_by_apps": "false",
+                        "managed_by_argo_tunnel": "false"
+                    },
+                    "modifiedOn": "2024-12-18T18:23:39.075409Z",
+                    "name": "pleasantrees",
+                    "priority": null,
+                    "proxiable": true,
+                    "proxied": true,
+                    "tags": [],
+                    "ttl": 1,
+                    "type": "CNAME",
+                    "value": null,
+                    "zoneId": "cab525ddbd3cce184bffe956495cd89d"
+                },
+                "parent": "urn:pulumi:main::deploy_standard::pulumi:pulumi:Stack::deploy_standard-main",
+                "dependencies": [
+                    "urn:pulumi:main::deploy_standard::cloudflare:index/zeroTrustTunnelCloudflared:ZeroTrustTunnelCloudflared::main-tunnel"
+                ],
+                "provider": "urn:pulumi:main::deploy_standard::pulumi:providers:cloudflare::cloudflare-provider-tunnel::a6a01ca8-97fd-42f2-89c7-aa2fbbd518a2",
+                "propertyDependencies": {
+                    "content": [
+                        "urn:pulumi:main::deploy_standard::cloudflare:index/zeroTrustTunnelCloudflared:ZeroTrustTunnelCloudflared::main-tunnel"
+                    ],
+                    "name": [],
+                    "proxied": [],
+                    "type": [],
+                    "zoneId": []
+                },
+                "created": "2024-12-18T18:23:39.333380874Z",
+                "modified": "2024-12-18T20:18:51.712223309Z",
+                "sourcePosition": "project:///venv/lib/python3.9/site-packages/pulumi_cloudflare/record.py#622"
+            },
+            {
+                "urn": "urn:pulumi:main::deploy_standard::gcp:projects/iAMBinding:IAMBinding::iam-binding-storage.objectViewer",
+                "custom": true,
+                "id": "pleasantrees-dwh/roles/storage.objectViewer",
+                "type": "gcp:projects/iAMBinding:IAMBinding",
+                "inputs": {
+                    "__defaults": [],
+                    "members": [
+                        "serviceAccount:nodeone@pleasantrees-dwh.iam.gserviceaccount.com"
+                    ],
+                    "project": "pleasantrees-dwh",
+                    "role": "roles/storage.objectViewer"
+                },
+                "outputs": {
+                    "condition": null,
+                    "etag": "BwYpj4R2kO0=",
+                    "id": "pleasantrees-dwh/roles/storage.objectViewer",
+                    "members": [
+                        "serviceAccount:nodeone@pleasantrees-dwh.iam.gserviceaccount.com"
+                    ],
+                    "project": "pleasantrees-dwh",
+                    "role": "roles/storage.objectViewer"
+                },
+                "parent": "urn:pulumi:main::deploy_standard::pulumi:pulumi:Stack::deploy_standard-main",
+                "dependencies": [
+                    "urn:pulumi:main::deploy_standard::gcp:projects/service:Service::enable-serviceusage.googleapis.com",
+                    "urn:pulumi:main::deploy_standard::gcp:serviceaccount/account:Account::service-account",
+                    "urn:pulumi:main::deploy_standard::gcp:projects/service:Service::enable-bigquery.googleapis.com",
+                    "urn:pulumi:main::deploy_standard::gcp:projects/service:Service::enable-cloudresourcemanager.googleapis.com",
+                    "urn:pulumi:main::deploy_standard::gcp:projects/service:Service::enable-iam.googleapis.com",
+                    "urn:pulumi:main::deploy_standard::gcp:projects/service:Service::enable-storage.googleapis.com",
+                    "urn:pulumi:main::deploy_standard::gcp:projects/service:Service::enable-secretmanager.googleapis.com"
+                ],
+                "provider": "urn:pulumi:main::deploy_standard::pulumi:providers:gcp::default_8_11_0::90f7bfc7-17fa-4143-b64e-fd04e999553f",
+                "propertyDependencies": {
+                    "members": [
+                        "urn:pulumi:main::deploy_standard::gcp:serviceaccount/account:Account::service-account"
+                    ],
+                    "project": [],
+                    "role": []
+                },
+                "created": "2024-12-18T18:24:03.742330679Z",
+                "modified": "2024-12-18T18:24:03.742330679Z",
+                "sourcePosition": "project:///venv/lib/python3.9/site-packages/pulumi_gcp/projects/iam_binding.py#822"
+            },
+            {
+                "urn": "urn:pulumi:main::deploy_standard::gcp:projects/iAMBinding:IAMBinding::iam-binding-bigquery.jobUser",
+                "custom": true,
+                "id": "pleasantrees-dwh/roles/bigquery.jobUser",
+                "type": "gcp:projects/iAMBinding:IAMBinding",
+                "inputs": {
+                    "__defaults": [],
+                    "members": [
+                        "serviceAccount:nodeone@pleasantrees-dwh.iam.gserviceaccount.com"
+                    ],
+                    "project": "pleasantrees-dwh",
+                    "role": "roles/bigquery.jobUser"
+                },
+                "outputs": {
+                    "condition": null,
+                    "etag": "BwYpj4R2kO0=",
+                    "id": "pleasantrees-dwh/roles/bigquery.jobUser",
+                    "members": [
+                        "serviceAccount:nodeone@pleasantrees-dwh.iam.gserviceaccount.com"
+                    ],
+                    "project": "pleasantrees-dwh",
+                    "role": "roles/bigquery.jobUser"
+                },
+                "parent": "urn:pulumi:main::deploy_standard::pulumi:pulumi:Stack::deploy_standard-main",
+                "dependencies": [
+                    "urn:pulumi:main::deploy_standard::gcp:projects/service:Service::enable-iam.googleapis.com",
+                    "urn:pulumi:main::deploy_standard::gcp:projects/service:Service::enable-storage.googleapis.com",
+                    "urn:pulumi:main::deploy_standard::gcp:projects/service:Service::enable-secretmanager.googleapis.com",
+                    "urn:pulumi:main::deploy_standard::gcp:projects/service:Service::enable-serviceusage.googleapis.com",
+                    "urn:pulumi:main::deploy_standard::gcp:serviceaccount/account:Account::service-account",
+                    "urn:pulumi:main::deploy_standard::gcp:projects/service:Service::enable-bigquery.googleapis.com",
+                    "urn:pulumi:main::deploy_standard::gcp:projects/service:Service::enable-cloudresourcemanager.googleapis.com"
+                ],
+                "provider": "urn:pulumi:main::deploy_standard::pulumi:providers:gcp::default_8_11_0::90f7bfc7-17fa-4143-b64e-fd04e999553f",
+                "propertyDependencies": {
+                    "members": [
+                        "urn:pulumi:main::deploy_standard::gcp:serviceaccount/account:Account::service-account"
+                    ],
+                    "project": [],
+                    "role": []
+                },
+                "created": "2024-12-18T18:24:03.947727805Z",
+                "modified": "2024-12-18T18:24:03.947727805Z",
+                "sourcePosition": "project:///venv/lib/python3.9/site-packages/pulumi_gcp/projects/iam_binding.py#822"
+            },
+            {
+                "urn": "urn:pulumi:main::deploy_standard::gcp:projects/iAMBinding:IAMBinding::iam-binding-storage.objectCreator",
+                "custom": true,
+                "id": "pleasantrees-dwh/roles/storage.objectCreator",
+                "type": "gcp:projects/iAMBinding:IAMBinding",
+                "inputs": {
+                    "__defaults": [],
+                    "members": [
+                        "serviceAccount:nodeone@pleasantrees-dwh.iam.gserviceaccount.com"
+                    ],
+                    "project": "pleasantrees-dwh",
+                    "role": "roles/storage.objectCreator"
+                },
+                "outputs": {
+                    "condition": null,
+                    "etag": "BwYpj4R2kO0=",
+                    "id": "pleasantrees-dwh/roles/storage.objectCreator",
+                    "members": [
+                        "serviceAccount:nodeone@pleasantrees-dwh.iam.gserviceaccount.com"
+                    ],
+                    "project": "pleasantrees-dwh",
+                    "role": "roles/storage.objectCreator"
+                },
+                "parent": "urn:pulumi:main::deploy_standard::pulumi:pulumi:Stack::deploy_standard-main",
+                "dependencies": [
+                    "urn:pulumi:main::deploy_standard::gcp:projects/service:Service::enable-cloudresourcemanager.googleapis.com",
+                    "urn:pulumi:main::deploy_standard::gcp:projects/service:Service::enable-iam.googleapis.com",
+                    "urn:pulumi:main::deploy_standard::gcp:projects/service:Service::enable-storage.googleapis.com",
+                    "urn:pulumi:main::deploy_standard::gcp:projects/service:Service::enable-secretmanager.googleapis.com",
+                    "urn:pulumi:main::deploy_standard::gcp:projects/service:Service::enable-serviceusage.googleapis.com",
+                    "urn:pulumi:main::deploy_standard::gcp:serviceaccount/account:Account::service-account",
+                    "urn:pulumi:main::deploy_standard::gcp:projects/service:Service::enable-bigquery.googleapis.com"
+                ],
+                "provider": "urn:pulumi:main::deploy_standard::pulumi:providers:gcp::default_8_11_0::90f7bfc7-17fa-4143-b64e-fd04e999553f",
+                "propertyDependencies": {
+                    "members": [
+                        "urn:pulumi:main::deploy_standard::gcp:serviceaccount/account:Account::service-account"
+                    ],
+                    "project": [],
+                    "role": []
+                },
+                "created": "2024-12-18T18:24:04.346850813Z",
+                "modified": "2024-12-18T18:24:04.346850813Z",
+                "sourcePosition": "project:///venv/lib/python3.9/site-packages/pulumi_gcp/projects/iam_binding.py#822"
+            },
+            {
+                "urn": "urn:pulumi:main::deploy_standard::gcp:projects/iAMBinding:IAMBinding::iam-binding-secretmanager.secretAccessor",
+                "custom": true,
+                "id": "pleasantrees-dwh/roles/secretmanager.secretAccessor",
+                "type": "gcp:projects/iAMBinding:IAMBinding",
+                "inputs": {
+                    "__defaults": [],
+                    "members": [
+                        "serviceAccount:nodeone@pleasantrees-dwh.iam.gserviceaccount.com"
+                    ],
+                    "project": "pleasantrees-dwh",
+                    "role": "roles/secretmanager.secretAccessor"
+                },
+                "outputs": {
+                    "condition": null,
+                    "etag": "BwYpj4R2kO0=",
+                    "id": "pleasantrees-dwh/roles/secretmanager.secretAccessor",
+                    "members": [
+                        "serviceAccount:nodeone@pleasantrees-dwh.iam.gserviceaccount.com"
+                    ],
+                    "project": "pleasantrees-dwh",
+                    "role": "roles/secretmanager.secretAccessor"
+                },
+                "parent": "urn:pulumi:main::deploy_standard::pulumi:pulumi:Stack::deploy_standard-main",
+                "dependencies": [
+                    "urn:pulumi:main::deploy_standard::gcp:projects/service:Service::enable-bigquery.googleapis.com",
+                    "urn:pulumi:main::deploy_standard::gcp:projects/service:Service::enable-cloudresourcemanager.googleapis.com",
+                    "urn:pulumi:main::deploy_standard::gcp:projects/service:Service::enable-iam.googleapis.com",
+                    "urn:pulumi:main::deploy_standard::gcp:projects/service:Service::enable-storage.googleapis.com",
+                    "urn:pulumi:main::deploy_standard::gcp:projects/service:Service::enable-secretmanager.googleapis.com",
+                    "urn:pulumi:main::deploy_standard::gcp:projects/service:Service::enable-serviceusage.googleapis.com",
+                    "urn:pulumi:main::deploy_standard::gcp:serviceaccount/account:Account::service-account"
+                ],
+                "provider": "urn:pulumi:main::deploy_standard::pulumi:providers:gcp::default_8_11_0::90f7bfc7-17fa-4143-b64e-fd04e999553f",
+                "propertyDependencies": {
+                    "members": [
+                        "urn:pulumi:main::deploy_standard::gcp:serviceaccount/account:Account::service-account"
+                    ],
+                    "project": [],
+                    "role": []
+                },
+                "created": "2024-12-18T18:24:03.555042451Z",
+                "modified": "2024-12-18T18:24:03.555042451Z",
+                "sourcePosition": "project:///venv/lib/python3.9/site-packages/pulumi_gcp/projects/iam_binding.py#822"
+            },
+            {
+                "urn": "urn:pulumi:main::deploy_standard::pulumi:providers:command::default_1_0_1",
+                "custom": true,
+                "id": "cd8e2127-36f5-43c4-92b1-ebe55b730a7a",
+                "type": "pulumi:providers:command",
+                "inputs": {
+                    "__internal": {},
+                    "version": "1.0.1"
+                },
+                "outputs": {
+                    "version": "1.0.1"
+                },
+                "created": "2024-12-18T18:24:08.357344976Z",
+                "modified": "2024-12-18T18:24:08.357344976Z"
+            },
+            {
+                "urn": "urn:pulumi:main::deploy_standard::command:local:Command::nixosImageBuildCommand",
+                "custom": true,
+                "id": "nixosImageBuildCommand3978a644",
+                "type": "command:local:Command",
+                "inputs": {
+                    "addPreviousOutputInEnv": true,
+                    "create": {
+                        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+                        "plaintext": "\"python /workspace/src/scripts/pulumi/deploy_standard/infrastructure/nixos_build_image.py --sa-key-content 'ewogICJ0eXBlIjogInNlcnZpY2VfYWNjb3VudCIsCiAgInByb2plY3RfaWQiOiAicGxlYXNhbnRyZWVzLWR3aCIsCiAgInByaXZhdGVfa2V5X2lkIjogImRlMWI5MDIxYjA0OWFiZWJjY2IyMmRkOGFjNmM2MjY5ZjBiZmY5NTQiLAogICJwcml2YXRlX2tleSI6ICItLS0tLUJFR0lOIFBSSVZBVEUgS0VZLS0tLS1cbk1JSUV2UUlCQURBTkJna3Foa2lHOXcwQkFRRUZBQVNDQktjd2dnU2pBZ0VBQW9JQkFRQ3JTT2Vtd0ZobUNXOCtcbkZIWVd0QmVVOUhLTnRjRFh0NVh5ZUsvM1hpbHlhM0RQa3pmNVZzbHRTSHJuZGFheXZ1RDF3YXlPdWYvbk42V3VcbnhmbVF5RzZnZkVteFN5WkxCenZxZ1NOcFpWNkE1NEJXMHNIR05SdE1nVlRPWHIyUEdOSkIrSm8yVHFYNHRXVXNcbllqVkgwTE5lNEZVQnZOMVE1dmRGY2g0RHl2cko0Y1UyQWx4RHR2bE9jK084eitSMFEwSU5HUHg1SGM4cGFnNkNcbmxIeGVRVzZ4VmZaOCszT0NzMTR0MzN4TXRzQ3JTV21YeVpHMWJDdzFJS1FVazRKbnZnYmVmeHF0elo3NW1RZEdcbkRBb2dUQXBvdHZaeGtzcDFMSnhUeXJDYWZjN1RpU2x3L1ZjUkswdWRDQkN4QjY2bnlzRHUraW1PZHZXa0crbVZcblZlV3JsRVVKQWdNQkFBRUNnZ0VBQnpFZHR1anpIVCt1cWREaW4zUHEzSkNDQWRTOGx1SW91K0JZNVI1UlI3SmVcbnIzeUxPRjh1UUhZdllPb1YrSUhld0xyajA2OVlJUjE3U2JJYTF6c3ZOL0pZQnNkMHdXZzVtaEJYakF5YlVmYkdcbmN2N1E3NUZaeHRYVVdZRHRYU1dKNklhM2RPbksrcjBsRlI2L2hYY3NIT0wyOXNaM0ZYZEpNU09JUXBrQ2ZEajZcbnU5QTI3WThrcnVkU01OUFdsMUpINE5Xc1QrWmt1dlZKTWdjMDgrSzVyVFBIZjh0OGZQZWRmYlBjZmNsL3VwczFcbmtPTWcwSXZRNk5ZNU5BUS81ZFQzQndnNU42MXhwMkhWdVV1YXM0c01FVUx1THJvcTFTaTZzaDBTK2plZjlVbVlcbnNGc0lhbG9xbGM4bnUrbStGK2pVMjZrbkI2NzkvYnJoZHZwKzNPMGVQUUtCZ1FEYmtsVk1VSHBORWVmbWpJUnBcbjRwRGR5ZVlWSm0xWjlrS0cxcStZS3VJNklSMTRVTkJnQnFKWlNFdTZIdTc1OThDQjBkcnNvRUQvdVFRQWtIVlZcbkhvVGVLL3EwV0hJTGJMNTFLREJnaWowc2drUmlGL05jM1k1UFR3a3hXSDBTWDN4NHVwTE0vdVBoTGRkcnliVU1cbk5wL2FHRXdHRTJmWHFObWdrOUs2cGhEQmpRS0JnUURIczdxVGNzRHJCMDhkUDF6LzVGZ2I2MnNzbEF4V2QzWWdcbm9nVEJyV1BDRWtLRmcrQVE5QzhlWjRodjV0ZzMwVzFPTVM0QkFVdFNBa1pFUnByazFIc3ppU29jelJNUzUwNFBcblRVd0ZsSytkaEV5Z3RXbWFpdS9oUVlibTVDdS9PcXJNeEI0aWxaWHF4aHNVZlNFWU5NQWZlTzB5UThYY2xURWFcblN6aHVpK3hNYlFLQmdRQ252ZVJDTjkwbkViM2JDSkNFSDkxU1F0THVaM3YwMVVnL29MVm5CNlBxaXEvcjRiay9cbkV2Sm1TTy9wVVlaNkdzYkxwcG1jV2xVdHg1ZUNJdG93Vys5Zmw3T2dvVTBHNDEyaFBVR3dEd3ZxKzkzb0hxb0JcbjBSVE9DL0JXN1dZbmFpRTZUamFtT3plMktJSkJTMGh2K3k4bHU1Z2dzQ1NOd2VYNFlkWUVWNmZIWlFLQmdDK3BcbjdBd3BSWFpUSmtUYXpMMmVxSkR4WFlFa1ROV09hYmxjTWpwdndmR2VIaFp6NVZUbWt5QjBvWkhqelJOMWZ0czhcbnpiZ2JzUGgvNW5tQlNKTDVTL1orOUhndlVqQWUyUGk2QUQwTXdlV2NvQlZ6ZHlNVnFpOWZUbTFwWkMrZU53bnNcbmZTelAreG92OG1Ldmd1aWVIb1RrZmVpVFdIUlBmNHJCRFZVRlBINzVBb0dBYkRsKzlXMFgxMzRqSXJvRGFkeGRcbkJna3E2YnVsc2hCWHJsRlcydVhiQ0l1YWs1QTI5NGI4Vk5CWHQ0QXkvMGZKMVE4dEtnZ0FpeStCVUc5eFpCTXJcbnNZb1d4MlpxUzRCbHZndDdYQ2NmTnJtWG1wSy9iRXg1anJYMUFMaksxZmw5YjgrTzBJVDB3bm93eEZBbTZ2b0NcbklkVUtWM3ZpK2RDaEZQcjVGaDdiellBPVxuLS0tLS1FTkQgUFJJVkFURSBLRVktLS0tLVxuIiwKICAiY2xpZW50X2VtYWlsIjogIm5vZGVvbmVAcGxlYXNhbnRyZWVzLWR3aC5pYW0uZ3NlcnZpY2VhY2NvdW50LmNvbSIsCiAgImNsaWVudF9pZCI6ICIxMDIzODMwODQ1NDIyODkwNTA0NjkiLAogICJhdXRoX3VyaSI6ICJodHRwczovL2FjY291bnRzLmdvb2dsZS5jb20vby9vYXV0aDIvYXV0aCIsCiAgInRva2VuX3VyaSI6ICJodHRwczovL29hdXRoMi5nb29nbGVhcGlzLmNvbS90b2tlbiIsCiAgImF1dGhfcHJvdmlkZXJfeDUwOV9jZXJ0X3VybCI6ICJodHRwczovL3d3dy5nb29nbGVhcGlzLmNvbS9vYXV0aDIvdjEvY2VydHMiLAogICJjbGllbnRfeDUwOV9jZXJ0X3VybCI6ICJodHRwczovL3d3dy5nb29nbGVhcGlzLmNvbS9yb2JvdC92MS9tZXRhZGF0YS94NTA5L25vZGVvbmUlNDBwbGVhc2FudHJlZXMtZHdoLmlhbS5nc2VydmljZWFjY291bnQuY29tIiwKICAidW5pdmVyc2VfZG9tYWluIjogImdvb2dsZWFwaXMuY29tIgp9Cg==' --hostname prodbox-pleasantrees-1 --config /workspace/src/scripts/pulumi/deploy_standard/build/configuration.nix\""
+                    },
+                    "environment": {
+                        "PYTHONUNBUFFERED": "1"
+                    }
+                },
+                "outputs": {
+                    "addPreviousOutputInEnv": true,
+                    "create": {
+                        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+                        "plaintext": "\"python /workspace/src/scripts/pulumi/deploy_standard/infrastructure/nixos_build_image.py --sa-key-content 'ewogICJ0eXBlIjogInNlcnZpY2VfYWNjb3VudCIsCiAgInByb2plY3RfaWQiOiAicGxlYXNhbnRyZWVzLWR3aCIsCiAgInByaXZhdGVfa2V5X2lkIjogImRlMWI5MDIxYjA0OWFiZWJjY2IyMmRkOGFjNmM2MjY5ZjBiZmY5NTQiLAogICJwcml2YXRlX2tleSI6ICItLS0tLUJFR0lOIFBSSVZBVEUgS0VZLS0tLS1cbk1JSUV2UUlCQURBTkJna3Foa2lHOXcwQkFRRUZBQVNDQktjd2dnU2pBZ0VBQW9JQkFRQ3JTT2Vtd0ZobUNXOCtcbkZIWVd0QmVVOUhLTnRjRFh0NVh5ZUsvM1hpbHlhM0RQa3pmNVZzbHRTSHJuZGFheXZ1RDF3YXlPdWYvbk42V3VcbnhmbVF5RzZnZkVteFN5WkxCenZxZ1NOcFpWNkE1NEJXMHNIR05SdE1nVlRPWHIyUEdOSkIrSm8yVHFYNHRXVXNcbllqVkgwTE5lNEZVQnZOMVE1dmRGY2g0RHl2cko0Y1UyQWx4RHR2bE9jK084eitSMFEwSU5HUHg1SGM4cGFnNkNcbmxIeGVRVzZ4VmZaOCszT0NzMTR0MzN4TXRzQ3JTV21YeVpHMWJDdzFJS1FVazRKbnZnYmVmeHF0elo3NW1RZEdcbkRBb2dUQXBvdHZaeGtzcDFMSnhUeXJDYWZjN1RpU2x3L1ZjUkswdWRDQkN4QjY2bnlzRHUraW1PZHZXa0crbVZcblZlV3JsRVVKQWdNQkFBRUNnZ0VBQnpFZHR1anpIVCt1cWREaW4zUHEzSkNDQWRTOGx1SW91K0JZNVI1UlI3SmVcbnIzeUxPRjh1UUhZdllPb1YrSUhld0xyajA2OVlJUjE3U2JJYTF6c3ZOL0pZQnNkMHdXZzVtaEJYakF5YlVmYkdcbmN2N1E3NUZaeHRYVVdZRHRYU1dKNklhM2RPbksrcjBsRlI2L2hYY3NIT0wyOXNaM0ZYZEpNU09JUXBrQ2ZEajZcbnU5QTI3WThrcnVkU01OUFdsMUpINE5Xc1QrWmt1dlZKTWdjMDgrSzVyVFBIZjh0OGZQZWRmYlBjZmNsL3VwczFcbmtPTWcwSXZRNk5ZNU5BUS81ZFQzQndnNU42MXhwMkhWdVV1YXM0c01FVUx1THJvcTFTaTZzaDBTK2plZjlVbVlcbnNGc0lhbG9xbGM4bnUrbStGK2pVMjZrbkI2NzkvYnJoZHZwKzNPMGVQUUtCZ1FEYmtsVk1VSHBORWVmbWpJUnBcbjRwRGR5ZVlWSm0xWjlrS0cxcStZS3VJNklSMTRVTkJnQnFKWlNFdTZIdTc1OThDQjBkcnNvRUQvdVFRQWtIVlZcbkhvVGVLL3EwV0hJTGJMNTFLREJnaWowc2drUmlGL05jM1k1UFR3a3hXSDBTWDN4NHVwTE0vdVBoTGRkcnliVU1cbk5wL2FHRXdHRTJmWHFObWdrOUs2cGhEQmpRS0JnUURIczdxVGNzRHJCMDhkUDF6LzVGZ2I2MnNzbEF4V2QzWWdcbm9nVEJyV1BDRWtLRmcrQVE5QzhlWjRodjV0ZzMwVzFPTVM0QkFVdFNBa1pFUnByazFIc3ppU29jelJNUzUwNFBcblRVd0ZsSytkaEV5Z3RXbWFpdS9oUVlibTVDdS9PcXJNeEI0aWxaWHF4aHNVZlNFWU5NQWZlTzB5UThYY2xURWFcblN6aHVpK3hNYlFLQmdRQ252ZVJDTjkwbkViM2JDSkNFSDkxU1F0THVaM3YwMVVnL29MVm5CNlBxaXEvcjRiay9cbkV2Sm1TTy9wVVlaNkdzYkxwcG1jV2xVdHg1ZUNJdG93Vys5Zmw3T2dvVTBHNDEyaFBVR3dEd3ZxKzkzb0hxb0JcbjBSVE9DL0JXN1dZbmFpRTZUamFtT3plMktJSkJTMGh2K3k4bHU1Z2dzQ1NOd2VYNFlkWUVWNmZIWlFLQmdDK3BcbjdBd3BSWFpUSmtUYXpMMmVxSkR4WFlFa1ROV09hYmxjTWpwdndmR2VIaFp6NVZUbWt5QjBvWkhqelJOMWZ0czhcbnpiZ2JzUGgvNW5tQlNKTDVTL1orOUhndlVqQWUyUGk2QUQwTXdlV2NvQlZ6ZHlNVnFpOWZUbTFwWkMrZU53bnNcbmZTelAreG92OG1Ldmd1aWVIb1RrZmVpVFdIUlBmNHJCRFZVRlBINzVBb0dBYkRsKzlXMFgxMzRqSXJvRGFkeGRcbkJna3E2YnVsc2hCWHJsRlcydVhiQ0l1YWs1QTI5NGI4Vk5CWHQ0QXkvMGZKMVE4dEtnZ0FpeStCVUc5eFpCTXJcbnNZb1d4MlpxUzRCbHZndDdYQ2NmTnJtWG1wSy9iRXg1anJYMUFMaksxZmw5YjgrTzBJVDB3bm93eEZBbTZ2b0NcbklkVUtWM3ZpK2RDaEZQcjVGaDdiellBPVxuLS0tLS1FTkQgUFJJVkFURSBLRVktLS0tLVxuIiwKICAiY2xpZW50X2VtYWlsIjogIm5vZGVvbmVAcGxlYXNhbnRyZWVzLWR3aC5pYW0uZ3NlcnZpY2VhY2NvdW50LmNvbSIsCiAgImNsaWVudF9pZCI6ICIxMDIzODMwODQ1NDIyODkwNTA0NjkiLAogICJhdXRoX3VyaSI6ICJodHRwczovL2FjY291bnRzLmdvb2dsZS5jb20vby9vYXV0aDIvYXV0aCIsCiAgInRva2VuX3VyaSI6ICJodHRwczovL29hdXRoMi5nb29nbGVhcGlzLmNvbS90b2tlbiIsCiAgImF1dGhfcHJvdmlkZXJfeDUwOV9jZXJ0X3VybCI6ICJodHRwczovL3d3dy5nb29nbGVhcGlzLmNvbS9vYXV0aDIvdjEvY2VydHMiLAogICJjbGllbnRfeDUwOV9jZXJ0X3VybCI6ICJodHRwczovL3d3dy5nb29nbGVhcGlzLmNvbS9yb2JvdC92MS9tZXRhZGF0YS94NTA5L25vZGVvbmUlNDBwbGVhc2FudHJlZXMtZHdoLmlhbS5nc2VydmljZWFjY291bnQuY29tIiwKICAidW5pdmVyc2VfZG9tYWluIjogImdvb2dsZWFwaXMuY29tIgp9Cg==' --hostname prodbox-pleasantrees-1 --config /workspace/src/scripts/pulumi/deploy_standard/build/configuration.nix\""
+                    },
+                    "environment": {
+                        "PYTHONUNBUFFERED": "1"
+                    },
+                    "stderr": "2024-12-18 19:52:52,468 - INFO - Setting up build directories...\n2024-12-18 19:52:52,468 - DEBUG - Running command: sudo chown -R 1000:1000 /workspace/build/out\n2024-12-18 19:52:52,474 - DEBUG - Command completed in 0.01 seconds\n2024-12-18 19:52:52,474 - DEBUG - Running command: sudo chown -R 1000:1000 /workspace/build/tmp\n2024-12-18 19:52:52,480 - DEBUG - Command completed in 0.01 seconds\n2024-12-18 19:52:52,480 - INFO - Cleaning up temporary directory...\n2024-12-18 19:52:52,480 - DEBUG - Created Nix expression:\n\n    { config, pkgs, lib, ... }:\n    {\n    imports = [ /workspace/src/scripts/pulumi/deploy_standard/build/configuration.nix ];\n\n    _module.args = {\n        serviceAccountFile = \"/workspace/_build/creds/service-account.json\";\n        hostname = \"prodbox-pleasantrees-1\";\n    };\n    }\n    \n2024-12-18 19:52:52,480 - INFO - Building Nix image with command: nix-build \u003cnixpkgs/nixos/lib/eval-config.nix\u003e -A config.system.build.googleComputeImage --arg modules [ /workspace/build/tmp/configuration.nix ] --argstr system x86_64-linux -o /workspace/build/tmp/result -j 10 --show-trace\n2024-12-18 19:52:52,480 - DEBUG - Running command: nix-build \u003cnixpkgs/nixos/lib/eval-config.nix\u003e -A config.system.build.googleComputeImage --arg modules [ /workspace/build/tmp/configuration.nix ] --argstr system x86_64-linux -o /workspace/build/tmp/result -j 10 --show-trace\n2024-12-18 19:57:41,980 - DEBUG - Command completed in 289.50 seconds\n2024-12-18 19:57:41,980 - DEBUG - Command output: /nix/store/xrz94872zm26k1gw99ig9wcs192mzrxw-google-compute-image\n2024-12-18 19:57:41,980 - INFO - Build completed, store path: /workspace/build/tmp/result\n2024-12-18 19:57:41,980 - DEBUG - Resolved store path: /nix/store/xrz94872zm26k1gw99ig9wcs192mzrxw-google-compute-image\n2024-12-18 19:57:41,981 - INFO - Found image file: /nix/store/xrz94872zm26k1gw99ig9wcs192mzrxw-google-compute-image/nixos-image-24.11pre-git-x86_64-linux.raw.tar.gz\n2024-12-18 19:57:41,981 - INFO - Found built image at: /nix/store/xrz94872zm26k1gw99ig9wcs192mzrxw-google-compute-image/nixos-image-24.11pre-git-x86_64-linux.raw.tar.gz\n2024-12-18 19:57:41,981 - INFO - Starting file copy from /nix/store/xrz94872zm26k1gw99ig9wcs192mzrxw-google-compute-image/nixos-image-24.11pre-git-x86_64-linux.raw.tar.gz to /workspace/build/out/nixos-image-x86_64-linux.raw.tar.gz\n2024-12-18 19:57:43,527 - INFO - Source file size: 1450.12 MB\n2024-12-18 19:57:45,959 - INFO - File copy completed and verified successfully",
+                    "stdout": "{\"image_path\": \"/workspace/build/out/nixos-image-x86_64-linux.raw.tar.gz\", \"image_name\": \"nixos-image-x86_64-linux.raw.tar.gz\", \"file_size\": 1520565744, \"file_hash\": \"78da599212787a7dd668d1ecb911be37b7d2844faa764a59326b966b784cbac2\", \"hostname\": \"prodbox-pleasantrees-1\"}"
+                },
+                "parent": "urn:pulumi:main::deploy_standard::pulumi:pulumi:Stack::deploy_standard-main",
+                "dependencies": [
+                    "urn:pulumi:main::deploy_standard::gcp:serviceaccount/account:Account::service-account",
+                    "urn:pulumi:main::deploy_standard::gcp:serviceaccount/key:Key::service-account-key",
+                    "urn:pulumi:main::deploy_standard::gcp:projects/iAMBinding:IAMBinding::iam-binding-bigquery.dataEditor",
+                    "urn:pulumi:main::deploy_standard::gcp:projects/iAMBinding:IAMBinding::iam-binding-secretmanager.secretAccessor",
+                    "urn:pulumi:main::deploy_standard::gcp:projects/iAMBinding:IAMBinding::iam-binding-bigquery.jobUser",
+                    "urn:pulumi:main::deploy_standard::gcp:projects/iAMBinding:IAMBinding::iam-binding-storage.objectViewer",
+                    "urn:pulumi:main::deploy_standard::gcp:storage/bucket:Bucket::machine_images",
+                    "urn:pulumi:main::deploy_standard::gcp:projects/iAMBinding:IAMBinding::iam-binding-storage.objectCreator"
+                ],
+                "provider": "urn:pulumi:main::deploy_standard::pulumi:providers:command::default_1_0_1::cd8e2127-36f5-43c4-92b1-ebe55b730a7a",
+                "propertyDependencies": {
+                    "addPreviousOutputInEnv": [],
+                    "create": [
+                        "urn:pulumi:main::deploy_standard::gcp:serviceaccount/key:Key::service-account-key"
+                    ],
+                    "environment": []
+                },
+                "customTimeouts": {
+                    "create": 1800,
+                    "update": 1800
+                },
+                "created": "2024-12-18T18:49:15.396776561Z",
+                "modified": "2024-12-18T19:57:47.28434956Z",
+                "sourcePosition": "project:///venv/lib/python3.9/site-packages/pulumi_command/local/command.py#716"
+            },
+            {
+                "urn": "urn:pulumi:main::deploy_standard::gcp:storage/bucketObject:BucketObject::nixos-image",
+                "custom": true,
+                "id": "machine_images-2af651d-nixos-images/nixos-image-x86_64-linux.raw.tar.gz",
+                "type": "gcp:storage/bucketObject:BucketObject",
+                "inputs": {
+                    "__defaults": [
+                        "detectMd5hash"
+                    ],
+                    "bucket": "machine_images-2af651d",
+                    "detectMd5hash": "different hash",
+                    "name": "nixos-images/nixos-image-x86_64-linux.raw.tar.gz",
+                    "source": {
+                        "4dabf18193072939515e22adb298388d": "c44067f5952c0a294b673a41bacd8c17",
+                        "hash": "30c6df2ea597fe0c2881052aef4c944c4a564f61cb58d6c2880735a1bfd95006",
+                        "path": "/workspace/build/out/nixos-image-x86_64-linux.raw.tar.gz"
+                    }
+                },
+                "outputs": {
+                    "__meta": "{\"e2bfb730-ecaa-11e6-8f88-34363bc7c4c0\":{\"create\":240000000000,\"delete\":240000000000,\"update\":240000000000}}",
+                    "bucket": "machine_images-2af651d",
+                    "cacheControl": "",
+                    "content": {
+                        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+                        "plaintext": "null"
+                    },
+                    "contentDisposition": "",
+                    "contentEncoding": "",
+                    "contentLanguage": "",
+                    "contentType": "application/x-gzip",
+                    "crc32c": "f6sOSA==",
+                    "customerEncryption": {
+                        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+                        "plaintext": "null"
+                    },
+                    "detectMd5hash": "XnPtB2UYM/cO7HUpz4S83A==",
+                    "eventBasedHold": false,
+                    "generation": 1734547839294764,
+                    "id": "machine_images-2af651d-nixos-images/nixos-image-x86_64-linux.raw.tar.gz",
+                    "kmsKeyName": "",
+                    "md5hash": {
+                        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+                        "plaintext": "\"XnPtB2UYM/cO7HUpz4S83A==\""
+                    },
+                    "mediaLink": "https://storage.googleapis.com/download/storage/v1/b/machine_images-2af651d/o/nixos-images%2Fnixos-image-x86_64-linux.raw.tar.gz?generation=1734547839294764\u0026alt=media",
+                    "metadata": null,
+                    "name": "nixos-images/nixos-image-x86_64-linux.raw.tar.gz",
+                    "outputName": "nixos-images/nixos-image-x86_64-linux.raw.tar.gz",
+                    "retention": null,
+                    "selfLink": "https://www.googleapis.com/storage/v1/b/machine_images-2af651d/o/nixos-images%2Fnixos-image-x86_64-linux.raw.tar.gz",
+                    "source": {
+                        "4dabf18193072939515e22adb298388d": "c44067f5952c0a294b673a41bacd8c17",
+                        "hash": "30c6df2ea597fe0c2881052aef4c944c4a564f61cb58d6c2880735a1bfd95006",
+                        "path": "/workspace/build/out/nixos-image-x86_64-linux.raw.tar.gz"
+                    },
+                    "storageClass": "STANDARD",
+                    "temporaryHold": false
+                },
+                "parent": "urn:pulumi:main::deploy_standard::pulumi:pulumi:Stack::deploy_standard-main",
+                "dependencies": [
+                    "urn:pulumi:main::deploy_standard::gcp:projects/iAMBinding:IAMBinding::iam-binding-storage.objectCreator",
+                    "urn:pulumi:main::deploy_standard::command:local:Command::nixosImageBuildCommand",
+                    "urn:pulumi:main::deploy_standard::gcp:projects/iAMBinding:IAMBinding::iam-binding-bigquery.jobUser",
+                    "urn:pulumi:main::deploy_standard::gcp:projects/iAMBinding:IAMBinding::iam-binding-bigquery.dataEditor",
+                    "urn:pulumi:main::deploy_standard::gcp:storage/bucket:Bucket::machine_images",
+                    "urn:pulumi:main::deploy_standard::gcp:projects/iAMBinding:IAMBinding::iam-binding-storage.objectViewer",
+                    "urn:pulumi:main::deploy_standard::gcp:projects/iAMBinding:IAMBinding::iam-binding-secretmanager.secretAccessor",
+                    "urn:pulumi:main::deploy_standard::gcp:serviceaccount/account:Account::service-account",
+                    "urn:pulumi:main::deploy_standard::gcp:serviceaccount/key:Key::service-account-key"
+                ],
+                "provider": "urn:pulumi:main::deploy_standard::pulumi:providers:gcp::default_8_11_0::90f7bfc7-17fa-4143-b64e-fd04e999553f",
+                "propertyDependencies": {
+                    "bucket": [
+                        "urn:pulumi:main::deploy_standard::gcp:storage/bucket:Bucket::machine_images"
+                    ],
+                    "name": [
+                        "urn:pulumi:main::deploy_standard::command:local:Command::nixosImageBuildCommand"
+                    ],
+                    "source": [
+                        "urn:pulumi:main::deploy_standard::command:local:Command::nixosImageBuildCommand"
+                    ]
+                },
+                "pendingReplacement": true,
+                "additionalSecretOutputs": [
+                    "md5hash",
+                    "content",
+                    "customerEncryption"
+                ],
+                "created": "2024-12-18T18:50:39.529755997Z",
+                "modified": "2024-12-18T18:50:39.529755997Z",
+                "sourcePosition": "project:///venv/lib/python3.9/site-packages/pulumi_gcp/storage/bucket_object.py#849"
+            },
+            {
+                "urn": "urn:pulumi:main::deploy_standard::gcp:storage/bucketObject:BucketObject$gcp:compute/image:Image::nixos-gce-image",
+                "custom": true,
+                "id": "projects/pleasantrees-dwh/global/images/nixos-image",
+                "type": "gcp:compute/image:Image",
+                "inputs": {
+                    "__defaults": [],
+                    "description": "NixOS custom image",
+                    "family": "nixos",
+                    "labels": {
+                        "environment": "production",
+                        "managed-by": "pulumi"
+                    },
+                    "name": "nixos-image",
+                    "rawDisk": {
+                        "__defaults": [
+                            "containerType"
+                        ],
+                        "containerType": "TAR",
+                        "source": "https://storage.googleapis.com/machine_images-2af651d/nixos-images/nixos-image-x86_64-linux.raw.tar.gz"
+                    }
+                },
+                "outputs": {
+                    "__meta": "{\"e2bfb730-ecaa-11e6-8f88-34363bc7c4c0\":{\"create\":1200000000000,\"delete\":1200000000000,\"update\":1200000000000}}",
+                    "archiveSizeBytes": 1761636160,
+                    "creationTimestamp": "2024-12-18T10:50:40.025-08:00",
+                    "description": "NixOS custom image",
+                    "diskSizeGb": 7,
+                    "effectiveLabels": {
+                        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+                        "plaintext": "{\"environment\":\"production\",\"goog-pulumi-provisioned\":\"true\",\"managed-by\":\"pulumi\"}"
+                    },
+                    "family": "nixos",
+                    "guestOsFeatures": [],
+                    "id": "projects/pleasantrees-dwh/global/images/nixos-image",
+                    "imageEncryptionKey": null,
+                    "labelFingerprint": "mm5PxQDXbeY=",
+                    "labels": {
+                        "environment": "production",
+                        "managed-by": "pulumi"
+                    },
+                    "licenses": [],
+                    "name": "nixos-image",
+                    "project": "pleasantrees-dwh",
+                    "pulumiLabels": {
+                        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+                        "plaintext": "{\"environment\":\"production\",\"goog-pulumi-provisioned\":\"true\",\"managed-by\":\"pulumi\"}"
+                    },
+                    "rawDisk": {
+                        "containerType": "TAR",
+                        "sha1": "",
+                        "source": "https://storage.googleapis.com/machine_images-2af651d/nixos-images/nixos-image-x86_64-linux.raw.tar.gz"
+                    },
+                    "selfLink": "https://www.googleapis.com/compute/v1/projects/pleasantrees-dwh/global/images/nixos-image",
+                    "sourceDisk": "",
+                    "sourceImage": "",
+                    "sourceSnapshot": "",
+                    "storageLocations": [
+                        "us"
+                    ]
+                },
+                "parent": "urn:pulumi:main::deploy_standard::gcp:storage/bucketObject:BucketObject::nixos-image",
+                "dependencies": [
+                    "urn:pulumi:main::deploy_standard::gcp:storage/bucketObject:BucketObject::nixos-image"
+                ],
+                "provider": "urn:pulumi:main::deploy_standard::pulumi:providers:gcp::default_8_11_0::90f7bfc7-17fa-4143-b64e-fd04e999553f",
+                "propertyDependencies": {
+                    "rawDisk": [
+                        "urn:pulumi:main::deploy_standard::gcp:storage/bucketObject:BucketObject::nixos-image"
+                    ]
+                },
+                "pendingReplacement": true,
+                "additionalSecretOutputs": [
+                    "effectiveLabels",
+                    "pulumiLabels"
+                ],
+                "created": "2024-12-18T18:52:12.682446964Z",
+                "modified": "2024-12-18T18:52:12.682446964Z",
+                "sourcePosition": "project:///venv/lib/python3.9/site-packages/pulumi_gcp/compute/image.py#1081"
+            },
+            {
+                "urn": "urn:pulumi:main::deploy_standard::gcp:storage/bucketObject:BucketObject$gcp:compute/image:Image$gcp:compute/instance:Instance::nixos-instance",
+                "custom": true,
+                "id": "projects/pleasantrees-dwh/zones/us-central1-a/instances/nixos-vm",
+                "type": "gcp:compute/instance:Instance",
+                "inputs": {
+                    "__defaults": [
+                        "canIpForward",
+                        "deletionProtection"
+                    ],
+                    "bootDisk": {
+                        "__defaults": [
+                            "autoDelete",
+                            "mode"
+                        ],
+                        "autoDelete": true,
+                        "initializeParams": {
+                            "__defaults": [],
+                            "image": "https://www.googleapis.com/compute/v1/projects/pleasantrees-dwh/global/images/nixos-image",
+                            "size": 20,
+                            "type": "pd-standard"
+                        },
+                        "mode": "READ_WRITE"
+                    },
+                    "canIpForward": false,
+                    "deletionProtection": false,
+                    "labels": {
+                        "environment": "production",
+                        "managed-by": "pulumi"
+                    },
+                    "machineType": "e2-micro",
+                    "metadata": {
+                        "startup-script": "#!/bin/bash\n                echo \"Instance started successfully\" \u003e /var/log/startup.log\n                "
+                    },
+                    "name": "nixos-vm",
+                    "networkInterfaces": [
+                        {
+                            "__defaults": [],
+                            "accessConfigs": [
+                                {
+                                    "__defaults": []
+                                }
+                            ],
+                            "network": "default"
+                        }
+                    ],
+                    "zone": "us-central1-a"
+                },
+                "outputs": {
+                    "__meta": "{\"e2bfb730-ecaa-11e6-8f88-34363bc7c4c0\":{\"create\":1200000000000,\"delete\":1200000000000,\"update\":1200000000000},\"schema_version\":\"6\"}",
+                    "advancedMachineFeatures": null,
+                    "allowStoppingForUpdate": null,
+                    "attachedDisks": [],
+                    "bootDisk": {
+                        "autoDelete": true,
+                        "deviceName": "persistent-disk-0",
+                        "diskEncryptionKeyRaw": {
+                            "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+                            "plaintext": "\"\""
+                        },
+                        "diskEncryptionKeySha256": "",
+                        "initializeParams": {
+                            "enableConfidentialCompute": false,
+                            "image": "https://www.googleapis.com/compute/beta/projects/pleasantrees-dwh/global/images/nixos-image",
+                            "labels": {},
+                            "provisionedIops": 0,
+                            "provisionedThroughput": 0,
+                            "resourceManagerTags": null,
+                            "resourcePolicies": null,
+                            "size": 20,
+                            "storagePool": "",
+                            "type": "pd-standard"
+                        },
+                        "interface": "",
+                        "kmsKeySelfLink": "",
+                        "mode": "READ_WRITE",
+                        "source": "https://www.googleapis.com/compute/v1/projects/pleasantrees-dwh/zones/us-central1-a/disks/nixos-vm"
+                    },
+                    "canIpForward": false,
+                    "confidentialInstanceConfig": null,
+                    "cpuPlatform": "Intel Broadwell",
+                    "creationTimestamp": "2024-12-18T10:52:13.689-08:00",
+                    "currentStatus": "RUNNING",
+                    "deletionProtection": false,
+                    "description": "",
+                    "desiredStatus": null,
+                    "effectiveLabels": {
+                        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+                        "plaintext": "{\"environment\":\"production\",\"goog-pulumi-provisioned\":\"true\",\"managed-by\":\"pulumi\"}"
+                    },
+                    "enableDisplay": false,
+                    "guestAccelerators": [],
+                    "hostname": "",
+                    "id": "projects/pleasantrees-dwh/zones/us-central1-a/instances/nixos-vm",
+                    "instanceId": "2947417191123691314",
+                    "keyRevocationActionType": "",
+                    "labelFingerprint": "mm5PxQDXbeY=",
+                    "labels": {
+                        "environment": "production",
+                        "managed-by": "pulumi"
+                    },
+                    "machineType": "e2-micro",
+                    "metadata": {
+                        "startup-script": "#!/bin/bash\n                echo \"Instance started successfully\" \u003e /var/log/startup.log\n                "
+                    },
+                    "metadataFingerprint": "Jply7Y4WYUI=",
+                    "metadataStartupScript": null,
+                    "minCpuPlatform": "",
+                    "name": "nixos-vm",
+                    "networkInterfaces": [
+                        {
+                            "accessConfigs": [
+                                {
+                                    "natIp": "34.42.219.31",
+                                    "networkTier": "PREMIUM",
+                                    "publicPtrDomainName": "",
+                                    "securityPolicy": ""
+                                }
+                            ],
+                            "aliasIpRanges": [],
+                            "internalIpv6PrefixLength": 0,
+                            "ipv6AccessConfigs": [],
+                            "ipv6AccessType": "",
+                            "ipv6Address": "",
+                            "name": "nic0",
+                            "network": "https://www.googleapis.com/compute/v1/projects/pleasantrees-dwh/global/networks/default",
+                            "networkAttachment": "",
+                            "networkIp": "10.128.0.7",
+                            "nicType": "",
+                            "queueCount": 0,
+                            "securityPolicy": "",
+                            "stackType": "IPV4_ONLY",
+                            "subnetwork": "https://www.googleapis.com/compute/v1/projects/pleasantrees-dwh/regions/us-central1/subnetworks/default",
+                            "subnetworkProject": "pleasantrees-dwh"
+                        }
+                    ],
+                    "networkPerformanceConfig": null,
+                    "params": null,
+                    "partnerMetadata": null,
+                    "project": "pleasantrees-dwh",
+                    "pulumiLabels": {
+                        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+                        "plaintext": "{\"environment\":\"production\",\"goog-pulumi-provisioned\":\"true\",\"managed-by\":\"pulumi\"}"
+                    },
+                    "reservationAffinity": null,
+                    "resourcePolicies": null,
+                    "scheduling": {
+                        "automaticRestart": true,
+                        "hostErrorTimeoutSeconds": 0,
+                        "instanceTerminationAction": "",
+                        "localSsdRecoveryTimeout": null,
+                        "maintenanceInterval": "",
+                        "maxRunDuration": null,
+                        "minNodeCpus": 0,
+                        "nodeAffinities": [],
+                        "onHostMaintenance": "MIGRATE",
+                        "onInstanceStopAction": null,
+                        "preemptible": false,
+                        "provisioningModel": "STANDARD"
+                    },
+                    "scratchDisks": [],
+                    "selfLink": "https://www.googleapis.com/compute/v1/projects/pleasantrees-dwh/zones/us-central1-a/instances/nixos-vm",
+                    "serviceAccount": null,
+                    "shieldedInstanceConfig": null,
+                    "tags": null,
+                    "tagsFingerprint": "42WmSpB8rSM=",
+                    "zone": "us-central1-a"
+                },
+                "parent": "urn:pulumi:main::deploy_standard::gcp:storage/bucketObject:BucketObject$gcp:compute/image:Image::nixos-gce-image",
+                "dependencies": [
+                    "urn:pulumi:main::deploy_standard::gcp:storage/bucketObject:BucketObject$gcp:compute/image:Image::nixos-gce-image"
+                ],
+                "provider": "urn:pulumi:main::deploy_standard::pulumi:providers:gcp::default_8_11_0::90f7bfc7-17fa-4143-b64e-fd04e999553f",
+                "propertyDependencies": {
+                    "bootDisk": [
+                        "urn:pulumi:main::deploy_standard::gcp:storage/bucketObject:BucketObject$gcp:compute/image:Image::nixos-gce-image"
+                    ]
+                },
+                "pendingReplacement": true,
+                "additionalSecretOutputs": [
+                    "effectiveLabels",
+                    "pulumiLabels"
+                ],
+                "created": "2024-12-18T18:52:50.731433012Z",
+                "modified": "2024-12-18T18:52:50.731433012Z",
+                "sourcePosition": "project:///venv/lib/python3.9/site-packages/pulumi_gcp/compute/instance.py#1838"
+            }
+        ],
+        "metadata": {}
+    }
+}
