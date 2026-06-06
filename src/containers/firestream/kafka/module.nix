@@ -157,6 +157,11 @@ let
   configScript = builtins.readFile ./scripts/config.sh;
   initScript = builtins.readFile ./scripts/init.sh;
   secretsScript = builtins.readFile ./scripts/secrets.sh;
+  # Pure helper-function definitions extracted from {validate,config,init}.sh —
+  # emitted at top-level of libhelperskafka.sh so chart init containers can
+  # invoke kafka_server_conf_set, kafka_common_conf_set, etc. after
+  # `source /opt/bitnami/scripts/libkafka.sh`.
+  helpersScript = builtins.readFile ./scripts/helpers.sh;
 
   # Kafka-specific helper functions (needed by scripts)
   # These supplement the core library functions
@@ -353,6 +358,14 @@ let
         "$@"
       fi
     }
+
+    # ----------------------------------------------------------------------
+    # Helpers relocated from scripts/{validate,config,init}.sh so they're
+    # visible at top-level of libkafka.sh (chart init containers source the
+    # lib and call kafka_server_conf_set, kafka_common_conf_set, etc. directly).
+    # Bodies are unchanged from the original script definitions.
+    # ----------------------------------------------------------------------
+    ${helpersScript}
   '';
 
   # System dependencies (Kafka-specific extras)
@@ -488,9 +501,13 @@ in firestream.mkJavaContainerModule {
     };
   };
 
+  # Per-container helpers: emitted at top-level of libhelperskafka.sh by the
+  # engine, so chart init containers can `source /opt/bitnami/scripts/libkafka.sh`
+  # and use these helpers (kafka_server_conf_set, etc.) directly.
+  perContainerHelpers = kafkaHelpers;
+
   # Validation function
-  # Prepend Kafka helpers so functions are available
-  validateFn = kafkaHelpers + ''
+  validateFn = ''
     error_code=0
     ${validateScript}
     [[ "$error_code" -eq 0 ]] || exit "$error_code"
@@ -498,7 +515,7 @@ in firestream.mkJavaContainerModule {
 
   # Activation: Load secrets
   # Note: NSS wrapper is automatically enabled by mkJavaContainerModule
-  activateFn = kafkaHelpers + ''
+  activateFn = ''
     info "Activating Kafka configuration..."
 
     # Load secrets from _FILE variables
@@ -508,11 +525,11 @@ in firestream.mkJavaContainerModule {
   '';
 
   # Configuration generation
-  configFn = kafkaHelpers + configScript;
+  configFn = configScript;
 
   # Initialization (KRaft storage setup, directory creation)
   # Include configScript for helper functions like kafka_configure_default_truststore_locations
-  initFn = kafkaHelpers + configScript + initScript;
+  initFn = configScript + initScript;
 
   # Startup command
   # Note: NSS wrapper is automatically enabled by mkJavaContainerModule before runCmd

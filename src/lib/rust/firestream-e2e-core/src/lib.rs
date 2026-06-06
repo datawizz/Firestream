@@ -1,0 +1,32 @@
+//! Transport-agnostic primitives shared by every Firestream end-to-end harness.
+//!
+//! Phase 1 of the k3d/helm e2e plan extracted these symbols from
+//! `src/lib/rust/firestream/tests/e2e/` so a second harness (the k8s one in
+//! Phase 2+) can sit on the same foundation as the existing docker-compose
+//! harness. Nothing in this crate knows about docker, k8s, helm, or nix —
+//! callers wire their own backends via the [`exec::Exec`] trait and pass
+//! backend-specific data (compose file path / cluster name / kubeconfig) only
+//! through the harness layer above.
+//!
+//! # Modules
+//!
+//! - [`probe`] — `Probe` trait + base impls (`Tcp`, `HttpReady`,
+//!   `PgIsReady`, `RedisPing`, `KafkaApiVersions`). The last three are
+//!   generic over an `Exec` impl so the same code drives `docker compose
+//!   exec` and `kubectl exec`.
+//! - [`retry`] — `retry_until_sync` deadline loop used to drive a probe
+//!   until success-or-deadline.
+//! - [`env`] — accessors for the `FIRESTREAM_E2E_*` env-var contract:
+//!   `env_strict`, `env_keep`, `env_timeout_secs`, plus a generic
+//!   `selected()` filter gate and a generic `should_skip()` PATH check.
+//! - [`guard`] — `wait_with_budget`, the bounded-wait helper used by
+//!   teardown guards' `Drop` implementations.
+//! - [`exec`] — the transport-agnostic `Exec` trait. One impl per backend
+//!   (`DockerComposeExec` lives in the docker harness; `KubectlExec` lands
+//!   in `firestream-e2e-k8s` in Phase 2).
+
+pub mod env;
+pub mod exec;
+pub mod guard;
+pub mod probe;
+pub mod retry;

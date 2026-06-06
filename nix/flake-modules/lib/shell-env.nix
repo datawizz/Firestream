@@ -90,6 +90,12 @@ let
     trivy   # Container vulnerability scanner
     grype   # Vulnerability scanner for containers and filesystems
     docker  # Docker CLI for container management
+
+    # K8s tools used by the firestream-e2e-k8s harness. kubectl and helm
+    # are typically present system-wide (NixOS / brew); k3d almost never
+    # is — adding it here keeps `make test-e2e-k8s*` working without
+    # requiring an out-of-shell `nix shell nixpkgs#k3d --command …` wrap.
+    k3d
   ];
 
   # Create a profile script that sets up the environment

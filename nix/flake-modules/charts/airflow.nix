@@ -22,6 +22,12 @@
 # `image:` plus a `metrics.image:` for the StatsD exporter, and components
 # web/scheduler/worker/dagProcessor/triggerer all share the top-level image
 # via the `airflow.image` helper template).
+#
+# Phase B (image-injection sweep): adds two MORE slots for the bundled
+# postgresql and redis subcharts so the rendered chart pulls
+# `firestream-postgresql:17` + `firestream-redis:8` instead of
+# `bitnami/postgresql` + `bitnami/redis` for the bundled deployment. The
+# main `airflow` slot is unchanged.
 { ... }: {
   perSystem = { pkgs, lib, config, evalChart, ... }:
     let
@@ -51,6 +57,27 @@
           tag = imgEval.imageTag;              # falls back to version when image.tag is null
         };
 
+      # Phase B: subchart image triples for the bundled postgresql + redis.
+      pgImg =
+        let
+          imgEval = config.firestreamImages.postgresql.eval (_: {});
+          imgCfg = imgEval.config.postgresql.image;
+        in {
+          registry = imgCfg.registry;
+          repository = imgCfg.repository;
+          tag = imgEval.imageTag;
+        };
+
+      redisImg =
+        let
+          imgEval = config.firestreamImages.redis.eval (_: {});
+          imgCfg = imgEval.config.redis.image;
+        in {
+          registry = imgCfg.registry;
+          repository = imgCfg.repository;
+          tag = imgEval.imageTag;
+        };
+
       # Override module: populate `_meta.containerRefs` with one slot pointing
       # at the chart's shared top-level `image:`. Layering this AFTER optionsPath
       # in `evalChart`'s modules list ensures it merges into the same
@@ -65,12 +92,48 @@
       # This is the documented Bitnami escape hatch
       # (https://github.com/bitnami/charts/issues/30850) and applies ONLY when
       # the chart is consumed with our injected image.
+      # Phase F: firestream-airflow bakes AIRFLOW_*_DIR / *_FILE env vars
+      # under /opt/airflow (see src/containers/firestream/airflow/options.nix).
+      # The Bitnami chart mounts emptyDirs at /opt/bitnami/airflow/{logs,tmp,
+      # nss-wrapper,secrets,venv} and subPath mounts for airflow.cfg /
+      # webserver_config.py / airflow.db. /emptydir is the parent for the
+      # init container's bootstrap workspace. readOnlyRootFilesystem is
+      # enforced on all components.
+      #
+      # Remap every path var to the chart's actual mount layout. Since the
+      # chart's `extraEnvVars` lives at the top level of values.yaml and
+      # applies to ALL pods (web/scheduler/worker/dagProcessor/triggerer +
+      # init/wait jobs), one set covers the whole deployment.
+      firestreamPathOverrides = [
+        { name = "AIRFLOW_CONF_FILE";           value = "/opt/bitnami/airflow/airflow.cfg"; }
+        { name = "AIRFLOW_WEBSERVER_CONF_FILE"; value = "/opt/bitnami/airflow/webserver_config.py"; }
+        { name = "AIRFLOW_LOGS_DIR";            value = "/opt/bitnami/airflow/logs"; }
+        { name = "AIRFLOW_SCHEDULER_LOGS_DIR";  value = "/opt/bitnami/airflow/logs/scheduler"; }
+        { name = "AIRFLOW_TMP_DIR";             value = "/opt/bitnami/airflow/tmp"; }
+        { name = "AIRFLOW_DAGS_DIR";            value = "/opt/bitnami/airflow/dags"; }
+        { name = "AIRFLOW_PLUGINS_DIR";         value = "/opt/bitnami/airflow/plugins"; }
+      ];
+
       imageInjectionModule = { ... }: {
-        config.airflow._meta.containerRefs.airflow = {
-          inherit (airflowImg) registry repository tag;
-          componentPath = [ "image" ];
+        config.airflow._meta.containerRefs = {
+          airflow = {
+            inherit (airflowImg) registry repository tag;
+            componentPath = [ "image" ];
+          };
+          postgresql = {
+            inherit (pgImg) registry repository tag;
+            componentPath = [ "postgresql" "image" ];
+          };
+          redis = {
+            inherit (redisImg) registry repository tag;
+            componentPath = [ "redis" "image" ];
+          };
         };
         config.airflow.global.security.allowInsecureImages = true;
+        # Top-level airflow.extraEnvVars applies to every airflow component
+        # pod (web, scheduler, worker, dagProcessor, triggerer) AND the
+        # init/setup-db jobs. Single point of truth.
+        config.airflow.extraEnvVars = firestreamPathOverrides;
       };
 
       c = evalChart {

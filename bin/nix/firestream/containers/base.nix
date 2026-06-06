@@ -81,6 +81,12 @@ in
     initFn ? "",
     runCmd ? "",
 
+    # Per-container helpers emitted at top-level of libhelpers<name>.sh.
+    # Forwarded to mkAppModule so chart init containers can source
+    # /opt/bitnami/scripts/lib<name>.sh and call helpers like
+    # kafka_server_conf_set / airflow_conf_set directly.
+    perContainerHelpers ? "",
+
     # Build-time (prepopulate phase) - passed to mkAppModule
     prepopulateFn ? "",
     prepopulateFiles ? {},
@@ -129,7 +135,7 @@ in
       inherit name version envVars envVarsWithSecrets paths user;
       inherit validateFn configFn initFn runCmd;
       inherit prepopulateFn prepopulateFiles prepopulateDirs runtimeDirs;
-      inherit activateFn enableStateTracking;
+      inherit activateFn enableStateTracking perContainerHelpers;
       extraDeps = extraDeps ++ runtimeBinDeps;
     };
 
@@ -234,7 +240,8 @@ ${user.name}:!:::::::
       # Layer group 2: App scripts (change with code updates)
       appModule.scripts.envDefaults
       appModule.scripts.fileLoader
-      appModule.scripts.lib
+      appModule.scripts.libHelpers   # libhelpers<name>.sh: top-level helpers
+      appModule.scripts.lib          # lib<name>.sh: phase wrappers (sources libHelpers)
       finalEntrypoint           # CRITICAL: was missing from metadataEnv
       appModule.scripts.setup
       appModule.scripts.run
@@ -351,6 +358,22 @@ ${user.name}:!:::::::
           app_dir="$base_dir/${name}"
           resolve_symlink "$app_dir"
         done
+
+        # Bitnami chart compat: the upstream charts source helper scripts
+        # from `/opt/bitnami/scripts/lib<name>.sh`. Mirror the firestream
+        # scripts at the Bitnami path so chart command/args overrides Just
+        # Work without patching every chart's templates.
+        #
+        # We deliberately do NOT symlink /opt/bitnami/${name} → /opt/firestream/${name}:
+        # several Bitnami charts mount configmaps/secrets inside that path
+        # (e.g. `/opt/bitnami/airflow/airflow.cfg`), and Kubernetes can't
+        # overlay mounts onto a symlink target. Instead we create an empty
+        # writable directory there so volume mounts have a real target.
+        if [ -d "./opt/firestream/scripts" ] && [ ! -e "./opt/bitnami/scripts" ]; then
+          mkdir -p ./opt/bitnami
+          ln -s /opt/firestream/scripts ./opt/bitnami/scripts
+        fi
+        mkdir -p ./opt/bitnami/${name}
 
         # Ensure home directory exists
         mkdir -p ./home/${user.name}

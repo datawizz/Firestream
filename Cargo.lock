@@ -1658,6 +1658,7 @@ dependencies = [
  "docker-manager",
  "filesystem-manager",
  "firestream-charts",
+ "firestream-e2e-core",
  "firestream-vib",
  "futures",
  "helm-manager",
@@ -1777,6 +1778,33 @@ dependencies = [
  "tempfile",
  "thiserror 1.0.69",
  "tracing",
+]
+
+[[package]]
+name = "firestream-e2e-core"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "once_cell",
+ "reqwest 0.12.28",
+ "thiserror 1.0.69",
+ "which",
+]
+
+[[package]]
+name = "firestream-e2e-k8s"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "firestream",
+ "firestream-charts",
+ "firestream-e2e-core",
+ "k8s-manager",
+ "once_cell",
+ "rand 0.8.5",
+ "tokio",
+ "tracing",
+ "which",
 ]
 
 [[package]]

@@ -510,15 +510,20 @@ in firestream.mkPythonContainerModule {
     "/opt/odoo/conf/odoo.conf.template" = odooConfigTemplate;
   };
 
+  # Per-container helpers: emitted at top-level of libhelpersodoo.sh by the
+  # engine, so chart init containers can `source /opt/bitnami/scripts/libodoo.sh`
+  # and use these helpers directly.
+  perContainerHelpers = odooHelpers;
+
   # Validation function
-  validateFn = odooHelpers + ''
+  validateFn = ''
     error_code=0
     ${validateScript}
     [[ "$error_code" -eq 0 ]] || exit "$error_code"
   '';
 
   # Activation: Load secrets and process config templates
-  activateFn = odooHelpers + ''
+  activateFn = ''
     info "Activating Odoo configuration..."
 
     # Load secrets from _FILE variables
@@ -529,11 +534,20 @@ in firestream.mkPythonContainerModule {
     list_db_val="$(is_boolean_yes "$ODOO_LIST_DB" && echo 'True' || echo 'False')"
     log_level_val="$(is_boolean_yes "$BITNAMI_DEBUG" && echo 'debug' || echo 'info')"
 
-    # Process config template if exists
+    # Process config template if exists. Look in baked /opt/odoo/conf
+    # (where prepopulateFiles puts the template) BEFORE the K8s-overridden
+    # ODOO_CONF_DIR — the template is baked into the image, not under PVC.
     local conf_dir="''${ODOO_CONF_DIR:-/opt/odoo/conf}"
     local conf_file="''${ODOO_CONF_FILE:-$conf_dir/odoo.conf}"
+    local template_file="$conf_dir/odoo.conf.template"
+    [[ -f "$template_file" ]] || template_file="/opt/odoo/conf/odoo.conf.template"
 
-    if [[ -f "$conf_dir/odoo.conf.template" ]] && [[ ! -f "$conf_file" ]]; then
+    # Ensure conf_dir exists. With Bitnami chart's PVC at /bitnami/odoo,
+    # the chart already created /bitnami/odoo as a mount point, but the
+    # `conf` subdir might not exist yet. mkdir -p is a no-op if it exists.
+    ${pkgs.coreutils}/bin/mkdir -p "$conf_dir" 2>/dev/null || true
+
+    if [[ -f "$template_file" ]] && [[ ! -f "$conf_file" ]]; then
       info "Generating odoo.conf from template..."
       ${pkgs.gnused}/bin/sed \
         -e "s|{{ODOO_ADDONS_DIR}}|''${ODOO_ADDONS_DIR:-/opt/odoo/addons}|g" \
@@ -549,7 +563,7 @@ in firestream.mkPythonContainerModule {
         -e "s|{{ODOO_LONGPOLLING_PORT_NUMBER}}|''${ODOO_LONGPOLLING_PORT_NUMBER:-8072}|g" \
         -e "s|{{ODOO_LIST_DB}}|''${list_db_val}|g" \
         -e "s|{{ODOO_LOG_LEVEL}}|''${log_level_val}|g" \
-        "$conf_dir/odoo.conf.template" > "$conf_file"
+        "$template_file" > "$conf_file"
 
       info "Generated odoo.conf"
     fi
@@ -561,10 +575,10 @@ in firestream.mkPythonContainerModule {
   '';
 
   # Configuration generation
-  configFn = odooHelpers + configScript;
+  configFn = configScript;
 
   # Initialization
-  initFn = odooHelpers + initScript;
+  initFn = initScript;
 
   # Startup command
   runCmd = ''

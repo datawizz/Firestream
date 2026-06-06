@@ -178,6 +178,12 @@ let
   configScript = builtins.readFile ./scripts/config.sh;
   initScript = builtins.readFile ./scripts/init.sh;
   secretsScript = builtins.readFile ./scripts/secrets.sh;
+  # Pure helper-function definitions extracted from init.sh + new
+  # init-container helpers (airflow_conf_set, airflow_wait_for_db_*,
+  # airflow_wait_for_admin_user, airflow_webserver_conf_set). Emitted at
+  # top-level of libhelpersairflow.sh so chart init containers can invoke
+  # them after `source /opt/bitnami/scripts/libairflow.sh`.
+  helpersScript = builtins.readFile ./scripts/helpers.sh;
 
   # Airflow-specific helper functions (needed by scripts)
   # These are adapted from Bitnami's libairflow.sh and libversion.sh
@@ -324,6 +330,14 @@ let
 
         info "All secrets processed successfully"
     }
+
+    # ----------------------------------------------------------------------
+    # Helpers relocated from scripts/init.sh + new init-container helpers
+    # (airflow_conf_set, airflow_webserver_conf_set, airflow_wait_for_*)
+    # required by Bitnami's chart init containers. Visible at top-level of
+    # libairflow.sh so chart init containers can call them directly.
+    # ----------------------------------------------------------------------
+    ${helpersScript}
   '';
 
   # System dependencies (libs needed in the container)
@@ -524,9 +538,13 @@ in firestream.mkPythonContainerModule {
     "/opt/airflow/webserver_config.py.template" = webserverConfigTemplate;
   };
 
+  # Per-container helpers: emitted at top-level of libhelpersairflow.sh by the
+  # engine, so chart init containers can `source /opt/bitnami/scripts/libairflow.sh`
+  # and use these helpers (airflow_conf_set, airflow_wait_for_db_connection, etc.) directly.
+  perContainerHelpers = airflowHelpers;
+
   # Validation function (from validate.sh)
-  # Prepend airflow helpers so secret processing functions are available
-  validateFn = airflowHelpers + validateScript;
+  validateFn = validateScript;
 
   # Activation: Replace {{PLACEHOLDERS}} with runtime values
   # This runs after validation but before init/config
@@ -617,12 +635,10 @@ in firestream.mkPythonContainerModule {
   '';
 
   # Initialization (database, users, pools) - from init.sh
-  # Prepend airflow helpers so functions are available
-  initFn = airflowHelpers + initScript;
+  initFn = initScript;
 
   # Runtime config adjustments (crudini-based) - from config.sh
-  # Prepend airflow helpers so functions are available
-  configFn = airflowHelpers + configScript;
+  configFn = configScript;
 
   # Startup command based on component type
   runCmd = ''

@@ -1,4 +1,4 @@
-# JupyterHub chart flake-module (Phase 6b - Agent G5)
+# JupyterHub chart flake-module (Phase 6b - Agent G5; Phase B image injection)
 # Copyright Firestream. MIT License.
 #
 # Wires the JupyterHub Helm chart through the options-driven evalChart
@@ -14,14 +14,26 @@
 # subcharts (Chart.yaml lists both). vendor-subcharts.nix consumes the
 # in-repo Bitnami fork at src/charts/bitnami/.
 #
-# Image injection is NOT yet wired (no firestreamImages.jupyterhub container
-# in the registry has its image consumed here). The Bitnami chart ships four
-# images (hub, proxy, singleuser, os-shell auxiliary); those would each be
-# injected (componentPath = [ "hub" "image" ] / [ "proxy" "image" ] /
-# [ "singleuser" "image" ] / [ "auxiliaryImage" ]) once Firestream containers
-# exist. For now, `_meta.containerRefs` stays empty and the bundled Bitnami
-# images render unchanged; no `global.security.allowInsecureImages` flip
-# needed.
+# Phase B image injection: the Bitnami chart ships five image slots
+#   - hub                   (bitnami/jupyterhub)
+#   - proxy                 (bitnami/configurable-http-proxy)
+#   - singleuser            (bitnami/jupyter-base-notebook)
+#   - auxiliaryImage        (bitnami/os-shell — init sidecar)
+#   - postgresql (subchart) (bitnami/postgresql)
+#
+# Firestream ships ONE `firestream-jupyterhub:5.3.0` image (the JupyterHub
+# container is a single python-workspace artefact — see
+# nix/flake-modules/containers/jupyterhub.nix). We point hub, proxy, and
+# singleuser at it. That image carries the full JupyterHub python environment
+# which contains the configurable-http-proxy CLI and jupyter-base-notebook
+# binaries — so the same image can play all three roles (k8s pods only need
+# the relevant entrypoint, which is pulled from the chart's pod spec, not
+# from the image's ENTRYPOINT). The auxiliary slot points at
+# `firestream-os-shell:1` (Phase A deliverable). The postgresql subchart slot
+# points at `firestream-postgresql:17`.
+#
+# `global.security.allowInsecureImages` is flipped to bypass Bitnami's
+# NOTES.txt whitelist.
 { ... }: {
   perSystem = { pkgs, lib, config, evalChart, ... }:
     let
@@ -36,10 +48,94 @@
         { name = "postgresql"; }
       ];
 
+      jupyterhubImg =
+        let
+          imgEval = config.firestreamImages.jupyterhub.eval (_: {});
+          imgCfg = imgEval.config.jupyterhub.image;
+        in {
+          registry = imgCfg.registry;
+          repository = imgCfg.repository;
+          tag = imgEval.imageTag;
+        };
+
+      osShellImg =
+        let
+          imgEval = config.firestreamImages."os-shell".eval (_: {});
+          imgCfg = imgEval.config."os-shell".image;
+        in {
+          registry = imgCfg.registry;
+          repository = imgCfg.repository;
+          tag = imgEval.imageTag;
+        };
+
+      pgImg =
+        let
+          imgEval = config.firestreamImages.postgresql.eval (_: {});
+          imgCfg = imgEval.config.postgresql.image;
+        in {
+          registry = imgCfg.registry;
+          repository = imgCfg.repository;
+          tag = imgEval.imageTag;
+        };
+
+      # Phase F: firestream-jupyterhub bakes JUPYTERHUB_* path env vars
+      # under /opt/jupyterhub (see src/containers/firestream/jupyterhub/
+      # options.nix). The Bitnami chart mounts:
+      #   - /etc/jupyterhub/jupyterhub_config.py (configmap subPath)
+      #   - /usr/local/etc/jupyterhub/secret/    (Secret)
+      #   - /tmp                                  (emptyDir)
+      # No PVC for hub data; readOnlyRootFilesystem is enforced on hub +
+      # proxy. The hub container runs `jupyterhub --config /etc/jupyterhub/
+      # jupyterhub_config.py --upgrade-db` directly (bypassing the firestream
+      # entrypoint), so most path env vars are advisory rather than load-
+      # bearing — but the chart-mounted config path MUST be reflected so any
+      # logging or transient state lands on /tmp (the only writable mount).
+      firestreamPathOverrides = [
+        { name = "JUPYTERHUB_CONF_FILE"; value = "/etc/jupyterhub/jupyterhub_config.py"; }
+        { name = "JUPYTERHUB_CONF_DIR";  value = "/etc/jupyterhub"; }
+        { name = "JUPYTERHUB_TMP_DIR";   value = "/tmp"; }
+        { name = "JUPYTERHUB_PID_FILE";  value = "/tmp/jupyterhub.pid"; }
+        { name = "JUPYTERHUB_LOGS_DIR";  value = "/tmp/logs"; }
+        { name = "JUPYTERHUB_LOG_FILE";  value = "/tmp/logs/jupyterhub.log"; }
+        { name = "JUPYTERHUB_DATA_DIR";  value = "/tmp/data"; }
+        { name = "JUPYTERHUB_VOLUME_DIR"; value = "/tmp"; }
+      ];
+
+      imageInjectionModule = { ... }: {
+        config.jupyterhub._meta.containerRefs = {
+          hub = {
+            inherit (jupyterhubImg) registry repository tag;
+            componentPath = [ "hub" "image" ];
+          };
+          proxy = {
+            inherit (jupyterhubImg) registry repository tag;
+            componentPath = [ "proxy" "image" ];
+          };
+          singleuser = {
+            inherit (jupyterhubImg) registry repository tag;
+            componentPath = [ "singleuser" "image" ];
+          };
+          auxiliaryImage = {
+            inherit (osShellImg) registry repository tag;
+            componentPath = [ "auxiliaryImage" ];
+          };
+          postgresql = {
+            inherit (pgImg) registry repository tag;
+            componentPath = [ "postgresql" "image" ];
+          };
+        };
+        config.jupyterhub.global.security.allowInsecureImages = true;
+        # Per-component extraEnvVars. singleuser pods are user-spawned but
+        # also benefit from consistent env (config_files_path inheritance).
+        config.jupyterhub.hub.extraEnvVars = firestreamPathOverrides;
+        config.jupyterhub.proxy.extraEnvVars = firestreamPathOverrides;
+        config.jupyterhub.singleuser.extraEnvVars = firestreamPathOverrides;
+      };
+
       c = evalChart {
         name = "jupyterhub";
         inherit chartSrc subcharts;
-        modules = [ optionsPath ];
+        modules = [ optionsPath imageInjectionModule ];
       };
     in
     {
@@ -55,7 +151,7 @@
         eval = userMod: evalChart {
           name = "jupyterhub";
           inherit chartSrc subcharts;
-          modules = [ optionsPath userMod ];
+          modules = [ optionsPath imageInjectionModule userMod ];
         };
         options = c.options;
       };

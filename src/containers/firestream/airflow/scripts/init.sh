@@ -1,25 +1,11 @@
 # Airflow initialization logic
 # Copyright Firestream. MIT License.
 # This file is sourced, not executed directly
-
-# Helper function for retry_while - checks if admin user exists
-# Must handle set -e properly by not letting the command trigger immediate exit
-is_airflow_admin_created() {
-    local airflow_users
-    airflow_users="$(airflow users list --output plain 2>&1 | grep -v DEBUG)" || true
-    if echo "${airflow_users}" | grep -q "$AIRFLOW_USERNAME"; then
-        return 0
-    fi
-    return 1
-}
-
-# Helper function for retry_while - checks if DB migrations are complete
-# Must handle set -e properly by not letting the command trigger immediate exit
-is_db_migrated() {
-    local result=0
-    airflow db check-migrations --migration-wait-timeout=0 >/dev/null 2>&1 || result=$?
-    return $result
-}
+#
+# NOTE: Helper function definitions (is_airflow_admin_created, is_db_migrated,
+# airflow_conf_set, airflow_webserver_conf_set, airflow_wait_for_db_connection,
+# airflow_wait_for_db_migrations, airflow_wait_for_admin_user) live in
+# scripts/helpers.sh and are emitted at top-level of libairflow.sh.
 
 info "Initializing Airflow (component: $AIRFLOW_COMPONENT_TYPE)..."
 

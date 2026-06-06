@@ -72,6 +72,7 @@
         ./nix/flake-modules/containers/redis.nix
         ./nix/flake-modules/containers/kafka.nix
         ./nix/flake-modules/containers/spark.nix
+        ./nix/flake-modules/containers/os-shell.nix
         ./nix/flake-modules/charts/airflow.nix
         ./nix/flake-modules/charts/postgresql.nix
         ./nix/flake-modules/charts/redis.nix

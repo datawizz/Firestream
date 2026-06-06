@@ -1,13 +1,16 @@
-// E2E harness orchestration: per-stack lifecycle, skip/filter gates,
-// serialisation, port discovery via `nix eval --json`, retry-with-deadline,
-// and the StackGuard whose Drop runs `nix run .#<name>-down` under a 60s
-// wall-clock timeout (audit correction 6b).
+// E2E harness orchestration (docker-compose backend): per-stack lifecycle,
+// skip/filter gates, serialisation, port discovery via `nix eval --json`,
+// retry-with-deadline, and the StackGuard whose Drop runs `nix run .#<name>-down`
+// under a 60s wall-clock timeout (audit correction 6b).
+//
+// As of Phase 1 of the k3d/helm e2e plan, the transport-agnostic primitives
+// (Probe trait, retry loop, env accessors, drop-budget wait helper, Exec
+// trait) have moved to `firestream-e2e-core`. This file is the
+// docker-specific harness that wraps them.
 //
 // Probes are SYNCHRONOUS (see `probes.rs`). No tokio runtime is created in
 // run_one. This eliminates the "runtime dropped in unwind" hazard the audit
-// flagged: there is nothing async to drop, ever. (If Phase 3 introduces an
-// async probe variant, the local-runtime pattern from the plan can be
-// reintroduced and dropped before StackGuard with a scoped block.)
+// flagged: there is nothing async to drop, ever.
 //
 // ------------------------------------------------------------------
 // Environment-variable contract (Phase 4)
@@ -23,24 +26,21 @@
 // | `FIRESTREAM_E2E_HEALTHD`       | `0` ⇒ skip the unified HealthEndpoint chain; use per-protocol probes (Phase 1)    | `1` (use it)     |
 // | `FIRESTREAM_E2E_HTTP`          | `0` ⇒ skip every HTTP-based probe (HealthEndpoint, HttpReady, SparkWithWorkers)   | `1`              |
 //
-// HEALTHD vs HTTP matrix (Phase 4 default → HealthEndpoint everywhere):
-//
-//   HEALTHD=1, HTTP=1 (defaults):   Tcp(<app_port>) → HealthEndpoint(/readyz + /sbom)
-//   HEALTHD=1, HTTP=0:              Tcp(<app_port>) only (no HTTP path is run)
-//   HEALTHD=0, HTTP=1:              per-protocol chain (PgIsReady, RedisPing, KafkaApiVersions, …)
-//   HEALTHD=0, HTTP=0:              per-protocol chain without its HTTP component
-//
-// The HEALTHD knob is the principal lever — when set to `0` it pins the
-// harness to the Phase-1 per-protocol probes, which serve as the truth-table
-// for what each container's readiness command actually verifies. HTTP=0 is a
-// secondary filter on top of whichever chain HEALTHD selected.
+// `STACKS`, `KEEP`, `STRICT`, `TIMEOUT_SECS` are read via
+// `firestream_e2e_core::env`; `PREBUILD`, `HEALTHD`, `HTTP` remain
+// docker-harness-local because the next backend (k8s, Phase 2+) uses
+// different mechanisms for image preload and health-endpoint discovery.
 
-use std::io::ErrorKind;
 use std::path::PathBuf;
 use std::process::{Command, Stdio};
 use std::sync::{Mutex, OnceLock};
-use std::thread;
 use std::time::{Duration, Instant};
+
+use firestream_e2e_core::env::{
+    docker_daemon_check, env_keep, env_strict, env_timeout_secs, selected, should_skip,
+};
+use firestream_e2e_core::guard::wait_with_budget;
+use firestream_e2e_core::retry::retry_until_sync;
 
 use crate::probes::{self, Probe, ProbeCtx};
 use crate::stacks;
@@ -94,57 +94,22 @@ fn prebuild_once_if_enabled(stack: &str, build_list: &[String]) {
     }
 }
 
-// ----- Environment-variable contract (plan Phase 1b) -----
-
-fn env_strict() -> bool {
-    std::env::var("FIRESTREAM_E2E_STRICT").ok().as_deref() == Some("1")
-}
-
-fn env_keep() -> bool {
-    std::env::var("FIRESTREAM_E2E_KEEP").ok().as_deref() == Some("1")
-}
-
-fn env_timeout_secs() -> u64 {
-    std::env::var("FIRESTREAM_E2E_TIMEOUT_SECS")
-        .ok()
-        .and_then(|s| s.parse::<u64>().ok())
-        .unwrap_or(300)
-}
-
-/// `FIRESTREAM_E2E_STACKS=all|csv` filter gate. Empty/unset → canonical set.
-fn selected(stack: &str) -> bool {
-    match std::env::var("FIRESTREAM_E2E_STACKS").ok() {
-        None => stacks::is_canonical(stack),
-        Some(v) if v.trim().is_empty() => stacks::is_canonical(stack),
-        Some(v) if v.trim() == "all" => stacks::is_canonical(stack),
-        Some(v) => v.split(',').any(|s| s.trim() == stack),
-    }
-}
-
 // ----- Skip / strict gates -----
 
 /// Returns Some(reason) if the harness cannot run on this host, else None.
 /// `FIRESTREAM_E2E_STRICT=1` upgrades this to a hard panic in `run_one`.
-fn should_skip() -> Option<String> {
-    if which::which("nix").is_err() {
-        return Some("nix not on PATH".into());
+///
+/// Two-stage gate:
+///   1. `should_skip(&["nix", "docker"])` — both binaries on PATH.
+///   2. `docker_daemon_check()` — the daemon answers.
+/// Stage 2 lives in core because the docker harness is the only current
+/// consumer but the implementation has no docker-specific knowledge beyond
+/// "shell out to `docker info`".
+fn skip_reason() -> Option<String> {
+    if let Some(r) = should_skip(&["nix", "docker"]) {
+        return Some(r);
     }
-    if which::which("docker").is_err() {
-        return Some("docker not on PATH".into());
-    }
-    // `docker info` is the cheapest "daemon reachable" check.
-    let info = Command::new("docker")
-        .args(["info"])
-        .stdin(Stdio::null())
-        .stdout(Stdio::null())
-        .stderr(Stdio::null())
-        .status();
-    match info {
-        Ok(s) if s.success() => None,
-        Ok(s) => Some(format!("docker info exited with {}", s)),
-        Err(e) if e.kind() == ErrorKind::NotFound => Some("docker binary not found".into()),
-        Err(e) => Some(format!("docker info spawn failed: {}", e)),
-    }
+    docker_daemon_check()
 }
 
 // ----- Discovery via `nix eval --json` (audit correction 5) -----
@@ -297,21 +262,6 @@ impl StackGuard {
 }
 
 const DROP_BUDGET: Duration = Duration::from_secs(60);
-const POLL: Duration = Duration::from_millis(250);
-
-/// Wait up to `budget` for `child` to exit. Returns Ok(()) on clean exit,
-/// Err(()) on timeout. On timeout the caller is responsible for killing.
-fn wait_with_budget(child: &mut std::process::Child, budget: Duration) -> Result<(), ()> {
-    let start = Instant::now();
-    while start.elapsed() < budget {
-        match child.try_wait() {
-            Ok(Some(_)) => return Ok(()),
-            Ok(None) => thread::sleep(POLL),
-            Err(_) => return Err(()),
-        }
-    }
-    Err(())
-}
 
 impl Drop for StackGuard {
     fn drop(&mut self) {
@@ -401,30 +351,13 @@ impl StackGuard {
     }
 }
 
-// ----- Retry loop -----
-
-/// Run `f` until it returns Ok or `deadline` elapses. Sleeps `POLL_PROBE`
-/// between attempts. Returns the last error on deadline.
-fn retry_until_sync<F: FnMut() -> anyhow::Result<()>>(deadline: &Instant, mut f: F) -> anyhow::Result<()> {
-    const POLL_PROBE: Duration = Duration::from_millis(500);
-    let mut last_err: Option<anyhow::Error> = None;
-    while Instant::now() < *deadline {
-        match f() {
-            Ok(()) => return Ok(()),
-            Err(e) => last_err = Some(e),
-        }
-        thread::sleep(POLL_PROBE);
-    }
-    Err(last_err.unwrap_or_else(|| anyhow::anyhow!("probe never ran before deadline")))
-}
-
 // ----- Public entry: run_one -----
 
 /// Drive one canonical stack: skip-gate → filter-gate → serialise → resolve
 /// → pre-clean → up → arm guard → probe → drop guard (teardown).
 pub fn run_one(name: &str) {
     // 1. Skip / strict gate.
-    if let Some(reason) = should_skip() {
+    if let Some(reason) = skip_reason() {
         if env_strict() {
             panic!("[e2e:{}] STRICT: {}", name, reason);
         } else {
@@ -433,8 +366,9 @@ pub fn run_one(name: &str) {
         }
     }
 
-    // 2. Filter gate.
-    if !selected(name) {
+    // 2. Filter gate. `selected()` is generic over the canonical-set
+    //    predicate; the docker harness passes its own `is_canonical`.
+    if !selected(name, stacks::is_canonical) {
         eprintln!("[e2e:{}] SKIP: not selected by FIRESTREAM_E2E_STACKS", name);
         return;
     }

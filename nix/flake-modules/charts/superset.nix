@@ -1,4 +1,4 @@
-# Superset chart flake-module (Phase 6b - Agent G6)
+# Superset chart flake-module (Phase 6b - Agent G6; Phase B image injection)
 # Copyright Firestream. MIT License.
 #
 # Wires the Superset Helm chart through the options-driven evalChart
@@ -15,13 +15,12 @@
 # consumes the in-repo Bitnami fork at src/charts/bitnami/. The recursive
 # vendoring handles postgresql's own `common` dependency.
 #
-# Image injection is NOT yet wired (no firestreamImages.superset container
-# in the registry has its image consumed here). The Bitnami chart ships ONE
-# main image (bitnami/superset) shared across web/worker/beat/flower/init;
-# that would be injected (componentPath = [ "image" ]) once a Firestream
-# container exists. For now, `_meta.containerRefs` stays empty and the
-# bundled Bitnami image renders unchanged; no
-# `global.security.allowInsecureImages` flip needed.
+# Phase B image injection: Bitnami Superset ships ONE main image
+# (bitnami/superset — shared across web/worker/beat/flower/init via the chart's
+# `image` template helper), plus the bundled postgresql and redis subchart
+# images. We wire all three with firestream-* containers.
+# `global.security.allowInsecureImages` is flipped to bypass Bitnami's
+# NOTES.txt whitelist.
 { ... }: {
   perSystem = { pkgs, lib, config, evalChart, ... }:
     let
@@ -38,10 +37,78 @@
         { name = "redis"; }
       ];
 
+      supersetImg =
+        let
+          imgEval = config.firestreamImages.superset.eval (_: {});
+          imgCfg = imgEval.config.superset.image;
+        in {
+          registry = imgCfg.registry;
+          repository = imgCfg.repository;
+          tag = imgEval.imageTag;
+        };
+
+      pgImg =
+        let
+          imgEval = config.firestreamImages.postgresql.eval (_: {});
+          imgCfg = imgEval.config.postgresql.image;
+        in {
+          registry = imgCfg.registry;
+          repository = imgCfg.repository;
+          tag = imgEval.imageTag;
+        };
+
+      redisImg =
+        let
+          imgEval = config.firestreamImages.redis.eval (_: {});
+          imgCfg = imgEval.config.redis.image;
+        in {
+          registry = imgCfg.registry;
+          repository = imgCfg.repository;
+          tag = imgEval.imageTag;
+        };
+
+      # Phase F: firestream-superset bakes SUPERSET_* dirs under /opt/superset
+      # (see src/containers/firestream/superset/5/options.nix). The Bitnami
+      # chart mounts an emptyDir at /opt/bitnami/superset/superset_home
+      # (subPath superset-home) and /tmp; a Secret at
+      # /opt/bitnami/superset/secrets. readOnlyRootFilesystem is enforced.
+      # Co-locate logs/config under the superset_home emptyDir so they share
+      # writable storage; redirect TMP_DIR to /tmp.
+      firestreamPathOverrides = [
+        { name = "SUPERSET_HOME_DIR";    value = "/opt/bitnami/superset/superset_home"; }
+        { name = "SUPERSET_CONFIG_PATH"; value = "/opt/bitnami/superset/superset_home/superset_config.py"; }
+        { name = "SUPERSET_LOG_DIR";     value = "/opt/bitnami/superset/superset_home/logs"; }
+        { name = "SUPERSET_TMP_DIR";     value = "/tmp"; }
+      ];
+
+      imageInjectionModule = { ... }: {
+        config.superset._meta.containerRefs = {
+          superset = {
+            inherit (supersetImg) registry repository tag;
+            componentPath = [ "image" ];
+          };
+          postgresql = {
+            inherit (pgImg) registry repository tag;
+            componentPath = [ "postgresql" "image" ];
+          };
+          redis = {
+            inherit (redisImg) registry repository tag;
+            componentPath = [ "redis" "image" ];
+          };
+        };
+        config.superset.global.security.allowInsecureImages = true;
+        # Superset chart components: web (Flask webserver), worker (Celery),
+        # init (DB bootstrap job). Apply remap to all three so init/migrate
+        # writes go to the right mount and workers can read the same config.
+        config.superset.web.extraEnvVars = firestreamPathOverrides;
+        config.superset.worker.extraEnvVars = firestreamPathOverrides;
+        config.superset.init.extraEnvVars = firestreamPathOverrides;
+      };
+
       c = evalChart {
         name = "superset";
         inherit chartSrc subcharts;
-        modules = [ optionsPath ];
+        modules = [ optionsPath imageInjectionModule ];
       };
     in
     {
@@ -57,7 +124,7 @@
         eval = userMod: evalChart {
           name = "superset";
           inherit chartSrc subcharts;
-          modules = [ optionsPath userMod ];
+          modules = [ optionsPath imageInjectionModule userMod ];
         };
         options = c.options;
       };

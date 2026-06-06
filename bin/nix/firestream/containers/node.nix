@@ -71,6 +71,10 @@ in {
     initFn ? "",
     runCmd ? "",
 
+    # Per-container helpers emitted at top-level of libhelpers<name>.sh.
+    # Forwarded to mkContainerModule (and through to mkAppModule).
+    perContainerHelpers ? "",
+
     # Container dependencies
     systemDeps ? [],
     runtimeBinDeps ? [],
@@ -305,7 +309,7 @@ in {
       # Pass through two-phase lifecycle parameters
       prepopulateFn = combinedPrepopulateFn;
       inherit prepopulateFiles prepopulateDirs runtimeDirs;
-      inherit activateFn enableStateTracking;
+      inherit activateFn enableStateTracking perContainerHelpers;
 
       systemDeps = allSystemDeps;
       runtimeBinDeps = nodeRuntimeBins;

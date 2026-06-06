@@ -1,0 +1,27 @@
+[package]
+name = "firestream-e2e-core"
+version = "0.1.0"
+edition = "2024"
+authors = ["Firestream Team"]
+description = "Transport-agnostic readiness probes, retry loop, env-contract accessors, and teardown helpers shared by the docker-compose and k3d/helm e2e harnesses"
+license = "MIT"
+
+[lib]
+name = "firestream_e2e_core"
+path = "src/lib.rs"
+
+[dependencies]
+# Error handling
+anyhow = { workspace = true }
+thiserror = { workspace = true }
+
+# PATH lookup for the should_skip() gate
+which = { workspace = true }
+
+# HTTP-readiness probe (blocking, same flags as the existing harness so the
+# refactor doesn't drag a second TLS stack into the dep graph).
+reqwest = { workspace = true }
+
+[dev-dependencies]
+# Used to gate env-mutation tests so they don't race each other.
+once_cell = { workspace = true }

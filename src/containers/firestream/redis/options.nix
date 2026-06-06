@@ -7,7 +7,9 @@
 # byte-for-byte identical to the legacy flake.nix build path.
 #
 # NOTE: Redis is MULTI-VERSION (7/8). `version` varies per build and is supplied
-# by the flake-module via an inline override module, NOT here.
+# by the flake-module via an inline override module, NOT here. The Phase B
+# default alias (`redis`) now points at v8 — matching the Bitnami redis chart's
+# expected protocol — while `redis-7` remains available for consumer downgrade.
 #
 # IMPORTANT: env defaults use a PER-LEAF mkDefault (each value wrapped
 # individually). A single mkDefault around the whole attrset would be replaced

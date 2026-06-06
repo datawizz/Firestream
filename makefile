@@ -996,3 +996,33 @@ test-e2e:
 .PHONY: test-e2e-%
 test-e2e-%:
 	FIRESTREAM_E2E_STACKS=$* cargo test -p firestream --test e2e -- --ignored --test-threads=1 --nocapture
+
+# ==============================================================================
+# E2E K8s harness (Phase 4)
+#
+# Fresh k3d cluster per chart, helm install via the bundle, pod-Ready wait
+# + per-chart protocol probe. Local-only; NOT added to CI for the same reasons
+# as the docker harness (cold runs are hours, flake create is multi-minute).
+#
+# Env contract (see src/lib/rust/firestream-e2e-k8s/src/env.rs):
+#   FIRESTREAM_E2E_K8S_STACKS=all|csv      Subset filter (default: canonical 8)
+#   FIRESTREAM_E2E_K8S_KEEP=1              Skip cluster + release teardown
+#   FIRESTREAM_E2E_K8S_STRICT=1            Skip-gate failure becomes hard fail
+#   FIRESTREAM_E2E_K8S_TIMEOUT_SECS=600    Per-chart readiness deadline
+#   FIRESTREAM_E2E_K8S_PRELOAD=0           Skip Nix-built image preload
+#   FIRESTREAM_E2E_K8S_CHARTS_DIR=...      Override bundle path
+#   FIRESTREAM_E2E_K8S_HELM_TIMEOUT=...    Emergency override of the helm
+#                                          install timeout. The chart
+#                                          manifest's deployment.timeout is
+#                                          authoritative; only set when a
+#                                          specific chart needs headroom.
+# ==============================================================================
+
+.PHONY: test-e2e-k8s
+test-e2e-k8s:
+	cargo test -p firestream-e2e-k8s --test e2e_k8s -- --ignored --test-threads=1 --nocapture
+
+.PHONY: test-e2e-k8s-%
+test-e2e-k8s-%:
+	FIRESTREAM_E2E_K8S_STACKS=$* \
+	cargo test -p firestream-e2e-k8s --test e2e_k8s -- --ignored --test-threads=1 --nocapture

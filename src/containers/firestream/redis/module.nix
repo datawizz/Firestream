@@ -18,8 +18,10 @@
 , lib
 , firestream
 # Canonical version arg (matches eval-container's system runtime contract).
-# `redisVersion` is derived below so the body logic is unchanged.
-, version ? "7"
+# `redisVersion` is derived below so the body logic is unchanged. Bumped from
+# "7" to "8" in Phase B to match the Bitnami redis chart's expected protocol;
+# the v7 build is still produced under .#redis-7 for explicit downgrade.
+, version ? "8"
 
 # Externalized core-surface config. Defaults below are EXACTLY today's literals
 # so the legacy flake.nix path (which does not pass these) and evalContainer
@@ -468,15 +470,20 @@ in firestream.mkContainerModule {
     };
   };
 
+  # Per-container helpers: emitted at top-level of libhelpersredis.sh by the
+  # engine, so chart init containers can `source /opt/bitnami/scripts/libredis.sh`
+  # and use these helpers directly.
+  perContainerHelpers = redisHelpers;
+
   # Validation function
-  validateFn = redisHelpers + ''
+  validateFn = ''
     error_code=0
     ${validateScript}
     [[ "$error_code" -eq 0 ]] || exit "$error_code"
   '';
 
   # Activation: Load secrets
-  activateFn = redisHelpers + ''
+  activateFn = ''
     info "Activating Redis configuration..."
 
     # Load secrets from _FILE variables
@@ -486,10 +493,10 @@ in firestream.mkContainerModule {
   '';
 
   # Configuration generation
-  configFn = redisHelpers + configScript;
+  configFn = configScript;
 
   # Initialization (replication setup)
-  initFn = redisHelpers + initScript;
+  initFn = initScript;
 
   # Startup command
   runCmd = ''

@@ -70,3 +70,9 @@ anyhow = { workspace = true }
 tokio = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
+
+# Shared transport-agnostic e2e primitives (Probe trait, retry loop, env
+# accessors, Exec trait). The docker-compose harness wraps these with a
+# local DockerComposeExec; the k8s harness (Phase 2+) will do the same
+# with a KubectlExec.
+firestream-e2e-core = { workspace = true }

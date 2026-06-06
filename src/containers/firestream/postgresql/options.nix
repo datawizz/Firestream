@@ -151,8 +151,15 @@
     # standalone case working even if those vars are unset.
     health = {
       enable = lib.mkDefault true;
+      # `pg_isready` defaults to `/run/postgresql` for its socket directory.
+      # The firestream-postgresql container sockets at POSTGRESQL_TMP_DIR
+      # (default `/opt/firestream/postgresql/tmp`), and chart consumers
+      # override POSTGRESQL_TMP_DIR to a writable emptyDir mount. In neither
+      # case does the default socket directory exist. Pin TCP host+port for
+      # a deterministic, cross-deployment probe (matches the Bitnami
+      # chart's own readinessProbe pattern: `pg_isready -h 127.0.0.1 -p 5432`).
       readinessCmd = lib.mkDefault
-        ''pg_isready -U "''${POSTGRESQL_USERNAME:-postgres}" -d "''${POSTGRESQL_DATABASE:-postgres}"'';
+        ''pg_isready -U "''${POSTGRESQL_USERNAME:-postgres}" -d "''${POSTGRESQL_DATABASE:-postgres}" -h 127.0.0.1 -p "''${POSTGRESQL_PORT_NUMBER:-5432}"'';
     };
   };
 }

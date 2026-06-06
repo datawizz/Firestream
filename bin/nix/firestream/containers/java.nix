@@ -76,6 +76,10 @@
     initFn ? "",
     runCmd ? "",
 
+    # Per-container helpers emitted at top-level of libhelpers<name>.sh.
+    # Forwarded to mkContainerModule (and through to mkAppModule).
+    perContainerHelpers ? "",
+
     # Container dependencies
     systemDeps ? [],
     runtimeBinDeps ? [],
@@ -283,7 +287,7 @@
       prepopulateFn = combinedPrepopulateFn;
       inherit prepopulateFiles prepopulateDirs runtimeDirs;
       activateFn = combinedActivateFn;
-      inherit enableStateTracking;
+      inherit enableStateTracking perContainerHelpers;
 
       systemDeps = allSystemDeps;
       runtimeBinDeps = javaRuntimeBins;

@@ -358,9 +358,13 @@ in firestream.mkJavaContainerModule {
     "/opt/spark/conf/spark-defaults.conf.template" = sparkDefaultsTemplate;
   };
 
+  # Per-container helpers: emitted at top-level of libhelpersspark.sh by the
+  # engine, so chart init containers can `source /opt/bitnami/scripts/libspark.sh`
+  # and use these helpers directly.
+  perContainerHelpers = sparkHelpers;
+
   # Validation function (runs first)
-  # Prepend helpers so functions are available
-  validateFn = sparkHelpers + secretsScript + validateScript + ''
+  validateFn = secretsScript + validateScript + ''
     # Load secrets from files first
     spark_load_secrets
 
@@ -372,9 +376,15 @@ in firestream.mkJavaContainerModule {
   activateFn = ''
     info "Activating Spark configuration..."
 
-    # Process config template if exists
+    # Process config template if exists. The template is baked into the image
+    # at /opt/spark/conf/spark-defaults.conf.template (read-only), but the
+    # output conf_file must live at SPARK_CONF_FILE so K8s-injected env
+    # (Bitnami chart sets /opt/bitnami/spark/conf) wins over the baked default.
+    # Without this, charts that mount an emptyDir at /opt/bitnami/spark/conf
+    # and enforce readOnlyRootFilesystem would fail with
+    # "/opt/spark/conf/spark-defaults.conf: Read-only file system".
     local template_file="/opt/spark/conf/spark-defaults.conf.template"
-    local conf_file="/opt/spark/conf/spark-defaults.conf"
+    local conf_file="''${SPARK_CONF_FILE:-/opt/spark/conf/spark-defaults.conf}"
 
     if [[ -f "$template_file" ]] && [[ ! -f "$conf_file" ]]; then
       ${pkgs.gnused}/bin/sed \
@@ -384,7 +394,9 @@ in firestream.mkJavaContainerModule {
       info "Generated spark-defaults.conf from template"
     fi
 
-    # Save config hash for change detection
+    # Save config hash for change detection. save_config_hash itself is
+    # tolerant of read-only state dirs (Bitnami chart pods); no extra wrapper
+    # needed here.
     if [[ -f "$conf_file" ]]; then
       save_config_hash "spark" "$conf_file"
     fi
@@ -393,8 +405,7 @@ in firestream.mkJavaContainerModule {
   '';
 
   # Initialization (directory setup, first-run config)
-  # Prepend helpers so functions are available
-  initFn = sparkHelpers + configScript + initScript + ''
+  initFn = configScript + initScript + ''
     # Run initialization
     spark_initialize
 
@@ -403,7 +414,7 @@ in firestream.mkJavaContainerModule {
   '';
 
   # Runtime config adjustments
-  configFn = sparkHelpers + configScript;
+  configFn = configScript;
 
   # Startup command based on mode
   runCmd = ''
@@ -425,7 +436,13 @@ in firestream.mkJavaContainerModule {
         ;;
       worker)
         info "Starting Spark Worker connecting to ''${SPARK_MASTER_URL}..."
-        exec ${pkgs.spark}/bin/spark-class org.apache.spark.deploy.worker.Worker "''${SPARK_MASTER_URL}"
+        # Pass --work-dir explicitly so the Worker writes to a writable path.
+        # Bitnami chart sets SPARK_WORK_DIR=/opt/bitnami/spark/work (emptyDir);
+        # without --work-dir, spark defaults to $SPARK_HOME/work which is
+        # /nix/store/...spark.../work (read-only).
+        exec ${pkgs.spark}/bin/spark-class org.apache.spark.deploy.worker.Worker \
+          --work-dir "''${SPARK_WORK_DIR:-/opt/spark/work}" \
+          "''${SPARK_MASTER_URL}"
         ;;
       driver)
         # Kubernetes driver mode
