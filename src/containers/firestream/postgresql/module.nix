@@ -18,6 +18,139 @@
 , lib
 , firestream
 , version ? "17"
+
+# Externalized core-surface config. Defaults below are EXACTLY today's literals
+# so the legacy flake.nix path (which does not pass these) and evalContainer
+# (which passes the same values from options.nix) yield identical factory args.
+
+# Paths configuration (Bitnami compatibility)
+, paths ? {
+    base = "/opt/firestream/postgresql";
+    conf = "/opt/firestream/postgresql/conf";
+    data = "/firestream/postgresql/data";
+    logs = "/opt/firestream/postgresql/logs";
+  }
+
+# Environment variables with defaults
+# NOTE: Using pre-expanded literal values instead of shell variable references
+# because Nix attribute sets are sorted alphabetically, which would cause
+# dependent variables (e.g., DATA_DIR referencing VOLUME_DIR) to be exported
+# before their dependencies, failing with "unbound variable" under set -u.
+, envVars ? {
+    # Base directories (pre-expanded to avoid alphabetical ordering issues)
+    POSTGRESQL_BASE_DIR = "/opt/firestream/postgresql";
+    POSTGRESQL_VOLUME_DIR = "/firestream/postgresql";
+    POSTGRESQL_DATA_DIR = "/firestream/postgresql/data";
+    POSTGRESQL_CONF_DIR = "/opt/firestream/postgresql/conf";
+    POSTGRESQL_MOUNTED_CONF_DIR = "/firestream/postgresql/conf";
+    POSTGRESQL_DEFAULT_CONF_DIR = "/opt/firestream/postgresql/conf.default";
+    POSTGRESQL_CONF_FILE = "/opt/firestream/postgresql/conf/postgresql.conf";
+    POSTGRESQL_PGHBA_FILE = "/opt/firestream/postgresql/conf/pg_hba.conf";
+    POSTGRESQL_LOG_DIR = "/opt/firestream/postgresql/logs";
+    POSTGRESQL_LOG_FILE = "/opt/firestream/postgresql/logs/postgresql.log";
+    POSTGRESQL_TMP_DIR = "/opt/firestream/postgresql/tmp";
+    POSTGRESQL_PID_FILE = "/opt/firestream/postgresql/tmp/postgresql.pid";
+    POSTGRESQL_INITSCRIPTS_DIR = "/docker-entrypoint-initdb.d";
+    POSTGRESQL_PREINITSCRIPTS_DIR = "/docker-entrypoint-preinitdb.d";
+
+    # User and group
+    POSTGRESQL_DAEMON_USER = "postgres";
+    POSTGRESQL_DAEMON_GROUP = "postgres";
+
+    # Connection settings
+    POSTGRESQL_PORT_NUMBER = "5432";
+    POSTGRESQL_ALLOW_REMOTE_CONNECTIONS = "yes";
+    POSTGRESQL_INIT_MAX_TIMEOUT = "60";
+
+    # Authentication
+    # Default to ALLOW_EMPTY_PASSWORD=yes so the out-of-the-box image runs
+    # in local/dev/e2e environments without a password override. Production
+    # callers override these via the standard envVars override seam.
+    POSTGRESQL_PASSWORD = "";
+    POSTGRESQL_USERNAME = "postgres";
+    POSTGRESQL_DATABASE = "";
+    POSTGRESQL_POSTGRES_PASSWORD = "";
+    ALLOW_EMPTY_PASSWORD = "yes";
+
+    # Replication
+    POSTGRESQL_REPLICATION_MODE = "";
+    POSTGRESQL_REPLICATION_USER = "";
+    POSTGRESQL_REPLICATION_PASSWORD = "";
+    POSTGRESQL_MASTER_HOST = "";
+    POSTGRESQL_MASTER_PORT_NUMBER = "5432";
+    POSTGRESQL_NUM_SYNCHRONOUS_REPLICAS = "0";
+    POSTGRESQL_SYNCHRONOUS_COMMIT_MODE = "on";
+    POSTGRESQL_CLUSTER_APP_NAME = "walreceiver";
+    POSTGRESQL_WAL_LEVEL = "replica";
+    POSTGRESQL_REPLICATION_USE_PASSFILE = "no";
+    POSTGRESQL_REPLICATION_PASSFILE_PATH = "/opt/firestream/postgresql/conf/.pgpass";
+
+    # TLS
+    POSTGRESQL_ENABLE_TLS = "no";
+    POSTGRESQL_TLS_CERT_FILE = "";
+    POSTGRESQL_TLS_KEY_FILE = "";
+    POSTGRESQL_TLS_CA_FILE = "";
+    POSTGRESQL_TLS_CRL_FILE = "";
+    POSTGRESQL_TLS_PREFER_SERVER_CIPHERS = "yes";
+
+    # LDAP
+    POSTGRESQL_ENABLE_LDAP = "no";
+    POSTGRESQL_LDAP_URL = "";
+    POSTGRESQL_LDAP_SERVER = "";
+    POSTGRESQL_LDAP_PORT = "";
+    POSTGRESQL_LDAP_PREFIX = "";
+    POSTGRESQL_LDAP_SUFFIX = "";
+    POSTGRESQL_LDAP_BASE_DN = "";
+    POSTGRESQL_LDAP_BIND_DN = "";
+    POSTGRESQL_LDAP_BIND_PASSWORD = "";
+    POSTGRESQL_LDAP_SEARCH_ATTR = "";
+    POSTGRESQL_LDAP_SEARCH_FILTER = "";
+    POSTGRESQL_LDAP_TLS = "";
+    POSTGRESQL_LDAP_SCHEME = "";
+
+    # Other settings
+    POSTGRESQL_SHUTDOWN_MODE = "fast";
+    POSTGRESQL_PGCTLTIMEOUT = "60";
+    POSTGRESQL_FIRST_BOOT = "yes";
+    POSTGRESQL_INITDB_ARGS = "";
+    POSTGRESQL_INITDB_WAL_DIR = "";
+    POSTGRESQL_SHARED_PRELOAD_LIBRARIES = "";
+    POSTGRESQL_FSYNC = "on";
+    POSTGRESQL_DEFAULT_TOAST_COMPRESSION = "";
+    POSTGRESQL_PASSWORD_ENCRYPTION = "";
+
+    # NSS wrapper
+    NSS_WRAPPER_LIB = "${pkgs.nss_wrapper}/lib/libnss_wrapper.so";
+
+    # Debug mode
+    BITNAMI_DEBUG = "false";
+  }
+
+# Variables supporting _FILE suffix for Docker secrets
+, envVarsWithSecrets ? [
+    "POSTGRESQL_PASSWORD"
+    "POSTGRESQL_POSTGRES_PASSWORD"
+    "POSTGRESQL_REPLICATION_PASSWORD"
+    "POSTGRESQL_TLS_CERT_FILE"
+    "POSTGRESQL_TLS_KEY_FILE"
+    "POSTGRESQL_TLS_CA_FILE"
+    "POSTGRESQL_TLS_CRL_FILE"
+    "POSTGRESQL_LDAP_URL"
+    "POSTGRESQL_LDAP_BIND_PASSWORD"
+    "POSTGRESQL_INITDB_ARGS"
+    "POSTGRESQL_SHARED_PRELOAD_LIBRARIES"
+  ]
+
+, exposedPorts ? [ 5432 ]
+
+# In-image health/SBOM service configuration (Phase 3). Forwarded to
+# mkContainerModule, which wraps the entrypoint with a healthd launcher when
+# enabled. Default-off preserves byte-identical legacy-flake behaviour.
+, health ? { enable = false; port = 9180; readinessCmd = null; }
+
+# Image naming passthrough (parity defaults).
+, imageName ? "firestream-postgresql"
+, imageTag ? version
 }:
 
 let
@@ -387,120 +520,14 @@ in firestream.mkContainerModule {
   name = "postgresql";
   inherit version;
 
-  # Paths configuration (Bitnami compatibility)
-  paths = {
-    base = "/opt/firestream/postgresql";
-    conf = "/opt/firestream/postgresql/conf";
-    data = "/firestream/postgresql/data";
-    logs = "/opt/firestream/postgresql/logs";
-  };
+  # Paths, environment variables, and secret-aware variables are externalized
+  # as function arguments (defaults equal to the historical literals). The
+  # legacy flake.nix path uses the defaults; evalContainer passes the same
+  # values from options.nix, yielding identical factory args.
+  inherit paths envVars envVarsWithSecrets;
 
-  # Environment variables with defaults
-  # NOTE: Using pre-expanded literal values instead of shell variable references
-  # because Nix attribute sets are sorted alphabetically, which would cause
-  # dependent variables (e.g., DATA_DIR referencing VOLUME_DIR) to be exported
-  # before their dependencies, failing with "unbound variable" under set -u.
-  envVars = {
-    # Base directories (pre-expanded to avoid alphabetical ordering issues)
-    POSTGRESQL_BASE_DIR = "/opt/firestream/postgresql";
-    POSTGRESQL_VOLUME_DIR = "/firestream/postgresql";
-    POSTGRESQL_DATA_DIR = "/firestream/postgresql/data";
-    POSTGRESQL_CONF_DIR = "/opt/firestream/postgresql/conf";
-    POSTGRESQL_MOUNTED_CONF_DIR = "/firestream/postgresql/conf";
-    POSTGRESQL_DEFAULT_CONF_DIR = "/opt/firestream/postgresql/conf.default";
-    POSTGRESQL_CONF_FILE = "/opt/firestream/postgresql/conf/postgresql.conf";
-    POSTGRESQL_PGHBA_FILE = "/opt/firestream/postgresql/conf/pg_hba.conf";
-    POSTGRESQL_LOG_DIR = "/opt/firestream/postgresql/logs";
-    POSTGRESQL_LOG_FILE = "/opt/firestream/postgresql/logs/postgresql.log";
-    POSTGRESQL_TMP_DIR = "/opt/firestream/postgresql/tmp";
-    POSTGRESQL_PID_FILE = "/opt/firestream/postgresql/tmp/postgresql.pid";
-    POSTGRESQL_INITSCRIPTS_DIR = "/docker-entrypoint-initdb.d";
-    POSTGRESQL_PREINITSCRIPTS_DIR = "/docker-entrypoint-preinitdb.d";
-
-    # User and group
-    POSTGRESQL_DAEMON_USER = "postgres";
-    POSTGRESQL_DAEMON_GROUP = "postgres";
-
-    # Connection settings
-    POSTGRESQL_PORT_NUMBER = "5432";
-    POSTGRESQL_ALLOW_REMOTE_CONNECTIONS = "yes";
-    POSTGRESQL_INIT_MAX_TIMEOUT = "60";
-
-    # Authentication
-    POSTGRESQL_PASSWORD = "";
-    POSTGRESQL_USERNAME = "postgres";
-    POSTGRESQL_DATABASE = "";
-    POSTGRESQL_POSTGRES_PASSWORD = "";
-    ALLOW_EMPTY_PASSWORD = "no";
-
-    # Replication
-    POSTGRESQL_REPLICATION_MODE = "";
-    POSTGRESQL_REPLICATION_USER = "";
-    POSTGRESQL_REPLICATION_PASSWORD = "";
-    POSTGRESQL_MASTER_HOST = "";
-    POSTGRESQL_MASTER_PORT_NUMBER = "5432";
-    POSTGRESQL_NUM_SYNCHRONOUS_REPLICAS = "0";
-    POSTGRESQL_SYNCHRONOUS_COMMIT_MODE = "on";
-    POSTGRESQL_CLUSTER_APP_NAME = "walreceiver";
-    POSTGRESQL_WAL_LEVEL = "replica";
-    POSTGRESQL_REPLICATION_USE_PASSFILE = "no";
-    POSTGRESQL_REPLICATION_PASSFILE_PATH = "/opt/firestream/postgresql/conf/.pgpass";
-
-    # TLS
-    POSTGRESQL_ENABLE_TLS = "no";
-    POSTGRESQL_TLS_CERT_FILE = "";
-    POSTGRESQL_TLS_KEY_FILE = "";
-    POSTGRESQL_TLS_CA_FILE = "";
-    POSTGRESQL_TLS_CRL_FILE = "";
-    POSTGRESQL_TLS_PREFER_SERVER_CIPHERS = "yes";
-
-    # LDAP
-    POSTGRESQL_ENABLE_LDAP = "no";
-    POSTGRESQL_LDAP_URL = "";
-    POSTGRESQL_LDAP_SERVER = "";
-    POSTGRESQL_LDAP_PORT = "";
-    POSTGRESQL_LDAP_PREFIX = "";
-    POSTGRESQL_LDAP_SUFFIX = "";
-    POSTGRESQL_LDAP_BASE_DN = "";
-    POSTGRESQL_LDAP_BIND_DN = "";
-    POSTGRESQL_LDAP_BIND_PASSWORD = "";
-    POSTGRESQL_LDAP_SEARCH_ATTR = "";
-    POSTGRESQL_LDAP_SEARCH_FILTER = "";
-    POSTGRESQL_LDAP_TLS = "";
-    POSTGRESQL_LDAP_SCHEME = "";
-
-    # Other settings
-    POSTGRESQL_SHUTDOWN_MODE = "fast";
-    POSTGRESQL_PGCTLTIMEOUT = "60";
-    POSTGRESQL_FIRST_BOOT = "yes";
-    POSTGRESQL_INITDB_ARGS = "";
-    POSTGRESQL_INITDB_WAL_DIR = "";
-    POSTGRESQL_SHARED_PRELOAD_LIBRARIES = "";
-    POSTGRESQL_FSYNC = "on";
-    POSTGRESQL_DEFAULT_TOAST_COMPRESSION = "";
-    POSTGRESQL_PASSWORD_ENCRYPTION = "";
-
-    # NSS wrapper
-    NSS_WRAPPER_LIB = "${pkgs.nss_wrapper}/lib/libnss_wrapper.so";
-
-    # Debug mode
-    BITNAMI_DEBUG = "false";
-  };
-
-  # Variables supporting _FILE suffix for Docker secrets
-  envVarsWithSecrets = [
-    "POSTGRESQL_PASSWORD"
-    "POSTGRESQL_POSTGRES_PASSWORD"
-    "POSTGRESQL_REPLICATION_PASSWORD"
-    "POSTGRESQL_TLS_CERT_FILE"
-    "POSTGRESQL_TLS_KEY_FILE"
-    "POSTGRESQL_TLS_CA_FILE"
-    "POSTGRESQL_TLS_CRL_FILE"
-    "POSTGRESQL_LDAP_URL"
-    "POSTGRESQL_LDAP_BIND_PASSWORD"
-    "POSTGRESQL_INITDB_ARGS"
-    "POSTGRESQL_SHARED_PRELOAD_LIBRARIES"
-  ];
+  # Image naming passthrough.
+  inherit imageName imageTag;
 
   # Declarative directory schema
   runtimeDirs = {
@@ -637,7 +664,8 @@ in firestream.mkContainerModule {
 
   inherit systemDeps runtimeBinDeps;
 
-  exposedPorts = [ 5432 ];
+  inherit exposedPorts;
+  inherit health;
   volumes = [ "/firestream/postgresql" "/docker-entrypoint-initdb.d" "/docker-entrypoint-preinitdb.d" ];
 
   user = { name = "postgres"; group = "postgres"; uid = 1001; gid = 1001; };

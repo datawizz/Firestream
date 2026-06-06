@@ -53,6 +53,9 @@ result
 result-*
 .nix-cache/
 
+# Docker-based container build output (apps.<name>-image / firestream-build-image)
+.firestream-build/
+
 # Nix/direnv caches
 .direnv/
 .devenv/

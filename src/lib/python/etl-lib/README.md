@@ -1,266 +1,157 @@
-# ETL Lib: An Opinionated Data Platform
+# etl-lib
 
+Typed Python interface for working with the data services in the Firestream
+repository: Spark, Kafka, S3/Delta via the Hadoop S3A connector, LakeFS, and
+GCP Secret Manager. Used from Airflow DAGs and ad-hoc ETL jobs.
 
-ETL Lib is a platform to speed up development of Machine Learning models from ideation to production in batch and streaming by providing a batteries included approach to a modern Big Data stack. Firestream offers a full ML Ops platform that you can run on your laptop, desktop, or public cloud.
+> **Status:** in active development. The high-level pipeline API
+> (`DataFactory.run`, `DataModel.make`, the streaming sources, S3/Kafka sinks)
+> is published as `NotImplementedError` so the contract is visible to callers
+> and typecheckers — but the wiring is not finished. The lower-level helpers
+> (`SparkClient`, `KafkaClient`, REST source, Brownian-motion generator, type
+> conversion utilities) are usable today.
 
-Instead of compatibility with the cornucopia of data science projects available today, Firestream aims to combine the best in class open software projects for each primary component of a modern Big Data stack. Where other platforms seek to rebrand open source projects or paywall features, Firestream aims to simply implement the underlying open source software with minimum modifications. Because everything runs in Kubernetes it is easy to deploy Firestream locally or using a cloud provider like GKE or KMS. Because it's all open source it is easy to deploy in air gapped environments or to be modified to suite your use case.
+## Install
 
-Firestream creates a production ready environment in a single Docker container which includes the core components of a modern Big Data stack:
-
-* Development Environment -> Vs Code + Remote Container
-* Container Service -> Moby + Kind + Kubernetes w/ DinD
-* Pub/Sub -> Kafka
-* Stream Processing -> Spark
-* Batch Processing -> Spark
-* Metadata Persistence -> PostgreSQL
-* Object Storage -> MinIO (S3) via Hadoop
-* Storage Format -> Parquet
-* ML Model Tracking / Deployment -> ML Flow
-* Python API -> Firestream
-
-## **Installation**
-
-Prerequisites:
-* Debian 11+ / Ubuntu 18.02+ with Docker installed
-
-```
-git clone https://github.com/symtrade/firestream && \
-cd firestream && \
-sh bootstrap.sh
+```bash
+uv pip install -e .
+# or
+pip install -e .
 ```
 
-This will download the repo and begin building the resources. As services are started you will see output in the terminal listing the ports to access each service as http://SERVICE:PORT which will be automatically forwarded to the terminal that invoked bootstrap.sh.
+Python 3.12.10 is required.
 
-Firestream makes extensive use of IpTables for internal networking and modification of /etc/hosts for internal DNS and has only been tested on debian 11+.
+## What ships today
 
+### Working
 
-## Architecture
+| Module                                   | What it does                                                         |
+| ---------------------------------------- | -------------------------------------------------------------------- |
+| `etl_lib.DataContext`                    | Holds model + time-window + Spark config; pandas↔Spark conversion.   |
+| `etl_lib.DataModel`                      | Pydantic base with `json_schema()` / `avro_schema()` export.         |
+| `etl_lib.services.SparkClient`          | Configured `SparkSession` with Delta + S3A + LakeFS.                 |
+| `etl_lib.services.KafkaClient`          | Avro `SerializingProducer`, schema-registry helpers, admin client.   |
+| `etl_lib.source.REST_DataSource`         | HTTP GET with exponential backoff and local file cache.              |
+| `etl_lib.source.BrownianMotion_DataSource.generate_gbm` | Geometric Brownian Motion price series. |
+| `etl_lib.source.BrownianMotion_DataSource.generate_timestamps` | Jittered event timestamps. |
+| `etl_lib.sink.Console_DataSink`          | `.show()` + `.printSchema()` for development.                        |
+| `etl_lib._utils.types.types`             | `@struct` decorator + Python-type → Spark `StructType` inference.    |
+| `etl_lib._utils.secrets.Secrets`         | GCP Secret Manager wrapper (ADC or service-account JSON).            |
+| `etl_lib._utils.git_revision`            | Current `HEAD` SHA (full and short).                                 |
+| `etl_lib._utils.broadcast_join`          | Bucketed event-time stream-stream join helper.                       |
 
-![Screenshot](images/Firestream.png)
+### Declared but `NotImplementedError`
 
-Firestream uses Kafka for pub/sub message passing between Spark executors. Microservices are run as pods for bespoke data connections while Spark Applications are used for processing both streaming and batch data. Using the Firestream API, models are declared in the abstract. A model called with streaming=True will be executed against the Kafka cluster. If streaming=False the model will be excuted as a spark batch operation against external data or data stored internally in MinIO S3 object store. If --cache is set the model will be materialized as a parquet file increasing re-processing batch speed or checkpointed if streaming. 
+These appear in the public API so downstream code can typecheck against the
+intended shape. Calling them raises `NotImplementedError`:
 
-## Monitoring
+- `DataModel.make` (abstract; subclasses must implement)
+- `DataFactory.run`
+- `DataContext.__len__`
+- `DataIndex.make`, `DataHeader.make`, `DataFooter.make`
+- `Random_DataSource.random_data` (depends on `DataModel.make_one`)
+- `BrownianMotion_DataSource.make`
+- `SparkDataFrame_DataSource.make`
+- `SparkREST_DataSource.make`
+- `Kafka_DataSource.make`, `Kafka_DataSource.df_from_kafka`
+- `SparkRateMicroBatch_StreamingSource.make`
+- `S3_DataSink.sink`
+- `Console_DataSink.sink` for streaming DataFrames
 
-Firestream uses https://github.com/txn2/kubefwd to make all resources available via port forwarding to the computer that is ssh'ed into the Firestream main container.
+### Not shipping
 
+Previously stubbed and now removed entirely:
 
-The state of streaming and batch jobs can be viewed using the Spark History Server at : http://spark_history:5001
+- `etl_lib.services.solr`
+- `etl_lib.services.JDBC`
+- `etl_lib.services.pytorch` (Petastorm + PyTorch integration)
+- `Local_DataSink`, `GoogleCloudStorage`, `Kafka_DataSink`, `TestSink`
 
-Kafka can be monitored using Kafka Manager at : 
+## Quickstart
 
-MinIO contains a web server for it's status available at : http://minio:9000
+```python
+from etl_lib import DataContext
+from etl_lib.services.spark.client import SparkClient
 
-bootstrap.sh launches some heartbeat jobs for a smoketest.
-It also runs each of the tests in ./tests
+spark = SparkClient(app_name="hello")
 
+ctx = DataContext(
+    model=None,
+    start="2024-01-01",
+    end="2024-01-02",
+    spark_client=spark,
+)
 
-
-
-## Example Model
-
-Firestream provides a Python API for **Model Driven Engineering** where the transformations are highlighted and the developer (mostly) does not *need* to reason about the state of the underlying processing. This *reason when you want to* approach is considered a feature of Firestream.
-
-
-```
-"""
-Define a pipeline as a series of models that are both distinct steps and are interconnected.
-
-"""
-
-
-from etl_lib import DataModel, DataFactory
-from etl_lib.sources import Random_DataSource
-from etl_lib.sinks import Kafka_DataSink
-from etl_lib.types import (
-    Datetime_Type,
-    Timedelta_Type,
-    BrownianMotion_Type,
-    Float_Type,
-    Integer_Type,
-    String_Type,
-    Array_Type
-    )
-
-@DataModel
-class StockTrades:
-    symbol: String_Type
-    event_time: Datetime_Type
-    price: Float_Type
-    volume: Integer_Type
-
-    def make(context):
-        df = context.make(context.model)
-        return df
-
-
-@DataModel
-class StockCandle:
-    symbol: String_Type
-    event_time: Datetime_Type
-    high: Float_Type
-    low: Float_Type
-    open: Float_Type
-    close: Float_Type
-
-    def make(context):
-        df = StockTrades.make(context)
-
-        # Pandas API
-        df.resample('1H').agg({
-            'open':'first',
-            'high':'max',
-            'low':'min',
-            'close':'last'
-        })
-
-        return df
-
-with DataFactory(
-    start="2021-01-01",
-    end="2021-12-31",
-    intervals=[timedelta(days=1)],
-    symbols=[SPY, TSLA, XOM]
-    ) as factory:
-
-    factory.make(
-        model = StockCandle,
-        source = factory.make(
-            model=StockTrades,
-            source=BrownianMotion_DataSource,
-            sink=Kafka_DataSink
-        )
-    )
-
-    factory.run()
-
+# Pandas → Spark
+import pandas as pd
+pdf = pd.DataFrame({"x": [1, 2, 3]})
+sdf = spark.spark_session.createDataFrame(pdf)
+sdf.show()
 ```
 
+Define a typed schema:
 
+```python
+from etl_lib import DataModel
+from typing import Optional
 
+class Trade(DataModel):
+    symbol: str
+    price: float
+    volume: int
+    nickname: Optional[str] = None
 
-## Motivation
-
-The modern Data Stack requires a diverse set of technologies and skillsets that generally require a team to develop and operate successfully. Platforms exist which combine open source projects with closed source resources to create vendor locked environments. Sometimes you need to inspect every aspect of the Machine Learning process and nothing like local or single server development really gives you the same access to the components. When it is time to deploy there should be no friction and the compute / storage resources should be cloud scale. 
-
-The process of "Idea" to "Production" usually looks like this:
-
-1. Have an idea 💡
-2. Create a model prototype against a subset of data
-3. Test/Train the model prototype against all of your data
-4. Rewrite the model to work in production, expose a REST endpoint
-5. Rewrite the model to work on streaming data, integrate with Pub/Sub
-6. Deploy the model in production to process live data
-7. Monitor the model for errors and SLA guarantees
-8. Maintain and Improve the model, sometimes with breaking changes
-9. Have an idea for a prototype that uses this model as input, see step 1.
-
-The existing toolbox of open source "Data Pipelines" is a cornucopia of options to accomplish this process by abstracting away key parts. Enterprise options generally reduce complexity by providing simplified (proprietary) APIs for portions of this process while selling compute resources. Open source projects generally choose a part of the process to focus on and ignore the rest. Projects which attempt to tackle the full process make key parts inaccessible which prevents flexibility in deployment that might be required for your specific use case.
-
-Firestream approaches this problem by leveraging open source projects to create a ensamble Data Infrustructure Stack, wrapped in a pythonic API to enable *Model Driven Engineering* where models are written once and work everywhere.
-
-
-
-## Deployment
-
-```
-# Run once as a batch job
-python example_model.py batch
-
-# Run as a batch job on a daily schedule
-python example_model.py batch daily
-
-# Run persistently as a stream job
-python example_model.py stream
-
+print(Trade(symbol="AAPL", price=190.0, volume=100).get_schema("AVRO"))
 ```
 
+Generate a Geometric Brownian Motion price series:
 
-## Under the Hood
+```python
+from datetime import timedelta
+import pandas as pd
+from etl_lib.source import BrownianMotion_DataSource
 
-ETL Lib uses Kind to create a local Kubernetes cluster running inside Docker. Using Helm the Bitnami Charts for Kafka are deployed with minor modifications. Using Helm the Spark_on_K8 operator is used for persistant jobs. A Hadoop HDFS instance is created in the K8 cluster as well for persistent storage. Finally a Jupyter Notebook server is launched in K8 for exploratory analysis.
+src = BrownianMotion_DataSource.__new__(BrownianMotion_DataSource)
+src.start = pd.Timestamp("2024-01-01T00:00:00", tz="UTC")
+src.end = src.start + pd.Timedelta(seconds=60)
+src.intervals = [timedelta(seconds=1)]
+src.length = 60
+src.seed = 42
 
-ETL Lib uses git submodules and shallow clone to pull specific required directories.
+series = src.generate_gbm(mu=0.1, sigma=0.1, p0=100.0)
+```
 
-## Goals
+Once `DataModel.make_one` is implemented, the same source will be reachable
+through the higher-level `.make()` pipeline.
 
-Building dynamic composistions of data in the abstract with seemless deployment to production and super fast execution via Spark. ETL Lib defines a set of objects which provide a common API for accessing and blending data in motion, at rest, internal, and external, in development and straight to production.
+## Environment variables
 
-Firestream is a libary to encompass the full modern data stack. It takes from the best open source projects and combines their strengths with the aim to dazzle.
+`SparkClient` reads connection details from the environment so credentials
+never need to land in source. Set the ones relevant to your deployment:
 
-- Small - only ~ xxx lines of code
-- Fast - Uses PySpark under the hood
-- Flexible - Python idioms with strong types. Enables quick prototyping and deployment to production with the same code and schema evolution.
-- Streaming - Uses Spark Streaming and payload hashing with Kafka to enable exactly once processing inside expected SLA
-- Optimized - Includes partition mapping in data definition which is seemlessly deployed in a Kafka cluster and locally using Parquet for fast iterative development without reading excess data.
-- Big - Use sharded partition for abstract definitions of data that enable fast access to S3 API by reducing time-to-list
+| Variable                          | Used by                                                  |
+| --------------------------------- | -------------------------------------------------------- |
+| `S3_LOCAL_ENDPOINT_URL`           | S3A endpoint (when `storage_location="local"`)           |
+| `S3_LOCAL_ACCESS_KEY_ID`          | S3A access key                                           |
+| `S3_LOCAL_SECRET_ACCESS_KEY`      | S3A secret                                               |
+| `S3_LOCAL_BUCKET_NAME`            | Warehouse bucket                                         |
+| `S3_LOCAL_DEFAULT_REGION`         | Bucket region                                            |
+| `S3_CLOUD_*`                      | Same set, used when `storage_location="cloud"`           |
+| `LAKEFS_ENDPOINT_URL`             | LakeFS API endpoint                                      |
+| `LAKEFS_ACCESS_KEY`               | LakeFS access key                                        |
+| `LAKEFS_SECRET_KEY`               | LakeFS secret                                            |
+| `KAFKA_BOOTSTRAP_SERVERS`         | Kafka bootstrap (default points at the local K3D cluster)|
+| `KAFKA_SCHEMA_REGISTRY_URL`       | Schema registry URL                                      |
+| `DEPLOYMENT_MODE`                 | Used as the default catalog branch (`main` if unset)     |
+| `GCP_PROJECT_ID`                  | Used by `Secrets` for Secret Manager calls               |
+| `GOOGLE_APPLICATION_CREDENTIALS_PATH` / `GCP_CRED_RAW` | Fallback service-account credentials |
 
-## Comparisons to other projects
+## Tests
 
+```bash
+pytest                  # unit tests only (default — integration is excluded)
+pytest -m integration   # requires a live K3D cluster + S3/Kafka
+```
 
-* dbt - Does not support streaming
-* ML Flow / Kubeflow - Platform with no API
-* Hopsworks - Paywalled for advanced usage
-* Databricks - Requires EULA that gives them your data
-* 
-
-### ETL Lib Objects
-
-DataModel:
-    The DataModel is the core object of ETL Lib.
-    The DataModel is a simple Python Dataclass with a "make" method. The Make method defines the steps to create a instace of that DataModel as a Spark DataFrame.
-    Fields within the DataModel may be other DataModels (composition) or built in Python types. All fields are thus strongly typed.
-    Fields are based on the <https://avro.apache.org/docs/> standard. ETL Lib fields support all data structures that the Avro standard supports.
-
-    Every DataModel is responsible for two things:
-
-        1. Provide a "Make" method which returns a DataFrame of that model, given a DataContext. The DataContext will detail the mode (streaming/batch) the start and end timestamps, etc to fully parameterize the DataModel for all environments. This allows for straight forward testing.
-
-        2. Provide an API to the make method (as python arguments) which creates the DataModel under different conditions. i.e. a Make method could be provided any DataFrame to substitute for a source so long as the provided DataFrame contains the expected columns.
-
-    The Transform method
-
-## Core Objects
-
-- DataSource:
-    An object that can be passed as an argument to a DataModel's "Make" method in lieu of a Spark DataFrame. This enables data to be sourced from the external world (REST) or generated (Geometric Brownian Motion), or define your own source based on your environment. DataModels which are made using a DataSource return an instance of themselves just like any other method of making a DataModel.
-
-- DataSink:
-    Provides a standard interface to write out data.
-    Supported data destinations include:
-    1. To the console (useful for development)
-    2. Locally (useful for single box testing, ML Training, and development)
-    3. To the Kafka Cluster in Kubernetes (production, testing)
-
-- DataContext:
-    An object which contains all parameters needed to run a DataModel in development, testing, ML training, or production settings. Includes start and end timestamps, streaming vs batch, the DataSink, etc.
-    Includes methods to retrieve secrets required to access private data sources.
-
-- DataFactory:
-    Takes as input a abstract syntax tree of DataModels and arguments to their make method.
-    Enables complex composistion of models via a single mapping object.
-
-- DataType:
-    Defines a custom type for a column of data. Types can include instructions on how to construct them (Brownian Motion, Normal Distribution, compressed image, etc)
-
-
-
-
-
-# Known Issues
-
-1. Spark 3.3.1 + Hadoop 3.3.4 issue a warning about logging in S3. "WARN s3a.S3ABlockOutputStream: Application invoked the Syncable API against stream writing"
-This can safely be ignored as logs are indeed written even though the "file system" doesn't support flush symantics. https://issues.apache.org/jira/browse/HADOOP-17847
-
-
-
-
-2. Kafka as packaged by Bitnami reports odd addresses for the service when installed using helm. The correct one saved in the project's config is kafka.default.svc.cluster.local which is accessible from within the dev container pod based on DNS hackz
-
-
-
-# DNS
-
-The DNS of the DevContainer is set in the DockerCompose file to a value that is set in the Kind cluster config, 10.96.0.10. This allows the DevContainer to "reach" out to the Docker host and route DNS requests to the Kind Control Plane, which makes service hostnames resolvable by the dev container. However, if the Kind Control Plane is not booted there is no valid DNS in the container. This makes VS Code plugins fail to install, and could be confusing.
-
-Ideally, the K8 DNS can be used as a secondary DNS endpoint (without a performacne hit?) which would allow regular addresses to be resolved without the Kind cluster being up.
+Unit tests cover the type-conversion utilities, the git revision helpers, and
+the Brownian-motion generator. They run without any external services.

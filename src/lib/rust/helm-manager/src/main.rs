@@ -1,28 +1,20 @@
-use helm_manager::HelmManager;
+//! Minimal `helm-manager` binary.
+//!
+//! Historically this binary listed available embedded charts. Chart discovery
+//! has moved to the `firestream-charts` crate (driven by the flake-emitted
+//! index at `/opt/firestream/charts`). This binary now just verifies the
+//! helm CLI is reachable; it's kept as a smoke-test entry point so the crate
+//! still produces a binary target.
+
+use helm_manager::helm_client::HelmClient;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    // Initialize logging
     tracing_subscriber::fmt::init();
 
-    // Create helm manager
-    let manager = HelmManager::new().await?;
-
-    // List available charts
-    println!("Available Bitnami Charts:");
-    for chart in manager.list_charts() {
-        println!("  - {}", chart);
-    }
-
-    // Example: Deploy PostgreSQL
-    // let deployment = Deployment::builder("postgresql")
-    //     .name("my-database")
-    //     .namespace("default")
-    //     .env_file("/workspace/etc/.env")
-    //     .build()?;
-    //
-    // let release = manager.deploy(deployment).await?;
-    // println!("Deployed: {} in namespace {}", release.name, release.namespace);
+    let _helm = HelmClient::new()?;
+    println!("helm-manager: helm binary located on PATH.");
+    println!("Chart discovery now lives in `firestream-charts`.");
 
     Ok(())
 }

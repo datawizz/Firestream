@@ -1,0 +1,11 @@
+name: deploy_standard
+description: The standard deployment
+runtime:
+  name: python
+  options:
+    toolchain: pip
+    virtualenv: venv
+config:
+  pulumi:tags:
+    value:
+      pulumi:template: python

@@ -20,6 +20,114 @@
 , odooVersion        # e.g., "18.0"
 , python ? pkgs.python312
 , odooSource         # The Odoo source derivation
+
+# Externalized core-surface config. Defaults below are EXACTLY today's literals
+# so the legacy flake.nix path (which does not pass these) and evalContainer
+# (which passes the same values from options.nix) yield identical factory args.
+
+# Paths configuration
+, paths ? {
+    base = "/opt/odoo";
+    conf = "/opt/odoo/conf";
+    data = "/opt/odoo/data";
+    logs = "/opt/odoo/log";
+  }
+
+# Environment variables with defaults
+, envVars ? {
+    # Paths
+    ODOO_BASE_DIR = "/opt/odoo";
+    ODOO_BIN_DIR = "/opt/odoo/bin";
+    ODOO_CONF_DIR = "/opt/odoo/conf";
+    ODOO_CONF_FILE = "/opt/odoo/conf/odoo.conf";
+    ODOO_DATA_DIR = "/opt/odoo/data";
+    ODOO_ADDONS_DIR = "/opt/odoo/addons";
+    ODOO_TMP_DIR = "/opt/odoo/tmp";
+    ODOO_PID_FILE = "/opt/odoo/tmp/odoo.pid";
+    ODOO_LOGS_DIR = "/opt/odoo/log";
+    ODOO_LOG_FILE = "/opt/odoo/log/odoo-server.log";
+
+    # Volume paths
+    ODOO_VOLUME_DIR = "/opt/odoo";
+
+    # User/group
+    ODOO_DAEMON_USER = "odoo";
+    ODOO_DAEMON_GROUP = "odoo";
+
+    # Port configuration
+    ODOO_PORT_NUMBER = "8069";
+    ODOO_LONGPOLLING_PORT_NUMBER = "8072";
+
+    # Bootstrap configuration
+    ODOO_SKIP_BOOTSTRAP = "no";
+    ODOO_SKIP_MODULES_UPDATE = "no";
+    ODOO_LOAD_DEMO_DATA = "no";
+    ODOO_LIST_DB = "no";
+
+    # Odoo credentials
+    ODOO_EMAIL = "admin";
+    ODOO_PASSWORD = "admin";
+
+    # SMTP configuration
+    ODOO_SMTP_HOST = "";
+    ODOO_SMTP_PORT_NUMBER = "";
+    ODOO_SMTP_USER = "";
+    ODOO_SMTP_PASSWORD = "";
+    ODOO_SMTP_PROTOCOL = "";
+
+    # Database configuration
+    ODOO_DATABASE_HOST = "postgresql";
+    ODOO_DATABASE_PORT_NUMBER = "5432";
+    ODOO_DATABASE_NAME = "firestream_odoo";
+    ODOO_DATABASE_USER = "firestream";
+    ODOO_DATABASE_PASSWORD = "";
+    ODOO_DATABASE_FILTER = "";
+
+    # Timeouts
+    ODOO_DB_WAIT_TIMEOUT = "120";
+
+    # Empty password flag — default to yes for out-of-the-box local/dev/e2e
+    # use; production overrides via the standard envVars override seam.
+    ALLOW_EMPTY_PASSWORD = "yes";
+
+    # Debug mode
+    BITNAMI_DEBUG = "false";
+
+    # Odoo version (for scripts)
+    ODOO_VERSION = odooVersion;
+  }
+
+# Variables that support Docker secrets (_FILE suffix)
+, envVarsWithSecrets ? [
+    "ODOO_PASSWORD"
+    "ODOO_DATABASE_PASSWORD"
+    "ODOO_SMTP_PASSWORD"
+    "ODOO_SMTP_HOST"
+    "ODOO_SMTP_PORT_NUMBER"
+    "ODOO_SMTP_USER"
+    "ODOO_SMTP_PROTOCOL"
+    "ODOO_DATABASE_HOST"
+    "ODOO_DATABASE_PORT_NUMBER"
+    "ODOO_DATABASE_NAME"
+    "ODOO_DATABASE_USER"
+    "ODOO_DATABASE_FILTER"
+    "ODOO_EMAIL"
+    "ODOO_SKIP_BOOTSTRAP"
+    "ODOO_SKIP_MODULES_UPDATE"
+    "ODOO_LOAD_DEMO_DATA"
+    "ODOO_LIST_DB"
+  ]
+
+, exposedPorts ? [ 8069 8072 ]
+
+# In-image health/SBOM service configuration (Phase 4). Forwarded to
+# mkPythonContainerModule (which forwards to mkContainerModule). Default-off
+# preserves byte-identical legacy-flake behaviour.
+, health ? { enable = false; port = 9180; readinessCmd = null; }
+
+# Image naming passthrough (parity defaults).
+, imageName ? "firestream-odoo"
+, imageTag ? odooVersion
 }:
 
 let
@@ -305,97 +413,14 @@ in firestream.mkPythonContainerModule {
   version = odooVersion;
   inherit pythonEnv python;
 
-  # Paths configuration
-  paths = {
-    base = "/opt/odoo";
-    conf = "/opt/odoo/conf";
-    data = "/opt/odoo/data";
-    logs = "/opt/odoo/log";
-  };
+  # Paths, environment variables, and secret-aware variables are externalized
+  # as function arguments (defaults equal to the historical literals). The
+  # legacy flake.nix path uses the defaults; evalContainer passes the same
+  # values from options.nix, yielding identical factory args.
+  inherit paths envVars envVarsWithSecrets;
 
-  # Environment variables with defaults
-  envVars = {
-    # Paths
-    ODOO_BASE_DIR = "/opt/odoo";
-    ODOO_BIN_DIR = "/opt/odoo/bin";
-    ODOO_CONF_DIR = "/opt/odoo/conf";
-    ODOO_CONF_FILE = "/opt/odoo/conf/odoo.conf";
-    ODOO_DATA_DIR = "/opt/odoo/data";
-    ODOO_ADDONS_DIR = "/opt/odoo/addons";
-    ODOO_TMP_DIR = "/opt/odoo/tmp";
-    ODOO_PID_FILE = "/opt/odoo/tmp/odoo.pid";
-    ODOO_LOGS_DIR = "/opt/odoo/log";
-    ODOO_LOG_FILE = "/opt/odoo/log/odoo-server.log";
-
-    # Volume paths
-    ODOO_VOLUME_DIR = "/opt/odoo";
-
-    # User/group
-    ODOO_DAEMON_USER = "odoo";
-    ODOO_DAEMON_GROUP = "odoo";
-
-    # Port configuration
-    ODOO_PORT_NUMBER = "8069";
-    ODOO_LONGPOLLING_PORT_NUMBER = "8072";
-
-    # Bootstrap configuration
-    ODOO_SKIP_BOOTSTRAP = "no";
-    ODOO_SKIP_MODULES_UPDATE = "no";
-    ODOO_LOAD_DEMO_DATA = "no";
-    ODOO_LIST_DB = "no";
-
-    # Odoo credentials
-    ODOO_EMAIL = "admin";
-    ODOO_PASSWORD = "admin";
-
-    # SMTP configuration
-    ODOO_SMTP_HOST = "";
-    ODOO_SMTP_PORT_NUMBER = "";
-    ODOO_SMTP_USER = "";
-    ODOO_SMTP_PASSWORD = "";
-    ODOO_SMTP_PROTOCOL = "";
-
-    # Database configuration
-    ODOO_DATABASE_HOST = "postgresql";
-    ODOO_DATABASE_PORT_NUMBER = "5432";
-    ODOO_DATABASE_NAME = "firestream_odoo";
-    ODOO_DATABASE_USER = "firestream";
-    ODOO_DATABASE_PASSWORD = "";
-    ODOO_DATABASE_FILTER = "";
-
-    # Timeouts
-    ODOO_DB_WAIT_TIMEOUT = "120";
-
-    # Empty password flag
-    ALLOW_EMPTY_PASSWORD = "no";
-
-    # Debug mode
-    BITNAMI_DEBUG = "false";
-
-    # Odoo version (for scripts)
-    ODOO_VERSION = odooVersion;
-  };
-
-  # Variables that support Docker secrets (_FILE suffix)
-  envVarsWithSecrets = [
-    "ODOO_PASSWORD"
-    "ODOO_DATABASE_PASSWORD"
-    "ODOO_SMTP_PASSWORD"
-    "ODOO_SMTP_HOST"
-    "ODOO_SMTP_PORT_NUMBER"
-    "ODOO_SMTP_USER"
-    "ODOO_SMTP_PROTOCOL"
-    "ODOO_DATABASE_HOST"
-    "ODOO_DATABASE_PORT_NUMBER"
-    "ODOO_DATABASE_NAME"
-    "ODOO_DATABASE_USER"
-    "ODOO_DATABASE_FILTER"
-    "ODOO_EMAIL"
-    "ODOO_SKIP_BOOTSTRAP"
-    "ODOO_SKIP_MODULES_UPDATE"
-    "ODOO_LOAD_DEMO_DATA"
-    "ODOO_LIST_DB"
-  ];
+  # Image naming passthrough.
+  inherit imageName imageTag;
 
   # Runtime directories with declarative schema
   runtimeDirs = {
@@ -558,7 +583,8 @@ in firestream.mkPythonContainerModule {
 
   inherit systemDeps runtimeBinDeps;
 
-  exposedPorts = [ 8069 8072 ];
+  inherit exposedPorts;
+  inherit health;
   volumes = [ "/opt/odoo/data" "/opt/odoo/addons" "/bitnami/python" "/docker-entrypoint-init.d" ];
 
   user = {

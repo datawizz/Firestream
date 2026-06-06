@@ -34,7 +34,9 @@ Works on Linux, macOS, and Windows (WSL). Only requires Docker.
 - [Make Commands](#make-commands)
 - [Application Templates](#application-templates)
 - [Architecture](#architecture)
+- [Project Structure](#project-structure)
 - [Development](#development)
+- [Kubernetes Deployment](#kubernetes-deployment)
 
 ---
 
@@ -198,6 +200,64 @@ cargo run -p templatizer -- spark -n my-app -l python -o ./output --config my-co
 cargo run -p templatizer -- list --detailed
 ```
 
+### Configuration
+
+Templates can be configured three ways:
+
+- **TUI** — interactive field editing with validation and computed values
+- **CLI flags** — for simple overrides
+- **YAML/JSON config files** — for reproducible generation
+
+Example PySpark config:
+
+```yaml
+app_name: "sensor-pipeline"
+version: "1.0.0"
+language: "python"
+organization: "com.example"
+s3_enabled: true
+s3_bucket: "data-lake"
+s3_region: "us-west-2"
+kafka_enabled: true
+kafka_bootstrap_servers: "localhost:9092"
+kafka_topic: "sensor-readings"
+driver_memory: "2g"
+executor_memory: "4g"
+num_executors: 3
+```
+
+Example Puppeteer config:
+
+```yaml
+site_name: "product_catalog"
+site_url: "https://shop.example.com"
+workflow_type: "dom-scraping"
+auth_type: "form"
+login_path: "/login"
+s3_bucket: "scraped-data"
+output_format: "parquet"
+enable_retry: true
+retry_attempts: 3
+data_schema:
+  fields:
+    - name: "product_id"
+      type: "string"
+      required: true
+    - name: "price"
+      type: "number"
+      required: true
+dom_extraction:
+  item_selector: ".product-card"
+  fields:
+    product_id:
+      type: "attribute"
+      selector: "[data-id]"
+      attribute: "data-id"
+    price:
+      type: "text"
+      selector: ".price"
+```
+
 ---
 
 ## Architecture
@@ -236,6 +296,55 @@ Each container definition in `src/containers/firestream/<name>/` includes a `mod
 
 ---
 
+## Project Structure
+
+```
+Firestream/
+├── bin/
+│   ├── build-container.sh              # Container build entrypoint (wraps bin/build/)
+│   └── nix/firestream/                 # Nix module system
+│       ├── lib/                        # Shell function libraries (log, fs, net, etc.)
+│       ├── containers/                 # Container factories (base, python, java, node)
+│       ├── apps/                       # Application factories
+│       ├── rust/                       # mkRustPackage (Fenix + Crane)
+│       ├── node/                       # mkNodePackage
+│       ├── packages/                   # Built-from-source packages
+│       └── tests/                      # Module tests
+├── src/
+│   ├── app/
+│   │   ├── firestream-tui/             # Terminal UI (ratatui)
+│   │   └── firestream-docs/            # Documentation site (fumadocs / Next.js)
+│   ├── containers/firestream/          # Nix-built container definitions
+│   │   ├── airflow/                    #   Apache Airflow 3.0.3
+│   │   ├── kafka/                      #   Apache Kafka 4.0 (KRaft)
+│   │   ├── spark/                      #   Apache Spark 4.0.0
+│   │   ├── postgresql/                 #   PostgreSQL 16, 17
+│   │   ├── redis/                      #   Redis 7, 8
+│   │   ├── jupyterhub/                 #   JupyterHub 5.3.0
+│   │   ├── odoo/                       #   Odoo 18.0
+│   │   ├── superset/                   #   Apache Superset 4.x, 5.x
+│   │   └── supabase/                   #   Supabase
+│   ├── charts/firestream/              # Helm charts (Airflow, PostgreSQL, Redis)
+│   ├── templates/                      # Application templates
+│   │   ├── spark/                      #   PySpark & Scala Spark generators
+│   │   ├── puppeteer/                  #   DOM & functional scraper generators
+│   │   ├── superset/                   #   Superset dashboard generator
+│   │   ├── multi_platform_app/         #   Next.js + Tauri + SwiftUI monorepo
+│   │   ├── standard_puppeteer/         #   Standalone scraper boilerplate
+│   │   ├── standard_project/           #   Python project boilerplate
+│   │   ├── _app_template/              #   Generic Helm chart generator
+│   │   └── _example_apps/              #   Reference implementations
+│   └── lib/
+│       ├── rust/                       # Rust workspace crates
+│       └── python/                     # Python ETL library
+├── docker/firestream/                  # DevContainer configuration
+├── flake.nix                           # Root Nix flake
+├── makefile                            # Primary build interface
+└── Cargo.toml                          # Rust workspace root
+```
+
+---
+
 ## Development
 
 ### Option A: Just Docker
@@ -266,6 +375,20 @@ cargo test --workspace      # Run all tests
 ### Contributing
 
 Contributions are welcome. See the [Contributing Guide](src/app/firestream-docs/content/docs/development/contributing.mdx).
+
+---
+
+## Kubernetes Deployment
+
+Firestream containers can be deployed to Kubernetes via Helm charts:
+
+```bash
+ls src/charts/firestream/     # airflow/  postgresql/  redis/
+
+helm install airflow src/charts/firestream/airflow/
+```
+
+The `k8s-manager` crate provides K3D cluster lifecycle management, and `helm-manager` handles chart deployment with environment-specific configuration.
 
 ---
 

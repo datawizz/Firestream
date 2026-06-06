@@ -38,4 +38,5 @@ tracing-subscriber = { workspace = true }
 dirs = { workspace = true }
 tera = { workspace = true }
 tokio-util = "0.7"
+toml = { workspace = true }
 keyring = "2.0"

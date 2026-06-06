@@ -1,0 +1,36 @@
+{
+  "bundle": {
+    "chartPath": "/nix/store/fake-airflow-chart-bundle/chart",
+    "renderedPath": "/nix/store/fake-airflow-chart-bundle/rendered.yaml",
+    "valuesPath": "/nix/store/fake-airflow-chart-bundle/values.yaml"
+  },
+  "chart": "airflow",
+  "deployment": {
+    "atomic": true,
+    "forceUpgrade": false,
+    "hooksDisabled": false,
+    "skipCrds": false,
+    "timeout": "10m",
+    "wait": true,
+    "waitForJobs": true
+  },
+  "images": {
+    "airflow": {
+      "componentPath": ["image"],
+      "repository": "firestream-airflow",
+      "tag": "3.0.3"
+    }
+  },
+  "lifecycle": {
+    "dependsOn": ["postgresql", "redis"]
+  },
+  "name": "airflow",
+  "provenance": {},
+  "release": {
+    "createNamespace": true,
+    "namespace": "airflow",
+    "releaseName": "airflow"
+  },
+  "schemaVersion": "1",
+  "version": "24.2.4"
+}

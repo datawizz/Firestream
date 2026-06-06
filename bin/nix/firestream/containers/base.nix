@@ -23,7 +23,7 @@
 #     };
 #   in container.dockerImage
 
-{ pkgs, lib, mkAppModule, coreLibs, waitForPortPkg, firestreamVibPkg }:
+{ pkgs, lib, mkAppModule, coreLibs, waitForPortPkg, firestreamVibPkg, firestreamHealthdPkg }:
 
 let
   # Import metadata library for SBOM and container metadata generation
@@ -50,6 +50,10 @@ in
     # Basic metadata
     name,
     version ? "1.0.0",
+
+    # Docker image naming (parity-preserving defaults match the historical literals)
+    imageName ? "firestream-${name}",
+    imageTag ? version,
 
     # Environment configuration (passed to mkAppModule)
     envVars ? {},
@@ -100,6 +104,17 @@ in
     # Optional custom entrypoint wrapper
     entrypointWrapper ? null, # Function: entrypoint -> wrapped entrypoint
 
+    # In-image health/SBOM service configuration (Phase 3).
+    # When `health.enable == true`, a one-shot shell wrapper is layered ONTO
+    # the existing entrypoint that backgrounds firestream-healthd and then
+    # `exec`s the inner entrypoint. When false (the default), the image is
+    # byte-identical to a pre-Phase-3 image and no health server is launched.
+    health ? {
+      enable = false;
+      port = 9180;
+      readinessCmd = null;
+    },
+
     # Optional additional scripts
     customScripts ? {},       # { name = script; } - additional scripts to include
 
@@ -126,6 +141,7 @@ in
         pkgs.cacert
         pkgs.stdenv.cc.cc.lib
         waitForPortPkg  # Rust-based port checker - available in all containers
+        firestreamHealthdPkg  # In-image /healthz, /readyz, /sbom, /metadata server (Phase 2: present, not yet launched)
       ]
     );
 
@@ -150,11 +166,45 @@ nobody:!x:::::::
 ${user.name}:!:::::::
 '';
 
-    # Get the entrypoint, optionally wrapped
-    finalEntrypoint =
+    # Get the entrypoint, optionally wrapped by the runtime's custom wrapper
+    # (e.g. mkJavaContainerModule's JVM wrapper).
+    innerEntrypoint =
       if entrypointWrapper != null
       then entrypointWrapper appModule.scripts.entrypoint
       else appModule.scripts.entrypoint;
+
+    # Phase 3: layer a health-launching wrapper ONTO the existing entrypoint
+    # when `health.enable == true`. The wrapper:
+    #   1. Honors FIRESTREAM_HEALTHD_DISABLE as an escape hatch (skips healthd).
+    #   2. Launches `firestream-healthd` in the background (output -> stderr),
+    #      passing `--readiness-cmd` only when configured so the binary's
+    #      default behavior is preserved otherwise.
+    #   3. exec's the inner entrypoint with its original args so the app stays
+    #      PID-target (single-exec PID-1 semantics preserved). Healthd is
+    #      reaped by Docker when the container stops.
+    # The wrapper binary is named exactly `${name}-entrypoint` so the Docker
+    # Entrypoint config (`${finalEntrypoint}/bin/${name}-entrypoint`) stays
+    # consistent whether or not health is enabled.
+    healthWrapper = pkgs.writeShellScriptBin "${name}-entrypoint" ''
+      set -euo pipefail
+
+      # Escape hatch: skip healthd entirely.
+      if [ -n "''${FIRESTREAM_HEALTHD_DISABLE:-}" ]; then
+        exec "${innerEntrypoint}/bin/${name}-entrypoint" "$@"
+      fi
+
+      "${firestreamHealthdPkg}/bin/firestream-healthd" \
+        --port "${toString health.port}" \
+        --bind 0.0.0.0 \
+        --metadata-path /opt/firestream \
+        ${lib.optionalString (health.readinessCmd != null)
+          "--readiness-cmd ${lib.escapeShellArg health.readinessCmd}"} \
+        >&2 2>&1 &
+
+      exec "${innerEntrypoint}/bin/${name}-entrypoint" "$@"
+    '';
+
+    finalEntrypoint = if health.enable then healthWrapper else innerEntrypoint;
 
     # Build custom scripts
     customScriptPackages = lib.mapAttrsToList (
@@ -179,6 +229,7 @@ ${user.name}:!:::::::
       pkgs.cacert
       pkgs.stdenv.cc.cc.lib
       waitForPortPkg
+      firestreamHealthdPkg  # Phase 2: binary present in /nix/store; entrypoint unchanged.
     ] ++ systemDeps ++ runtimeBinDeps ++ extraDeps ++ [
       # Layer group 2: App scripts (change with code updates)
       appModule.scripts.envDefaults
@@ -244,8 +295,8 @@ ${user.name}:!:::::::
 
     # Docker image
     dockerImage = pkgs.dockerTools.buildLayeredImage {
-      name = "firestream-${name}";
-      tag = version;
+      name = imageName;
+      tag = imageTag;
       maxLayers = 100;  # Modern Docker supports 128, use 100 for fine-grained caching
 
       # Contents = imageContents + metadata

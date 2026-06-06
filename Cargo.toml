@@ -19,6 +19,9 @@ members = [
     # Infrastructure crates (flattened)
     "src/lib/rust/docker-manager",
     "src/lib/rust/filesystem-manager",
+    "src/lib/rust/firestream-charts",
+    "src/lib/rust/firestream-healthd",
+    "src/lib/rust/firestream-metadata",
     "src/lib/rust/firestream-vib",
     "src/lib/rust/helm-manager",
     "src/lib/rust/k8s-manager",
@@ -34,6 +37,9 @@ firestream = { path = "src/lib/rust/firestream" }
 firestream-tui = { path = "src/app/firestream-tui" }
 docker-manager = { path = "src/lib/rust/docker-manager" }
 filesystem-manager = { path = "src/lib/rust/filesystem-manager" }
+firestream-charts = { path = "src/lib/rust/firestream-charts" }
+firestream-healthd = { path = "src/lib/rust/firestream-healthd" }
+firestream-metadata = { path = "src/lib/rust/firestream-metadata" }
 firestream-vib = { path = "src/lib/rust/firestream-vib" }
 helm-manager = { path = "src/lib/rust/helm-manager" }
 k8s-manager = { path = "src/lib/rust/k8s-manager" }
@@ -86,6 +92,8 @@ dialoguer = "0.11"
 once_cell = "1.19"
 serde_yaml = "0.9"
 regex = "1.10"
+reqwest = { version = "0.12", default-features = false, features = ["blocking", "rustls-tls"] }
+tiny_http = "0.12"
 
 
 # Terminal User Interface (TUI) / Command Line Interface (CLI)

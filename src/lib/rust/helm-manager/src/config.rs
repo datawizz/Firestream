@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
-/// Configuration for HelmManager
+/// Configuration for the helm/kubectl client wrappers in this crate.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Config {
     /// Path to helm binary (if not in PATH)

@@ -1,0 +1,79 @@
+encryptionsalt: v1:M5sgQ4/QSNU=:v1:jTGi+/HQ3o5h64N8:UWGq7YvSAp91D8ae50nQKE2oOfrHHw==
+config:
+  deploy_standard:cloudflare_api_token:
+    secure: v1:mdZEDFU2VIfTG2na:5Mj6ko9fWHR3Y7RRA2vYCUFQID5r7unJChtEZXbGyUAbqC8VoOfRHMXIIPG8GAusFeH2THNk+BU=
+  deploy_standard:cloudflare_zone_id:
+    secure: v1:tiUMVpNpJj53Mud/:oBDXadWs+7wLC9H5yZQFW7UHX5hOGqkPZLleQ2mXMMgk9rileUytFytGiVniihJu
+  deploy_standard:cloudflare_account_id:
+    secure: v1:jIjs6ibu37vDfNWp:jhwmCIqXTFNkqYht8dyrlA3hymUq6vuFi7H0hvkiIHTuYr5l8oqToyJ1o/owhVUb
+  deploy_standard:tailscale_api_key:
+    secure: v1:15KpJVWsuJc0ZadG:bvxNcXTKN1ZgPxAX1COJFk/UX66Etl3snS7bnmhVjFDzW4Eln09EXHO2JirMlyDy82JW1yQ+hK/b2DZe8JLAid2KkJgsjPqQOIiGTb4=
+  deploy_standard:tailscale_tailnet_name:
+    secure: v1:Fi41pjF28RTgRUxe:U0VXJqdcQyGGAws5oIdV6Y0QVoAKBxU2qx7y0HxJrpa2D1VlU2U=
+  deploy_standard:cloudflare_domain: centerpoint.consulting
+  deploy_standard:cloudflare_public_domain: pleasantrees.centerpoint.consulting
+  deploy_standard:deployment_name: deploy_standard
+  deploy_standard:customer_name: pleasantrees
+  deploy_standard:customer_email_domain: enjoypleasantrees.com
+  deploy_standard:gcp_project: pleasantrees-dev
+  deploy_standard:gcp_region: us-central1
+  deploy_standard:gcp_region_zone: us-central1-a
+  deploy_standard:gce_machine_type: e2-standard-2
+  deploy_standard:environment: prod
+  deploy_standard:rotation_days: "30"
+  deploy_standard:machine_prefix: prodbox
+  deploy_standard:region: us1
+  environment_variable:google_application_credentials: /etc/gcp/service-account.json
+  environment_variable:machine_hostname: prodbox
+  environment_variable:machine_root_password: trustme
+  environment_variable:machine_app_user: app
+  environment_variable:key_rotation_days: "90"
+  software_deployment:github_repo_1_url: https://github.com/Cogent-Creation-Co/Firestream
+  software_deployment:github_repo_1_branch: main
+  software_deployment:github_repo_1_commit: ""
+  software_deployment:github_repo_2_url: https://github.com/Pleasantrees/Pleasantrees
+  software_deployment:github_repo_2_branch: main
+  software_deployment:github_repo_2_commit: ""
+  software_deployment:github_repo_3_url: https://github.com/Center-Point-Consulting-Group-LLC/pleasant_ui
+  software_deployment:github_repo_3_branch: main
+  software_deployment:github_repo_3_commit: ""
+  identity_admin:plublic_domain: centerpoint.consulting
+  identity_admin:fully_qualified_domain_name: auth.centerpoint.consulting
+  identity_admin:gcp_project_id:
+    secure: v1:XIHGbhft2aPGLLsI:xsuzuDejj3pAnd0KgE58klzAlNrzme/Qdz1QNDOuY2S4kHTfItQuGlA=
+  identity_admin:gcp_regions: '["us-central1"]'
+  identity_admin:oauth_client_id:
+    secure: v1:X2Y+PFM3/WIYmKiV:60GKIVvuvXbAwUMzZAcKytjNeAxmnEGtoSwU
+  identity_admin:oauth_client_secret:
+    secure: v1:S9R7AlWKOaNCMcYp:BdXe/aeii5kULsl820/SDSn50f9yAl/SwIwz5c++bg==
+  identity_admin:google_project_apis: '["iam.googleapis.com", "cloudresourcemanager.googleapis.com", "storage.googleapis.com", "secretmanager.googleapis.com", "bigquery.googleapis.com", "compute.googleapis.com"]'
+  identity_admin:cloudflare_account_id:
+    secure: v1:3M4ToBVGW86khs+a:K+mDdHASMR7BuRu2vsySLvmKiVCvl7RiwiYAPw==
+  identity_admin:cloudflare_access_client_id:
+    secure: v1:YGB1CEe6umLJMDdt:Nd7udZhyUiRHVMyYotF07OobKN7zy4W/dXbU9lu+RlbG1Q==
+  identity_admin:cloudflare_access_client_secret:
+    secure: v1:GaMgecQgFrJqIUl6:Tzffym0Et5m0Nn5LQrZl6WL8U0irazxFOX3XU49dreW/vvYJjHo=
+  identity_admin:session_duration: 24h
+  identity_admin:token_expiry: 1h
+  identity_admin:refresh_token_expiry: 30d
+  identity_admin:allowed_callback_domains: '*.centerpoint.consulting'
+  deploy_standard:tenant_id: pleasantrees
+  deploy_standard:application_: pleasantrees
+  deploy_standard:tenant_callback: '["enjoypleasantrees.com", "centerpoint.consulting"]'
+  deploy_standard:auth_callback_url: https://pleasantrees.centerpoint.consulting/auth/callback
+  deploy_standard:domain_name: centerpoint.consulting
+  deploy_standard:fully_qualified_domain_name: pleasantrees.centerpoint.consulting
+  deploy_standard:gcp_project_id: pleasantrees-dev
+  deploy_standard:geographic_region: us1
+  deploy_standard:gcp_regions: '["us-central1"]'
+  deploy_standard:gcp_region_zones: '["us-central1-a"]'
+  deploy_standard:gcp_machine_type: e2-standard-2
+  deploy_standard:gcp_machine_node_count: "1"
+  deploy_standard:google_service_account_roles: '["roles/bigquery.dataEditor", "roles/bigquery.jobUser", "roles/storage.objectViewer", "roles/storage.objectCreator", "roles/secretmanager.secretAccessor"]'
+  deploy_standard:google_project_apis: '["iam.googleapis.com", "cloudresourcemanager.googleapis.com", "storage.googleapis.com", "secretmanager.googleapis.com", "bigquery.googleapis.com", "compute.googleapis.com"]'
+  deploy_standard:build_environment_production: "true"
+  deploy_standard:build_environment_production_target: google-cloud-platform
+  deploy_standard:build_environment_development: "true"
+  deploy_standard:build_environment_development_target: qemu
+  deploy_standard:build_environment_staging: "false"
+  deploy_standard:build_environment_staging_target: google-cloud-platform

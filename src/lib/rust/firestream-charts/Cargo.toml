@@ -1,0 +1,25 @@
+[package]
+name = "firestream-charts"
+version = "0.1.0"
+edition = "2024"
+description = "Schema types and runtime reader for Firestream Helm chart manifests emitted by Nix"
+license = "MIT"
+
+[dependencies]
+# Serialization
+serde = { workspace = true }
+serde_json = { workspace = true }
+
+# Error handling
+thiserror = { workspace = true }
+
+# Structured logging (used for warnings about charts missing from the index
+# when resolving a stack)
+tracing = { workspace = true }
+
+[dev-dependencies]
+tempfile = { workspace = true }
+
+[lib]
+name = "firestream_charts"
+path = "src/lib.rs"

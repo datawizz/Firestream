@@ -3,28 +3,33 @@ use serde_json::Value as JsonValue;
 use std::collections::HashMap;
 use std::path::Path;
 
-/// Resolve values for a deployment from various sources
+/// Resolve values for a deployment from various sources.
+///
+/// Precedence (lowest to highest, later sources override earlier ones):
+/// 1. Values files (in the order they were added).
+/// 2. Environment variables / `.env` file.
+/// 3. Inline values set on the [`Deployment`].
+///
+/// Default chart values used to be sourced from an in-crate embedded chart
+/// archive; that responsibility has moved to the `firestream-charts` crate.
+/// Callers that want chart defaults applied should add the chart's
+/// `values.yaml` to `values_files` explicitly.
 pub async fn resolve_values(deployment: &Deployment) -> Result<JsonValue> {
     let mut values = Values::new();
 
-    // 1. Start with default chart values
-    if let Ok(default_values) = crate::embedded_charts::get_default_values(&deployment.chart) {
-        values = Values::from_json(default_values)?;
-    }
-
-    // 2. Apply values from files (in order)
+    // 1. Apply values from files (in order)
     for values_file in &deployment.values_files {
         let file_values = load_values_file(values_file).await?;
         values.merge(file_values);
     }
 
-    // 3. Apply environment variables (highest priority)
+    // 2. Apply environment variables
     if let Some(ref env_file) = deployment.env_file {
         let env_values = load_env_values(env_file, &deployment.env_prefix).await?;
         values.merge(env_values);
     }
 
-    // 4. Apply inline values
+    // 3. Apply inline values (highest priority)
     if let Some(ref inline_values) = deployment.values {
         values.merge(inline_values.clone());
     }
@@ -80,8 +85,8 @@ async fn load_env_values(env_file: impl AsRef<Path>, prefix: &Option<String>) ->
 fn convert_env_to_values(env_map: HashMap<String, String>, prefix: &Option<String>) -> Result<Values> {
     let mut values = Values::new();
     
-    // Define common mappings for Bitnami charts
-    let mappings = get_bitnami_mappings();
+    // Common env-var → Helm-values path mappings used by many charts.
+    let mappings = get_chart_env_mappings();
     
     for (env_key, env_value) in env_map {
         // Check if this env var should be included
@@ -106,8 +111,8 @@ fn convert_env_to_values(env_map: HashMap<String, String>, prefix: &Option<Strin
     Ok(values)
 }
 
-/// Get common environment variable mappings for Bitnami charts
-fn get_bitnami_mappings() -> HashMap<String, String> {
+/// Common env-var → Helm-values path mappings shared across standard charts.
+fn get_chart_env_mappings() -> HashMap<String, String> {
     let mut mappings = HashMap::new();
     
     // PostgreSQL mappings

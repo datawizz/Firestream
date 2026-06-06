@@ -16,6 +16,7 @@ path = "src/main.rs"
 # Internal crates - firestream imports ALL other crates
 docker-manager = { workspace = true }
 filesystem-manager = { workspace = true }
+firestream-charts = { workspace = true }
 firestream-vib = { workspace = true }
 helm-manager = { workspace = true }
 k8s-manager = { workspace = true }
@@ -59,3 +60,13 @@ thiserror = { workspace = true }
 [dev-dependencies]
 tempfile = { workspace = true }
 k8s-openapi = { workspace = true }
+
+# Phase 1 e2e harness deps. Tests are gated behind #[ignore] so these only
+# affect `cargo test --no-run` build artifact size, never CI runtime.
+wait-for-port = { workspace = true }
+which = { workspace = true }
+reqwest = { workspace = true }
+anyhow = { workspace = true }
+tokio = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }

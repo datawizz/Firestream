@@ -9,11 +9,16 @@ pub mod lifecycle;
 pub mod executor;
 pub mod charts;
 pub mod app;
+pub mod from_manifest;
 
 pub use types::*;
 pub use trait_def::*;
 pub use lifecycle::*;
 pub use executor::*;
+pub use from_manifest::{
+    chart_info_for, chart_info_from_manifest, charts_dir, try_registry,
+    CHARTS_DIR_ENV, DEFAULT_CHARTS_DIR,
+};
 
 // Re-export commonly used chart implementations
 pub use charts::common::CommonChart;
