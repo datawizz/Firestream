@@ -69,6 +69,12 @@ help:
 	@echo "  make docs-dev            # Start docs dev server (port 3001)"
 	@echo "  make docs-build          # Build documentation site"
 	@echo "  make docs-clean          # Clean docs build artifacts"
+	@echo ""
+	@echo "=== Homepage ==="
+	@echo ""
+	@echo "  make homepage-dev        # Start homepage dev server (auto port)"
+	@echo "  make homepage-build      # Build homepage site"
+	@echo "  make homepage-clean      # Clean homepage build artifacts"
 
 # ==============================================================================
 # Core Variables
@@ -82,6 +88,9 @@ DEVCONTAINER_PREINIT := docker/firestream/docker_preinit.sh
 
 # Documentation
 DOCS_DIR := src/app/firestream-docs
+
+# Homepage (Lakehouse TCO calculator landing)
+HOMEPAGE_DIR := src/app/firestream-homepage
 
 # Container build script (handles cross-platform Nix builds)
 BUILD_CONTAINER := bin/build-container.sh
@@ -919,3 +928,33 @@ docs-clean:
 
 docs-install:
 	cd $(DOCS_DIR) && pnpm install
+
+# ==============================================================================
+# Homepage (Lakehouse TCO calculator landing)
+# ==============================================================================
+
+homepage-dev:
+	@echo "Starting homepage dev server..."
+	@if [ ! -d "$(HOMEPAGE_DIR)/node_modules" ]; then \
+		echo "Installing dependencies..."; \
+		cd $(HOMEPAGE_DIR) && pnpm install; \
+	fi
+	cd $(HOMEPAGE_DIR) && pnpm dev
+
+homepage-build:
+	@echo "Building homepage site..."
+	@if [ ! -d "$(HOMEPAGE_DIR)/node_modules" ]; then \
+		echo "Installing dependencies..."; \
+		cd $(HOMEPAGE_DIR) && pnpm install; \
+	fi
+	cd $(HOMEPAGE_DIR) && pnpm build
+	@echo "Homepage built successfully!"
+
+homepage-clean:
+	@echo "Cleaning homepage build artifacts..."
+	rm -rf $(HOMEPAGE_DIR)/.next
+	rm -rf $(HOMEPAGE_DIR)/out
+	@echo "Homepage cleaned!"
+
+homepage-install:
+	cd $(HOMEPAGE_DIR) && pnpm install
