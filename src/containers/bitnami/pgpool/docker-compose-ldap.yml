@@ -3,7 +3,7 @@
 
 services:
   pg-0:
-    image: docker.io/bitnami/postgresql-repmgr:latest
+    image: docker.io/soldevelo/postgresql-repmgr:latest
     ports:
       - 5432
     volumes:
@@ -39,7 +39,7 @@ services:
       - REPMGR_USERNAME=repmgr
       - REPMGR_PASSWORD=repmgrpassword
   pgpool:
-    image: docker.io/bitnami/pgpool:4
+    image: docker.io/soldevelo/pgpool:4
     ports:
       - 5432:5432
     environment:

@@ -3,7 +3,7 @@
 
 services:
   postgresql:
-    image: docker.io/bitnami/postgresql:latest
+    image: docker.io/soldevelo/postgresql:latest
     volumes:
       - postgresql_data:/bitnami/postgresql
     environment:

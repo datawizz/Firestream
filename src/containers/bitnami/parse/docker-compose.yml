@@ -3,7 +3,7 @@
 
 services:
   mongodb:
-    image: docker.io/bitnami/mongodb:latest
+    image: docker.io/soldevelo/mongodb:latest
     volumes:
       - 'mongodb_data:/bitnami/mongodb'
     environment:

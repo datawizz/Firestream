@@ -3,7 +3,7 @@
 
 services:
   mariadb:
-    image: docker.io/bitnami/mariadb:latest
+    image: docker.io/soldevelo/mariadb:latest
     environment:
       - ALLOW_EMPTY_PASSWORD=yes
       - MARIADB_DATABASE=myapp

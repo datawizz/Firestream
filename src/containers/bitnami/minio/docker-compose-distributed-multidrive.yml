@@ -3,7 +3,7 @@
 
 services:
   prepare-data:
-    image: 'docker.io/bitnami/os-shell:latest'
+    image: 'docker.io/soldevelo/os-shell:latest'
     user: root
     command:
       - /bin/bash
