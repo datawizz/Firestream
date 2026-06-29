@@ -15,7 +15,7 @@ use std::path::PathBuf;
 use std::process::{Command, Output, Stdio};
 
 use anyhow::{Context, Result};
-use firestream_e2e_core::exec::Exec;
+use crate::exec::Exec;
 
 /// `Exec` impl that runs `kubectl --kubeconfig <kubeconfig> exec -n
 /// <namespace> <target> -- <args…>`.

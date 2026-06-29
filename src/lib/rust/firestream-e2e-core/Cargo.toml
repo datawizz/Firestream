@@ -22,6 +22,25 @@ which = { workspace = true }
 # refactor doesn't drag a second TLS stack into the dep graph).
 reqwest = { workspace = true }
 
+# --- k8s submodule deps (relocated from firestream-e2e-k8s) ---
+# k3d cluster lifecycle. The k8s::cluster glue talks to k3d through
+# K3dClusterManager rather than shelling out, mirroring production.
+k8s-manager = { workspace = true }
+
+# Chart-manifest reader: k8s::images walks `ChartManifest.images` to derive
+# the firestream-* image set to preload. Relocated from firestream-e2e-k8s.
+firestream-charts = { workspace = true }
+
+# K3dClusterManager's cluster methods are async; k8s::cluster::create_cluster
+# wraps them in a current-thread runtime so the public API stays sync.
+tokio = { workspace = true }
+
+# 6-char lowercase alphanumeric suffix for per-test cluster names.
+rand = "0.8"
+
+# Structured logging for cluster/teardown lifecycle events.
+tracing = { workspace = true }
+
 [dev-dependencies]
 # Used to gate env-mutation tests so they don't race each other.
 once_cell = { workspace = true }

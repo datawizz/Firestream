@@ -41,7 +41,8 @@ macro_rules! stack_test_k8s {
 fn e2e_k8s_cluster_lifecycle() {
     // Bypass harness::run_one — we want to assert on the cluster
     // directly. The chart tests below go through run_one.
-    use firestream_e2e_k8s::{cluster, env::env_keep_k8s, harness::should_skip_k8s};
+    use firestream_e2e_core::k8s::cluster;
+    use firestream_e2e_k8s::{env::env_keep_k8s, harness::should_skip_k8s};
 
     if let Some(reason) = should_skip_k8s() {
         eprintln!("[e2e-k8s:lifecycle] SKIP: {}", reason);
@@ -92,3 +93,23 @@ stack_test_k8s!(e2e_k8s_spark, "spark");
 stack_test_k8s!(e2e_k8s_jupyterhub, "jupyterhub");
 stack_test_k8s!(e2e_k8s_superset, "superset");
 stack_test_k8s!(e2e_k8s_odoo, "odoo");
+
+// ---- PostgreSQL backup/restore round-trip (multi-chart) ----
+// Deploys seaweedfs + postgresql (backup.enabled=true), seeds a sentinel
+// row, runs an on-demand backup (the same KubectlClient path the
+// `firestream helm backup` CLI uses), asserts the object lands in
+// SeaweedFS, drops the table, restores from the produced key, and asserts
+// the row is back. Gated by the `pg-backup` filter token:
+//   FIRESTREAM_E2E_K8S_STACKS=pg-backup
+#[test]
+#[ignore = "e2e-k8s: pg backup/restore round-trip; needs k3d+kubectl+helm+nix+docker; run via `make test-e2e-k8s-pg-backup`"]
+fn e2e_k8s_pg_backup() {
+    firestream_e2e_k8s::pg_backup::run_pg_backup_roundtrip();
+}
+
+// ---- Object store (non-Bitnami chart) ----
+// SeaweedFS is the default local S3 object store. Its all-in-one pod is
+// deployed first in the dev stack (object store up before consumers).
+// The harness probe GETs the S3 gateway on :8333 (see
+// firestream_e2e_core::k8s::probes `for_chart` "seaweedfs" arm).
+stack_test_k8s!(e2e_k8s_seaweedfs, "seaweedfs");

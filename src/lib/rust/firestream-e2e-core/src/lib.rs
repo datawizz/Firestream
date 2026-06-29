@@ -22,11 +22,16 @@
 //! - [`guard`] — `wait_with_budget`, the bounded-wait helper used by
 //!   teardown guards' `Drop` implementations.
 //! - [`exec`] — the transport-agnostic `Exec` trait. One impl per backend
-//!   (`DockerComposeExec` lives in the docker harness; `KubectlExec` lands
-//!   in `firestream-e2e-k8s` in Phase 2).
+//!   (`DockerComposeExec` lives in the docker harness; `KubectlExec` lives
+//!   in [`k8s::exec`]).
+//! - [`k8s`] — k3d cluster lifecycle, `kubectl`-driven probe matrix,
+//!   port-forward and readiness helpers. Relocated here from
+//!   `firestream-e2e-k8s` so the main `firestream` CLI can reuse it
+//!   without forming a dependency cycle.
 
 pub mod env;
 pub mod exec;
 pub mod guard;
+pub mod k8s;
 pub mod probe;
 pub mod retry;

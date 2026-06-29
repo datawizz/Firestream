@@ -17,6 +17,14 @@ path = "src/main.rs"
 docker-manager = { workspace = true }
 filesystem-manager = { workspace = true }
 firestream-charts = { workspace = true }
+# Shared transport-agnostic e2e primitives + the relocated k8s/k3d glue
+# (`firestream_e2e_core::k8s`: cluster lifecycle, KubectlExec, port-forward,
+# readiness wait, per-chart probe matrix). Promoted from a dev-dependency to
+# a normal dependency so the CLI can reuse the probe/cluster glue. NOTE: do
+# NOT add `firestream-e2e-k8s` here — it depends on `firestream`, so a reverse
+# edge would form a cycle. The reusable glue lives in core precisely to avoid
+# that.
+firestream-e2e-core = { workspace = true }
 firestream-vib = { workspace = true }
 helm-manager = { workspace = true }
 k8s-manager = { workspace = true }
@@ -71,8 +79,7 @@ tokio = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 
-# Shared transport-agnostic e2e primitives (Probe trait, retry loop, env
-# accessors, Exec trait). The docker-compose harness wraps these with a
-# local DockerComposeExec; the k8s harness (Phase 2+) will do the same
-# with a KubectlExec.
-firestream-e2e-core = { workspace = true }
+# NOTE: `firestream-e2e-core` is now a normal [dependencies] entry (above) —
+# the docker-compose harness in `tests/e2e/` still uses it (Probe trait,
+# retry loop, env accessors, Exec trait), and a normal dep is visible to
+# dev/test code too.

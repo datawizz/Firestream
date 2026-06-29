@@ -24,12 +24,14 @@ use std::path::Path;
 
 use anyhow::{Context, Result, bail};
 use firestream::deploy::helm::deploy_chart_lifecycle;
-use firestream::deploy::helm_lifecycle::{CommonChart, chart_info_from_manifest};
+use firestream::deploy::helm_lifecycle::{ChartSetValue, CommonChart, chart_info_from_manifest};
 use firestream_charts::Charts;
 use tracing::info;
 
-use crate::cluster::ClusterHandle;
-use crate::images;
+use firestream_e2e_core::k8s::cluster::ClusterHandle;
+use firestream_e2e_core::k8s::images;
+
+use crate::env::env_preload;
 
 /// What a successful deploy hands back to the harness. The fields are
 /// exactly what `wait_pods_ready` + the probe chain need:
@@ -72,6 +74,26 @@ pub fn deploy_chart(
     charts_dir: &Path,
     chart: &str,
 ) -> Result<DeployedRelease> {
+    deploy_chart_with_overrides(handle, charts_dir, chart, &[])
+}
+
+/// Same as [`deploy_chart`] but layers extra helm `--set key=value`
+/// overrides onto the manifest-derived base values. Used by the
+/// PostgreSQL backup round-trip e2e to flip `backup.enabled=true` (the
+/// chart ships it `false` by default) without forking the manifest or
+/// editing the bundle on disk.
+///
+/// Each `(key, value)` pair is appended to `ChartInfo.values`, which the
+/// helm executor turns into a `--set <key>=<value>` flag (see
+/// `helm_lifecycle::executor` — set values are applied AFTER the
+/// `values_files`, so they win). This is the harness's single
+/// per-test value-override seam.
+pub fn deploy_chart_with_overrides(
+    handle: &ClusterHandle,
+    charts_dir: &Path,
+    chart: &str,
+    set_values: &[(&str, &str)],
+) -> Result<DeployedRelease> {
     let charts = Charts::open(charts_dir).with_context(|| {
         format!(
             "open chart bundle at {} (set FIRESTREAM_E2E_K8S_CHARTS_DIR or run \
@@ -88,9 +110,18 @@ pub fn deploy_chart(
     // off — otherwise the cluster will try to pull them from upstream and
     // fail (they only exist as local flake derivations). Post-Phase-B
     // every chart has a populated `images` block, so this drives a real
-    // load for every deploy.
-    images::preload_images_for(handle, &manifest)
-        .with_context(|| format!("preload images for chart `{}`", chart))?;
+    // load for every deploy. Honour the harness opt-out
+    // (`FIRESTREAM_E2E_K8S_PRELOAD=0`) here — the relocated
+    // `preload_images_for` in firestream-e2e-core no longer reads env.
+    if env_preload() {
+        images::preload_images_for(handle, &manifest)
+            .with_context(|| format!("preload images for chart `{}`", chart))?;
+    } else {
+        eprintln!(
+            "[preload] FIRESTREAM_E2E_K8S_PRELOAD=0; skipping image preload for chart `{}`",
+            chart
+        );
+    }
 
     let mut info = chart_info_from_manifest(&manifest);
     // The chart manifest's `deployment.timeout` is authoritative. The
@@ -98,6 +129,15 @@ pub fn deploy_chart(
     // path only — leave it unset under normal use.
     if let Some(t) = crate::env::env_helm_timeout() {
         info.timeout = t;
+    }
+    // Per-test value overrides -> `helm --set k=v`. Empty for the normal
+    // single-chart sweep; the backup round-trip uses this to enable the
+    // pg_dumpall CronJob.
+    for (k, v) in set_values {
+        info.values.push(ChartSetValue {
+            key: (*k).to_string(),
+            value: (*v).to_string(),
+        });
     }
     let release_name = info.name.clone();
     let namespace = info.custom_namespace.clone().unwrap_or_else(|| {

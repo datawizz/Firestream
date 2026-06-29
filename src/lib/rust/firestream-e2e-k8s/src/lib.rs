@@ -7,29 +7,28 @@
 //!
 //! # Layout
 //!
+//! The reusable k8s/k3d glue — cluster lifecycle, `KubectlExec`,
+//! port-forward, readiness wait, and the per-chart probe matrix — was
+//! relocated to [`firestream_e2e_core::k8s`] so the main `firestream`
+//! CLI can reuse it without forming a dependency cycle. This crate now
+//! holds only the firestream-dependent harness layer:
+//!
 //! - [`env`] — `FIRESTREAM_E2E_K8S_*` accessors. Distinct from core's
 //!   `FIRESTREAM_E2E_*` because the docker and k8s harnesses can be
 //!   filtered/configured independently.
-//! - [`exec`] — `KubectlExec`: [`firestream_e2e_core::exec::Exec`] impl
-//!   that shells out to `kubectl --kubeconfig <p> exec -n <ns> <pod>
-//!   -- <args…>`. Lets the same `PgIsReady`/`RedisPing`/`KafkaApiVersions`
-//!   probes from core drive both the docker and k8s harnesses.
-//! - [`readiness`] — `wait_pods_ready`: blocking wrapper around
-//!   `kubectl wait --for=condition=Ready pod -l app.kubernetes.io/instance=...`.
-//! - [`cluster`] — per-test k3d cluster lifecycle. `create_cluster()`
-//!   stands up a fresh cluster with a 6-char random suffix; `ClusterGuard`
-//!   tears it down on Drop under a 60s budget (honors
-//!   `FIRESTREAM_E2E_K8S_KEEP=1`).
-//! - [`harness`] — `should_skip_k8s()` + `run_one(chart)` skeleton.
+//! - [`deploy`] — deploys a single chart from the bundle via
+//!   `firestream::deploy::helm::deploy_chart_lifecycle` (the reason this
+//!   crate depends on `firestream`, and why the glue above had to move
+//!   to core rather than the other way around).
+//! - [`harness`] — `should_skip_k8s()` + `run_one(chart)`, the full
+//!   pipeline wiring the relocated core glue to deploy/images.
 //!
-//! Stubs for Phase 3+: [`deploy`], [`images`], [`portforward`], [`probes`].
+//! Image preload was relocated to
+//! [`firestream_e2e_core::k8s::images`] so the main `firestream` CLI can
+//! reuse it; [`deploy`] calls it via that path (gated by
+//! `FIRESTREAM_E2E_K8S_PRELOAD`).
 
-pub mod cluster;
 pub mod deploy;
 pub mod env;
-pub mod exec;
 pub mod harness;
-pub mod images;
-pub mod portforward;
-pub mod probes;
-pub mod readiness;
+pub mod pg_backup;

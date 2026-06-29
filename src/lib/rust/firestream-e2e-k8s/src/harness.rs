@@ -13,14 +13,12 @@ use std::time::{Duration, Instant};
 
 use firestream_e2e_core::env::{docker_daemon_check, should_skip};
 use firestream_e2e_core::guard::wait_with_budget;
+use firestream_e2e_core::k8s::{cluster, probes, readiness};
 use firestream_e2e_core::retry::retry_until_sync;
 use tracing::warn;
 
-use crate::cluster;
 use crate::deploy::{self, DeployedRelease};
 use crate::env::{env_charts_dir, env_keep_k8s, env_strict_k8s, env_timeout_secs_k8s, selected_k8s};
-use crate::probes;
-use crate::readiness;
 
 /// Required external binaries for the k8s harness. Missing any one
 /// short-circuits the test with a "skip" message (or a panic when
@@ -50,7 +48,7 @@ pub fn should_skip_k8s() -> Option<String> {
 /// single process. The 6-char random cluster suffix in
 /// [`cluster::create_cluster`] handles the cross-process case; together
 /// they serialise cluster ops on any given machine.
-fn harness_lock() -> &'static Mutex<()> {
+pub(crate) fn harness_lock() -> &'static Mutex<()> {
     static LOCK: OnceLock<Mutex<()>> = OnceLock::new();
     LOCK.get_or_init(|| Mutex::new(()))
 }
@@ -207,7 +205,7 @@ fn drop_namespace(kubeconfig: &Path, ns: &str, budget: Duration) -> Result<(), (
 /// already encoded in `env_charts_dir()`; this function adds the
 /// nix-build fallback because the dev-shell-emitted `.firestream/charts`
 /// may not be present in a fresh checkout.
-fn resolve_charts_dir(chart: &str) -> std::path::PathBuf {
+pub(crate) fn resolve_charts_dir(chart: &str) -> std::path::PathBuf {
     let primary = env_charts_dir();
     if primary.join("index.json").exists() {
         return primary;

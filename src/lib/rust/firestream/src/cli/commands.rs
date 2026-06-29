@@ -3,6 +3,7 @@
 //! This module implements the actual command execution for the CLI.
 
 use super::args::{Cli, Command, ConfigCommand, StateCommand, ClusterCommand, HelmCommand};
+use crate::app;
 use crate::services::ServiceManager;
 use crate::config::{ConfigManager, ServiceState, ServiceStatus, ResourceUsage};
 use crate::state::{StateManager, ResourceType, K3dClusterConfig, FirestreamState};
@@ -176,6 +177,10 @@ pub async fn execute_command(cli: Cli) -> Result<()> {
 
         Some(Command::Helm { ref command }) => {
             execute_helm_command(command, &cli.charts_dir).await?;
+        }
+
+        Some(Command::App { ref command }) => {
+            app::execute_app_command(command, &cli).await?;
         }
 
         Some(Command::Template { name, project_type, output, non_interactive, values }) => {
@@ -1067,6 +1072,7 @@ async fn execute_helm_command(command: &HelmCommand, charts_dir: &PathBuf) -> Re
     use crate::deploy::helm_lifecycle::{chart_info_from_manifest, CommonChart};
     use crate::deploy::helm::deploy_chart_lifecycle;
     use firestream_charts::Charts;
+    use helm_manager::kubectl_client::KubectlClient;
 
     let charts = Charts::open(charts_dir).map_err(|e| {
         FirestreamError::ConfigError(format!(
@@ -1128,7 +1134,413 @@ async fn execute_helm_command(command: &HelmCommand, charts_dir: &PathBuf) -> Re
                 deploy_chart_lifecycle(Box::new(common), None).await?;
             }
         }
+        HelmCommand::Backup { chart, namespace } => {
+            let manifest = charts.get(chart).map_err(|e| {
+                FirestreamError::ConfigError(format!(
+                    "Chart `{}` not found in {:?}: {}",
+                    chart, charts_dir, e
+                ))
+            })?;
+
+            let release_name = manifest
+                .release
+                .release_name
+                .clone()
+                .unwrap_or_else(|| manifest.name.clone());
+            let ns = namespace
+                .clone()
+                .or_else(|| manifest.release.namespace.clone())
+                .unwrap_or_else(|| "default".to_string());
+            let fullname = bitnami_fullname(&release_name, &manifest.chart);
+            let cronjob = format!("{}-pgdumpall", fullname);
+            let job_name = k8s_name_trunc(format!("{}-manual-{}", cronjob, short_id()));
+
+            let kubectl = KubectlClient::new()
+                .map_err(|e| FirestreamError::KubernetesError(e.to_string()))?;
+
+            info!(
+                "Creating manual backup job `{}` from cronjob `{}` in namespace `{}`",
+                job_name, cronjob, ns
+            );
+            kubectl
+                .create_job_from_cronjob(&ns, &cronjob, &job_name)
+                .await
+                .map_err(|e| {
+                    FirestreamError::KubernetesError(format!(
+                        "Could not start backup job from cronjob `{}` (is `backup.enabled` set on chart `{}`?): {}",
+                        cronjob, chart, e
+                    ))
+                })?;
+
+            let timeout = BACKUP_RESTORE_TIMEOUT_SECS;
+            kubectl
+                .wait_for_job(&ns, &job_name, timeout)
+                .await
+                .map_err(|e| FirestreamError::KubernetesError(e.to_string()))?;
+
+            info!("Backup job `{}` completed.", job_name);
+
+            // Best-effort: surface the exact object key from the job logs.
+            let key = match kubectl.get_logs(&ns, &format!("job/{}", job_name)).await {
+                Ok(logs) => logs
+                    .lines()
+                    .rev()
+                    .find_map(|l| l.split("backup complete:").nth(1).map(|s| s.trim().to_string()))
+                    .filter(|s| !s.is_empty()),
+                Err(_) => None,
+            };
+
+            match key {
+                Some(k) => println!("Backup complete. Object: {}", k),
+                None => {
+                    println!("Backup complete (job `{}`).", job_name);
+                    println!("Discover the exact key from the job logs:");
+                    println!("  kubectl logs -n {} job/{}", ns, job_name);
+                    println!(
+                        "or list:  aws s3 ls s3://firestream/pg-backups/ --endpoint-url http://seaweedfs-all-in-one.seaweedfs.svc.cluster.local:8333"
+                    );
+                }
+            }
+        }
+        HelmCommand::Restore { chart, from, namespace } => {
+            let manifest = charts.get(chart).map_err(|e| {
+                FirestreamError::ConfigError(format!(
+                    "Chart `{}` not found in {:?}: {}",
+                    chart, charts_dir, e
+                ))
+            })?;
+
+            let release_name = manifest
+                .release
+                .release_name
+                .clone()
+                .unwrap_or_else(|| manifest.name.clone());
+            let ns = namespace
+                .clone()
+                .or_else(|| manifest.release.namespace.clone())
+                .unwrap_or_else(|| "default".to_string());
+            let fullname = bitnami_fullname(&release_name, &manifest.chart);
+            let cronjob_name = format!("{}-pgdumpall", fullname);
+
+            let kubectl = KubectlClient::new()
+                .map_err(|e| FirestreamError::KubernetesError(e.to_string()))?;
+
+            // Single source of truth: inherit the deployed backup CronJob's
+            // container spec (image, env incl. S3/AWS creds + PG conn + the
+            // SeaweedFS-vs-cloud-S3 toggles, volumes, securityContext). This
+            // works for SeaweedFS AND real cloud S3 automatically, with zero
+            // duplication of the env contract.
+            let cronjob_json = kubectl
+                .get_resource_json("cronjob", &cronjob_name, &ns)
+                .await
+                .map_err(|e| {
+                    FirestreamError::ConfigError(format!(
+                        "backup not configured for `{}`; restore needs the `{}` CronJob (set backup.enabled=true). Underlying error: {}",
+                        chart, cronjob_name, e
+                    ))
+                })?;
+            let job_name = k8s_name_trunc(format!("{}-pgrestore-{}", fullname, short_id()));
+            let job_manifest = build_pg_restore_job_json(&cronjob_json, &job_name, &ns, from)?;
+
+            info!(
+                "Applying restore job `{}` (inherited from cronjob `{}`) in namespace `{}` from key `{}`",
+                job_name, cronjob_name, ns, from
+            );
+            kubectl
+                .apply_yaml(&job_manifest, Some(&ns))
+                .await
+                .map_err(|e| FirestreamError::KubernetesError(e.to_string()))?;
+
+            kubectl
+                .wait_for_job(&ns, &job_name, BACKUP_RESTORE_TIMEOUT_SECS)
+                .await
+                .map_err(|e| FirestreamError::KubernetesError(e.to_string()))?;
+
+            println!("Restore complete from key `{}` (job `{}`).", from, job_name);
+        }
     }
 
     Ok(())
+}
+
+/// Default deadline (seconds) for a manual backup or restore Job to finish.
+const BACKUP_RESTORE_TIMEOUT_SECS: u64 = 600;
+
+/// A short, collision-resistant suffix for ad-hoc Job names.
+///
+/// Uses the same `uuid` crate the rest of the codebase relies on for unique
+/// identifiers (see `state/manager.rs`, `deploy/environment.rs`); no wall-clock
+/// time is involved.
+fn short_id() -> String {
+    uuid::Uuid::new_v4().to_string()[..8].to_string()
+}
+
+/// Trim a generated name to the 63-char Kubernetes name limit, dropping any
+/// trailing `-` left behind by truncation.
+fn k8s_name_trunc(name: String) -> String {
+    let mut s: String = name.chars().take(63).collect();
+    while s.ends_with('-') {
+        s.pop();
+    }
+    s
+}
+
+/// Replicate Bitnami's `common.names.fullname` for the common no-override case.
+///
+/// If the release name already contains the chart name, the chart name is not
+/// appended (e.g. release `postgresql` -> `postgresql`); otherwise the result
+/// is `<release>-<chart>` (e.g. release `testpg` -> `testpg-postgresql`). The
+/// value is truncated to 63 chars. For a standalone postgresql release this is
+/// also `postgresql.v1.primary.fullname`, i.e. the StatefulSet / primary
+/// Service / Secret name and the `<...>-pgdumpall` CronJob prefix.
+fn bitnami_fullname(release_name: &str, chart_name: &str) -> String {
+    let base = if release_name.contains(chart_name) {
+        release_name.to_string()
+    } else {
+        format!("{}-{}", release_name, chart_name)
+    };
+    k8s_name_trunc(base)
+}
+
+/// The restore container's shell script.
+///
+/// Mirrors the backup CronJob's conditional endpoint + addressing-style logic
+/// (so it works against SeaweedFS and real cloud S3 alike) and the same
+/// `PGPASSWORD`/`HOME` handling. Every connection/credential value
+/// (`PGHOST`/`PGPORT`/`PGUSER`/`PGPASSWORD_FILE` and the `S3_*`/`AWS_*` env) is
+/// inherited from the CronJob container; this script only adds `S3_BACKUP_KEY`
+/// resolution. `--from` may be a bucket-relative key OR a full `s3://…` URI.
+// NB: no `set -e` — the retry loop owns exit handling. Object stores (and
+// fresh-cluster DNS) can transiently refuse connections; a single blip should
+// not fail the restore. We retry the download→psql pipeline a bounded number of
+// times. The dump is produced by `pg_dumpall --clean --if-exists`, so
+// re-applying after a partial failure is idempotent (DROP ... IF EXISTS then
+// recreate). Tunable via FIRESTREAM_RESTORE_MAX_ATTEMPTS.
+const PG_RESTORE_SCRIPT: &str = r#"set -uo pipefail
+export PGPASSWORD="${PGPASSWORD:-$(cat "$PGPASSWORD_FILE" 2>/dev/null || true)}"
+export HOME="${HOME:-/tmp}"
+if [ -n "${S3_ADDRESSING_STYLE:-}" ]; then aws configure set default.s3.addressing_style "$S3_ADDRESSING_STYLE"; fi
+uri="$S3_BACKUP_KEY"
+case "$uri" in s3://*) ;; *) uri="s3://$S3_BACKUP_BUCKET/$uri" ;; esac
+# Preflight: a freshly-scheduled Job pod can take a while before it can reach a
+# cross-namespace ClusterIP (kube-proxy/DNS settling → botocore "Could not
+# connect"). Poll a cheap `s3 ls` until reachable before pulling the dump.
+waitn="${FIRESTREAM_RESTORE_S3_WAIT_ATTEMPTS:-60}"
+waiti="${FIRESTREAM_RESTORE_S3_WAIT_INTERVAL:-5}"
+ready=""
+i=1
+while [ "$i" -le "$waitn" ]; do
+  if aws s3 ls "s3://$S3_BACKUP_BUCKET/" ${S3_ENDPOINT_URL:+--endpoint-url "$S3_ENDPOINT_URL"} >/dev/null 2>&1; then
+    ready=1; break
+  fi
+  echo "[firestream] waiting for S3 endpoint ($i/$waitn)..." >&2
+  i=$((i + 1)); sleep "$waiti"
+done
+if [ -z "$ready" ]; then echo "[firestream] S3 endpoint unreachable after $waitn attempts" >&2; exit 1; fi
+echo "[firestream] restoring from $uri"
+max="${FIRESTREAM_RESTORE_MAX_ATTEMPTS:-3}"
+attempt=1
+while :; do
+  if aws s3 cp "$uri" - ${S3_ENDPOINT_URL:+--endpoint-url "$S3_ENDPOINT_URL"} | gunzip -c | psql -h "$PGHOST" -p "$PGPORT" -U "$PGUSER" -d postgres; then
+    echo "[firestream] restore complete"
+    exit 0
+  fi
+  if [ "$attempt" -ge "$max" ]; then
+    echo "[firestream] restore failed after $max attempts" >&2
+    exit 1
+  fi
+  echo "[firestream] restore attempt $attempt failed; retrying in 10s..." >&2
+  attempt=$((attempt + 1))
+  sleep 10
+done
+"#;
+
+/// Build a one-shot PostgreSQL restore Job by INHERITING the deployed backup
+/// CronJob's container spec.
+///
+/// `cronjob` is the full `kubectl get cronjob … -o json` object. We lift
+/// `spec.jobTemplate.spec.template.spec` (the pod spec) verbatim — image, env
+/// (including S3/AWS creds whether literal or `secretKeyRef`, the
+/// SeaweedFS-vs-cloud toggles, and the PG connection vars), volumes,
+/// volumeMounts, securityContext, imagePullSecrets, nodeSelector, tolerations —
+/// and only:
+///   * replace the container `command` with [`PG_RESTORE_SCRIPT`],
+///   * append `S3_BACKUP_KEY=<from>`,
+///   * drop the backup-only `PGDUMP_DIR` env var,
+///   * force `restartPolicy: Never`.
+///
+/// This is the single source of truth shared by the `firestream helm restore`
+/// CLI arm and the Phase-3 e2e harness, so the two can never drift.
+///
+/// `cronjob_json` is the raw `kubectl get cronjob … -o json` output (parsed
+/// here, so callers don't need their own `serde_json` dependency). The output
+/// is a JSON string (`kubectl apply -f -` accepts JSON).
+pub fn build_pg_restore_job_json(
+    cronjob_json: &str,
+    job_name: &str,
+    namespace: &str,
+    from: &str,
+) -> Result<String> {
+    use serde_json::{json, Value};
+
+    let cronjob: Value = serde_json::from_str(cronjob_json)?;
+
+    let pod_spec = cronjob
+        .pointer("/spec/jobTemplate/spec/template/spec")
+        .ok_or_else(|| {
+            FirestreamError::ConfigError(
+                "CronJob JSON missing spec.jobTemplate.spec.template.spec".into(),
+            )
+        })?;
+    let mut pod_spec = pod_spec.clone();
+
+    let mut container = pod_spec
+        .get("containers")
+        .and_then(|c| c.as_array())
+        .and_then(|c| c.first())
+        .cloned()
+        .ok_or_else(|| {
+            FirestreamError::ConfigError("CronJob pod spec has no containers".into())
+        })?;
+
+    // Inherit env, drop the backup-only PGDUMP_DIR, append the restore key.
+    let mut env: Vec<Value> = container
+        .get("env")
+        .and_then(|e| e.as_array())
+        .cloned()
+        .unwrap_or_default();
+    env.retain(|e| e.get("name").and_then(|n| n.as_str()) != Some("PGDUMP_DIR"));
+    env.push(json!({ "name": "S3_BACKUP_KEY", "value": from }));
+
+    let cobj = container.as_object_mut().ok_or_else(|| {
+        FirestreamError::ConfigError("CronJob container is not a JSON object".into())
+    })?;
+    cobj.insert("name".into(), json!("pg-restore"));
+    cobj.insert("env".into(), Value::Array(env));
+    cobj.insert(
+        "command".into(),
+        json!(["bash", "-c", PG_RESTORE_SCRIPT]),
+    );
+    // The CronJob sets `command` (not `args`); strip any inherited args so the
+    // restore script is the sole entrypoint.
+    cobj.remove("args");
+
+    let pobj = pod_spec.as_object_mut().ok_or_else(|| {
+        FirestreamError::ConfigError("CronJob pod spec is not a JSON object".into())
+    })?;
+    pobj.insert("restartPolicy".into(), json!("Never"));
+    pobj.insert("containers".into(), json!([container]));
+
+    let labels = json!({
+        "app.kubernetes.io/managed-by": "firestream",
+        "app.kubernetes.io/component": "pg_restore",
+    });
+
+    let job = json!({
+        "apiVersion": "batch/v1",
+        "kind": "Job",
+        "metadata": {
+            "name": job_name,
+            "namespace": namespace,
+            "labels": labels,
+        },
+        "spec": {
+            "backoffLimit": 0,
+            "template": {
+                "metadata": { "labels": labels },
+                "spec": pod_spec,
+            },
+        },
+    });
+
+    Ok(serde_json::to_string_pretty(&job)?)
+}
+
+#[cfg(test)]
+mod backup_restore_tests {
+    use super::*;
+    use serde_json::json;
+
+    fn sample_cronjob() -> serde_json::Value {
+        json!({
+            "apiVersion": "batch/v1",
+            "kind": "CronJob",
+            "metadata": { "name": "postgresql-pgdumpall", "namespace": "postgresql" },
+            "spec": { "jobTemplate": { "spec": { "template": { "spec": {
+                "restartPolicy": "Never",
+                "imagePullSecrets": [{ "name": "regcred" }],
+                "containers": [{
+                    "name": "postgresql-pgdumpall",
+                    "image": "registry.example/firestream-postgresql:17",
+                    "command": ["bash", "-c", "pg_dumpall | gzip | aws s3 cp - ..."],
+                    "env": [
+                        { "name": "PGUSER", "value": "postgres" },
+                        { "name": "PGHOST", "value": "postgresql" },
+                        { "name": "PGPORT", "value": "5432" },
+                        { "name": "PGDUMP_DIR", "value": "/backup/pgdump" },
+                        { "name": "PGPASSWORD_FILE", "value": "/opt/firestream/postgresql/secrets/postgres-password" },
+                        { "name": "AWS_ACCESS_KEY_ID", "valueFrom": { "secretKeyRef": { "name": "cloud-creds", "key": "access" } } },
+                        { "name": "S3_ENDPOINT_URL", "value": "" },
+                        { "name": "S3_BACKUP_BUCKET", "value": "firestream" },
+                        { "name": "S3_ADDRESSING_STYLE", "value": "" }
+                    ],
+                    "securityContext": { "runAsNonRoot": true },
+                    "volumeMounts": [
+                        { "name": "postgresql-password", "mountPath": "/opt/firestream/postgresql/secrets/" }
+                    ]
+                }],
+                "volumes": [
+                    { "name": "postgresql-password", "secret": { "secretName": "postgresql" } }
+                ]
+            }}}}}
+        })
+    }
+
+    #[test]
+    fn restore_job_inherits_cronjob_container() {
+        let cj = sample_cronjob().to_string();
+        let out = build_pg_restore_job_json(
+            &cj,
+            "postgresql-pgrestore-abc",
+            "postgresql",
+            "pg-backups/pg_dumpall-2026-01-01-00-00-00.sql.gz",
+        )
+        .expect("build restore job");
+        let v: serde_json::Value = serde_json::from_str(&out).unwrap();
+
+        assert_eq!(v["kind"], "Job");
+        assert_eq!(v["metadata"]["name"], "postgresql-pgrestore-abc");
+        assert_eq!(v["spec"]["template"]["spec"]["restartPolicy"], "Never");
+
+        let c = &v["spec"]["template"]["spec"]["containers"][0];
+        // Inherited image + securityContext + imagePullSecrets/volumes preserved.
+        assert_eq!(c["image"], "registry.example/firestream-postgresql:17");
+        assert_eq!(c["securityContext"]["runAsNonRoot"], true);
+        assert_eq!(
+            v["spec"]["template"]["spec"]["imagePullSecrets"][0]["name"],
+            "regcred"
+        );
+        assert_eq!(
+            v["spec"]["template"]["spec"]["volumes"][0]["secret"]["secretName"],
+            "postgresql"
+        );
+        // Command replaced with the restore script.
+        assert_eq!(c["command"][0], "bash");
+        assert!(c["command"][2].as_str().unwrap().contains("restore complete"));
+
+        // env: PGDUMP_DIR dropped, S3_BACKUP_KEY appended, secretKeyRef cred kept.
+        let env = c["env"].as_array().unwrap();
+        assert!(env.iter().all(|e| e["name"] != "PGDUMP_DIR"));
+        assert!(env.iter().any(|e| e["name"] == "S3_BACKUP_KEY"
+            && e["value"] == "pg-backups/pg_dumpall-2026-01-01-00-00-00.sql.gz"));
+        assert!(env.iter().any(|e| e["name"] == "AWS_ACCESS_KEY_ID"
+            && e["valueFrom"]["secretKeyRef"]["name"] == "cloud-creds"));
+        assert!(env.iter().any(|e| e["name"] == "PGHOST" && e["value"] == "postgresql"));
+    }
+
+    #[test]
+    fn restore_job_errors_on_missing_pod_spec() {
+        let bogus = json!({ "kind": "CronJob", "spec": {} }).to_string();
+        assert!(build_pg_restore_job_json(&bogus, "j", "ns", "key").is_err());
+    }
 }

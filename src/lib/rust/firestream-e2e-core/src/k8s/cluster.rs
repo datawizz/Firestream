@@ -18,7 +18,7 @@ use std::process::{Command, Stdio};
 use std::time::Duration;
 
 use anyhow::{Context, Result, anyhow, bail};
-use firestream_e2e_core::guard::wait_with_budget;
+use crate::guard::wait_with_budget;
 use k8s_manager::{
     K3dClusterConfig, K3dClusterManager, K3dDevModeConfig, K3dNetworkConfig, K3dRegistryConfig,
     K3dTimeoutConfig, K3dTlsConfig,

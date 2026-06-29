@@ -247,6 +247,13 @@ pub struct Index {
     #[serde(default)]
     pub charts: BTreeMap<String, ChartIndexEntry>,
 
+    /// Base (un-overlaid) charts keyed by Firestream name. Added in Phase 5;
+    /// each value points at the base chart directory (Chart.yaml at root, no
+    /// Firestream values overlay / no image injection). Optional and additive:
+    /// an older index without this key parses to an empty map.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub base_charts: BTreeMap<String, BaseChartEntry>,
+
     /// Named stacks (deployment groups), each value is an ordered list of
     /// chart names. Entries MAY reference charts not present in `charts` —
     /// the reader handles that gracefully (see `Charts::stack`).
@@ -262,6 +269,16 @@ pub struct Index {
 pub struct ChartIndexEntry {
     /// Path RELATIVE to the index's parent directory.
     pub manifest_path: PathBuf,
+}
+
+/// One entry in `Index.base_charts`. Holds the relative path to that chart's
+/// base (un-overlaid) chart directory (resolved against the index's parent
+/// directory at read time). The directory has `Chart.yaml` at its root.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct BaseChartEntry {
+    /// Path RELATIVE to the index's parent directory (e.g. `postgresql-base`).
+    pub base_chart_path: PathBuf,
 }
 
 /// Convenience alias for a named stack (an ordered list of chart names).

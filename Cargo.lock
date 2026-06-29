@@ -1785,9 +1785,14 @@ name = "firestream-e2e-core"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "firestream-charts",
+ "k8s-manager",
  "once_cell",
+ "rand 0.8.5",
  "reqwest 0.12.28",
  "thiserror 1.0.69",
+ "tokio",
+ "tracing",
  "which",
 ]
 
@@ -1799,12 +1804,10 @@ dependencies = [
  "firestream",
  "firestream-charts",
  "firestream-e2e-core",
- "k8s-manager",
+ "helm-manager",
  "once_cell",
- "rand 0.8.5",
  "tokio",
  "tracing",
- "which",
 ]
 
 [[package]]

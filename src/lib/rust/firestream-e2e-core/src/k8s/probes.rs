@@ -27,12 +27,12 @@ use std::sync::Arc;
 use std::time::Instant;
 
 use anyhow::{Context, Result, anyhow, bail};
-use firestream_e2e_core::exec::Exec;
-use firestream_e2e_core::probe::{HttpReady, PgIsReady, Probe as CoreProbeTrait, RedisPing};
+use crate::exec::Exec;
+use crate::probe::{HttpReady, PgIsReady, Probe as CoreProbeTrait, RedisPing};
 
-use crate::cluster::ClusterHandle;
-use crate::exec::KubectlExec;
-use crate::portforward::forward_service;
+use super::cluster::ClusterHandle;
+use super::exec::KubectlExec;
+use super::portforward::forward_service;
 
 /// Per-test context handed to every probe. The probe matrix consumes
 /// these fields to construct a `KubectlExec` per-run, look up the right
@@ -565,7 +565,7 @@ fn read_secret_value_b64(
 
 /// Return the readiness probe chain for `chart`.
 ///
-/// All eight canonical Firestream charts are wired here. Each probe
+/// All nine canonical Firestream charts are wired here. Each probe
 /// chain is single-element; we could add tcp pre-checks before each
 /// protocol probe but the retry loop in `harness::run_one` already
 /// handles flakiness via wall-clock-bounded retries.
@@ -581,6 +581,7 @@ fn read_secret_value_b64(
 /// | jupyterhub  | `…/instance=<rel>,…/component=hub`                  | 8081 | `/hub/health`              |
 /// | superset    | `…/instance=<rel>,…/component=superset-web`         |   80 | `/health`                  |
 /// | odoo        | `…/instance=<rel>,…/name=odoo`                      |   80 | `/web/health`              |
+/// | seaweedfs   | `…/instance=<rel>,…/component=seaweedfs-all-in-one`  | 8333 | `/`                        |
 ///
 /// The selectors deliberately use the *instance* label (release name)
 /// rather than the *name* label (chart name) so jupyterhub/superset
@@ -663,9 +664,29 @@ pub fn for_chart(chart: &str, ctx: &K8sCtx) -> Result<Vec<Box<dyn Probe>>> {
             path: "/web/health",
             max_status: 500,
         })]),
+        "seaweedfs" => Ok(vec![Box::new(HttpProbeOverPortForward {
+            // SeaweedFS is NOT a Bitnami chart — the all-in-one Service
+            // (`templates/all-in-one/all-in-one-service.yml`) carries
+            // `app.kubernetes.io/component=seaweedfs-all-in-one`. The S3
+            // gateway listens on 8333 (`swfs-s3` port). The chart's native
+            // readiness probe only hits the master `/cluster/status` on
+            // 9333 (proves the process is up, not that S3 is serving), so
+            // we probe the S3 gateway directly: a GET on `/` with auth
+            // enabled returns 403 (AccessDenied) which `max_status=500`
+            // accepts — that 403 proves the S3 gateway is alive and
+            // handling requests.
+            name: "seaweedfs_s3_gateway",
+            service_selector: format!(
+                "app.kubernetes.io/instance={},app.kubernetes.io/component=seaweedfs-all-in-one",
+                rel
+            ),
+            remote_port: 8333,
+            path: "/",
+            max_status: 500,
+        })]),
         other => bail!(
             "probe chain for chart `{}` not implemented; known charts: \
-             postgresql, redis, kafka, airflow, spark, jupyterhub, superset, odoo",
+             postgresql, redis, kafka, airflow, spark, jupyterhub, superset, odoo, seaweedfs",
             other
         ),
     }
@@ -771,6 +792,7 @@ mod tests {
             "jupyterhub",
             "superset",
             "odoo",
+            "seaweedfs",
         ] {
             match for_chart(chart, &ctx) {
                 Ok(chain) => {

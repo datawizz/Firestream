@@ -17,11 +17,6 @@ path = "src/lib.rs"
 # work over kubectl exec.
 firestream-e2e-core = { workspace = true }
 
-# k3d cluster lifecycle. We talk to k3d through K3dClusterManager rather
-# than shelling out so cluster setup mirrors what the rest of the project
-# uses in production.
-k8s-manager = { workspace = true }
-
 # Phase 3: chart bundle reader. `Charts::open(charts_dir)` + `.get(chart)`
 # parses the index + per-chart manifest the Nix side emits.
 firestream-charts = { workspace = true }
@@ -32,6 +27,13 @@ firestream-charts = { workspace = true }
 # real code path, not a parallel shell-out.
 firestream = { workspace = true }
 
+# Phase-3 backup round-trip: the kubectl execution layer. We drive the
+# SAME `KubectlClient` helpers the `firestream helm backup/restore` CLI
+# arms use (`create_job_from_cronjob`, `wait_for_job`, `get_logs`,
+# `apply_yaml`) so the e2e exercises the real on-demand code path rather
+# than a parallel shell-out.
+helm-manager = { workspace = true }
+
 # Error type used throughout the crate (cluster create, exec failures, etc.)
 anyhow = { workspace = true }
 
@@ -41,14 +43,7 @@ anyhow = { workspace = true }
 # firestream-e2e-core's convention).
 tokio = { workspace = true }
 
-# 6-char lowercase alphanumeric suffix for per-test cluster names so
-# parallel `cargo test` invocations across processes don't collide.
-rand = "0.8"
-
-# PATH lookup for the should_skip_k8s() gate. Reuses core's pattern.
-which = { workspace = true }
-
-# Structured logging for cluster/teardown lifecycle events. Optional but
+# Structured logging for deploy/teardown lifecycle events. Optional but
 # useful when triaging a failed test.
 tracing = { workspace = true }
 

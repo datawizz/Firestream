@@ -130,6 +130,43 @@ fn minimal_index_defaults_cleanly() {
     assert!(idx.stacks.is_empty());
 }
 
+/// Test 3c: an index carrying the Phase-5 `baseCharts` block parses and
+/// exposes it. Also proves backward compatibility: an index WITHOUT the key
+/// yields an empty `base_charts` map (covered by `minimal_index_defaults_cleanly`).
+#[test]
+fn index_with_base_charts_parses() {
+    let with_base = serde_json::json!({
+        "schemaVersion": "1",
+        "charts": {
+            "postgresql": { "manifestPath": "postgresql/chart-manifest.json" }
+        },
+        "baseCharts": {
+            "postgresql": { "baseChartPath": "postgresql-base" }
+        },
+        "stacks": { "dev": ["postgresql"] }
+    });
+
+    let idx: Index = serde_json::from_value(with_base).expect("index with baseCharts must parse");
+    assert_eq!(idx.schema_version, "1");
+    assert_eq!(
+        idx.base_charts
+            .get("postgresql")
+            .map(|e| e.base_chart_path.as_path()),
+        Some(PathBuf::from("postgresql-base").as_path())
+    );
+
+    // Round-trips back out under the camelCase keys.
+    let serialized = serde_json::to_string(&idx).unwrap();
+    assert!(serialized.contains("baseCharts"));
+    assert!(serialized.contains("baseChartPath"));
+
+    // An index that predates Phase 5 (no baseCharts key) still parses, with an
+    // empty map.
+    let legacy: Index = serde_json::from_value(serde_json::json!({ "schemaVersion": "1" }))
+        .expect("legacy index without baseCharts must parse");
+    assert!(legacy.base_charts.is_empty());
+}
+
 /// Build an on-disk charts farm in `tmp` with one valid chart (`airflow`)
 /// and an index that registers it.
 fn write_airflow_farm(tmp: &TempDir) {

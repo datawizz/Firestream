@@ -28,7 +28,7 @@ use std::time::Duration;
 
 use anyhow::{Context, Result, anyhow, bail};
 
-use crate::cluster::ClusterHandle;
+use super::cluster::ClusterHandle;
 
 /// Owns a running `kubectl port-forward` child + the local port it bound.
 /// Kills the child on Drop (best effort; Drop never panics).
