@@ -21,7 +21,7 @@ data:
     {{- end }}
     {{- if .Values.auth.acl.enabled }}
     # The file with Redis ACL rules
-    aclfile /opt/bitnami/redis/etc/users.acl
+    aclfile /opt/firestream/redis/etc/users.acl
     {{- end }}
     # End of common configuration
   master.conf: |-
@@ -84,7 +84,7 @@ data:
     sentinel failover-timeout {{ .Values.sentinel.masterSet }} {{ .Values.sentinel.failoverTimeout }}
     sentinel parallel-syncs {{ .Values.sentinel.masterSet }} {{ .Values.sentinel.parallelSyncs }}
     {{- if or .Values.sentinel.masterService.enabled .Values.sentinel.service.createMaster }}
-      sentinel client-reconfig-script {{ .Values.sentinel.masterSet }} /opt/bitnami/scripts/start-scripts/push-master-label.sh
+      sentinel client-reconfig-script {{ .Values.sentinel.masterSet }} /opt/firestream/scripts/start-scripts/push-master-label.sh
     {{- end }}
     {{- if .Values.auth.acl.sentinel }}
     # Sentinel ACL configuration, only for users with password

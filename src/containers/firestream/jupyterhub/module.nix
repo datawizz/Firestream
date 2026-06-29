@@ -393,7 +393,7 @@ in firestream.mkPythonContainerModule {
   };
 
   # Per-container helpers: emitted at top-level of libhelpersjupyterhub.sh by the
-  # engine, so chart init containers can `source /opt/bitnami/scripts/libjupyterhub.sh`
+  # engine, so chart init containers can `source /opt/firestream/scripts/libjupyterhub.sh`
   # and use these helpers directly.
   perContainerHelpers = jupyterhubHelpers;
 

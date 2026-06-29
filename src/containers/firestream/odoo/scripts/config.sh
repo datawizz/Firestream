@@ -24,8 +24,8 @@ if [[ ! -f "$ODOO_CONF_FILE" ]] || is_boolean_yes "${ODOO_FORCE_OVERWRITE_CONF:-
         debug "Generating default config"
         cat > "$ODOO_CONF_FILE" <<EOF
 [options]
-; Addons paths (Odoo built-in + custom)
-addons_path = ${ODOO_BASE_DIR}/addons,${ODOO_BASE_DIR}/odoo/addons,${ODOO_ADDONS_DIR}
+; Addons paths (Odoo built-in + baked vendored + custom)
+addons_path = ${ODOO_BASE_DIR}/addons,${ODOO_BASE_DIR}/odoo/addons,${ODOO_BASE_DIR}/vendor-addons,${ODOO_ADDONS_DIR}
 
 ; Admin password for database management (master password)
 admin_passwd = ${ODOO_PASSWORD}

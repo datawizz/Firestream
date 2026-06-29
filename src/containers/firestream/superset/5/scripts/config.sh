@@ -8,7 +8,7 @@ info "Configuring Superset runtime settings..."
 # via template substitution. This script handles any runtime adjustments.
 
 # Verify config file exists
-local config_file="${SUPERSET_CONFIG_PATH:-/opt/superset/superset_config.py}"
+local config_file="${SUPERSET_CONFIG_PATH:-/opt/firestream/superset/superset_home/superset_config.py}"
 if [[ ! -f "$config_file" ]]; then
   warn "Configuration file not found at $config_file"
   warn "This may indicate an issue with the activation phase"

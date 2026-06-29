@@ -485,6 +485,34 @@ kafka_dynamic_environment_variables() {
 }
 
 ########################
+# Normalize a 22-char base64 Kafka Uuid (KRaft directory id) to its canonical
+# form. The chart's kraft Secret generates random alphanumeric 22-char ids
+# whose final character carries non-canonical low bits; Kafka rewrites them to
+# canonical base64url when it formats meta.properties (e.g. a trailing 'j' ->
+# 'g'). The KIP-853 --initial-controllers voter set MUST use the same canonical
+# dir-id Kafka stores in each node's meta.properties — otherwise a node's vote
+# requests reference a directory.id the target controller doesn't recognise,
+# every peer stays UNRECORDED, and the quorum never elects a leader (clients
+# then can't fetch metadata). Decode->re-encode to canonicalise; on any error
+# fall back to the raw value unchanged.
+# Arguments:
+#   $1 - raw 22-char (base64url) id
+# Returns:
+#   canonical id on stdout
+########################
+kafka_normalize_dir_id() {
+  local v="${1:-}"
+  [[ -z "$v" ]] && { printf '%s' "$v"; return 0; }
+  # base64url -> standard base64, then decode (16 bytes) and re-encode canonically.
+  local b64="${v//-/+}"; b64="${b64//_//}"
+  local canonical
+  canonical="$(printf '%s==' "$b64" | base64 -d 2>/dev/null | base64 -w0 2>/dev/null)" || { printf '%s' "$v"; return 0; }
+  canonical="${canonical:0:22}"
+  canonical="${canonical//+/-}"; canonical="${canonical//\//_}"
+  if [[ -n "$canonical" ]]; then printf '%s' "$canonical"; else printf '%s' "$v"; fi
+}
+
+########################
 # Initialize KRaft storage
 ########################
 kafka_kraft_storage_initialize() {
@@ -494,6 +522,16 @@ kafka_kraft_storage_initialize() {
   # If cluster.id found in meta.properties, use it
   if [[ -f "${KAFKA_DATA_DIR}/meta.properties" ]]; then
     KAFKA_CLUSTER_ID=$(grep "^cluster.id=" "${KAFKA_DATA_DIR}/meta.properties" | sed -E 's/^cluster\.id=(\S+)$/\1/')
+    export KAFKA_CLUSTER_ID
+  fi
+
+  # The chart shares a single cluster id across all nodes via the kraft Secret,
+  # injected as KAFKA_KRAFT_CLUSTER_ID. Every controller/broker MUST format with
+  # that same id, otherwise each node invents its own and peers reject votes
+  # with INCONSISTENT_CLUSTER_ID — the quorum never elects a leader. Fall back to
+  # KAFKA_KRAFT_CLUSTER_ID before generating a throwaway random uuid.
+  if is_empty_value "${KAFKA_CLUSTER_ID:-}" && ! is_empty_value "${KAFKA_KRAFT_CLUSTER_ID:-}"; then
+    KAFKA_CLUSTER_ID="$KAFKA_KRAFT_CLUSTER_ID"
     export KAFKA_CLUSTER_ID
   fi
 
@@ -542,12 +580,27 @@ kafka_kraft_storage_initialize() {
 
   # For Kafka 4.0+, controller role requires kraft.version feature, and
   # `kafka-storage format --feature=kraft.version=1` additionally requires one
-  # of --standalone / --initial-controllers / --no-initial-controllers (Kafka
-  # 4.x dynamic-controllers contract). Pick --standalone when the quorum has a
-  # single voter, otherwise --no-initial-controllers (multi-node bootstrap).
+  # of --initial-controllers / --standalone / --no-initial-controllers (Kafka
+  # 4.x dynamic-controllers / KIP-853 contract).
+  #
+  # Multi-controller clusters MUST be bootstrapped with --initial-controllers so
+  # every node agrees on the same initial voter set (node-id@host:port:dir-id).
+  # The chart's prepare-config init container materialises that list (with the
+  # per-node stable directory IDs) at $KAFKA_INITIAL_CONTROLLERS_FILE and the
+  # broker/controller env exports KAFKA_INITIAL_CONTROLLERS / the file path. If
+  # we instead format every node with --standalone, each becomes its own
+  # single-voter quorum -> split brain -> nodes CrashLoop with
+  # "No readable meta.properties". Only fall back to --standalone for a genuine
+  # single-voter quorum, or --no-initial-controllers when no list is available.
   if [[ "${KAFKA_CFG_PROCESS_ROLES:-}" =~ "controller" ]]; then
     args+=("--feature=kraft.version=1")
-    if [[ "${KAFKA_CFG_CONTROLLER_QUORUM_VOTERS:-}" != *,* ]]; then
+    local initial_controllers="${KAFKA_INITIAL_CONTROLLERS:-}"
+    if is_empty_value "$initial_controllers" && [[ -f "${KAFKA_INITIAL_CONTROLLERS_FILE:-}" ]]; then
+      initial_controllers="$(< "${KAFKA_INITIAL_CONTROLLERS_FILE}")"
+    fi
+    if ! is_empty_value "$initial_controllers"; then
+      args+=("--initial-controllers" "$initial_controllers")
+    elif [[ "${KAFKA_CFG_CONTROLLER_QUORUM_VOTERS:-}" != *,* ]]; then
       args+=("--standalone")
     else
       args+=("--no-initial-controllers")
@@ -555,7 +608,21 @@ kafka_kraft_storage_initialize() {
   fi
 
   info "Formatting storage directories to add metadata..."
-  debug_execute kafka-storage.sh format "${args[@]}"
+  # Do NOT swallow format errors (the previous debug_execute hid stderr): a
+  # silently-failed format leaves no meta.properties, but the engine still marks
+  # the app initialized, so every later restart skips initialization and Kafka
+  # dies with "No readable meta.properties files found" forever. Surface the
+  # output and verify meta.properties landed; returning non-zero here lets the
+  # entrypoint (set -e) abort BEFORE mark_app_initialized, so a restart re-runs
+  # the format instead of poisoning the data dir.
+  if ! kafka-storage.sh format "${args[@]}"; then
+    error "kafka-storage format failed"
+    return 1
+  fi
+  if [[ ! -f "${KAFKA_DATA_DIR}/meta.properties" ]]; then
+    error "kafka-storage format did not produce ${KAFKA_DATA_DIR}/meta.properties"
+    return 1
+  fi
 }
 
 ########################

@@ -379,121 +379,13 @@ in {
         persistence = mkOption {
           default = null;
           description = "Persistence configuration for controller data";
-          type = types.nullOr (types.submodule {
-            freeformType = types.attrsOf types.anything;
-            options = {
-              enabled = mkOption {
-                type = types.nullOr types.bool;
-                default = null;
-                description = "Enable persistence via PVC";
-              };
-
-              existingClaim = mkOption {
-                type = types.nullOr types.str;
-                default = null;
-                description = "Use an existing PVC";
-              };
-
-              storageClass = mkOption {
-                type = types.nullOr types.str;
-                default = null;
-                description = "PVC Storage Class";
-              };
-
-              accessModes = mkOption {
-                type = types.nullOr (types.listOf types.str);
-                default = null;
-                description = "PV access modes";
-              };
-
-              size = mkOption {
-                type = types.nullOr types.str;
-                default = null;
-                description = "PV size";
-              };
-
-              annotations = mkOption {
-                type = types.nullOr (types.attrsOf types.str);
-                default = null;
-                description = "Additional annotations for the PVC";
-              };
-
-              labels = mkOption {
-                type = types.nullOr (types.attrsOf types.str);
-                default = null;
-                description = "Additional labels for the PVC";
-              };
-
-              selector = mkOption {
-                type = types.nullOr (types.attrsOf types.anything);
-                default = null;
-                description = "Label selector to match an existing PV";
-              };
-
-              mountPath = mkOption {
-                type = types.nullOr types.str;
-                default = null;
-                description = "Mount path of the data volume";
-              };
-            };
-          });
+          type = types.nullOr t.persistenceType;
         };
 
         logPersistence = mkOption {
           default = null;
           description = "Persistence configuration for Kafka logs (separate from data)";
-          type = types.nullOr (types.submodule {
-            freeformType = types.attrsOf types.anything;
-            options = {
-              enabled = mkOption {
-                type = types.nullOr types.bool;
-                default = null;
-                description = "Enable log persistence via PVC";
-              };
-
-              existingClaim = mkOption {
-                type = types.nullOr types.str;
-                default = null;
-                description = "Use an existing PVC";
-              };
-
-              storageClass = mkOption {
-                type = types.nullOr types.str;
-                default = null;
-                description = "PVC Storage Class";
-              };
-
-              accessModes = mkOption {
-                type = types.nullOr (types.listOf types.str);
-                default = null;
-                description = "PV access modes";
-              };
-
-              size = mkOption {
-                type = types.nullOr types.str;
-                default = null;
-                description = "PV size";
-              };
-
-              annotations = mkOption {
-                type = types.nullOr (types.attrsOf types.str);
-                default = null;
-                description = "Additional annotations for the PVC";
-              };
-
-              selector = mkOption {
-                type = types.nullOr (types.attrsOf types.anything);
-                default = null;
-                description = "Label selector to match an existing PV";
-              };
-
-              mountPath = mkOption {
-                type = types.nullOr types.str;
-                default = null;
-                description = "Mount path of the logs volume";
-              };
-            };
-          });
+          type = types.nullOr t.persistenceType;
         };
       };
     });

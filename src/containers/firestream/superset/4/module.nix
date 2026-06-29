@@ -466,7 +466,7 @@ in firestream.mkPythonContainerModule {
   };
 
   # Per-container helpers: emitted at top-level of libhelperssuperset.sh by the
-  # engine, so chart init containers can `source /opt/bitnami/scripts/libsuperset.sh`
+  # engine, so chart init containers can `source /opt/firestream/scripts/libsuperset.sh`
   # and use these helpers directly.
   perContainerHelpers = supersetHelpers;
 

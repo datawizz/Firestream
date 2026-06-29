@@ -35,7 +35,7 @@ export FIRESTREAM_APP_NAME="spark"
 # ============================================================
 
 # Base installation (Nix package location)
-export SPARK_HOME="${SPARK_HOME:-/opt/spark}"
+export SPARK_HOME="${SPARK_HOME:-/opt/firestream/spark}"
 export SPARK_BASE_DIR="${SPARK_BASE_DIR:-${SPARK_HOME}}"
 
 # Configuration directories

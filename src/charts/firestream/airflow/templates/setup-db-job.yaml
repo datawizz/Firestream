@@ -90,8 +90,8 @@ spec:
           args:
             - -ec
             - |
-              . /opt/bitnami/scripts/airflow-env.sh
-              . /opt/bitnami/scripts/libairflow.sh
+              . /opt/firestream/scripts/airflow-env.sh
+              . /opt/firestream/scripts/libairflow.sh
 
               info "Trying to connect to the database server"
               airflow_wait_for_db_connection
@@ -121,11 +121,22 @@ spec:
           env:
             - name: BITNAMI_DEBUG
               value: {{ ternary "true" "false" (or .Values.image.debug .Values.diagnosticMode.enabled) | quote }}
+            {{- /*
+              airflow_wait_for_db_connection reads AIRFLOW_DATABASE_HOST/PORT;
+              without these it falls back to the container's baked "postgresql"
+              default and cannot resolve the release-scoped service. The actual
+              `airflow db migrate` reads the full conn from the prepare-config-
+              generated airflow.cfg, so only host/port are needed here.
+            */}}
+            - name: AIRFLOW_DATABASE_HOST
+              value: {{ include "airflow.database.host" . }}
+            - name: AIRFLOW_DATABASE_PORT_NUMBER
+              value: {{ include "airflow.database.port" . }}
             - name: AIRFLOW_USERNAME
               value: {{ .Values.auth.username }}
             {{- if .Values.usePasswordFiles }}
             - name: AIRFLOW_PASSWORD_FILE
-              value: "/opt/bitnami/airflow/secrets/airflow-password"
+              value: "/opt/firestream/airflow/secrets/airflow-password"
             {{- else }}
             - name: AIRFLOW_PASSWORD
               valueFrom:
@@ -152,20 +163,20 @@ spec:
               mountPath: /tmp
               subPath: tmp-dir
             - name: empty-dir
-              mountPath: /opt/bitnami/airflow/logs
+              mountPath: /opt/firestream/airflow/logs
               subPath: app-logs-dir
             - name: empty-dir
-              mountPath: /opt/bitnami/airflow/airflow.db
+              mountPath: /opt/firestream/airflow/airflow.db
               subPath: app-base-dir/airflow.db
             - name: empty-dir
-              mountPath: /opt/bitnami/airflow/airflow.cfg
+              mountPath: /opt/firestream/airflow/airflow.cfg
               subPath: app-base-dir/airflow.cfg
             - name: empty-dir
-              mountPath: /opt/bitnami/airflow/config/airflow_local_settings.py
+              mountPath: /opt/firestream/airflow/config/airflow_local_settings.py
               subPath: app-conf-dir/airflow_local_settings.py
             {{- if  .Values.usePasswordFiles }}
             - name: airflow-secrets
-              mountPath: /opt/bitnami/airflow/secrets
+              mountPath: /opt/firestream/airflow/secrets
             {{- end }}
             {{- if .Values.setupDBJob.extraVolumeMounts }}
             {{- include "common.tplvalues.render" (dict "value" .Values.setupDBJob.extraVolumeMounts "context" $) | nindent 12 }}

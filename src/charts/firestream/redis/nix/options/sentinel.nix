@@ -216,70 +216,7 @@ in {
         persistence = mkOption {
           default = null;
           description = "Persistence configuration for Redis Sentinel nodes";
-          type = types.nullOr (types.submodule {
-            freeformType = types.attrsOf types.anything;
-            options = {
-              enabled = mkOption {
-                type = types.nullOr types.bool;
-                default = null;
-                description = "Enable persistence on Redis sentinel nodes using PVC (Experimental)";
-              };
-
-              storageClass = mkOption {
-                type = types.nullOr types.str;
-                default = null;
-                description = "Persistent Volume storage class";
-              };
-
-              accessModes = mkOption {
-                type = types.nullOr (types.listOf types.str);
-                default = null;
-                description = "Persistent Volume access modes";
-              };
-
-              size = mkOption {
-                type = types.nullOr types.str;
-                default = null;
-                description = "Persistent Volume size";
-              };
-
-              annotations = mkOption {
-                type = types.nullOr (types.attrsOf types.str);
-                default = null;
-                description = "Additional custom annotations for the PVC";
-              };
-
-              labels = mkOption {
-                type = types.nullOr (types.attrsOf types.str);
-                default = null;
-                description = "Additional custom labels for the PVC";
-              };
-
-              selector = mkOption {
-                type = types.nullOr (types.attrsOf types.anything);
-                default = null;
-                description = "Additional labels to match for the PVC";
-              };
-
-              dataSource = mkOption {
-                type = types.nullOr (types.attrsOf types.anything);
-                default = null;
-                description = "Custom PVC data source";
-              };
-
-              medium = mkOption {
-                type = types.nullOr types.str;
-                default = null;
-                description = "Provide a medium for `emptyDir` volumes";
-              };
-
-              sizeLimit = mkOption {
-                type = types.nullOr types.str;
-                default = null;
-                description = "Set this to enable a size limit for `emptyDir` volumes";
-              };
-            };
-          });
+          type = types.nullOr t.persistenceType;
         };
 
         persistentVolumeClaimRetentionPolicy = mkOption {

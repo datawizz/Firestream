@@ -561,8 +561,8 @@ controller.quorum.bootstrap.servers: {{ include "kafka.controller.quorumBootstra
 # TLS configuration
 ssl.keystore.type: JKS
 ssl.truststore.type: JKS
-ssl.keystore.location: /opt/bitnami/kafka/config/certs/kafka.keystore.jks
-ssl.truststore.location: /opt/bitnami/kafka/config/certs/kafka.truststore.jks
+ssl.keystore.location: /opt/firestream/kafka/config/certs/kafka.keystore.jks
+ssl.truststore.location: /opt/firestream/kafka/config/certs/kafka.truststore.jks
 ssl.client.auth: {{ .Values.tls.sslClientAuth }}
 ssl.endpoint.identification.algorithm: {{ .Values.tls.endpointIdentificationAlgorithm }}
 {{- end }}
@@ -645,7 +645,7 @@ Environment variables required to configure SASL
   value: {{ join "," .Values.sasl.client.users | quote }}
 {{- if .Values.usePasswordFiles }}
 - name: KAFKA_CLIENT_PASSWORDS_FILE
-  value: /opt/bitnami/kafka/config/secrets/client-passwords
+  value: /opt/firestream/kafka/config/secrets/client-passwords
 {{- else }}
 - name: KAFKA_CLIENT_PASSWORDS
   valueFrom:
@@ -660,7 +660,7 @@ Environment variables required to configure SASL
   value: {{ .Values.sasl.interbroker.user | quote }}
 {{- if .Values.usePasswordFiles }}
 - name: KAFKA_INTER_BROKER_PASSWORD_FILE
-  value: /opt/bitnami/kafka/config/secrets/inter-broker-password
+  value: /opt/firestream/kafka/config/secrets/inter-broker-password
 {{- else }}
 - name: KAFKA_INTER_BROKER_PASSWORD
   valueFrom:
@@ -674,7 +674,7 @@ Environment variables required to configure SASL
   value: {{ .Values.sasl.interbroker.clientId | quote }}
 {{- if .Values.usePasswordFiles }}
 - name: KAFKA_INTER_BROKER_CLIENT_SECRET_FILE
-  value: /opt/bitnami/kafka/config/secrets/inter-broker-client-secret
+  value: /opt/firestream/kafka/config/secrets/inter-broker-client-secret
 {{- else }}
 - name: KAFKA_INTER_BROKER_CLIENT_SECRET
   valueFrom:
@@ -690,7 +690,7 @@ Environment variables required to configure SASL
   value: {{ .Values.sasl.controller.user | quote }}
 {{- if .Values.usePasswordFiles }}
 - name: KAFKA_CONTROLLER_PASSWORD_FILE
-  value: /opt/bitnami/kafka/config/secrets/controller-password
+  value: /opt/firestream/kafka/config/secrets/controller-password
 {{- else }}
 - name: KAFKA_CONTROLLER_PASSWORD
   valueFrom:
@@ -704,7 +704,7 @@ Environment variables required to configure SASL
   value: {{ .Values.sasl.controller.clientId | quote }}
 {{- if .Values.usePasswordFiles }}
 - name: KAFKA_CONTROLLER_CLIENT_SECRET_FILE
-  value: /opt/bitnami/kafka/config/secrets/controller-client-secret
+  value: /opt/firestream/kafka/config/secrets/controller-client-secret
 {{- else }}
 - name: KAFKA_CONTROLLER_CLIENT_SECRET
   valueFrom:

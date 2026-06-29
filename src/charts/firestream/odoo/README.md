@@ -341,16 +341,16 @@ See the [Parameters](#parameters) section to configure the PVC or to disable per
 | Name                                                 | Description                                                              | Value          |
 | ---------------------------------------------------- | ------------------------------------------------------------------------ | -------------- |
 | `postgresql.enabled`                                 | Switch to enable or disable the PostgreSQL helm chart                    | `true`         |
-| `postgresql.auth.username`                           | Name for a custom user to create                                         | `bn_odoo`      |
+| `postgresql.auth.username`                           | Name for a custom user to create                                         | `firestream`      |
 | `postgresql.auth.password`                           | Password for the custom user to create                                   | `""`           |
-| `postgresql.auth.database`                           | Name for a custom database to create                                     | `bitnami_odoo` |
+| `postgresql.auth.database`                           | Name for a custom database to create                                     | `firestream_odoo` |
 | `postgresql.auth.existingSecret`                     | Name of existing secret to use for PostgreSQL credentials                | `""`           |
 | `postgresql.architecture`                            | PostgreSQL architecture (`standalone` or `replication`)                  | `standalone`   |
 | `externalDatabase.host`                              | Database host                                                            | `""`           |
 | `externalDatabase.port`                              | Database port number                                                     | `5432`         |
-| `externalDatabase.user`                              | Non-root username for Odoo                                               | `bn_odoo`      |
+| `externalDatabase.user`                              | Non-root username for Odoo                                               | `firestream`      |
 | `externalDatabase.password`                          | Password for the non-root username for Odoo                              | `""`           |
-| `externalDatabase.database`                          | Odoo database name                                                       | `bitnami_odoo` |
+| `externalDatabase.database`                          | Odoo database name                                                       | `firestream_odoo` |
 | `externalDatabase.create`                            | Enable PostgreSQL user and database creation (when using an external db) | `true`         |
 | `externalDatabase.postgresqlPostgresUser`            | External Database admin username                                         | `postgres`     |
 | `externalDatabase.postgresqlPostgresPassword`        | External Database admin password                                         | `""`           |

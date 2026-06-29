@@ -81,7 +81,7 @@
     atomic = true;
     wait = true;
     waitForJobs = true;
-    timeout = "10m";
+    timeout = "20m";
     forceUpgrade = false;
     hooksDisabled = false;
     skipCrds = false;

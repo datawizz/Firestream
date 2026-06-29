@@ -248,7 +248,7 @@ spark_generate_env_file() {
     # Single-quoted heredoc tag — the ${VAR:-default} syntax is preserved
     # verbatim in the file and resolved when env.sh is *sourced* by spark-class.
     # The previous (unquoted-EOF) form expanded all vars at generation time,
-    # baking SPARK_HOME=/opt/spark into the file and clobbering callers (e.g.
+    # baking SPARK_HOME=/opt/firestream/spark into the file and clobbering callers (e.g.
     # the entrypoint's runtime override) who set SPARK_HOME to the nix-store
     # spark path.
     cat > "$env_file" << 'EOF'
@@ -260,7 +260,7 @@ spark_generate_env_file() {
 export JAVA_HOME="${JAVA_HOME:-/opt/java}"
 
 # Spark paths
-export SPARK_HOME="${SPARK_HOME:-/opt/spark}"
+export SPARK_HOME="${SPARK_HOME:-/opt/firestream/spark}"
 export SPARK_CONF_DIR="${SPARK_CONF_DIR:-${SPARK_HOME}/conf}"
 export SPARK_LOG_DIR="${SPARK_LOG_DIR:-${SPARK_HOME}/logs}"
 export SPARK_WORK_DIR="${SPARK_WORK_DIR:-${SPARK_HOME}/work}"

@@ -23,6 +23,45 @@ postgresql_execute() {
 }
 
 ########################
+# Execute SQL statements against a REMOTE PostgreSQL instance.
+# Mirrors the Bitnami libpostgresql.sh `postgresql_remote_execute` signature so
+# chart init containers (e.g. superset/jupyterhub `wait-for-db`) that run the
+# firestream-postgresql image can `source libpostgresql.sh` and call it directly:
+#   echo "SELECT 1" | postgresql_remote_execute HOST PORT DB USER PASSWORD
+# SQL is read from stdin. Returns psql's exit code (used by retry_while loops).
+# Arguments:
+#   $1 - hostname (required)
+#   $2 - port (required)
+#   $3 - database (optional)
+#   $4 - user (default: postgres)
+#   $5 - password (optional)
+#   Additional args passed to psql
+########################
+postgresql_remote_execute() {
+  local -r hostname="${1:?hostname is required}"
+  local -r port="${2:?port is required}"
+  local db="${3:-}"
+  local user="${4:-postgres}"
+  local pass="${5:-}"
+  shift 5 || true
+  local args=("-U" "$user" "-p" "$port" "-h" "$hostname" "-w")
+  [[ -n "$db" ]] && args+=("-d" "$db")
+  PGPASSWORD="$pass" psql "${args[@]}" "$@"
+}
+
+########################
+# Execute SQL against a remote PostgreSQL instance and PRINT the query output.
+# Bitnami libpostgresql.sh distinguishes a quiet variant (postgresql_remote_execute)
+# from a printing one (postgresql_remote_execute_print_output); the superset
+# `wait-for-examples` init container greps the printed rows. Same signature as
+# postgresql_remote_execute; psql's default output is printed to stdout.
+# Arguments: hostname port [database] [user] [password] [extra psql args]
+########################
+postgresql_remote_execute_print_output() {
+  postgresql_remote_execute "$@"
+}
+
+########################
 # Initialize master database
 ########################
 postgresql_master_init_db() {

@@ -106,7 +106,7 @@ spec:
             - /bin/sh
             - -ec
             - |
-              cp /tmp/certs/* /opt/bitnami/postgresql/certs/
+              cp /tmp/certs/* /opt/firestream/postgresql/certs/
               chmod 600 {{ include "postgresql.v1.tlsCertKey" . }}
           volumeMounts:
             - name: empty-dir
@@ -115,7 +115,7 @@ spec:
             - name: raw-certificates
               mountPath: /tmp/certs
             - name: postgresql-certificates
-              mountPath: /opt/bitnami/postgresql/certs
+              mountPath: /opt/firestream/postgresql/certs
         {{- else if and .Values.volumePermissions.enabled (or .Values.primary.persistence.enabled .Values.shmVolume.enabled) }}
         - name: init-chmod-data
           image: {{ include "postgresql.v1.volumePermissions.image" . }}
@@ -148,11 +148,11 @@ spec:
               chmod -R 777 /dev/shm
               {{- end }}
               {{- if .Values.tls.enabled }}
-              cp /tmp/certs/* /opt/bitnami/postgresql/certs/
+              cp /tmp/certs/* /opt/firestream/postgresql/certs/
               {{- if eq ( toString ( .Values.volumePermissions.containerSecurityContext.runAsUser )) "auto" }}
-              chown -R `id -u`:`id -G | cut -d " " -f2` /opt/bitnami/postgresql/certs/
+              chown -R `id -u`:`id -G | cut -d " " -f2` /opt/firestream/postgresql/certs/
               {{- else }}
-              chown -R {{ .Values.primary.containerSecurityContext.runAsUser }}:{{ .Values.primary.podSecurityContext.fsGroup }} /opt/bitnami/postgresql/certs/
+              chown -R {{ .Values.primary.containerSecurityContext.runAsUser }}:{{ .Values.primary.podSecurityContext.fsGroup }} /opt/firestream/postgresql/certs/
               {{- end }}
               chmod 600 {{ include "postgresql.v1.tlsCertKey" . }}
               {{- end }}
@@ -178,7 +178,7 @@ spec:
             - name: raw-certificates
               mountPath: /tmp/certs
             - name: postgresql-certificates
-              mountPath: /opt/bitnami/postgresql/certs
+              mountPath: /opt/firestream/postgresql/certs
             {{- end }}
         {{- end }}
         {{- if .Values.primary.initContainers }}
@@ -218,7 +218,7 @@ spec:
             {{- if .Values.auth.enablePostgresUser }}
             {{- if .Values.auth.usePasswordFiles }}
             - name: POSTGRES_PASSWORD_FILE
-              value: {{ printf "/opt/bitnami/postgresql/secrets/%s" (include "postgresql.v1.adminPasswordKey" .) }}
+              value: {{ printf "/opt/firestream/postgresql/secrets/%s" (include "postgresql.v1.adminPasswordKey" .) }}
             {{- else }}
             - name: POSTGRES_PASSWORD
               valueFrom:
@@ -235,7 +235,7 @@ spec:
               value: {{ $customUser | quote }}
             {{- if .Values.auth.usePasswordFiles }}
             - name: POSTGRES_PASSWORD_FILE
-              value: {{ printf "/opt/bitnami/postgresql/secrets/%s" (include "postgresql.v1.userPasswordKey" .) }}
+              value: {{ printf "/opt/firestream/postgresql/secrets/%s" (include "postgresql.v1.userPasswordKey" .) }}
             {{- else }}
             - name: POSTGRES_PASSWORD
               valueFrom:
@@ -246,7 +246,7 @@ spec:
             {{- if .Values.auth.enablePostgresUser }}
             {{- if .Values.auth.usePasswordFiles }}
             - name: POSTGRES_POSTGRES_PASSWORD_FILE
-              value: {{ printf "/opt/bitnami/postgresql/secrets/%s" (include "postgresql.v1.adminPasswordKey" .) }}
+              value: {{ printf "/opt/firestream/postgresql/secrets/%s" (include "postgresql.v1.adminPasswordKey" .) }}
             {{- else }}
             - name: POSTGRES_POSTGRES_PASSWORD
               valueFrom:
@@ -268,7 +268,7 @@ spec:
               value: {{ .Values.auth.replicationUsername | quote }}
             {{- if .Values.auth.usePasswordFiles }}
             - name: POSTGRES_REPLICATION_PASSWORD_FILE
-              value: {{ printf "/opt/bitnami/postgresql/secrets/%s" (include "postgresql.v1.replicationPasswordKey" .) }}
+              value: {{ printf "/opt/firestream/postgresql/secrets/%s" (include "postgresql.v1.replicationPasswordKey" .) }}
             {{- else }}
             - name: POSTGRES_REPLICATION_PASSWORD
               valueFrom:
@@ -464,10 +464,10 @@ spec:
               mountPath: /tmp
               subPath: tmp-dir
             - name: empty-dir
-              mountPath: /opt/bitnami/postgresql/conf
+              mountPath: /opt/firestream/postgresql/conf
               subPath: app-conf-dir
             - name: empty-dir
-              mountPath: /opt/bitnami/postgresql/tmp
+              mountPath: /opt/firestream/postgresql/tmp
               subPath: app-tmp-dir
             {{- if or .Values.primary.preInitDb.scriptsConfigMap .Values.primary.preInitDb.scripts }}
             - name: custom-preinit-scripts
@@ -491,11 +491,11 @@ spec:
             {{- end }}
             {{- if and .Values.auth.usePasswordFiles (or .Values.auth.enablePostgresUser $customUser) }}
             - name: postgresql-password
-              mountPath: /opt/bitnami/postgresql/secrets/
+              mountPath: /opt/firestream/postgresql/secrets/
             {{- end }}
             {{- if .Values.tls.enabled }}
             - name: postgresql-certificates
-              mountPath: /opt/bitnami/postgresql/certs
+              mountPath: /opt/firestream/postgresql/certs
               readOnly: true
             {{- end }}
             {{- if .Values.shmVolume.enabled }}
@@ -539,7 +539,7 @@ spec:
               value: {{ printf "127.0.0.1:%d/postgres?sslmode=disable" (int (include "postgresql.v1.service.port" .)) }}
             {{- if .Values.auth.usePasswordFiles }}
             - name: DATA_SOURCE_PASS_FILE
-              value: {{ printf "/opt/bitnami/postgresql/secrets/%s" (include (ternary "postgresql.v1.adminPasswordKey" "postgresql.v1.userPasswordKey" (empty $customUser)) .) }}
+              value: {{ printf "/opt/firestream/postgresql/secrets/%s" (include (ternary "postgresql.v1.adminPasswordKey" "postgresql.v1.userPasswordKey" (empty $customUser)) .) }}
             {{- else }}
             - name: DATA_SOURCE_PASS
               valueFrom:
@@ -586,7 +586,7 @@ spec:
               subPath: tmp-dir
             {{- if and .Values.auth.usePasswordFiles (or .Values.auth.enablePostgresUser $customUser) }}
             - name: postgresql-password
-              mountPath: /opt/bitnami/postgresql/secrets/
+              mountPath: /opt/firestream/postgresql/secrets/
             {{- end }}
             {{- if .Values.metrics.customMetrics }}
             - name: custom-metrics

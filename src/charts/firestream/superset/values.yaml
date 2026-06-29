@@ -455,7 +455,7 @@ web:
   service:
     ## @param web.service.type Superset webserver service type
     ##
-    type: LoadBalancer
+    type: ClusterIP
     ## @param web.service.ports.http Superset webserver service HTTP port
     ##
     ports:
@@ -1794,7 +1794,7 @@ flower:
   service:
     ## @param flower.service.type Superset celery flower service type
     ##
-    type: LoadBalancer
+    type: ClusterIP
     ## @param flower.service.ports.flower Superset celery flower service port
     ##
     ports:
@@ -2151,9 +2151,9 @@ postgresql:
   enabled: true
   auth:
     enablePostgresUser: true
-    username: bn_superset
+    username: firestream
     password: ""
-    database: bitnami_superset
+    database: firestream_superset
     existingSecret: ""
   architecture: standalone
   primary:
@@ -2192,8 +2192,8 @@ postgresql:
 externalDatabase:
   host: ""
   port: 5432
-  user: bn_superset
-  database: bitnami_superset
+  user: firestream
+  database: firestream_superset
   password: ""
   existingSecret: ""
   existingSecretPasswordKey: "db-password"

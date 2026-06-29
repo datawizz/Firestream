@@ -19,27 +19,27 @@
     # Paths configuration (Bitnami compatibility)
     # Per-key mkDefault so individual paths can be overridden independently.
     paths = {
-      base = lib.mkDefault "/opt/bitnami/kafka";
-      conf = lib.mkDefault "/opt/bitnami/kafka/config";
-      data = lib.mkDefault "/bitnami/kafka/data";
-      logs = lib.mkDefault "/opt/bitnami/kafka/logs";
+      base = lib.mkDefault "/opt/firestream/kafka";
+      conf = lib.mkDefault "/opt/firestream/kafka/config";
+      data = lib.mkDefault "/firestream/kafka/data";
+      logs = lib.mkDefault "/opt/firestream/kafka/logs";
     };
 
     # Environment variables with defaults
     # CRITICAL: per-leaf mkDefault (wrap each value), NOT a whole-set mkDefault.
     env = builtins.mapAttrs (_: lib.mkDefault) {
       # Base directories
-      KAFKA_BASE_DIR = "/opt/bitnami/kafka";
-      KAFKA_VOLUME_DIR = "/bitnami/kafka";
-      KAFKA_DATA_DIR = "/bitnami/kafka/data";
-      KAFKA_CONF_DIR = "/opt/bitnami/kafka/config";
-      KAFKA_MOUNTED_CONF_DIR = "/bitnami/kafka/config";
-      KAFKA_CONF_FILE = "/opt/bitnami/kafka/config/server.properties";
-      KAFKA_LOG_DIR = "/opt/bitnami/kafka/logs";
-      KAFKA_HOME = "/opt/bitnami/kafka";
-      KAFKA_CERTS_DIR = "/opt/bitnami/kafka/config/certs";
-      KAFKA_TMP_DIR = "/opt/bitnami/kafka/tmp";
-      KAFKA_PID_FILE = "/opt/bitnami/kafka/tmp/kafka.pid";
+      KAFKA_BASE_DIR = "/opt/firestream/kafka";
+      KAFKA_VOLUME_DIR = "/firestream/kafka";
+      KAFKA_DATA_DIR = "/firestream/kafka/data";
+      KAFKA_CONF_DIR = "/opt/firestream/kafka/config";
+      KAFKA_MOUNTED_CONF_DIR = "/firestream/kafka/config";
+      KAFKA_CONF_FILE = "/opt/firestream/kafka/config/server.properties";
+      KAFKA_LOG_DIR = "/opt/firestream/kafka/logs";
+      KAFKA_HOME = "/opt/firestream/kafka";
+      KAFKA_CERTS_DIR = "/opt/firestream/kafka/config/certs";
+      KAFKA_TMP_DIR = "/opt/firestream/kafka/tmp";
+      KAFKA_PID_FILE = "/opt/firestream/kafka/tmp/kafka.pid";
       KAFKA_INITSCRIPTS_DIR = "/docker-entrypoint-initdb.d";
 
       # User and group
@@ -98,7 +98,7 @@
 
       # Other settings
       KAFKA_INIT_MAX_TIMEOUT = "60";
-      KAFKA_CFG_LOG_DIRS = "/bitnami/kafka/data";
+      KAFKA_CFG_LOG_DIRS = "/firestream/kafka/data";
       KAFKA_CFG_MAX_REQUEST_SIZE = "";
       KAFKA_CFG_MAX_PARTITION_FETCH_BYTES = "";
 
@@ -128,6 +128,13 @@
     ];
 
     exposedPorts = lib.mkDefault [ 9092 9093 ];
+
+    # Distinct host-port offset (spacing 2000) so all 8 canonical apps can run
+    # simultaneously on docker without colliding. kafka=26000.
+    #   kafka client     9092 -> host 35092
+    #   kafka controller 9093 -> host 35093
+    #   healthd          9180 -> host 35180
+    compose.hostPortOffset = lib.mkDefault 26000;
 
     # Phase 4: enable in-image firestream-healthd. The readinessCmd asks the
     # broker for its API versions over the configured client listener — this

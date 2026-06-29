@@ -12,35 +12,101 @@
 # Per-leaf mkDefault lets a consumer override a single env var while every other
 # default is preserved.
 
-{ lib, pkgs, ... }:
+{ lib, pkgs, config, ... }:
 
+let
+  # Spec for one vendored DAG source. `src` (a derivation/path), when set, WINS
+  # over owner/repo/rev/hash so a local `dags/` folder or any non-GitHub source
+  # works too. See ./vendor-dags.nix for how these become a baked
+  # /opt/firestream/airflow/dags tree.
+  vendoredDagSpec = lib.types.submodule {
+    options = {
+      name = lib.mkOption {
+        type = lib.types.str;
+        description = "Label for this source (used in build logs and collision errors).";
+      };
+      owner = lib.mkOption {
+        type = lib.types.nullOr lib.types.str;
+        default = null;
+        description = "GitHub owner (when fetching via fetchFromGitHub).";
+      };
+      repo = lib.mkOption {
+        type = lib.types.nullOr lib.types.str;
+        default = null;
+        description = "GitHub repo (when fetching via fetchFromGitHub).";
+      };
+      rev = lib.mkOption {
+        type = lib.types.nullOr lib.types.str;
+        default = null;
+        description = "Commit or tag to pin (when fetching via fetchFromGitHub).";
+      };
+      hash = lib.mkOption {
+        type = lib.types.nullOr lib.types.str;
+        default = null;
+        description = "fetchFromGitHub sha256 (SRI string).";
+      };
+      src = lib.mkOption {
+        type = lib.types.nullOr (lib.types.either lib.types.path lib.types.package);
+        default = null;
+        description = ''
+          A prebuilt source tree (derivation or path). When set, it WINS over
+          owner/repo/rev/hash, enabling a local `dags/` folder, fetchgit, or a
+          flake input. This is the common "bake my DAG" case.
+        '';
+      };
+      sourceRoot = lib.mkOption {
+        type = lib.types.str;
+        default = ".";
+        description = "Subdirectory inside the source that contains the DAG files.";
+      };
+    };
+  };
+in
 {
+  # Build-time DAG vendoring: a list of DAG-source specs baked into the image at
+  # /opt/firestream/airflow/dags (Airflow's dags_folder). Empty by default —
+  # stock images are unchanged. Forwarded to the container factory via
+  # `extraModuleArgs.vendoredDags` below (the eval-container.nix seam).
+  options.airflow.vendoredDags = lib.mkOption {
+    type = lib.types.listOf vendoredDagSpec;
+    default = [ ];
+    description = ''
+      DAG sources to vendor at build time. Each entry is fetched (GitHub by
+      default, or any `src`), and its files are laid into a baked
+      /opt/firestream/airflow/dags directory the scheduler scans directly.
+    '';
+  };
+
   config.airflow = {
+    # Forward the vendored-dags list to module.nix through the factory's
+    # extraModuleArgs seam (eval-container.nix splices this into moduleArgs).
+    extraModuleArgs.vendoredDags = config.airflow.vendoredDags;
+
     version = lib.mkDefault "3.0.3";
 
     python = lib.mkDefault pkgs.python312;
 
-    # Paths configuration (Airflow uses /opt/airflow structure)
+    # Paths configuration (Airflow uses /opt/firestream/airflow structure)
     # Per-key mkDefault so individual paths can be overridden independently.
     paths = {
-      base = lib.mkDefault "/opt/airflow";
-      conf = lib.mkDefault "/opt/airflow";
-      data = lib.mkDefault "/opt/airflow/dags";
-      logs = lib.mkDefault "/opt/airflow/logs";
+      base = lib.mkDefault "/opt/firestream/airflow";
+      conf = lib.mkDefault "/opt/firestream/airflow";
+      data = lib.mkDefault "/opt/firestream/airflow/dags";
+      logs = lib.mkDefault "/opt/firestream/airflow/logs";
     };
 
     # Environment variables with defaults (from env-defaults.sh)
     # CRITICAL: per-leaf mkDefault (wrap each value), NOT a whole-set mkDefault.
     env = builtins.mapAttrs (_: lib.mkDefault) {
       # Paths
-      AIRFLOW_HOME = "/opt/airflow";
-      AIRFLOW_DAGS_DIR = "/opt/airflow/dags";
-      AIRFLOW_LOGS_DIR = "/opt/airflow/logs";
-      AIRFLOW_SCHEDULER_LOGS_DIR = "/opt/airflow/logs/scheduler";
-      AIRFLOW_PLUGINS_DIR = "/opt/airflow/plugins";
-      AIRFLOW_TMP_DIR = "/opt/airflow/tmp";
-      AIRFLOW_CONF_FILE = "/opt/airflow/airflow.cfg";
-      AIRFLOW_WEBSERVER_CONF_FILE = "/opt/airflow/webserver_config.py";
+      AIRFLOW_HOME = "/opt/firestream/airflow";
+      AIRFLOW_DAGS_DIR = "/opt/firestream/airflow/dags";
+      AIRFLOW_LOGS_DIR = "/opt/firestream/airflow/logs";
+      AIRFLOW_SCHEDULER_LOGS_DIR = "/opt/firestream/airflow/logs/scheduler";
+      AIRFLOW_PLUGINS_DIR = "/opt/firestream/airflow/plugins";
+      AIRFLOW_TMP_DIR = "/opt/firestream/airflow/tmp";
+      AIRFLOW_CONF_FILE = "/opt/firestream/airflow/airflow.cfg";
+      AIRFLOW_WEBSERVER_CONF_FILE = "/opt/firestream/airflow/webserver_config.py";
 
       # User configuration
       AIRFLOW_USERNAME = "admin";
@@ -93,7 +159,7 @@
       AIRFLOW_LDAP_ALLOW_SELF_SIGNED = "True";
 
       # Python cache
-      PYTHONPYCACHEPREFIX = "/opt/airflow/tmp/pycache";
+      PYTHONPYCACHEPREFIX = "/opt/firestream/airflow/tmp/pycache";
 
       # Debug mode
       BITNAMI_DEBUG = "false";
@@ -185,16 +251,15 @@
       projectName = "firestream-airflow";
       dependencies = [ "postgresql" "redis" ];
 
-      # +20000 host-port offset so airflow's embedded postgres/redis (and
-      # api-server) don't collide with a standalone .#postgresql-up / .#redis-up
-      # left running concurrently AND so well-known developer ports (5432/6379/
-      # 8080 etc.) on the host machine are never grabbed. Container-side ports
+      # +20000 host-port offset. Each of the 8 canonical apps gets a DISTINCT
+      # offset (spacing 2000) so all 8 can run simultaneously on docker without
+      # host-port collisions. airflow=20000 (lowest band). Container-side ports
       # are unchanged, so service-to-service network references inside the
       # compose project (e.g. AIRFLOW_DATABASE_HOST=postgresql:5432) still
       # resolve normally.
       #   postgresql 5432  -> host 25432
       #   redis      6379  -> host 26379
-      #   api-server 8090  -> host 28090
+      #   api-server 8080  -> host 28080
       #   healthd    9180  -> host 29180
       hostPortOffset = 20000;
 

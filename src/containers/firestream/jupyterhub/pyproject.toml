@@ -13,6 +13,10 @@ dependencies = [
     "jupyterlab>=4.0.0",
     "oauthenticator>=16.0.0",
     "dockerspawner>=13.0.0",
+    # KubeSpawner (and its kubernetes_asyncio dep) is required by the Bitnami
+    # jupyterhub chart's hub config (c.JupyterHub.spawner_class =
+    # "kubespawner.KubeSpawner"; `from kubernetes_asyncio import client`).
+    "jupyterhub-kubespawner>=6.0.0",
     "psycopg2-binary>=2.9.0",
     "sqlalchemy>=2.0.0",
     "alembic>=1.13.0",

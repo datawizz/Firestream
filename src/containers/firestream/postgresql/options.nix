@@ -58,21 +58,35 @@
       # Default to ALLOW_EMPTY_PASSWORD=yes so the out-of-the-box image runs
       # in any local/dev/e2e environment without requiring a password override.
       # Production deployers override these via the standard mkDefault seam.
-      POSTGRESQL_PASSWORD = "";
-      POSTGRESQL_USERNAME = "postgres";
-      POSTGRESQL_DATABASE = "";
-      POSTGRESQL_POSTGRES_PASSWORD = "";
+      #
+      # The Bitnami postgresql chart injects credentials under docker-style
+      # `POSTGRES_*` env names, but every init/helper script here reads the
+      # `POSTGRESQL_*` prefix. mkEnvDefaults emits `export VAR="${VAR:-<value>}"`,
+      # so embedding a `${POSTGRES_*:-default}` fallback reproduces the alias
+      # bridge upstream Bitnami ships in its `postgresql-env.sh`. Each reference
+      # is `:-`-guarded (safe under `set -u`). The `_FILE` aliases are exported
+      # before the secrets file-loader runs so chart-mounted password files win.
+      # KEEP IN SYNC with module.nix's envVars default.
+      POSTGRESQL_PASSWORD = "\${POSTGRES_PASSWORD:-}";
+      POSTGRESQL_USERNAME = "\${POSTGRES_USER:-postgres}";
+      POSTGRESQL_DATABASE = "\${POSTGRES_DATABASE:-}";
+      POSTGRESQL_POSTGRES_PASSWORD = "\${POSTGRES_POSTGRES_PASSWORD:-}";
+      POSTGRESQL_PASSWORD_FILE = "\${POSTGRES_PASSWORD_FILE:-}";
+      POSTGRESQL_POSTGRES_PASSWORD_FILE = "\${POSTGRES_POSTGRES_PASSWORD_FILE:-}";
+      POSTGRESQL_INITSCRIPTS_USERNAME = "\${POSTGRES_INITSCRIPTS_USERNAME:-}";
+      POSTGRESQL_INITSCRIPTS_PASSWORD = "\${POSTGRES_INITSCRIPTS_PASSWORD:-}";
       ALLOW_EMPTY_PASSWORD = "yes";
 
-      # Replication
-      POSTGRESQL_REPLICATION_MODE = "";
-      POSTGRESQL_REPLICATION_USER = "";
-      POSTGRESQL_REPLICATION_PASSWORD = "";
-      POSTGRESQL_MASTER_HOST = "";
-      POSTGRESQL_MASTER_PORT_NUMBER = "5432";
-      POSTGRESQL_NUM_SYNCHRONOUS_REPLICAS = "0";
-      POSTGRESQL_SYNCHRONOUS_COMMIT_MODE = "on";
-      POSTGRESQL_CLUSTER_APP_NAME = "walreceiver";
+      # Replication (values alias the chart's `POSTGRES_*` names — see above)
+      POSTGRESQL_REPLICATION_MODE = "\${POSTGRES_REPLICATION_MODE:-}";
+      POSTGRESQL_REPLICATION_USER = "\${POSTGRES_REPLICATION_USER:-}";
+      POSTGRESQL_REPLICATION_PASSWORD = "\${POSTGRES_REPLICATION_PASSWORD:-}";
+      POSTGRESQL_REPLICATION_PASSWORD_FILE = "\${POSTGRES_REPLICATION_PASSWORD_FILE:-}";
+      POSTGRESQL_MASTER_HOST = "\${POSTGRES_MASTER_HOST:-}";
+      POSTGRESQL_MASTER_PORT_NUMBER = "\${POSTGRES_MASTER_PORT_NUMBER:-5432}";
+      POSTGRESQL_NUM_SYNCHRONOUS_REPLICAS = "\${POSTGRES_NUM_SYNCHRONOUS_REPLICAS:-0}";
+      POSTGRESQL_SYNCHRONOUS_COMMIT_MODE = "\${POSTGRES_SYNCHRONOUS_COMMIT_MODE:-on}";
+      POSTGRESQL_CLUSTER_APP_NAME = "\${POSTGRES_CLUSTER_APP_NAME:-walreceiver}";
       POSTGRESQL_WAL_LEVEL = "replica";
       POSTGRESQL_REPLICATION_USE_PASSFILE = "no";
       POSTGRESQL_REPLICATION_PASSFILE_PATH = "/opt/firestream/postgresql/conf/.pgpass";
@@ -104,8 +118,9 @@
       POSTGRESQL_SHUTDOWN_MODE = "fast";
       POSTGRESQL_PGCTLTIMEOUT = "60";
       POSTGRESQL_FIRST_BOOT = "yes";
-      POSTGRESQL_INITDB_ARGS = "";
-      POSTGRESQL_INITDB_WAL_DIR = "";
+      # Alias the chart's `POSTGRES_INITDB_*` names (note WALDIR vs WAL_DIR).
+      POSTGRESQL_INITDB_ARGS = "\${POSTGRES_INITDB_ARGS:-}";
+      POSTGRESQL_INITDB_WAL_DIR = "\${POSTGRES_INITDB_WALDIR:-}";
       POSTGRESQL_SHARED_PRELOAD_LIBRARIES = "";
       POSTGRESQL_FSYNC = "on";
       POSTGRESQL_DEFAULT_TOAST_COMPRESSION = "";
@@ -135,6 +150,12 @@
     ];
 
     exposedPorts = lib.mkDefault [ 5432 ];
+
+    # Distinct host-port offset (spacing 2000) so all 8 canonical apps can run
+    # simultaneously on docker without colliding. postgresql=22000.
+    #   postgresql 5432 -> host 27432
+    #   healthd    9180 -> host 31180
+    compose.hostPortOffset = lib.mkDefault 22000;
 
     # Phase 3 pilot / Phase 4 generalisation: enable the in-image
     # firestream-healthd service for postgresql. The entrypoint wrapper

@@ -26,27 +26,27 @@
 
 # Paths configuration (Bitnami compatibility)
 , paths ? {
-    base = "/opt/bitnami/kafka";
-    conf = "/opt/bitnami/kafka/config";
-    data = "/bitnami/kafka/data";
-    logs = "/opt/bitnami/kafka/logs";
+    base = "/opt/firestream/kafka";
+    conf = "/opt/firestream/kafka/config";
+    data = "/firestream/kafka/data";
+    logs = "/opt/firestream/kafka/logs";
   }
 
 # Environment variables with defaults
 # NOTE: Use absolute paths, NOT variable references like \${VAR} - bash strict mode (set -u) fails on those
 , envVars ? {
     # Base directories
-    KAFKA_BASE_DIR = "/opt/bitnami/kafka";
-    KAFKA_VOLUME_DIR = "/bitnami/kafka";
-    KAFKA_DATA_DIR = "/bitnami/kafka/data";
-    KAFKA_CONF_DIR = "/opt/bitnami/kafka/config";
-    KAFKA_MOUNTED_CONF_DIR = "/bitnami/kafka/config";
-    KAFKA_CONF_FILE = "/opt/bitnami/kafka/config/server.properties";
-    KAFKA_LOG_DIR = "/opt/bitnami/kafka/logs";
-    KAFKA_HOME = "/opt/bitnami/kafka";
-    KAFKA_CERTS_DIR = "/opt/bitnami/kafka/config/certs";
-    KAFKA_TMP_DIR = "/opt/bitnami/kafka/tmp";
-    KAFKA_PID_FILE = "/opt/bitnami/kafka/tmp/kafka.pid";
+    KAFKA_BASE_DIR = "/opt/firestream/kafka";
+    KAFKA_VOLUME_DIR = "/firestream/kafka";
+    KAFKA_DATA_DIR = "/firestream/kafka/data";
+    KAFKA_CONF_DIR = "/opt/firestream/kafka/config";
+    KAFKA_MOUNTED_CONF_DIR = "/firestream/kafka/config";
+    KAFKA_CONF_FILE = "/opt/firestream/kafka/config/server.properties";
+    KAFKA_LOG_DIR = "/opt/firestream/kafka/logs";
+    KAFKA_HOME = "/opt/firestream/kafka";
+    KAFKA_CERTS_DIR = "/opt/firestream/kafka/config/certs";
+    KAFKA_TMP_DIR = "/opt/firestream/kafka/tmp";
+    KAFKA_PID_FILE = "/opt/firestream/kafka/tmp/kafka.pid";
     KAFKA_INITSCRIPTS_DIR = "/docker-entrypoint-initdb.d";
 
     # User and group
@@ -105,7 +105,7 @@
 
     # Other settings
     KAFKA_INIT_MAX_TIMEOUT = "60";
-    KAFKA_CFG_LOG_DIRS = "/bitnami/kafka/data";
+    KAFKA_CFG_LOG_DIRS = "/firestream/kafka/data";
     KAFKA_CFG_MAX_REQUEST_SIZE = "";
     KAFKA_CFG_MAX_PARTITION_FETCH_BYTES = "";
 
@@ -414,7 +414,7 @@ in firestream.mkJavaContainerModule {
   # Declarative directory schema
   runtimeDirs = {
     data = {
-      path = "/bitnami/kafka/data";
+      path = "/firestream/kafka/data";
       type = "data";
       persistence = "persistent";
       mode = "0700";
@@ -423,7 +423,7 @@ in firestream.mkJavaContainerModule {
       description = "Kafka data directory (log.dirs)";
     };
     conf = {
-      path = "/opt/bitnami/kafka/config";
+      path = "/opt/firestream/kafka/config";
       type = "conf";
       persistence = "persistent";
       mode = "0755";
@@ -432,7 +432,7 @@ in firestream.mkJavaContainerModule {
       description = "Kafka configuration directory";
     };
     confDefault = {
-      path = "/opt/bitnami/kafka/config.default";
+      path = "/opt/firestream/kafka/config.default";
       type = "conf";
       persistence = "ephemeral";
       mode = "0755";
@@ -441,7 +441,7 @@ in firestream.mkJavaContainerModule {
       description = "Default configuration templates";
     };
     logs = {
-      path = "/opt/bitnami/kafka/logs";
+      path = "/opt/firestream/kafka/logs";
       type = "logs";
       persistence = "ephemeral";
       mode = "0755";
@@ -450,14 +450,14 @@ in firestream.mkJavaContainerModule {
       description = "Kafka log directory";
     };
     tmp = {
-      path = "/opt/bitnami/kafka/tmp";
+      path = "/opt/firestream/kafka/tmp";
       type = "tmp";
       persistence = "ephemeral";
       mode = "1777";
       description = "Temporary files and PID file";
     };
     certs = {
-      path = "/opt/bitnami/kafka/config/certs";
+      path = "/opt/firestream/kafka/config/certs";
       type = "conf";
       persistence = "persistent";
       mode = "0755";
@@ -466,7 +466,7 @@ in firestream.mkJavaContainerModule {
       description = "TLS certificates directory";
     };
     volumeDir = {
-      path = "/bitnami/kafka";
+      path = "/firestream/kafka";
       type = "data";
       persistence = "persistent";
       mode = "0755";
@@ -475,7 +475,7 @@ in firestream.mkJavaContainerModule {
       description = "Persistent volume root";
     };
     mountedConf = {
-      path = "/bitnami/kafka/config";
+      path = "/firestream/kafka/config";
       type = "conf";
       persistence = "persistent";
       mode = "0755";
@@ -544,7 +544,7 @@ in firestream.mkJavaContainerModule {
 
   inherit exposedPorts;
   inherit health;
-  volumes = [ "/bitnami/kafka" "/docker-entrypoint-initdb.d" ];
+  volumes = [ "/firestream/kafka" "/docker-entrypoint-initdb.d" ];
 
   user = { name = "kafka"; group = "kafka"; uid = 1001; gid = 1001; };
 

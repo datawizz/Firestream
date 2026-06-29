@@ -59,7 +59,7 @@ spec:
           args:
             - -ec
             - |
-              . /opt/bitnami/scripts/libkafka.sh
+              . /opt/firestream/scripts/libkafka.sh
 
               if [[ ! -f "$KAFKA_CONF_FILE" ]]; then
                   touch $KAFKA_CONF_FILE
@@ -182,10 +182,10 @@ spec:
           args:
             - -ec
             - |
-              . /opt/bitnami/scripts/libos.sh
+              . /opt/firestream/scripts/libos.sh
 
               exit_code=0
-              if ! retry_while "/opt/bitnami/kafka/bin/kafka-broker-api-versions.sh --bootstrap-server ${KAFKA_SERVICE} --command-config /shared/client.properties"; then
+              if ! retry_while "/opt/firestream/kafka/bin/kafka-broker-api-versions.sh --bootstrap-server ${KAFKA_SERVICE} --command-config /shared/client.properties"; then
                   echo "Kafka is not ready"
                   exit_code=1
               else
@@ -248,7 +248,7 @@ spec:
 
               kafka_provisioning_commands=(
               {{- range $topic := .Values.provisioning.topics }}
-                  "/opt/bitnami/kafka/bin/kafka-topics.sh \
+                  "/opt/firestream/kafka/bin/kafka-topics.sh \
                       --create \
                       --if-not-exists \
                       --bootstrap-server ${KAFKA_SERVICE} \
@@ -308,7 +308,7 @@ spec:
           volumeMounts:
             {{- if or .Values.log4j2 .Values.existingLog4j2ConfigMap }}
             - name: log4j2-config
-              mountPath: /opt/bitnami/kafka/config/log4j2.yaml
+              mountPath: /opt/firestream/kafka/config/log4j2.yaml
               subPath: log4j2.yaml
             {{- end }}
             {{- if (regexFind "SSL" (upper .Values.listeners.client.protocol)) }}

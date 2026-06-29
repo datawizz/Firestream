@@ -6,11 +6,11 @@
 # The module.nix envVars attribute provides the canonical defaults.
 
 # Paths
-export ODOO_BASE_DIR="${ODOO_BASE_DIR:-/opt/bitnami/odoo}"
+export ODOO_BASE_DIR="${ODOO_BASE_DIR:-/opt/firestream/odoo}"
 export ODOO_BIN_DIR="${ODOO_BIN_DIR:-${ODOO_BASE_DIR}/bin}"
 export ODOO_CONF_DIR="${ODOO_CONF_DIR:-${ODOO_BASE_DIR}/conf}"
 export ODOO_CONF_FILE="${ODOO_CONF_FILE:-${ODOO_CONF_DIR}/odoo.conf}"
-export ODOO_DATA_DIR="${ODOO_DATA_DIR:-${ODOO_BASE_DIR}/data}"
+export ODOO_DATA_DIR="${ODOO_DATA_DIR:-/firestream/odoo/data}"
 export ODOO_ADDONS_DIR="${ODOO_ADDONS_DIR:-${ODOO_BASE_DIR}/addons}"
 export ODOO_TMP_DIR="${ODOO_TMP_DIR:-${ODOO_BASE_DIR}/tmp}"
 export ODOO_PID_FILE="${ODOO_PID_FILE:-${ODOO_TMP_DIR}/odoo.pid}"
@@ -18,7 +18,7 @@ export ODOO_LOGS_DIR="${ODOO_LOGS_DIR:-${ODOO_BASE_DIR}/log}"
 export ODOO_LOG_FILE="${ODOO_LOG_FILE:-${ODOO_LOGS_DIR}/odoo-server.log}"
 
 # Volume paths
-export ODOO_VOLUME_DIR="${ODOO_VOLUME_DIR:-/bitnami/odoo}"
+export ODOO_VOLUME_DIR="${ODOO_VOLUME_DIR:-/firestream/odoo}"
 export ODOO_DATA_TO_PERSIST="${ODOO_DATA_TO_PERSIST:-${ODOO_ADDONS_DIR} ${ODOO_CONF_DIR} ${ODOO_DATA_DIR}}"
 
 # System users

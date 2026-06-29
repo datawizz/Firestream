@@ -114,7 +114,7 @@ spec:
             - name: AIRFLOW_EXECUTOR
               value: {{ .Values.executor }}
             - name: PYTHONPYCACHEPREFIX
-              value: "/opt/bitnami/airflow/venv/tmp"
+              value: "/opt/firestream/airflow/venv/tmp"
             {{- if or (eq .Values.executor "CeleryExecutor") (eq .Values.executor "CeleryKubernetesExecutor") }}
             - name: REDIS_HOST
               value: {{ include "airflow.redis.host" . | quote }}
@@ -206,33 +206,33 @@ spec:
               mountPath: /tmp
               subPath: tmp-dir
             - name: empty-dir
-              mountPath: /opt/bitnami/airflow/nss-wrapper
+              mountPath: /opt/firestream/airflow/nss-wrapper
               subPath: app-nss-wrapper-dir
             - name: empty-dir
-              mountPath: /opt/bitnami/airflow/tmp
+              mountPath: /opt/firestream/airflow/tmp
               subPath: app-tmp-dir
             - name: empty-dir
-              mountPath: /opt/bitnami/airflow/airflow.db
+              mountPath: /opt/firestream/airflow/airflow.db
               subPath: app-base-dir/airflow.db
             - name: empty-dir
-              mountPath: /opt/bitnami/airflow/airflow.cfg
+              mountPath: /opt/firestream/airflow/airflow.cfg
               subPath: app-base-dir/airflow.cfg
             - name: empty-dir
-              mountPath: /opt/bitnami/airflow/config/airflow_local_settings.py
+              mountPath: /opt/firestream/airflow/config/airflow_local_settings.py
               subPath: app-conf-dir/airflow_local_settings.py
             - name: empty-dir
-              mountPath: /opt/bitnami/airflow/venv
+              mountPath: /opt/firestream/airflow/venv
               subPath: venv-base-dir
             {{- if  .Values.usePasswordFiles }}
             - name: airflow-secrets
-              mountPath: /opt/bitnami/airflow/secrets
+              mountPath: /opt/firestream/airflow/secrets
             {{- end }}
             {{- if .Values.triggerer.persistence.enabled }}
             - name: logs
-              mountPath: /opt/bitnami/airflow/logs
+              mountPath: /opt/firestream/airflow/logs
             {{- else }}
             - name: empty-dir
-              mountPath: /opt/bitnami/airflow/logs
+              mountPath: /opt/firestream/airflow/logs
               subPath: app-logs-dir
             {{- end }}
             {{- if .Values.dags.enabled }}

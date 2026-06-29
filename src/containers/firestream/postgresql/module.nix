@@ -36,6 +36,16 @@
 # because Nix attribute sets are sorted alphabetically, which would cause
 # dependent variables (e.g., DATA_DIR referencing VOLUME_DIR) to be exported
 # before their dependencies, failing with "unbound variable" under set -u.
+#
+# EXCEPTION: the auth/replication/initdb defaults below intentionally read
+# through the Bitnami chart's docker-style `POSTGRES_*` env names (e.g.
+# `${POSTGRES_USER:-postgres}`). The Bitnami postgresql chart injects
+# credentials as `POSTGRES_USER`/`POSTGRES_DATABASE`/`POSTGRES_PASSWORD[_FILE]`
+# etc., but every init/helper script in this container reads the `POSTGRESQL_*`
+# prefix. mkEnvDefaults emits `export VAR="${VAR:-<value>}"`, so embedding a
+# `${POSTGRES_*:-default}` fallback produces the alias bridge upstream Bitnami
+# ships in its `postgresql-env.sh`. Each reference is `:-`-guarded, so it is
+# safe under `set -u` regardless of attribute ordering (no unbound variable).
 , envVars ? {
     # Base directories (pre-expanded to avoid alphabetical ordering issues)
     POSTGRESQL_BASE_DIR = "/opt/firestream/postgresql";
@@ -66,21 +76,30 @@
     # Default to ALLOW_EMPTY_PASSWORD=yes so the out-of-the-box image runs
     # in local/dev/e2e environments without a password override. Production
     # callers override these via the standard envVars override seam.
-    POSTGRESQL_PASSWORD = "";
-    POSTGRESQL_USERNAME = "postgres";
-    POSTGRESQL_DATABASE = "";
-    POSTGRESQL_POSTGRES_PASSWORD = "";
+    #
+    # Values alias the Bitnami chart's `POSTGRES_*` env names (see NOTE above);
+    # the `_FILE` aliases below are exported before the secrets file-loader runs
+    # so chart-mounted password files are honoured.
+    POSTGRESQL_PASSWORD = "\${POSTGRES_PASSWORD:-}";
+    POSTGRESQL_USERNAME = "\${POSTGRES_USER:-postgres}";
+    POSTGRESQL_DATABASE = "\${POSTGRES_DATABASE:-}";
+    POSTGRESQL_POSTGRES_PASSWORD = "\${POSTGRES_POSTGRES_PASSWORD:-}";
+    POSTGRESQL_PASSWORD_FILE = "\${POSTGRES_PASSWORD_FILE:-}";
+    POSTGRESQL_POSTGRES_PASSWORD_FILE = "\${POSTGRES_POSTGRES_PASSWORD_FILE:-}";
+    POSTGRESQL_INITSCRIPTS_USERNAME = "\${POSTGRES_INITSCRIPTS_USERNAME:-}";
+    POSTGRESQL_INITSCRIPTS_PASSWORD = "\${POSTGRES_INITSCRIPTS_PASSWORD:-}";
     ALLOW_EMPTY_PASSWORD = "yes";
 
-    # Replication
-    POSTGRESQL_REPLICATION_MODE = "";
-    POSTGRESQL_REPLICATION_USER = "";
-    POSTGRESQL_REPLICATION_PASSWORD = "";
-    POSTGRESQL_MASTER_HOST = "";
-    POSTGRESQL_MASTER_PORT_NUMBER = "5432";
-    POSTGRESQL_NUM_SYNCHRONOUS_REPLICAS = "0";
-    POSTGRESQL_SYNCHRONOUS_COMMIT_MODE = "on";
-    POSTGRESQL_CLUSTER_APP_NAME = "walreceiver";
+    # Replication (values alias the chart's `POSTGRES_*` names — see NOTE above)
+    POSTGRESQL_REPLICATION_MODE = "\${POSTGRES_REPLICATION_MODE:-}";
+    POSTGRESQL_REPLICATION_USER = "\${POSTGRES_REPLICATION_USER:-}";
+    POSTGRESQL_REPLICATION_PASSWORD = "\${POSTGRES_REPLICATION_PASSWORD:-}";
+    POSTGRESQL_REPLICATION_PASSWORD_FILE = "\${POSTGRES_REPLICATION_PASSWORD_FILE:-}";
+    POSTGRESQL_MASTER_HOST = "\${POSTGRES_MASTER_HOST:-}";
+    POSTGRESQL_MASTER_PORT_NUMBER = "\${POSTGRES_MASTER_PORT_NUMBER:-5432}";
+    POSTGRESQL_NUM_SYNCHRONOUS_REPLICAS = "\${POSTGRES_NUM_SYNCHRONOUS_REPLICAS:-0}";
+    POSTGRESQL_SYNCHRONOUS_COMMIT_MODE = "\${POSTGRES_SYNCHRONOUS_COMMIT_MODE:-on}";
+    POSTGRESQL_CLUSTER_APP_NAME = "\${POSTGRES_CLUSTER_APP_NAME:-walreceiver}";
     POSTGRESQL_WAL_LEVEL = "replica";
     POSTGRESQL_REPLICATION_USE_PASSFILE = "no";
     POSTGRESQL_REPLICATION_PASSFILE_PATH = "/opt/firestream/postgresql/conf/.pgpass";
@@ -112,8 +131,9 @@
     POSTGRESQL_SHUTDOWN_MODE = "fast";
     POSTGRESQL_PGCTLTIMEOUT = "60";
     POSTGRESQL_FIRST_BOOT = "yes";
-    POSTGRESQL_INITDB_ARGS = "";
-    POSTGRESQL_INITDB_WAL_DIR = "";
+    # Alias the chart's `POSTGRES_INITDB_*` names (note WALDIR vs WAL_DIR).
+    POSTGRESQL_INITDB_ARGS = "\${POSTGRES_INITDB_ARGS:-}";
+    POSTGRESQL_INITDB_WAL_DIR = "\${POSTGRES_INITDB_WALDIR:-}";
     POSTGRESQL_SHARED_PRELOAD_LIBRARIES = "";
     POSTGRESQL_FSYNC = "on";
     POSTGRESQL_DEFAULT_TOAST_COMPRESSION = "";
@@ -535,6 +555,9 @@ EOF
   runtimeBinDeps = with pkgs; [
     coreutils bash gnused gnugrep gawk findutils which
     postgresql gzip netcat-gnu
+    # S3 client for the pg_dumpall backup CronJob (reuses the server image) —
+    # streams logical dumps straight into SeaweedFS via `aws s3 cp -`.
+    awscli2
   ];
 
 in firestream.mkContainerModule {

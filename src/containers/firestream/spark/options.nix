@@ -27,10 +27,10 @@ in
     # Paths configuration
     # Per-key mkDefault so individual paths can be overridden independently.
     paths = {
-      base = lib.mkDefault "/opt/spark";
-      conf = lib.mkDefault "/opt/spark/conf";
+      base = lib.mkDefault "/opt/firestream/spark";
+      conf = lib.mkDefault "/opt/firestream/spark/conf";
       data = lib.mkDefault "/firestream/spark/data";
-      logs = lib.mkDefault "/opt/spark/logs";
+      logs = lib.mkDefault "/opt/firestream/spark/logs";
     };
 
     # Environment variables with defaults
@@ -45,15 +45,15 @@ in
       FIRESTREAM_VOLUME_DIR = "/firestream";
 
       # Spark paths
-      SPARK_HOME = "/opt/spark";
-      SPARK_BASE_DIR = "/opt/spark";
-      SPARK_CONF_DIR = "/opt/spark/conf";
-      SPARK_DEFAULT_CONF_DIR = "/opt/spark/conf.default";
-      SPARK_CONF_FILE = "/opt/spark/conf/spark-defaults.conf";
-      SPARK_WORK_DIR = "/opt/spark/work";
-      SPARK_LOG_DIR = "/opt/spark/logs";
-      SPARK_TMP_DIR = "/opt/spark/tmp";
-      SPARK_JARS_DIR = "/opt/spark/jars";
+      SPARK_HOME = "/opt/firestream/spark";
+      SPARK_BASE_DIR = "/opt/firestream/spark";
+      SPARK_CONF_DIR = "/opt/firestream/spark/conf";
+      SPARK_DEFAULT_CONF_DIR = "/opt/firestream/spark/conf.default";
+      SPARK_CONF_FILE = "/opt/firestream/spark/conf/spark-defaults.conf";
+      SPARK_WORK_DIR = "/opt/firestream/spark/work";
+      SPARK_LOG_DIR = "/opt/firestream/spark/logs";
+      SPARK_TMP_DIR = "/opt/firestream/spark/tmp";
+      SPARK_JARS_DIR = "/opt/firestream/spark/jars";
       SPARK_USER_JARS_DIR = "/firestream/spark/jars";
       SPARK_DATA_DIR = "/firestream/spark/data";
       SPARK_INITSCRIPTS_DIR = "/docker-entrypoint-initdb.d";
@@ -80,7 +80,7 @@ in
       # Note: JAVA_HOME is auto-set by mkJavaContainerModule
 
       # Python configuration
-      PYTHONPATH = "/opt/spark/python:/opt/spark/python/lib/py4j-0.10.9.7-src.zip";
+      PYTHONPATH = "/opt/firestream/spark/python:/opt/firestream/spark/python/lib/py4j-0.10.9.7-src.zip";
       PYSPARK_PYTHON = "${python}/bin/python3";
       PYSPARK_DRIVER_PYTHON = "${python}/bin/python3";
 
@@ -117,6 +117,16 @@ in
       4040   # Spark application UI
       6066   # Spark REST submission port
     ];
+
+    # Distinct host-port offset (spacing 2000) so all 8 canonical apps can run
+    # simultaneously on docker without colliding. spark=28000.
+    #   master      7077 -> host 35077
+    #   master UI   8080 -> host 36080
+    #   worker UI   8081 -> host 36081
+    #   app UI      4040 -> host 32040
+    #   REST submit 6066 -> host 34066
+    #   healthd     9180 -> host 37180
+    compose.hostPortOffset = lib.mkDefault 28000;
 
     # Phase 4: enable in-image firestream-healthd. The master and worker UIs
     # default to 8080 (master) / 8081 (worker). Bitnami's spark image

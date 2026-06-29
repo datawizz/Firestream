@@ -28,7 +28,7 @@ Access the pod you want to debug by executing
 
 In order to replicate the container startup scripts execute this command:
 
-  /opt/bitnami/scripts/superset/entrypoint.sh /opt/bitnami/scripts/superset/run.sh
+  /opt/firestream/scripts/superset/entrypoint.sh /opt/firestream/scripts/superset/run.sh
 
 {{- else }}
 

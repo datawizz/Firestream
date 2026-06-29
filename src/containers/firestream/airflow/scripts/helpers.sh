@@ -1,7 +1,7 @@
 # Airflow helper functions
 # Copyright Firestream. MIT License.
 # These functions are defined at top-level of libairflow.sh so chart init
-# containers can `source /opt/bitnami/scripts/libairflow.sh` and invoke them
+# containers can `source /opt/firestream/scripts/libairflow.sh` and invoke them
 # directly. The two retry-loop helpers were moved verbatim from init.sh;
 # the airflow_conf_set / airflow_wait_for_* helpers are new minimal
 # implementations modeled on Bitnami's libairflow.sh, sufficient to satisfy
@@ -11,7 +11,7 @@
 ########################
 # Set a key/value in an Airflow .cfg (INI) file.
 # Bitnami signature: airflow_conf_set <section> <key> <value> [<file>]
-# Default file is $AIRFLOW_CONF_FILE (typically /opt/airflow/airflow.cfg).
+# Default file is $AIRFLOW_CONF_FILE (typically /opt/firestream/airflow/airflow.cfg).
 # Implementation uses crudini if available, falling back to a sed-based
 # write that handles "missing section" / "missing key" / "update existing
 # key" cases.
@@ -20,7 +20,7 @@ airflow_conf_set() {
     local -r section="${1:?missing section}"
     local -r key="${2:?missing key}"
     local -r value="${3:-}"
-    local -r file="${4:-${AIRFLOW_CONF_FILE:-/opt/airflow/airflow.cfg}}"
+    local -r file="${4:-${AIRFLOW_CONF_FILE:-/opt/firestream/airflow/airflow.cfg}}"
 
     if [[ ! -f "$file" ]]; then
         warn "airflow_conf_set: config file $file does not exist; creating"
@@ -79,7 +79,7 @@ airflow_webserver_conf_set() {
     local -r key="${1:?missing key}"
     local -r value="${2:-}"
     local -r quote_value="${3:-no}"
-    local -r file="${AIRFLOW_WEBSERVER_CONF_FILE:-/opt/airflow/webserver_config.py}"
+    local -r file="${AIRFLOW_WEBSERVER_CONF_FILE:-/opt/firestream/airflow/webserver_config.py}"
 
     if [[ ! -f "$file" ]]; then
         warn "airflow_webserver_conf_set: $file does not exist; creating"

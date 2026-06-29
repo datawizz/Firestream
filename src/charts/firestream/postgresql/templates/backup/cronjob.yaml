@@ -61,7 +61,7 @@ spec:
               {{- end }}
               {{- if .Values.auth.usePasswordFiles }}
               - name:  PGPASSWORD_FILE
-                value: {{ printf "/opt/bitnami/postgresql/secrets/%s" (include "postgresql.v1.adminPasswordKey" .) }}
+                value: {{ printf "/opt/firestream/postgresql/secrets/%s" (include "postgresql.v1.adminPasswordKey" .) }}
               {{- else }}
               - name: PGPASSWORD
                 valueFrom:
@@ -83,6 +83,9 @@ spec:
                 value: {{ printf "/tmp/certs/%s" .Values.tls.certCAFilename }}
                 {{- end }}
               {{- end }}
+              {{- if .Values.backup.cronjob.extraEnvVars }}
+              {{- include "common.tplvalues.render" (dict "value" .Values.backup.cronjob.extraEnvVars "context" $) | nindent 14 }}
+              {{- end }}
             command: {{- include "common.tplvalues.render" (dict "value" .Values.backup.cronjob.command "context" $) | nindent 14 }}
             volumeMounts:
               {{- if .Values.tls.enabled }}
@@ -99,7 +102,7 @@ spec:
                 subPath: tmp-dir
               {{- if .Values.auth.usePasswordFiles }}
               - name: postgresql-password
-                mountPath: /opt/bitnami/postgresql/secrets/
+                mountPath: /opt/firestream/postgresql/secrets/
               {{- end }}
               {{- if .Values.backup.cronjob.extraVolumeMounts }}
               {{- include "common.tplvalues.render" (dict "value" .Values.backup.cronjob.extraVolumeMounts "context" $) | nindent 14 }}

@@ -37,9 +37,9 @@ pkgs.stdenv.mkDerivation {
   src = odooSrc;
 
   installPhase = ''
-    mkdir -p $out/opt/odoo
-    cp -r . $out/opt/odoo/
-    chmod +x $out/opt/odoo/odoo-bin
+    mkdir -p $out/opt/firestream/odoo
+    cp -r . $out/opt/firestream/odoo/
+    chmod +x $out/opt/firestream/odoo/odoo-bin
   '';
 
   dontBuild = true;

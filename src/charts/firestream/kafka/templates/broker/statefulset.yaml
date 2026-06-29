@@ -210,24 +210,29 @@ spec:
               mountPath: {{ .Values.broker.persistence.mountPath }}
             - name: logs
               mountPath: {{ .Values.broker.logPersistence.mountPath }}
+            # Mount the kafka-config emptyDir as the FULL conf directory (not a
+            # per-file subPath). The prepare-config init container renders the
+            # final server.properties into this same emptyDir, so the
+            # broker/controller gets the generated config AND a writable conf
+            # dir (required because Kafka rewrites config in-place at startup
+            # and the image conf dir is read-only under readOnlyRootFilesystem).
             - name: kafka-config
-              mountPath: /opt/bitnami/kafka/config/server.properties
-              subPath: server.properties
+              mountPath: /opt/firestream/kafka/config
             - name: tmp
               mountPath: /tmp
             {{- if or .Values.log4j2 .Values.existingLog4j2ConfigMap }}
             - name: log4j2-config
-              mountPath: /opt/bitnami/kafka/config/log4j2.yaml
+              mountPath: /opt/firestream/kafka/config/log4j2.yaml
               subPath: log4j2.yaml
             {{- end }}
             {{- if include "kafka.sslEnabled" . }}
             - name: kafka-shared-certs
-              mountPath: /opt/bitnami/kafka/config/certs
+              mountPath: /opt/firestream/kafka/config/certs
               readOnly: true
             {{- end }}
             {{- if and .Values.usePasswordFiles (include "kafka.saslEnabled" .) }}
             - name: kafka-sasl
-              mountPath: /opt/bitnami/kafka/config/secrets
+              mountPath: /opt/firestream/kafka/config/secrets
               readOnly: true
             {{- end }}
             {{- if .Values.extraVolumeMounts }}

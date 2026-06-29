@@ -21,34 +21,38 @@
 , python ? pkgs.python312
 , odooSource         # The Odoo source derivation
 
+# Build-time vendored addon repos (list of specs from options.odoo.vendoredAddons,
+# forwarded via extraModuleArgs). Empty ⇒ no vendoring, stock image unchanged.
+, vendoredAddons ? [ ]
+
 # Externalized core-surface config. Defaults below are EXACTLY today's literals
 # so the legacy flake.nix path (which does not pass these) and evalContainer
 # (which passes the same values from options.nix) yield identical factory args.
 
 # Paths configuration
 , paths ? {
-    base = "/opt/odoo";
-    conf = "/opt/odoo/conf";
-    data = "/opt/odoo/data";
-    logs = "/opt/odoo/log";
+    base = "/opt/firestream/odoo";
+    conf = "/opt/firestream/odoo/conf";
+    data = "/firestream/odoo/data";
+    logs = "/opt/firestream/odoo/log";
   }
 
 # Environment variables with defaults
 , envVars ? {
     # Paths
-    ODOO_BASE_DIR = "/opt/odoo";
-    ODOO_BIN_DIR = "/opt/odoo/bin";
-    ODOO_CONF_DIR = "/opt/odoo/conf";
-    ODOO_CONF_FILE = "/opt/odoo/conf/odoo.conf";
-    ODOO_DATA_DIR = "/opt/odoo/data";
-    ODOO_ADDONS_DIR = "/opt/odoo/addons";
-    ODOO_TMP_DIR = "/opt/odoo/tmp";
-    ODOO_PID_FILE = "/opt/odoo/tmp/odoo.pid";
-    ODOO_LOGS_DIR = "/opt/odoo/log";
-    ODOO_LOG_FILE = "/opt/odoo/log/odoo-server.log";
+    ODOO_BASE_DIR = "/opt/firestream/odoo";
+    ODOO_BIN_DIR = "/opt/firestream/odoo/bin";
+    ODOO_CONF_DIR = "/opt/firestream/odoo/conf";
+    ODOO_CONF_FILE = "/opt/firestream/odoo/conf/odoo.conf";
+    ODOO_DATA_DIR = "/firestream/odoo/data";
+    ODOO_ADDONS_DIR = "/opt/firestream/odoo/addons";
+    ODOO_TMP_DIR = "/opt/firestream/odoo/tmp";
+    ODOO_PID_FILE = "/opt/firestream/odoo/tmp/odoo.pid";
+    ODOO_LOGS_DIR = "/opt/firestream/odoo/log";
+    ODOO_LOG_FILE = "/opt/firestream/odoo/log/odoo-server.log";
 
     # Volume paths
-    ODOO_VOLUME_DIR = "/opt/odoo";
+    ODOO_VOLUME_DIR = "/firestream/odoo";
 
     # User/group
     ODOO_DAEMON_USER = "odoo";
@@ -131,6 +135,15 @@
 }:
 
 let
+  # Build-time vendored addons. Built only when specs are present; the resulting
+  # derivation lays modules at $out/opt/firestream/odoo/vendor-addons/<module>, which the
+  # image builder merges into /opt/firestream/odoo/vendor-addons in the rootfs.
+  vendoredAddonsDrv =
+    import ./vendor-addons.nix { inherit pkgs lib; } {
+      version = odooVersion;
+      specs = vendoredAddons;
+    };
+
   # Read external script files
   validateScript = builtins.readFile ./scripts/validate.sh;
   configScript = builtins.readFile ./scripts/config.sh;
@@ -236,10 +249,10 @@ let
     #   $@ - Arguments to pass to odoo-bin
     #########################
     odoo_execute() {
-      local config="''${ODOO_CONF_FILE:-/opt/odoo/conf/odoo.conf}"
+      local config="''${ODOO_CONF_FILE:-/opt/firestream/odoo/conf/odoo.conf}"
 
-      debug "Executing: python /opt/odoo/odoo-bin --config=$config --logfile= --pidfile= --stop-after-init $*"
-      python /opt/odoo/odoo-bin \
+      debug "Executing: python /opt/firestream/odoo/odoo-bin --config=$config --logfile= --pidfile= --stop-after-init $*"
+      python /opt/firestream/odoo/odoo-bin \
         --config="$config" \
         --logfile= \
         --pidfile= \
@@ -256,7 +269,7 @@ let
     odoo_conf_set() {
       local key="''${1:?key required}"
       local value="''${2:?value required}"
-      local conf_file="''${ODOO_CONF_FILE:-/opt/odoo/conf/odoo.conf}"
+      local conf_file="''${ODOO_CONF_FILE:-/opt/firestream/odoo/conf/odoo.conf}"
 
       debug "Setting $key = $value in $conf_file"
 
@@ -283,7 +296,7 @@ let
     #########################
     odoo_conf_get() {
       local key="''${1:?key required}"
-      local conf_file="''${ODOO_CONF_FILE:-/opt/odoo/conf/odoo.conf}"
+      local conf_file="''${ODOO_CONF_FILE:-/opt/firestream/odoo/conf/odoo.conf}"
 
       grep "^[[:space:]]*$key[[:space:]]*=" "$conf_file" 2>/dev/null | \
         ${pkgs.gnused}/bin/sed "s|^[[:space:]]*$key[[:space:]]*=[[:space:]]*||" | \
@@ -296,7 +309,7 @@ let
     #   Major version number (e.g., 18)
     #########################
     odoo_major_version() {
-      python /opt/odoo/odoo-bin --version 2>/dev/null | \
+      python /opt/firestream/odoo/odoo-bin --version 2>/dev/null | \
         grep -E -o "[0-9]+\.[0-9]+\.[0-9]+" | \
         cut -d'.' -f1
     }
@@ -372,8 +385,9 @@ let
   # Odoo config template with {{PLACEHOLDER}} syntax
   odooConfigTemplate = ''
     [options]
-    ; Addons paths
-    addons_path = /opt/odoo/addons,/opt/odoo/odoo/addons,{{ODOO_ADDONS_DIR}}
+    ; Addons paths. /opt/firestream/odoo/vendor-addons is the baked, read-only directory
+    ; populated at build time from config.odoo.vendoredAddons (empty otherwise).
+    addons_path = /opt/firestream/odoo/addons,/opt/firestream/odoo/odoo/addons,/opt/firestream/odoo/vendor-addons,{{ODOO_ADDONS_DIR}}
 
     ; Admin password for database management
     admin_passwd = {{ODOO_PASSWORD}}
@@ -425,7 +439,7 @@ in firestream.mkPythonContainerModule {
   # Runtime directories with declarative schema
   runtimeDirs = {
     home = {
-      path = "/opt/odoo";
+      path = "/opt/firestream/odoo";
       type = "conf";
       persistence = "ephemeral";
       mode = "0755";
@@ -434,7 +448,7 @@ in firestream.mkPythonContainerModule {
       description = "Odoo home directory";
     };
     conf = {
-      path = "/opt/odoo/conf";
+      path = "/opt/firestream/odoo/conf";
       type = "conf";
       persistence = "persistent";
       mode = "0755";
@@ -443,7 +457,7 @@ in firestream.mkPythonContainerModule {
       description = "Odoo configuration directory";
     };
     data = {
-      path = "/opt/odoo/data";
+      path = "/firestream/odoo/data";
       type = "data";
       persistence = "persistent";
       mode = "0755";
@@ -452,7 +466,7 @@ in firestream.mkPythonContainerModule {
       description = "Odoo data/filestore directory";
     };
     addons = {
-      path = "/opt/odoo/addons";
+      path = "/opt/firestream/odoo/addons";
       type = "data";
       persistence = "persistent";
       mode = "0755";
@@ -460,8 +474,21 @@ in firestream.mkPythonContainerModule {
       group = 1001;
       description = "Custom Odoo addons/modules";
     };
+    # Baked read-only addons vendored at build time (config.odoo.vendoredAddons).
+    # Declared ephemeral so the directory always exists (and addons_path stays
+    # valid) even when no addons are vendored. NOT in ODOO_DATA_TO_PERSIST — it is
+    # immutable image content, not PVC state, so the chart never remaps it.
+    vendorAddons = {
+      path = "/opt/firestream/odoo/vendor-addons";
+      type = "data";
+      persistence = "ephemeral";
+      mode = "0755";
+      owner = 1001;
+      group = 1001;
+      description = "Build-time vendored Odoo addons (read-only baseline)";
+    };
     logs = {
-      path = "/opt/odoo/log";
+      path = "/opt/firestream/odoo/log";
       type = "logs";
       persistence = "ephemeral";
       mode = "0755";
@@ -470,14 +497,14 @@ in firestream.mkPythonContainerModule {
       description = "Odoo log files";
     };
     tmp = {
-      path = "/opt/odoo/tmp";
+      path = "/opt/firestream/odoo/tmp";
       type = "tmp";
       persistence = "ephemeral";
       mode = "1777";
       description = "Temporary files";
     };
     volume = {
-      path = "/opt/odoo";
+      path = "/firestream/odoo";
       type = "data";
       persistence = "persistent";
       mode = "0755";
@@ -507,12 +534,12 @@ in firestream.mkPythonContainerModule {
 
   # Build-time: Static config templates
   prepopulateFiles = {
-    "/opt/odoo/conf/odoo.conf.template" = odooConfigTemplate;
+    "/opt/firestream/odoo/conf/odoo.conf.template" = odooConfigTemplate;
   };
 
   # Per-container helpers: emitted at top-level of libhelpersodoo.sh by the
-  # engine, so chart init containers can `source /opt/bitnami/scripts/libodoo.sh`
-  # and use these helpers directly.
+  # engine, so chart init containers can source the helper from
+  # /opt/firestream/scripts/libodoo.sh and use these helpers directly.
   perContainerHelpers = odooHelpers;
 
   # Validation function
@@ -534,26 +561,26 @@ in firestream.mkPythonContainerModule {
     list_db_val="$(is_boolean_yes "$ODOO_LIST_DB" && echo 'True' || echo 'False')"
     log_level_val="$(is_boolean_yes "$BITNAMI_DEBUG" && echo 'debug' || echo 'info')"
 
-    # Process config template if exists. Look in baked /opt/odoo/conf
+    # Process config template if exists. Look in baked /opt/firestream/odoo/conf
     # (where prepopulateFiles puts the template) BEFORE the K8s-overridden
     # ODOO_CONF_DIR — the template is baked into the image, not under PVC.
-    local conf_dir="''${ODOO_CONF_DIR:-/opt/odoo/conf}"
+    local conf_dir="''${ODOO_CONF_DIR:-/opt/firestream/odoo/conf}"
     local conf_file="''${ODOO_CONF_FILE:-$conf_dir/odoo.conf}"
     local template_file="$conf_dir/odoo.conf.template"
-    [[ -f "$template_file" ]] || template_file="/opt/odoo/conf/odoo.conf.template"
+    [[ -f "$template_file" ]] || template_file="/opt/firestream/odoo/conf/odoo.conf.template"
 
-    # Ensure conf_dir exists. With Bitnami chart's PVC at /bitnami/odoo,
-    # the chart already created /bitnami/odoo as a mount point, but the
-    # `conf` subdir might not exist yet. mkdir -p is a no-op if it exists.
+    # Ensure conf_dir exists. The conf dir lives under the app tree
+    # (/opt/firestream/odoo/conf) on the writable rootfs, not on the data PVC
+    # (/firestream/odoo); mkdir -p is a no-op if it already exists.
     ${pkgs.coreutils}/bin/mkdir -p "$conf_dir" 2>/dev/null || true
 
     if [[ -f "$template_file" ]] && [[ ! -f "$conf_file" ]]; then
       info "Generating odoo.conf from template..."
       ${pkgs.gnused}/bin/sed \
-        -e "s|{{ODOO_ADDONS_DIR}}|''${ODOO_ADDONS_DIR:-/opt/odoo/addons}|g" \
+        -e "s|{{ODOO_ADDONS_DIR}}|''${ODOO_ADDONS_DIR:-/opt/firestream/odoo/addons}|g" \
         -e "s|{{ODOO_PASSWORD}}|''${ODOO_PASSWORD:-admin}|g" \
-        -e "s|{{ODOO_DATA_DIR}}|''${ODOO_DATA_DIR:-/opt/odoo/data}|g" \
-        -e "s|{{ODOO_LOG_FILE}}|''${ODOO_LOG_FILE:-/opt/odoo/log/odoo-server.log}|g" \
+        -e "s|{{ODOO_DATA_DIR}}|''${ODOO_DATA_DIR:-/firestream/odoo/data}|g" \
+        -e "s|{{ODOO_LOG_FILE}}|''${ODOO_LOG_FILE:-/opt/firestream/odoo/log/odoo-server.log}|g" \
         -e "s|{{ODOO_DATABASE_HOST}}|''${ODOO_DATABASE_HOST:-postgresql}|g" \
         -e "s|{{ODOO_DATABASE_NAME}}|''${ODOO_DATABASE_NAME:-firestream_odoo}|g" \
         -e "s|{{ODOO_DATABASE_PASSWORD}}|''${ODOO_DATABASE_PASSWORD:-}|g" \
@@ -586,11 +613,11 @@ in firestream.mkPythonContainerModule {
 
     info "Starting Odoo ${odooVersion}..."
 
-    conf_file="''${ODOO_CONF_FILE:-/opt/odoo/conf/odoo.conf}"
-    pid_file="''${ODOO_PID_FILE:-/opt/odoo/tmp/odoo.pid}"
+    conf_file="''${ODOO_CONF_FILE:-/opt/firestream/odoo/conf/odoo.conf}"
+    pid_file="''${ODOO_PID_FILE:-/opt/firestream/odoo/tmp/odoo.pid}"
 
     # Run Odoo
-    exec python /opt/odoo/odoo-bin \
+    exec python /opt/firestream/odoo/odoo-bin \
       --config="$conf_file" \
       --pidfile="$pid_file"
   '';
@@ -599,7 +626,7 @@ in firestream.mkPythonContainerModule {
 
   inherit exposedPorts;
   inherit health;
-  volumes = [ "/opt/odoo/data" "/opt/odoo/addons" "/bitnami/python" "/docker-entrypoint-init.d" ];
+  volumes = [ "/firestream/odoo/data" "/opt/firestream/odoo/addons" "/bitnami/python" "/docker-entrypoint-init.d" ];
 
   user = {
     name = "odoo";
@@ -613,8 +640,11 @@ in firestream.mkPythonContainerModule {
   requirementsPath = "/bitnami/python/requirements.txt";
   enablePip = true;
 
-  # Extra packages for the container
-  extraDeps = [ odooSource ];
+  # Extra packages for the container. The vendored-addons derivation is only
+  # appended when specs are present, so an empty list yields a byte-identical
+  # closure to the pre-vendoring image.
+  extraDeps = [ odooSource ]
+    ++ lib.optional (vendoredAddons != [ ]) vendoredAddonsDrv;
 
   # Development shell extras
   devShellPackages = with pkgs; [ uv docker docker-compose ];

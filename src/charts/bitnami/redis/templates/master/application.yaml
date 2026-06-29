@@ -134,7 +134,7 @@ spec:
           {{- else }}
           args:
             - -ec
-            - /opt/bitnami/scripts/start-scripts/start-master.sh
+            - /opt/firestream/scripts/start-scripts/start-master.sh
           {{- end }}
           env:
             - name: BITNAMI_DEBUG
@@ -146,7 +146,7 @@ spec:
             {{- if .Values.auth.enabled }}
             {{- if .Values.auth.usePasswordFiles }}
             - name: REDIS_PASSWORD_FILE
-              value: "/opt/bitnami/redis/secrets/redis-password"
+              value: "/opt/firestream/redis/secrets/redis-password"
             {{- else }}
             - name: REDIS_PASSWORD
               valueFrom:
@@ -242,12 +242,12 @@ spec:
           {{- end }}
           volumeMounts:
             - name: start-scripts
-              mountPath: /opt/bitnami/scripts/start-scripts
+              mountPath: /opt/firestream/scripts/start-scripts
             - name: health
               mountPath: /health
             {{- if and .Values.auth.enabled .Values.auth.usePasswordFiles }}
             - name: redis-password
-              mountPath: /opt/bitnami/redis/secrets/
+              mountPath: /opt/firestream/redis/secrets/
             {{- end }}
             - name: redis-data
               mountPath: {{ .Values.master.persistence.path }}
@@ -257,10 +257,10 @@ spec:
               subPathExpr: {{ .Values.master.persistence.subPathExpr }}
               {{- end }}
             - name: config
-              mountPath: /opt/bitnami/redis/mounted-etc
+              mountPath: /opt/firestream/redis/mounted-etc
             {{- if and .Values.master.containerSecurityContext.enabled .Values.master.containerSecurityContext.readOnlyRootFilesystem }}
             - name: empty-dir
-              mountPath: /opt/bitnami/redis/etc/
+              mountPath: /opt/firestream/redis/etc/
               subPath: app-conf-dir
             - name: empty-dir
               mountPath: /tmp
@@ -268,7 +268,7 @@ spec:
             {{- end }}
             {{- if .Values.tls.enabled }}
             - name: redis-certificates
-              mountPath: /opt/bitnami/redis/certs
+              mountPath: /opt/firestream/redis/certs
               readOnly: true
             {{- end }}
             {{- if .Values.master.extraVolumeMounts }}
@@ -378,7 +378,7 @@ spec:
             {{- end }}
             {{- if .Values.tls.enabled }}
             - name: redis-certificates
-              mountPath: /opt/bitnami/redis/certs
+              mountPath: /opt/firestream/redis/certs
               readOnly: true
             {{- end }}
             {{- if .Values.metrics.extraVolumeMounts }}

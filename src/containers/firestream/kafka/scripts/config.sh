@@ -36,7 +36,16 @@ kafka_configure() {
     cp -L "${KAFKA_TLS_TRUSTSTORE_FILE}" "$KAFKA_CERTS_DIR"
   fi
 
-  if [[ ! -f "${KAFKA_MOUNTED_CONF_DIR}/server.properties" ]]; then
+  # Skip regeneration when a server.properties is already present — either in
+  # the user-mounted conf dir (KAFKA_MOUNTED_CONF_DIR) or already injected into
+  # the working conf dir (KAFKA_CONF_DIR). Under K8s the chart's prepare-config
+  # init container writes the fully-rendered server.properties (per-pod
+  # advertised.listeners, SASL/TLS placeholders resolved) into the kafka-config
+  # emptyDir, which the broker/controller mount AS the writable conf dir. In
+  # that case regenerating from env vars would clobber the init-rendered config
+  # (and the conf dir is mounted read-only-by-file otherwise), so we must reuse
+  # the injected file verbatim.
+  if [[ ! -f "${KAFKA_MOUNTED_CONF_DIR}/server.properties" ]] && [[ ! -f "${KAFKA_CONF_DIR}/server.properties" ]]; then
     info "No injected configuration files found, creating default config files"
 
     # Restore original server.properties but remove conflicting settings.
@@ -119,7 +128,7 @@ kafka_configure() {
     # Configure Kafka using environment variables again (allows user overrides)
     kafka_configure_from_environment_variables
   else
-    info "Detected mounted server.properties file at ${KAFKA_MOUNTED_CONF_DIR}/server.properties. Skipping configuration based on env variables"
+    info "Detected injected server.properties file (in ${KAFKA_MOUNTED_CONF_DIR} or ${KAFKA_CONF_DIR}). Skipping configuration based on env variables"
   fi
 }
 

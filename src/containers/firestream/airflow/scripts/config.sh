@@ -4,6 +4,16 @@
 
 info "Generating Airflow configuration..."
 
+# Chart mode: airflow.cfg is fully rendered by the chart's prepare-config init
+# container and mounted into this pod; the config dir itself is read-only, so the
+# crudini-based ini_set calls below would fail trying to write a temp file there.
+# The chart-provided cfg already contains the correct connection/executor/celery
+# settings, so skip in-container re-generation when AIRFLOW_SKIP_DB_SETUP=yes.
+if is_boolean_yes "${AIRFLOW_SKIP_DB_SETUP:-no}"; then
+  info "AIRFLOW_SKIP_DB_SETUP=yes - using chart-provided airflow.cfg; skipping configuration generation"
+  return 0
+fi
+
 major_version=$(airflow_major_version)
 debug "Detected Airflow major version: $major_version"
 

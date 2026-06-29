@@ -25,10 +25,10 @@
 
 # Paths configuration
 , paths ? {
-    base = "/opt/spark";
-    conf = "/opt/spark/conf";
+    base = "/opt/firestream/spark";
+    conf = "/opt/firestream/spark/conf";
     data = "/firestream/spark/data";
-    logs = "/opt/spark/logs";
+    logs = "/opt/firestream/spark/logs";
   }
 
 # Environment variables with defaults
@@ -42,15 +42,15 @@
     FIRESTREAM_VOLUME_DIR = "/firestream";
 
     # Spark paths
-    SPARK_HOME = "/opt/spark";
-    SPARK_BASE_DIR = "/opt/spark";
-    SPARK_CONF_DIR = "/opt/spark/conf";
-    SPARK_DEFAULT_CONF_DIR = "/opt/spark/conf.default";
-    SPARK_CONF_FILE = "/opt/spark/conf/spark-defaults.conf";
-    SPARK_WORK_DIR = "/opt/spark/work";
-    SPARK_LOG_DIR = "/opt/spark/logs";
-    SPARK_TMP_DIR = "/opt/spark/tmp";
-    SPARK_JARS_DIR = "/opt/spark/jars";
+    SPARK_HOME = "/opt/firestream/spark";
+    SPARK_BASE_DIR = "/opt/firestream/spark";
+    SPARK_CONF_DIR = "/opt/firestream/spark/conf";
+    SPARK_DEFAULT_CONF_DIR = "/opt/firestream/spark/conf.default";
+    SPARK_CONF_FILE = "/opt/firestream/spark/conf/spark-defaults.conf";
+    SPARK_WORK_DIR = "/opt/firestream/spark/work";
+    SPARK_LOG_DIR = "/opt/firestream/spark/logs";
+    SPARK_TMP_DIR = "/opt/firestream/spark/tmp";
+    SPARK_JARS_DIR = "/opt/firestream/spark/jars";
     SPARK_USER_JARS_DIR = "/firestream/spark/jars";
     SPARK_DATA_DIR = "/firestream/spark/data";
     SPARK_INITSCRIPTS_DIR = "/docker-entrypoint-initdb.d";
@@ -77,7 +77,7 @@
     # Note: JAVA_HOME is auto-set by mkJavaContainerModule
 
     # Python configuration
-    PYTHONPATH = "/opt/spark/python:/opt/spark/python/lib/py4j-0.10.9.7-src.zip";
+    PYTHONPATH = "/opt/firestream/spark/python:/opt/firestream/spark/python/lib/py4j-0.10.9.7-src.zip";
     PYSPARK_PYTHON = "${python}/bin/python3";
     PYSPARK_DRIVER_PYTHON = "${python}/bin/python3";
 
@@ -233,7 +233,7 @@ in firestream.mkJavaContainerModule {
   gcOpts = "-XX:+UseG1GC -XX:MaxGCPauseMillis=20 -XX:InitiatingHeapOccupancyPercent=35";
 
   # Classpath: Spark JAR directories
-  jarDirs = [ "/opt/spark/jars" "/firestream/spark/jars" ];
+  jarDirs = [ "/opt/firestream/spark/jars" "/firestream/spark/jars" ];
 
   # Paths, environment variables, and secret-aware variables are externalized
   # as function arguments (defaults equal to the historical literals). The
@@ -255,7 +255,7 @@ in firestream.mkJavaContainerModule {
   # Runtime directories with declarative schema
   runtimeDirs = {
     home = {
-      path = "/opt/spark";
+      path = "/opt/firestream/spark";
       type = "conf";
       persistence = "ephemeral";
       mode = "0755";
@@ -264,7 +264,7 @@ in firestream.mkJavaContainerModule {
       description = "Spark installation directory";
     };
     conf = {
-      path = "/opt/spark/conf";
+      path = "/opt/firestream/spark/conf";
       type = "conf";
       persistence = "ephemeral";
       mode = "0755";
@@ -273,7 +273,7 @@ in firestream.mkJavaContainerModule {
       description = "Spark configuration files";
     };
     confDefault = {
-      path = "/opt/spark/conf.default";
+      path = "/opt/firestream/spark/conf.default";
       type = "conf";
       persistence = "ephemeral";
       mode = "0755";
@@ -282,7 +282,7 @@ in firestream.mkJavaContainerModule {
       description = "Default configuration templates";
     };
     work = {
-      path = "/opt/spark/work";
+      path = "/opt/firestream/spark/work";
       type = "work";
       persistence = "ephemeral";
       mode = "0755";
@@ -291,7 +291,7 @@ in firestream.mkJavaContainerModule {
       description = "Spark executor work directory";
     };
     logs = {
-      path = "/opt/spark/logs";
+      path = "/opt/firestream/spark/logs";
       type = "logs";
       persistence = "persistent";
       mode = "0755";
@@ -300,14 +300,14 @@ in firestream.mkJavaContainerModule {
       description = "Spark application and daemon logs";
     };
     tmp = {
-      path = "/opt/spark/tmp";
+      path = "/opt/firestream/spark/tmp";
       type = "tmp";
       persistence = "ephemeral";
       mode = "1777";
       description = "Temporary files";
     };
     jars = {
-      path = "/opt/spark/jars";
+      path = "/opt/firestream/spark/jars";
       type = "data";
       persistence = "ephemeral";
       mode = "0755";
@@ -355,7 +355,7 @@ in firestream.mkJavaContainerModule {
 
   # Build-time: Static config templates
   prepopulateFiles = {
-    "/opt/spark/conf/spark-defaults.conf.template" = sparkDefaultsTemplate;
+    "/opt/firestream/spark/conf/spark-defaults.conf.template" = sparkDefaultsTemplate;
   };
 
   # Per-container helpers: emitted at top-level of libhelpersspark.sh by the
@@ -377,14 +377,14 @@ in firestream.mkJavaContainerModule {
     info "Activating Spark configuration..."
 
     # Process config template if exists. The template is baked into the image
-    # at /opt/spark/conf/spark-defaults.conf.template (read-only), but the
+    # at /opt/firestream/spark/conf/spark-defaults.conf.template (read-only), but the
     # output conf_file must live at SPARK_CONF_FILE so K8s-injected env
-    # (Bitnami chart sets /opt/bitnami/spark/conf) wins over the baked default.
-    # Without this, charts that mount an emptyDir at /opt/bitnami/spark/conf
+    # (Bitnami chart sets /opt/firestream/spark/conf) wins over the baked default.
+    # Without this, charts that mount an emptyDir at /opt/firestream/spark/conf
     # and enforce readOnlyRootFilesystem would fail with
-    # "/opt/spark/conf/spark-defaults.conf: Read-only file system".
-    local template_file="/opt/spark/conf/spark-defaults.conf.template"
-    local conf_file="''${SPARK_CONF_FILE:-/opt/spark/conf/spark-defaults.conf}"
+    # "/opt/firestream/spark/conf/spark-defaults.conf: Read-only file system".
+    local template_file="/opt/firestream/spark/conf/spark-defaults.conf.template"
+    local conf_file="''${SPARK_CONF_FILE:-/opt/firestream/spark/conf/spark-defaults.conf}"
 
     if [[ -f "$template_file" ]] && [[ ! -f "$conf_file" ]]; then
       ${pkgs.gnused}/bin/sed \
@@ -422,8 +422,8 @@ in firestream.mkJavaContainerModule {
 
     info "Starting Spark in ''${SPARK_MODE:-master} mode..."
 
-    # The env-defaults set SPARK_HOME=/opt/spark for bitnami compatibility, but
-    # /opt/spark only holds writable runtime dirs (conf/, jars/, logs/, work/).
+    # The env-defaults set SPARK_HOME=/opt/firestream/spark for bitnami compatibility, but
+    # /opt/firestream/spark only holds writable runtime dirs (conf/, jars/, logs/, work/).
     # The spark-class wrapper sources $SPARK_HOME/bin/load-spark-env.sh, which
     # only exists under the nix-store spark package — override SPARK_HOME to
     # point there before exec.
@@ -437,11 +437,11 @@ in firestream.mkJavaContainerModule {
       worker)
         info "Starting Spark Worker connecting to ''${SPARK_MASTER_URL}..."
         # Pass --work-dir explicitly so the Worker writes to a writable path.
-        # Bitnami chart sets SPARK_WORK_DIR=/opt/bitnami/spark/work (emptyDir);
+        # Bitnami chart sets SPARK_WORK_DIR=/opt/firestream/spark/work (emptyDir);
         # without --work-dir, spark defaults to $SPARK_HOME/work which is
         # /nix/store/...spark.../work (read-only).
         exec ${pkgs.spark}/bin/spark-class org.apache.spark.deploy.worker.Worker \
-          --work-dir "''${SPARK_WORK_DIR:-/opt/spark/work}" \
+          --work-dir "''${SPARK_WORK_DIR:-/opt/firestream/spark/work}" \
           "''${SPARK_MASTER_URL}"
         ;;
       driver)
@@ -469,7 +469,7 @@ in firestream.mkJavaContainerModule {
           "''${java_opts[@]}" \
           "-Xms''${SPARK_EXECUTOR_MEMORY:-1g}" \
           "-Xmx''${SPARK_EXECUTOR_MEMORY:-1g}" \
-          -cp '/opt/spark/conf::/opt/spark/jars/*' \
+          -cp '/opt/firestream/spark/conf::/opt/firestream/spark/jars/*' \
           org.apache.spark.scheduler.cluster.k8s.KubernetesExecutorBackend \
           --driver-url "''${SPARK_DRIVER_URL}" \
           --executor-id "''${SPARK_EXECUTOR_ID}" \
@@ -496,8 +496,8 @@ in firestream.mkJavaContainerModule {
 
   # Volume paths
   volumes = [
-    "/opt/spark/work"
-    "/opt/spark/logs"
+    "/opt/firestream/spark/work"
+    "/opt/firestream/spark/logs"
     "/firestream/spark/data"
     "/firestream/spark/jars"
   ];
