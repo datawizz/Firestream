@@ -1,0 +1,53 @@
+[package]
+name = "firestream-e2e-k8s"
+version = "0.1.0"
+edition = "2024"
+authors = ["Firestream Team"]
+description = "k3d/helm end-to-end test harness for the Firestream chart bundle. Per-test cluster lifecycle, image preload, helm deploy, kubectl-driven probes. Local-only (not exercised in CI)."
+license = "MIT"
+
+[lib]
+name = "firestream_e2e_k8s"
+path = "src/lib.rs"
+
+[dependencies]
+# Transport-agnostic primitives: Probe trait, retry loop, env-contract,
+# guard helpers, Exec trait. The KubectlExec impl in this crate satisfies
+# core's Exec trait so the same PgIsReady/RedisPing/KafkaApiVersions probes
+# work over kubectl exec.
+firestream-e2e-core = { workspace = true }
+
+# Phase 3: chart bundle reader. `Charts::open(charts_dir)` + `.get(chart)`
+# parses the index + per-chart manifest the Nix side emits.
+firestream-charts = { workspace = true }
+
+# Phase 3: the helm lifecycle deploy path. We deliberately route the test
+# harness through `deploy_chart_lifecycle` (same call sequence the CLI
+# takes in `firestream helm deploy <chart>`) so the test exercises the
+# real code path, not a parallel shell-out.
+firestream = { workspace = true }
+
+# Phase-3 backup round-trip: the kubectl execution layer. We drive the
+# SAME `KubectlClient` helpers the `firestream helm backup/restore` CLI
+# arms use (`create_job_from_cronjob`, `wait_for_job`, `get_logs`,
+# `apply_yaml`) so the e2e exercises the real on-demand code path rather
+# than a parallel shell-out.
+helm-manager = { workspace = true }
+
+# Error type used throughout the crate (cluster create, exec failures, etc.)
+anyhow = { workspace = true }
+
+# k8s-manager's cluster lifecycle methods are async. We spin a
+# current-thread tokio runtime inside the sync `create_cluster()` entry
+# point so the public API of this crate stays synchronous (matching
+# firestream-e2e-core's convention).
+tokio = { workspace = true }
+
+# Structured logging for deploy/teardown lifecycle events. Optional but
+# useful when triaging a failed test.
+tracing = { workspace = true }
+
+[dev-dependencies]
+# Serialise env-mutation in env-accessor unit tests so cargo's
+# in-process parallel runner can't race them.
+once_cell = { workspace = true }

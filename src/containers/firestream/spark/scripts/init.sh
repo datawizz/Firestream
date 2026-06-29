@@ -38,7 +38,9 @@ spark_initialize() {
 
     # Temp directory
     ensure_dir_exists "$SPARK_TMP_DIR"
-    chmod 1777 "$SPARK_TMP_DIR"
+    # chmod may fail on K8s emptyDirs mounted at non-baked paths (e.g. Bitnami
+    # chart's /opt/firestream/spark/tmp owned by root, pod runs as 1001) — best-effort
+    chmod 1777 "$SPARK_TMP_DIR" 2>/dev/null || debug "Skipped chmod on $SPARK_TMP_DIR"
 
     # User jars directory (persistent volume)
     if [[ -n "${SPARK_USER_JARS_DIR:-}" ]]; then

@@ -1,31 +1,70 @@
-// Per-protocol readiness probes for canonical Firestream stacks.
+// Per-protocol readiness probes for canonical Firestream stacks (docker-
+// compose backend).
+//
+// As of Phase 1 of the k3d/helm e2e plan, the transport-agnostic primitives
+// (`Probe` trait, `Tcp`, `HttpReady`, `PgIsReady`, `RedisPing`,
+// `KafkaApiVersions`) have moved to `firestream-e2e-core`. This file is now
+// the **docker-specific** probe matrix:
+//
+//   * `DockerComposeExec` — `Exec` impl that shells out to
+//     `docker compose -f <compose_file> -p <project> exec -T <service> <cmd…>`.
+//   * `ProbeCtx`           — per-stack context populated from `nix eval --json`.
+//   * `SparkWithWorkers`   — REST-JSON probe specific to the Spark master.
+//   * `HealthEndpoint`     — `firestream-healthd` `/readyz` + `/sbom` probe.
+//   * `for_stack(stack, ctx)` — the per-stack chain matrix the docker harness
+//     consults.
+//   * `dump_diagnostics`   — `docker compose ps` + `logs --tail 200` on failure.
 //
 // Audit correction 3: a blanket TCP-is-bound check is near-vacuous for several
-// stacks (Kafka's listener binds before metadata is serviceable; a Spark master
-// binds before workers register). Each probe below tests the protocol-level
-// invariant that downstream consumers actually depend on.
+// stacks (Kafka's listener binds before metadata is serviceable; a Spark
+// master binds before workers register). Each probe below tests the
+// protocol-level invariant that downstream consumers actually depend on.
 //
-// All probes are SYNCHRONOUS. The harness drives them inside a retry loop with
-// a wall-clock deadline (see `harness::retry_until_sync`). Sync probes
-// eliminate the "Tokio Runtime in Drop" hazard (audit correction 6) outright:
-// no async runtime is created in run_one, so there is nothing for StackGuard's
-// Drop to race against.
-//
-// NOTE on `wait-for-port`: the upstream `PortWaiter` API is async-only.
-// Spinning a fresh `tokio::runtime::Runtime` per probe invocation just to call
-// `.wait().await` is wasteful and adds a Drop race. `std::net::TcpStream`
-// with `connect_timeout` does the same job synchronously and is what every
-// blocking probe in this file uses for connectivity checks.
+// All probes are SYNCHRONOUS. The harness drives them inside a retry loop
+// with a wall-clock deadline (see `firestream_e2e_core::retry::retry_until_sync`).
 
 use std::io::Read;
-use std::net::{SocketAddr, TcpStream, ToSocketAddrs};
 use std::path::PathBuf;
-use std::process::{Command, Stdio};
+use std::process::{Command, Output, Stdio};
+use std::sync::Arc;
 use std::time::{Duration, Instant};
 
-use anyhow::{anyhow, bail, Context, Result};
+use anyhow::{Context, Result, anyhow, bail};
 
-/// Per-probe context populated by the harness from `nix eval` data.
+use firestream_e2e_core::exec::Exec;
+use firestream_e2e_core::probe::{
+    HttpReady, KafkaApiVersions, PgIsReady, RedisPing, Tcp,
+};
+
+// ---------- DockerComposeExec: Exec impl for `docker compose exec -T` ----------
+
+/// `Exec` impl that translates `target` into a compose service inside a fixed
+/// `(compose_file, project)` pair and runs the requested command via
+/// `docker compose -f <file> -p <project> exec -T <target> <args…>`.
+///
+/// One instance per stack — stash it in an `Arc` and hand it to every
+/// exec-driven probe in the stack's chain.
+pub struct DockerComposeExec {
+    pub compose_file: PathBuf,
+    pub project_name: String,
+}
+
+impl Exec for DockerComposeExec {
+    fn exec(&self, target: &str, args: &[&str]) -> Result<Output> {
+        let mut cmd = Command::new("docker");
+        cmd.args(["compose", "-f"])
+            .arg(&self.compose_file)
+            .args(["-p", &self.project_name, "exec", "-T", target])
+            .args(args)
+            .stdin(Stdio::null());
+        cmd.output()
+            .with_context(|| format!("spawn docker compose exec {} {:?}", target, args))
+    }
+}
+
+// ---------- ProbeCtx ----------
+
+/// Per-probe context populated by the docker harness from `nix eval` data.
 pub struct ProbeCtx {
     /// Path to the rendered docker-compose.yml (for `docker compose -f`).
     pub compose_file: PathBuf,
@@ -39,159 +78,71 @@ pub struct ProbeCtx {
     /// never has to recompute the offset itself.
     pub health_host_port: Option<u16>,
     /// Wall-clock deadline for the entire readiness phase of this stack.
-    /// Probes are advisory consumers; the harness owns retry & timeout.
     /// Allow dead_code: kept for Phase 3+ probes that bound their own
     /// per-probe operations against the outer deadline.
     #[allow(dead_code)]
     pub deadline: Instant,
 }
 
-/// Trait implemented by every readiness probe. `name` is used in failure
-/// messages; `run` must be cheap and idempotent because the harness calls it
-/// in a retry loop until success-or-deadline.
-pub trait Probe {
+impl ProbeCtx {
+    /// Construct a fresh `Arc<dyn Exec>` for the exec-driven probes in this
+    /// stack's chain. Cheap — the result wraps a `DockerComposeExec`
+    /// which holds only a path and a string.
+    fn exec(&self) -> Arc<dyn Exec> {
+        Arc::new(DockerComposeExec {
+            compose_file: self.compose_file.clone(),
+            project_name: self.project.clone(),
+        })
+    }
+}
+
+// ---------- Probe-trait adapter ----------
+//
+// `firestream_e2e_core::probe::Probe::run` takes `()` (transport-agnostic),
+// but the docker harness's run loop calls `probe.run(&ctx)`. Wrap every core
+// probe in a thin adapter so the for_stack() return type stays a
+// `Vec<Box<dyn LocalProbe>>` and the harness code is unchanged.
+
+/// Local probe trait — same shape as the original `probes::Probe`, takes the
+/// docker `ProbeCtx`. Implemented for both:
+///   * `CoreProbe<T>`           — adapter for transport-agnostic core probes
+///   * `SparkWithWorkers`       — docker-specific (HTTP-based) probe
+///   * `HealthEndpoint`         — docker-specific firestream-healthd probe
+pub trait Probe_ {
     fn name(&self) -> &str;
     fn run(&self, ctx: &ProbeCtx) -> Result<()>;
 }
 
-// ---------- TCP ----------
+// Re-export under the historical name so the harness imports stay untouched.
+pub use Probe_ as Probe;
 
-/// Synchronous TCP "connect succeeds" probe. Tries every resolved address for
-/// 127.0.0.1:port; ECONNREFUSED / ETIMEDOUT yield a retryable Err.
-pub struct Tcp {
-    pub port: u16,
+/// Adapter from `firestream_e2e_core::probe::Probe` (no ctx) to the harness's
+/// local `Probe` trait (takes `&ProbeCtx`).
+pub struct CoreProbe<T: firestream_e2e_core::probe::Probe> {
+    inner: T,
 }
 
-impl Probe for Tcp {
+impl<T: firestream_e2e_core::probe::Probe> CoreProbe<T> {
+    pub fn new(inner: T) -> Self {
+        Self { inner }
+    }
+}
+
+impl<T: firestream_e2e_core::probe::Probe> Probe_ for CoreProbe<T> {
     fn name(&self) -> &str {
-        "tcp"
+        self.inner.name()
     }
     fn run(&self, _ctx: &ProbeCtx) -> Result<()> {
-        let addrs: Vec<SocketAddr> = ("127.0.0.1", self.port)
-            .to_socket_addrs()
-            .with_context(|| format!("resolve 127.0.0.1:{}", self.port))?
-            .collect();
-        let timeout = Duration::from_secs(2);
-        let mut last_err: Option<std::io::Error> = None;
-        for addr in &addrs {
-            match TcpStream::connect_timeout(addr, timeout) {
-                Ok(_) => return Ok(()),
-                Err(e) => last_err = Some(e),
-            }
-        }
-        Err(anyhow!(
-            "tcp connect 127.0.0.1:{} failed: {}",
-            self.port,
-            last_err
-                .map(|e| e.to_string())
-                .unwrap_or_else(|| "no addresses".into())
-        ))
+        self.inner.run()
     }
 }
 
-// ---------- pg_isready ----------
-
-/// `docker compose exec -T <service> pg_isready -U <user> -d <db>` until exit 0.
-pub struct PgIsReady {
-    pub service: String,
-    pub user: String,
-    pub db: String,
+/// Convenience: `Box<CoreProbe<T>> as Box<dyn Probe_>` in one call.
+fn boxed<T: firestream_e2e_core::probe::Probe + 'static>(p: T) -> Box<dyn Probe_> {
+    Box::new(CoreProbe::new(p))
 }
 
-impl Probe for PgIsReady {
-    fn name(&self) -> &str {
-        "pg_isready"
-    }
-    fn run(&self, ctx: &ProbeCtx) -> Result<()> {
-        let status = Command::new("docker")
-            .args(["compose", "-f"])
-            .arg(&ctx.compose_file)
-            .args(["-p", &ctx.project, "exec", "-T", &self.service, "pg_isready", "-U", &self.user, "-d", &self.db])
-            .stdin(Stdio::null())
-            .stdout(Stdio::null())
-            .stderr(Stdio::null())
-            .status()
-            .context("spawn docker compose exec pg_isready")?;
-        if status.success() {
-            Ok(())
-        } else {
-            Err(anyhow!("pg_isready exited with {}", status))
-        }
-    }
-}
-
-// ---------- redis ping ----------
-
-/// `docker compose exec -T <service> redis-cli ping` until output == "PONG".
-pub struct RedisPing {
-    pub service: String,
-}
-
-impl Probe for RedisPing {
-    fn name(&self) -> &str {
-        "redis_ping"
-    }
-    fn run(&self, ctx: &ProbeCtx) -> Result<()> {
-        let out = Command::new("docker")
-            .args(["compose", "-f"])
-            .arg(&ctx.compose_file)
-            .args(["-p", &ctx.project, "exec", "-T", &self.service, "redis-cli", "ping"])
-            .stdin(Stdio::null())
-            .output()
-            .context("spawn docker compose exec redis-cli ping")?;
-        if !out.status.success() {
-            bail!("redis-cli ping exit {}: {}", out.status, String::from_utf8_lossy(&out.stderr));
-        }
-        let body = String::from_utf8_lossy(&out.stdout);
-        if body.trim() == "PONG" {
-            Ok(())
-        } else {
-            Err(anyhow!("redis-cli ping returned {:?}", body))
-        }
-    }
-}
-
-// ---------- kafka broker metadata ----------
-
-/// `kafka-broker-api-versions --bootstrap-server <bootstrap>` until exit 0.
-/// Verifies broker metadata is serviceable, not just listener bound.
-pub struct KafkaApiVersions {
-    pub service: String,
-    pub bootstrap: String,
-}
-
-impl Probe for KafkaApiVersions {
-    fn name(&self) -> &str {
-        "kafka_api_versions"
-    }
-    fn run(&self, ctx: &ProbeCtx) -> Result<()> {
-        let status = Command::new("docker")
-            .args(["compose", "-f"])
-            .arg(&ctx.compose_file)
-            .args([
-                "-p",
-                &ctx.project,
-                "exec",
-                "-T",
-                &self.service,
-                "kafka-broker-api-versions",
-                "--bootstrap-server",
-                &self.bootstrap,
-            ])
-            .stdin(Stdio::null())
-            .stdout(Stdio::null())
-            .stderr(Stdio::null())
-            .status()
-            .context("spawn docker compose exec kafka-broker-api-versions")?;
-        if status.success() {
-            Ok(())
-        } else {
-            Err(anyhow!("kafka-broker-api-versions exited with {}", status))
-        }
-    }
-}
-
-// ---------- spark master + worker count ----------
+// ---------- spark master + worker count (docker-specific) ----------
 
 /// HTTP GET on master REST endpoint, parse JSON, require `aliveworkers >= min_workers`.
 /// Reference: Spark master serves `/json/` returning `{ aliveworkers, ... }`.
@@ -200,7 +151,7 @@ pub struct SparkWithWorkers {
     pub min_workers: u32,
 }
 
-impl Probe for SparkWithWorkers {
+impl Probe_ for SparkWithWorkers {
     fn name(&self) -> &str {
         "spark_with_workers"
     }
@@ -237,42 +188,7 @@ impl Probe for SparkWithWorkers {
     }
 }
 
-// ---------- generic HTTP readiness ----------
-
-/// `reqwest::blocking::Client` GET; redirect policy = `none`; ready iff
-/// connect succeeds AND status < max_status (so 200/301/302/401/403 all count
-/// as "the app is alive"; 5xx is not ready).
-pub struct HttpReady {
-    pub url: String,
-    pub max_status: u16,
-}
-
-impl Probe for HttpReady {
-    fn name(&self) -> &str {
-        "http_ready"
-    }
-    fn run(&self, _ctx: &ProbeCtx) -> Result<()> {
-        let client = reqwest::blocking::Client::builder()
-            .redirect(reqwest::redirect::Policy::none())
-            .timeout(Duration::from_secs(5))
-            .build()
-            .context("build reqwest blocking client")?;
-        // reqwest converts connect failures (ECONNREFUSED, ETIMEDOUT) into Err,
-        // which the outer retry loop will swallow until the deadline.
-        let resp = client
-            .get(&self.url)
-            .send()
-            .with_context(|| format!("GET {}", self.url))?;
-        let status = resp.status().as_u16();
-        if status < self.max_status {
-            Ok(())
-        } else {
-            Err(anyhow!("GET {} status {} >= max {}", self.url, status, self.max_status))
-        }
-    }
-}
-
-// ---------- firestream-healthd /readyz + /sbom ----------
+// ---------- firestream-healthd /readyz + /sbom (docker-specific) ----------
 
 /// Probe the in-image `firestream-healthd` service. Polls `<base_url>/readyz`
 /// until 200, then makes a single `<base_url>/sbom?format=cyclonedx` request
@@ -281,14 +197,11 @@ impl Probe for HttpReady {
 /// success — the harness retry loop is only responsible for the readiness
 /// portion; a /sbom failure escalates immediately because the SBOM is baked
 /// at build time and retries cannot fix a malformed document.
-///
-/// Phase 3: only postgres is wired to this probe. Other stacks remain on
-/// their Phase 1 per-protocol probes until Phase 4.
 pub struct HealthEndpoint {
     pub base_url: String,
 }
 
-impl Probe for HealthEndpoint {
+impl Probe_ for HealthEndpoint {
     fn name(&self) -> &str {
         "health-endpoint"
     }
@@ -299,9 +212,7 @@ impl Probe for HealthEndpoint {
             .build()
             .context("build reqwest blocking client")?;
 
-        // Step 1: /readyz must return 200. reqwest converts connect failures
-        // (ECONNREFUSED, ETIMEDOUT) into Err which the outer retry loop in
-        // harness::retry_until_sync swallows until the deadline.
+        // Step 1: /readyz must return 200.
         let readyz_url = format!("{}/readyz", self.base_url.trim_end_matches('/'));
         let resp = client
             .get(&readyz_url)
@@ -313,8 +224,7 @@ impl Probe for HealthEndpoint {
         }
 
         // Step 2: /sbom?format=cyclonedx must parse as an object with a
-        // non-empty `components` array. CycloneDX 1.5 puts components at the
-        // top level (`{"bomFormat":"CycloneDX","components":[…]}`).
+        // non-empty `components` array.
         let sbom_url = format!(
             "{}/sbom?format=cyclonedx",
             self.base_url.trim_end_matches('/')
@@ -403,37 +313,19 @@ pub fn dump_diagnostics(compose_file: &PathBuf, project: &str) {
 /// | unset / `1`              | `0`                   | `Tcp(<app_port>)` only (no HTTP at all; degenerate but documented)               |
 /// | `0`                      | unset / `1`           | Per-protocol Phase-1 chain (PgIsReady, RedisPing, KafkaApiVersions, …)           |
 /// | `0`                      | `0`                   | Per-protocol Phase-1 chain WITHOUT its HTTP component (SparkWithWorkers, …)      |
-///
-/// `HEALTHD=0` is the principal escape hatch: it forces the harness to use
-/// the per-protocol probes (the Phase-1 truth-table for what each readiness
-/// command actually checks). `HTTP=0` then further strips any HTTP-based
-/// probe out of whichever chain `HEALTHD` selected.
-pub fn for_stack(stack: &str, ctx: &ProbeCtx) -> Vec<Box<dyn Probe>> {
+pub fn for_stack(stack: &str, ctx: &ProbeCtx) -> Vec<Box<dyn Probe_>> {
     let http_enabled = std::env::var("FIRESTREAM_E2E_HTTP")
         .map(|v| v != "0")
         .unwrap_or(true);
-    // HEALTHD=0 disables the unified HealthEndpoint chain everywhere and
-    // falls back to per-protocol probes (see the truth-table in the doc
-    // comment above). Default = use HealthEndpoint.
     let healthd_enabled = std::env::var("FIRESTREAM_E2E_HEALTHD")
         .map(|v| v != "0")
         .unwrap_or(true);
 
-    // Phase 4: when HEALTHD is enabled (the default) AND HTTP is enabled,
-    // every canonical stack uses the same chain shape:
-    //     Tcp(<app_port>) → HealthEndpoint(http://127.0.0.1:<health_host_port>)
-    // The HealthEndpoint probe asserts both /readyz=200 AND
-    // /sbom?format=cyclonedx parses to a JSON object with a non-empty
-    // `components` array (see HealthEndpoint::run). This is the "one
-    // contract everywhere" form.
-    //
-    // When HEALTHD=0, fall through to the Phase-1 per-protocol matrix
-    // (retained verbatim below) so probes.rs remains the truth-table.
     if healthd_enabled && http_enabled {
         let app_port = canonical_app_port(stack, ctx);
-        let mut chain: Vec<Box<dyn Probe>> = Vec::with_capacity(2);
+        let mut chain: Vec<Box<dyn Probe_>> = Vec::with_capacity(2);
         if let Some(p) = app_port {
-            chain.push(Box::new(Tcp { port: p }));
+            chain.push(boxed(Tcp { port: p }));
         }
         if let Some(hp) = ctx.health_host_port {
             chain.push(Box::new(HealthEndpoint {
@@ -441,9 +333,6 @@ pub fn for_stack(stack: &str, ctx: &ProbeCtx) -> Vec<Box<dyn Probe>> {
             }));
             return chain;
         }
-        // health_host_port is None means the stack has health.enable=false
-        // at the Nix layer. In Phase 4 every canonical stack opts in, so
-        // this branch is essentially defensive; fall through to per-protocol.
         eprintln!(
             "[e2e:{}] WARN: HealthEndpoint requested but health_host_port=None; \
              falling back to per-protocol chain",
@@ -453,12 +342,7 @@ pub fn for_stack(stack: &str, ctx: &ProbeCtx) -> Vec<Box<dyn Probe>> {
 
     // Per-protocol Phase-1 chain (preserved verbatim — this is the
     // truth-table for what each runtimeType actually needs to check).
-    // Reached when:
-    //   - FIRESTREAM_E2E_HEALTHD=0 (explicit opt-out of HealthEndpoint), or
-    //   - FIRESTREAM_E2E_HTTP=0 (degenerate TCP-only — but if HEALTHD is
-    //     also on, the chain above already produced just the Tcp probe and
-    //     returned), or
-    //   - health_host_port=None at runtime (defensive fall-through).
+    let exec = ctx.exec();
     match stack {
         "postgresql" => {
             let pg_port = ctx
@@ -467,10 +351,11 @@ pub fn for_stack(stack: &str, ctx: &ProbeCtx) -> Vec<Box<dyn Probe>> {
                 .copied()
                 .find(|p| *p == 5432)
                 .unwrap_or_else(|| ctx.host_ports.first().copied().unwrap_or(5432));
-            let mut chain: Vec<Box<dyn Probe>> = vec![Box::new(Tcp { port: pg_port })];
+            let mut chain: Vec<Box<dyn Probe_>> = vec![boxed(Tcp { port: pg_port })];
             if http_enabled {
-                chain.push(Box::new(PgIsReady {
-                    service: "postgresql".into(),
+                chain.push(boxed(PgIsReady {
+                    exec: exec.clone(),
+                    target: "postgresql".into(),
                     user: "postgres".into(),
                     db: "postgres".into(),
                 }));
@@ -480,35 +365,25 @@ pub fn for_stack(stack: &str, ctx: &ProbeCtx) -> Vec<Box<dyn Probe>> {
         "redis" => {
             let redis_port = ctx.host_ports.first().copied().unwrap_or(6379);
             vec![
-                Box::new(Tcp { port: redis_port }),
-                Box::new(RedisPing {
-                    service: "redis".into(),
+                boxed(Tcp { port: redis_port }),
+                boxed(RedisPing {
+                    exec: exec.clone(),
+                    target: "redis".into(),
                 }),
             ]
         }
         "kafka" => {
-            // Probe broker metadata via the in-container kafka tool. The
-            // listener may bind well before metadata is serviceable, so the
-            // bootstrap port alone is not enough.
             let port = ctx.host_ports.first().copied().unwrap_or(9092);
             vec![
-                Box::new(Tcp { port }),
-                Box::new(KafkaApiVersions {
-                    service: "kafka".into(),
+                boxed(Tcp { port }),
+                boxed(KafkaApiVersions {
+                    exec: exec.clone(),
+                    target: "kafka".into(),
                     bootstrap: "localhost:9092".into(),
                 }),
             ]
         }
         "spark" => {
-            // exposedPorts: [7077, 8080, 8081, 4040, 6066]. The master UI is on
-            // host 8080 (single-service default branch, offset 0). The worker
-            // UI is on 8081 — but in the default single-service compose there
-            // is no worker. For Phase 1 we only assert the master answers and
-            // require zero workers; later phases will introduce a worker.
-            //
-            // NOTE: the default compose has ONE service called "spark" which
-            // runs the master. There is no separate worker yet, so
-            // `min_workers = 0` here is intentional.
             let master_port = ctx
                 .host_ports
                 .iter()
@@ -516,7 +391,7 @@ pub fn for_stack(stack: &str, ctx: &ProbeCtx) -> Vec<Box<dyn Probe>> {
                 .find(|p| *p == 8080)
                 .unwrap_or_else(|| ctx.host_ports.get(1).copied().unwrap_or(8080));
             let master_url = format!("http://127.0.0.1:{}", master_port);
-            let mut chain: Vec<Box<dyn Probe>> = vec![Box::new(Tcp { port: master_port })];
+            let mut chain: Vec<Box<dyn Probe_>> = vec![boxed(Tcp { port: master_port })];
             if http_enabled {
                 chain.push(Box::new(SparkWithWorkers {
                     master_url,
@@ -526,23 +401,21 @@ pub fn for_stack(stack: &str, ctx: &ProbeCtx) -> Vec<Box<dyn Probe>> {
             chain
         }
         "airflow" => {
-            // Airflow stack publishes 25432 (pg), 26379 (redis), 28090 (api-server),
-            // 29180 (healthd). The hostPorts list is [api-server, healthd, pg,
-            // redis] in our setup (offset 20000). We probe pg/redis via docker
-            // exec, plus an HTTP probe on the api-server (8090 + 20000 = 28090).
             let api_port: u16 = 28090;
-            let mut chain: Vec<Box<dyn Probe>> = vec![
-                Box::new(PgIsReady {
-                    service: "postgresql".into(),
+            let mut chain: Vec<Box<dyn Probe_>> = vec![
+                boxed(PgIsReady {
+                    exec: exec.clone(),
+                    target: "postgresql".into(),
                     user: "airflow".into(),
                     db: "airflow".into(),
                 }),
-                Box::new(RedisPing {
-                    service: "redis".into(),
+                boxed(RedisPing {
+                    exec: exec.clone(),
+                    target: "redis".into(),
                 }),
             ];
             if http_enabled {
-                chain.push(Box::new(HttpReady {
+                chain.push(boxed(HttpReady {
                     url: format!("http://127.0.0.1:{}/", api_port),
                     max_status: 500,
                 }));
@@ -550,16 +423,15 @@ pub fn for_stack(stack: &str, ctx: &ProbeCtx) -> Vec<Box<dyn Probe>> {
             chain
         }
         "jupyterhub" => {
-            // exposedPorts = [8000 8081]; hub UI on 8000.
             let port = ctx
                 .host_ports
                 .iter()
                 .copied()
                 .find(|p| *p == 8000)
                 .unwrap_or_else(|| ctx.host_ports.first().copied().unwrap_or(8000));
-            let mut chain: Vec<Box<dyn Probe>> = vec![Box::new(Tcp { port })];
+            let mut chain: Vec<Box<dyn Probe_>> = vec![boxed(Tcp { port })];
             if http_enabled {
-                chain.push(Box::new(HttpReady {
+                chain.push(boxed(HttpReady {
                     url: format!("http://127.0.0.1:{}/hub/", port),
                     max_status: 500,
                 }));
@@ -567,16 +439,15 @@ pub fn for_stack(stack: &str, ctx: &ProbeCtx) -> Vec<Box<dyn Probe>> {
             chain
         }
         "superset" => {
-            // exposedPorts = [8088 5555]; webserver on 8088.
             let port = ctx
                 .host_ports
                 .iter()
                 .copied()
                 .find(|p| *p == 8088)
                 .unwrap_or_else(|| ctx.host_ports.first().copied().unwrap_or(8088));
-            let mut chain: Vec<Box<dyn Probe>> = vec![Box::new(Tcp { port })];
+            let mut chain: Vec<Box<dyn Probe_>> = vec![boxed(Tcp { port })];
             if http_enabled {
-                chain.push(Box::new(HttpReady {
+                chain.push(boxed(HttpReady {
                     url: format!("http://127.0.0.1:{}/health", port),
                     max_status: 500,
                 }));
@@ -584,16 +455,15 @@ pub fn for_stack(stack: &str, ctx: &ProbeCtx) -> Vec<Box<dyn Probe>> {
             chain
         }
         "odoo" => {
-            // exposedPorts = [8069 8072]; web UI on 8069.
             let port = ctx
                 .host_ports
                 .iter()
                 .copied()
                 .find(|p| *p == 8069)
                 .unwrap_or_else(|| ctx.host_ports.first().copied().unwrap_or(8069));
-            let mut chain: Vec<Box<dyn Probe>> = vec![Box::new(Tcp { port })];
+            let mut chain: Vec<Box<dyn Probe_>> = vec![boxed(Tcp { port })];
             if http_enabled {
-                chain.push(Box::new(HttpReady {
+                chain.push(boxed(HttpReady {
                     url: format!("http://127.0.0.1:{}/web/login", port),
                     max_status: 500,
                 }));
@@ -601,10 +471,6 @@ pub fn for_stack(stack: &str, ctx: &ProbeCtx) -> Vec<Box<dyn Probe>> {
             chain
         }
         other => {
-            // Defensive: undeclared stack falls back to TCP-only on every
-            // published port. Should never trigger because `stacks::CANONICAL`
-            // and the macro in `tests/e2e.rs` stay in sync; if it does, the
-            // probe is at least non-vacuous (it will catch nothing binding).
             eprintln!(
                 "[e2e:{}] WARN: no probe matrix defined; falling back to TCP-only",
                 other
@@ -612,20 +478,15 @@ pub fn for_stack(stack: &str, ctx: &ProbeCtx) -> Vec<Box<dyn Probe>> {
             ctx.host_ports
                 .iter()
                 .copied()
-                .map(|p| Box::new(Tcp { port: p }) as Box<dyn Probe>)
+                .map(|p| boxed(Tcp { port: p }))
                 .collect()
         }
     }
 }
 
 /// Resolve the canonical "app port" the Tcp pre-check should target for a
-/// stack in the HealthEndpoint chain. Mirrors the port-pick logic in the
-/// per-protocol matrix so the Tcp pre-check fails fast when the user-facing
-/// listener isn't bound yet (independent of /readyz).
+/// stack in the HealthEndpoint chain.
 fn canonical_app_port(stack: &str, ctx: &ProbeCtx) -> Option<u16> {
-    // Tries an exact match against the stack's well-known port first;
-    // falls back to the first published port; returns None only when the
-    // stack publishes nothing (shouldn't happen for any canonical stack).
     let preferred: Option<u16> = match stack {
         "postgresql" => Some(5432),
         "redis" => Some(6379),

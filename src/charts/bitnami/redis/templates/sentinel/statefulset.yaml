@@ -121,7 +121,7 @@ spec:
                 command:
                   - /bin/bash
                   - -ec
-                  - /opt/bitnami/scripts/start-scripts/prestop-redis.sh
+                  - /opt/firestream/scripts/start-scripts/prestop-redis.sh
           {{- end }}
           {{- end }}
           {{- if .Values.replica.containerSecurityContext.enabled }}
@@ -146,10 +146,10 @@ spec:
               ips=($(echo "{{ .Values.sentinel.externalAccess.service.loadBalancerIP }}" | cut -d [ -f2 | cut -d ] -f 1))
               export REDIS_CLUSTER_ANNOUNCE_IP="${ips[$pod_index]}"
               export REDIS_NODES="${ips[@]}"
-              /opt/bitnami/scripts/start-scripts/start-node.sh
+              /opt/firestream/scripts/start-scripts/start-node.sh
           {{- else }}
           args:
-            - /opt/bitnami/scripts/start-scripts/start-node.sh
+            - /opt/firestream/scripts/start-scripts/start-node.sh
           {{- end }}
           env:
             - name: POD_NAME
@@ -165,9 +165,9 @@ spec:
             {{- if .Values.auth.enabled }}
             {{- if .Values.auth.usePasswordFiles }}
             - name: REDIS_PASSWORD_FILE
-              value: "/opt/bitnami/redis/secrets/redis-password"
+              value: "/opt/firestream/redis/secrets/redis-password"
             - name: REDIS_MASTER_PASSWORD_FILE
-              value: "/opt/bitnami/redis/secrets/redis-password"
+              value: "/opt/firestream/redis/secrets/redis-password"
             {{- else }}
             - name: REDIS_PASSWORD
               valueFrom:
@@ -301,14 +301,14 @@ spec:
           {{- end }}
           volumeMounts:
             - name: start-scripts
-              mountPath: /opt/bitnami/scripts/start-scripts
+              mountPath: /opt/firestream/scripts/start-scripts
             - name: health
               mountPath: /health
             - name: sentinel-data
-              mountPath: /opt/bitnami/redis-sentinel/etc
+              mountPath: /opt/firestream/redis-sentinel/etc
             {{- if and .Values.auth.enabled .Values.auth.usePasswordFiles }}
             - name: redis-password
-              mountPath: /opt/bitnami/redis/secrets/
+              mountPath: /opt/firestream/redis/secrets/
             {{- end }}
             - name: redis-data
               mountPath: {{ .Values.replica.persistence.path }}
@@ -318,10 +318,10 @@ spec:
               subPathExpr: {{ .Values.replica.persistence.subPathExpr }}
               {{- end }}
             - name: config
-              mountPath: /opt/bitnami/redis/mounted-etc
+              mountPath: /opt/firestream/redis/mounted-etc
             {{- if and .Values.replica.containerSecurityContext.enabled .Values.replica.containerSecurityContext.readOnlyRootFilesystem }}
             - name: empty-dir
-              mountPath: /opt/bitnami/redis/etc
+              mountPath: /opt/firestream/redis/etc
               subPath: app-conf-dir
             - name: empty-dir
               mountPath: /tmp
@@ -329,7 +329,7 @@ spec:
             {{- end }}
             {{- if .Values.tls.enabled }}
             - name: redis-certificates
-              mountPath: /opt/bitnami/redis/certs
+              mountPath: /opt/firestream/redis/certs
               readOnly: true
             {{- end }}
             {{- if .Values.replica.extraVolumeMounts }}
@@ -348,7 +348,7 @@ spec:
                 command:
                   - /bin/bash
                   - -ec
-                  - /opt/bitnami/scripts/start-scripts/prestop-sentinel.sh
+                  - /opt/firestream/scripts/start-scripts/prestop-sentinel.sh
           {{- end }}
           {{- end }}
           {{- if .Values.sentinel.containerSecurityContext.enabled }}
@@ -373,10 +373,10 @@ spec:
               ips=($(echo "{{ .Values.sentinel.externalAccess.service.loadBalancerIP }}" | cut -d [ -f2 | cut -d ] -f 1))
               export REDIS_CLUSTER_ANNOUNCE_IP="${ips[$pod_index]}"
               export REDIS_NODES="${ips[@]}"
-              /opt/bitnami/scripts/start-scripts/start-sentinel.sh
+              /opt/firestream/scripts/start-scripts/start-sentinel.sh
           {{- else }}
           args:
-            - /opt/bitnami/scripts/start-scripts/start-sentinel.sh
+            - /opt/firestream/scripts/start-scripts/start-sentinel.sh
           {{- end }}
           env:
             - name: POD_NAME
@@ -388,7 +388,7 @@ spec:
             {{- if .Values.auth.enabled }}
             {{- if .Values.auth.usePasswordFiles }}
             - name: REDIS_PASSWORD_FILE
-              value: "/opt/bitnami/redis/secrets/redis-password"
+              value: "/opt/firestream/redis/secrets/redis-password"
             {{- else }}
             - name: REDIS_PASSWORD
               valueFrom:
@@ -502,7 +502,7 @@ spec:
               subPath: tmp-dir
             {{- end }}
             - name: start-scripts
-              mountPath: /opt/bitnami/scripts/start-scripts
+              mountPath: /opt/firestream/scripts/start-scripts
             - name: health
               mountPath: /health
             {{- if or .Values.sentinel.masterService.enabled .Values.sentinel.service.createMaster}}
@@ -510,10 +510,10 @@ spec:
               mountPath: /etc/shared
             {{- end }}
             - name: sentinel-data
-              mountPath: /opt/bitnami/redis-sentinel/etc
+              mountPath: /opt/firestream/redis-sentinel/etc
             {{- if and .Values.auth.enabled .Values.auth.usePasswordFiles }}
             - name: redis-password
-              mountPath: /opt/bitnami/redis/secrets/
+              mountPath: /opt/firestream/redis/secrets/
             {{- end }}
             - name: redis-data
               mountPath: {{ .Values.replica.persistence.path }}
@@ -523,10 +523,10 @@ spec:
               subPathExpr: {{ .Values.replica.persistence.subPathExpr }}
               {{- end }}
             - name: config
-              mountPath: /opt/bitnami/redis-sentinel/mounted-etc
+              mountPath: /opt/firestream/redis-sentinel/mounted-etc
             {{- if .Values.tls.enabled }}
             - name: redis-certificates
-              mountPath: /opt/bitnami/redis/certs
+              mountPath: /opt/firestream/redis/certs
               readOnly: true
             {{- end }}
             {{- if .Values.sentinel.extraVolumeMounts }}
@@ -634,7 +634,7 @@ spec:
             {{- end }}
             {{- if .Values.tls.enabled }}
             - name: redis-certificates
-              mountPath: /opt/bitnami/redis/certs
+              mountPath: /opt/firestream/redis/certs
               readOnly: true
             {{- end }}
             {{- if .Values.metrics.extraVolumeMounts }}
@@ -659,7 +659,7 @@ spec:
             - name: kubectl-shared
               mountPath: /etc/shared
             - name: kubectl-scripts
-              mountPath: /opt/bitnami/scripts/kubectl-scripts
+              mountPath: /opt/firestream/scripts/kubectl-scripts
           {{- if .Values.kubectl.resources }}
           resources: {{- toYaml .Values.kubectl.resources | nindent 12 }}
           {{- end }}

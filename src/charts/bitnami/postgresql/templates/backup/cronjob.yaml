@@ -61,7 +61,7 @@ spec:
               {{- end }}
               {{- if .Values.auth.usePasswordFiles }}
               - name:  PGPASSWORD_FILE
-                value: {{ printf "/opt/bitnami/postgresql/secrets/%s" (include "postgresql.v1.adminPasswordKey" .) }}
+                value: {{ printf "/opt/firestream/postgresql/secrets/%s" (include "postgresql.v1.adminPasswordKey" .) }}
               {{- else }}
               - name: PGPASSWORD
                 valueFrom:
@@ -99,7 +99,7 @@ spec:
                 subPath: tmp-dir
               {{- if .Values.auth.usePasswordFiles }}
               - name: postgresql-password
-                mountPath: /opt/bitnami/postgresql/secrets/
+                mountPath: /opt/firestream/postgresql/secrets/
               {{- end }}
               {{- if .Values.backup.cronjob.extraVolumeMounts }}
               {{- include "common.tplvalues.render" (dict "value" .Values.backup.cronjob.extraVolumeMounts "context" $) | nindent 14 }}

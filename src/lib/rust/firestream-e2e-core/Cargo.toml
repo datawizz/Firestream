@@ -1,0 +1,46 @@
+[package]
+name = "firestream-e2e-core"
+version = "0.1.0"
+edition = "2024"
+authors = ["Firestream Team"]
+description = "Transport-agnostic readiness probes, retry loop, env-contract accessors, and teardown helpers shared by the docker-compose and k3d/helm e2e harnesses"
+license = "MIT"
+
+[lib]
+name = "firestream_e2e_core"
+path = "src/lib.rs"
+
+[dependencies]
+# Error handling
+anyhow = { workspace = true }
+thiserror = { workspace = true }
+
+# PATH lookup for the should_skip() gate
+which = { workspace = true }
+
+# HTTP-readiness probe (blocking, same flags as the existing harness so the
+# refactor doesn't drag a second TLS stack into the dep graph).
+reqwest = { workspace = true }
+
+# --- k8s submodule deps (relocated from firestream-e2e-k8s) ---
+# k3d cluster lifecycle. The k8s::cluster glue talks to k3d through
+# K3dClusterManager rather than shelling out, mirroring production.
+k8s-manager = { workspace = true }
+
+# Chart-manifest reader: k8s::images walks `ChartManifest.images` to derive
+# the firestream-* image set to preload. Relocated from firestream-e2e-k8s.
+firestream-charts = { workspace = true }
+
+# K3dClusterManager's cluster methods are async; k8s::cluster::create_cluster
+# wraps them in a current-thread runtime so the public API stays sync.
+tokio = { workspace = true }
+
+# 6-char lowercase alphanumeric suffix for per-test cluster names.
+rand = "0.8"
+
+# Structured logging for cluster/teardown lifecycle events.
+tracing = { workspace = true }
+
+[dev-dependencies]
+# Used to gate env-mutation tests so they don't race each other.
+once_cell = { workspace = true }

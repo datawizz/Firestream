@@ -465,8 +465,13 @@ in firestream.mkPythonContainerModule {
     "/opt/superset/superset_config.py.template" = supersetConfigTemplate;
   };
 
+  # Per-container helpers: emitted at top-level of libhelperssuperset.sh by the
+  # engine, so chart init containers can `source /opt/firestream/scripts/libsuperset.sh`
+  # and use these helpers directly.
+  perContainerHelpers = supersetHelpers;
+
   # Validation function
-  validateFn = supersetHelpers + validateScript;
+  validateFn = validateScript;
 
   # Activation: Replace {{PLACEHOLDERS}} with runtime values
   activateFn = ''
@@ -542,10 +547,10 @@ in firestream.mkPythonContainerModule {
   '';
 
   # Initialization - from init.sh
-  initFn = supersetHelpers + initScript;
+  initFn = initScript;
 
   # Runtime config adjustments - from config.sh
-  configFn = supersetHelpers + configScript;
+  configFn = configScript;
 
   # Startup command based on role
   runCmd = ''

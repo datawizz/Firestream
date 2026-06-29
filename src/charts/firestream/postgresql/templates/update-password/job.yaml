@@ -60,16 +60,16 @@ spec:
               {{- $customDatabase := include "postgresql.v1.database" . | default "postgres" }}
               {{- if .Values.auth.usePasswordFiles }}
               # We need to load all the secret env vars to the system
-              for file in $(find /bitnami/postgresql/secrets -type f); do
+              for file in $(find /firestream/postgresql/secrets -type f); do
                   env_var_name="$(basename $file)"
                   echo "Exporting $env_var_name"
                   export $env_var_name="$(< $file)"
               done
               {{- end }}
 
-              . /opt/bitnami/scripts/postgresql-env.sh
-              . /opt/bitnami/scripts/libpostgresql.sh
-              . /opt/bitnami/scripts/liblog.sh
+              . /opt/firestream/scripts/postgresql-env.sh
+              . /opt/firestream/scripts/libpostgresql.sh
+              . /opt/firestream/scripts/liblog.sh
 
               primary_host={{ include "postgresql.v1.primary.fullname" . }}-0.{{ include "postgresql.v1.primary.svc.headless" . }}
               info "Starting password update job"
@@ -188,9 +188,9 @@ spec:
               subPath: job-dir
             {{- if .Values.auth.usePasswordFiles }}
             - name: postgresql-previous-credentials
-              mountPath: /bitnami/postgresql/secrets/previous
+              mountPath: /firestream/postgresql/secrets/previous
             - name: postgresql-new-credentials
-              mountPath: /bitnami/postgresql/secrets/new
+              mountPath: /firestream/postgresql/secrets/new
             {{- end }}
           {{- if .Values.passwordUpdateJob.extraVolumeMounts }}
             {{- include "common.tplvalues.render" (dict "value" .Values.passwordUpdateJob.extraVolumeMounts "context" $) | nindent 12 }}

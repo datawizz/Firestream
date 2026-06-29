@@ -38,6 +38,10 @@
         inherit pkgs lib firestreamLib;
       };
 
+      baseChart = import ../../bin/nix/firestream/charts/lib/base-chart.nix {
+        inherit pkgs lib;
+      };
+
       toChartManifest = import ../../bin/nix/firestream/charts/lib/to-chart-manifest.nix {
         inherit pkgs lib;
       };
@@ -51,6 +55,7 @@
       _module.args.firestreamLib = firestreamLib;
       _module.args.evalContainer = evalContainer;
       _module.args.evalChart = evalChart;
+      _module.args.baseChart = baseChart;
       _module.args.toChartManifest = toChartManifest;
       _module.args.injectContainerImages = injectContainerImages;
     };

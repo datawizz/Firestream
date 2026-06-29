@@ -44,8 +44,8 @@ pub mod spec;
 
 pub use reader::Charts;
 pub use spec::{
-    BreakingVersion, Bundle, ChartIndexEntry, ChartManifest, Deployment, ImageSlot, Index,
-    Lifecycle, Provenance, Release,
+    BaseChartEntry, BreakingVersion, Bundle, ChartIndexEntry, ChartManifest, Deployment,
+    ImageSlot, Index, Lifecycle, Provenance, Release,
 };
 
 /// Error type for chart manifest operations.

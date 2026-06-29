@@ -108,14 +108,13 @@ spec:
           {{- end }}
           env:
             {{- include "airflow.configure.airflow.common"  . | nindent 12 }}
-            - name: AIRFLOW_SKIP_DB_SETUP
-              value: {{ ternary "yes" "no" .Values.setupDBJob.enabled | quote }}
+            {{- /* AIRFLOW_SKIP_DB_SETUP is now emitted by airflow.configure.airflow.common for all components */}}
             {{- if not .Values.setupDBJob.enabled }}
             - name: AIRFLOW_USERNAME
               value: {{ .Values.auth.username }}
             {{- if .Values.usePasswordFiles }}
             - name: AIRFLOW_PASSWORD_FILE
-              value: "/opt/bitnami/airflow/secrets/airflow-password"
+              value: "/opt/firestream/airflow/secrets/airflow-password"
             {{- else }}
             - name: AIRFLOW_PASSWORD
               valueFrom:
@@ -125,7 +124,7 @@ spec:
             {{- end }}
             {{- end }}
             - name: PYTHONPYCACHEPREFIX
-              value: "/opt/bitnami/airflow/venv/tmp"
+              value: "/opt/firestream/airflow/venv/tmp"
             {{- if (include "airflow.isImageMajorVersion2" .) }}
             - name: AIRFLOW_COMPONENT_TYPE
               value: "webserver"
@@ -220,32 +219,32 @@ spec:
               mountPath: /tmp
               subPath: tmp-dir
             - name: empty-dir
-              mountPath: /opt/bitnami/airflow/nss-wrapper
+              mountPath: /opt/firestream/airflow/nss-wrapper
               subPath: app-nss-wrapper-dir
             - name: empty-dir
-              mountPath: /opt/bitnami/airflow/logs
+              mountPath: /opt/firestream/airflow/logs
               subPath: app-logs-dir
             - name: empty-dir
-              mountPath: /opt/bitnami/airflow/tmp
+              mountPath: /opt/firestream/airflow/tmp
               subPath: app-tmp-dir
             - name: empty-dir
-              mountPath: /opt/bitnami/airflow/airflow.db
+              mountPath: /opt/firestream/airflow/airflow.db
               subPath: app-base-dir/airflow.db
             - name: empty-dir
-              mountPath: /opt/bitnami/airflow/airflow.cfg
+              mountPath: /opt/firestream/airflow/airflow.cfg
               subPath: app-base-dir/airflow.cfg
             - name: empty-dir
-              mountPath: /opt/bitnami/airflow/config/airflow_local_settings.py
+              mountPath: /opt/firestream/airflow/config/airflow_local_settings.py
               subPath: app-conf-dir/airflow_local_settings.py
             - name: empty-dir
-              mountPath: /opt/bitnami/airflow/webserver_config.py
+              mountPath: /opt/firestream/airflow/webserver_config.py
               subPath: app-base-dir/webserver_config.py
             - name: empty-dir
-              mountPath: /opt/bitnami/airflow/venv
+              mountPath: /opt/firestream/airflow/venv
               subPath: venv-base-dir
             {{- if  .Values.usePasswordFiles }}
             - name: airflow-secrets
-              mountPath: /opt/bitnami/airflow/secrets
+              mountPath: /opt/firestream/airflow/secrets
             {{- end }}
             {{- if and .Values.ldap.enabled .Values.ldap.tls.enabled }}
             - name: airflow-ldap-ca-certificate
@@ -254,7 +253,7 @@ spec:
             {{- end }}
             {{- if .Values.web.tls.enabled }}
             - name: tls-certificates
-              mountPath: /opt/bitnami/airflow/certs
+              mountPath: /opt/firestream/airflow/certs
               readOnly: true
             {{- end }}
             {{- if .Values.dags.enabled }}

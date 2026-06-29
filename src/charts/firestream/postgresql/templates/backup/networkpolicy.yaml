@@ -29,4 +29,7 @@ spec:
           protocol: TCP
         - port: 53
           protocol: UDP
+    {{- if .Values.backup.cronjob.networkPolicy.extraEgress }}
+    {{- include "common.tplvalues.render" ( dict "value" .Values.backup.cronjob.networkPolicy.extraEgress "context" $ ) | nindent 4 }}
+    {{- end }}
 {{- end }}

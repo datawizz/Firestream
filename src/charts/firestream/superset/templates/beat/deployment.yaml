@@ -156,19 +156,19 @@ spec:
               mountPath: /tmp
               subPath: tmp-dir
             - name: empty-dir
-              mountPath: /opt/bitnami/superset/superset_home
+              mountPath: /opt/firestream/superset/superset_home
               subPath: superset-home
             - name: empty-dir
-              mountPath: /opt/bitnami/superset/tmp
+              mountPath: /opt/firestream/superset/tmp
               subPath: app-tmp-dir
             {{- if .Values.usePasswordFiles }}
             - name: superset-secrets
-              mountPath: /opt/bitnami/superset/secrets
+              mountPath: /opt/firestream/superset/secrets
               readOnly: true
             {{- end }}
             {{- if or .Values.existingConfigmap .Values.config }}
             - name: superset-config
-              mountPath: /bitnami/superset/conf
+              mountPath: /firestream/superset/conf
             {{- end }}
           {{- if .Values.beat.extraVolumeMounts }}
           {{- include "common.tplvalues.render" (dict "value" .Values.beat.extraVolumeMounts "context" $) | nindent 12 }}

@@ -6,9 +6,10 @@
 # submodule's free-form type so the whole subchart surface can be overridden
 # without re-declaring it here. Model A: all first-class leaves nullOr/default
 # = null so unset keys are stripped from the generated values.yaml.
-{ lib, ... }:
+{ lib, chartTypes, ... }:
 
 let
+  t = chartTypes;
   inherit (lib) mkOption types;
 in {
   options.airflow.postgresql = mkOption {
@@ -34,40 +35,7 @@ in {
         auth = mkOption {
           default = null;
           description = "PostgreSQL authentication parameters";
-          type = types.nullOr (types.submodule {
-            freeformType = types.attrsOf types.anything;
-            options = {
-              enablePostgresUser = mkOption {
-                type = types.nullOr types.bool;
-                default = null;
-                description = "Assign a password to the 'postgres' admin user";
-              };
-
-              username = mkOption {
-                type = types.nullOr types.str;
-                default = null;
-                description = "Name for a custom user to create";
-              };
-
-              password = mkOption {
-                type = types.nullOr types.str;
-                default = null;
-                description = "Password for the custom user to create";
-              };
-
-              database = mkOption {
-                type = types.nullOr types.str;
-                default = null;
-                description = "Name for a custom database to create";
-              };
-
-              existingSecret = mkOption {
-                type = types.nullOr types.str;
-                default = null;
-                description = "Name of existing secret to use for PostgreSQL credentials";
-              };
-            };
-          });
+          type = types.nullOr t.secretType;
         };
       };
     });

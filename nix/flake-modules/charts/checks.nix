@@ -43,6 +43,7 @@
       jupyterhubBundle = config.firestreamCharts.jupyterhub.chartBundle;
       supersetBundle = config.firestreamCharts.superset.chartBundle;
       odooBundle = config.firestreamCharts.odoo.chartBundle;
+      nextjsBundle = config.firestreamCharts.nextjs.chartBundle;
     in {
       checks.airflow-render-fidelity = pkgs.runCommand "airflow-render-fidelity"
         { nativeBuildInputs = [ pkgs.kubernetes-helm ]; } ''
@@ -77,11 +78,29 @@
         # container image line). The pulled chart never writes top-level
         # `image:` blocks in K8s objects - only pod containers do - so this
         # regex is unambiguous.
+        # Phase B: airflow now injects firestream-* images into BOTH its
+        # postgresql AND redis subcharts. The postgresql subchart's
+        # `_helpers.tpl` readiness probe (line 357) is gated on
+        # `contains "bitnami/" .Values.image.repository` and emits an extra
+        # `.initialized` flag-file check that is dropped when the firestream
+        # image is in use. Delete the line from both bare + withVals so the
+        # check stays meaningful for everything ELSE that diffs.
+        # Phase F: chart-side env-var remap (`airflow.extraEnvVars` in the
+        # flake-module) injects path env vars (AIRFLOW_CONF_FILE,
+        # AIRFLOW_WEBSERVER_CONF_FILE, AIRFLOW_LOGS_DIR,
+        # AIRFLOW_SCHEDULER_LOGS_DIR, AIRFLOW_TMP_DIR, AIRFLOW_DAGS_DIR,
+        # AIRFLOW_PLUGINS_DIR) into every airflow pod's env: block to remap
+        # the firestream container's baked path defaults onto the Bitnami
+        # chart's mountPaths. The bare chart obviously doesn't have those,
+        # so strip them from BOTH renders before diffing. Match on exact
+        # env-var name (trailing `$`) so `AIRFLOW_DATABASE_*` etc. survive.
         normalise() {
           sed -E \
             -e 's,^([[:space:]]*(postgres-password|password|redis-password|airflow-password|airflow-fernet-key|airflow-secret-key|airflow-jwt-secret-key):[[:space:]]*).*,\1<RANDOM>,' \
             -e 's,^([[:space:]]*checksum/secret:[[:space:]]*).*,\1<RANDOM>,' \
             -e 's,^([[:space:]]*image:[[:space:]]*).*,\1<IMAGE>,' \
+            -e '/\.initialized/d' \
+            -e '/^[[:space:]]+- name: AIRFLOW_(CONF_FILE|WEBSERVER_CONF_FILE|LOGS_DIR|SCHEDULER_LOGS_DIR|TMP_DIR|DAGS_DIR|PLUGINS_DIR)$/{N;d;}' \
             "$1"
         }
         normalise bare.raw.yaml     > bare.yaml
@@ -103,13 +122,22 @@
       #
       # Same shape as airflow: render the vendored chart twice (bare vs. with
       # our generated values.yaml), normalise inherently-random fields, and
-      # diff. PostgreSQL adds NO container-image injection in this phase
-      # (firestreamImages.postgresql does not exist yet), so the `image:`
-      # line normaliser is included defensively for forward compatibility —
-      # it's a no-op when both renders agree on the image line. The
-      # postgres-password / replication-password normalisers (already in the
-      # shared regex from airflow) catch the random secrets Bitnami generates
-      # per `helm template` invocation.
+      # diff. The postgres-password / replication-password normalisers
+      # (already in the shared regex from airflow) catch the random secrets
+      # Bitnami generates per `helm template` invocation.
+      #
+      # Phase B: postgresql container image injection now flips the
+      # `image.repository` from `bitnami/postgresql` to `firestream-postgresql`.
+      # The chart's readiness probe template
+      # (src/charts/bitnami/postgresql/templates/_helpers.tpl:357) is gated on
+      # `contains "bitnami/" .Values.image.repository` and emits an extra
+      # `[ -f /opt/bitnami/postgresql/tmp/.initialized ] || [ -f /bitnami/...
+      # postgresql/.initialized ]` line that is REMOVED when the firestream
+      # image is in use. The diff is INTENTIONAL — the firestream container
+      # does not maintain the same `.initialized` flag file path — but the
+      # render-fidelity check would false-fail on it. Delete the line from
+      # both bare + withVals (it's a chart-template-driven defensive check,
+      # not a semantic guarantee).
       # ----------------------------------------------------------------------
       checks.postgresql-render-fidelity = pkgs.runCommand "postgresql-render-fidelity"
         { nativeBuildInputs = [ pkgs.kubernetes-helm ]; } ''
@@ -125,11 +153,18 @@
         # those random secrets and so also differ. Normalise both renders to
         # <RANDOM> for those fields. Image normalisation is included for
         # parity with airflow / forward-compat once image injection lands.
+        # Phase B: also strip the `.initialized` flag check line (see header).
+        # Phase 1 path-de-branding: the per-chart `primary.extraEnvVars` path
+        # overrides were removed (chart now mounts firestream paths natively),
+        # so the POSTGRESQL_*_DIR env block no longer appears in either render
+        # and its strip line was deleted.
         normalise() {
           sed -E \
             -e 's,^([[:space:]]*(postgres-password|password|replication-password|admin-password):[[:space:]]*).*,\1<RANDOM>,' \
             -e 's,^([[:space:]]*checksum/secret:[[:space:]]*).*,\1<RANDOM>,' \
             -e 's,^([[:space:]]*image:[[:space:]]*).*,\1<IMAGE>,' \
+            -e '/\.initialized/d' \
+            -e '/^[[:space:]]+- name: POSTGRESQL_SHARED_PRELOAD_LIBRARIES$/{N;s,value:.*,value: <PRELOAD>,;}' \
             "$1"
         }
         normalise bare.raw.yaml     > bare.yaml
@@ -226,12 +261,22 @@
         helm template kafka ${kafkaBundle}/chart                          > bare.raw.yaml
         helm template kafka ${kafkaBundle}/chart -f ${kafkaBundle}/values.yaml > withVals.raw.yaml
 
+        # Phase 3 de-brand: the container + chart now share the same
+        # `/opt/firestream/kafka` + `/firestream/kafka` paths, so the path
+        # remap extraEnvVars were dropped. The only remaining flake-module
+        # injection is the KAFKA_TMP_DIR / KAFKA_PID_FILE redirect to the
+        # chart's `/tmp` emptyDir (`kafka.{controller,broker}.extraEnvVars`),
+        # which is net-new vs. the bare render. Strip that pair from BOTH
+        # renders so the diff stays semantic. (KAFKA_VOLUME_DIR / KAFKA_CONF_FILE
+        # are injected by the bare chart's own `prepare-config` init and appear
+        # symmetrically in both renders, so they need no stripping.)
         normalise() {
           sed -E \
             -e 's,^([[:space:]]*(password|admin-password|client-passwords|inter-broker-password|controller-password|system-user-password|sasl-jaas-config|keystore-password|truststore-password|key-password|cluster-id):[[:space:]]*).*,\1<RANDOM>,' \
             -e 's,^([[:space:]]*controller-[0-9]+-id:[[:space:]]*).*,\1<RANDOM>,' \
             -e 's,^([[:space:]]*checksum/secret:[[:space:]]*).*,\1<RANDOM>,' \
             -e 's,^([[:space:]]*image:[[:space:]]*).*,\1<IMAGE>,' \
+            -e '/^[[:space:]]+- name: KAFKA_(TMP_DIR|PID_FILE)$/{N;d;}' \
             "$1"
         }
         normalise bare.raw.yaml     > bare.yaml
@@ -279,11 +324,19 @@
         helm template spark ${sparkBundle}/chart                          > bare.raw.yaml
         helm template spark ${sparkBundle}/chart -f ${sparkBundle}/values.yaml > withVals.raw.yaml
 
+        # Phase F: chart-side env-var remap (`spark.master.extraEnvVars` +
+        # `spark.worker.extraEnvVars` in the flake-module) injects path env
+        # vars (SPARK_CONF_DIR, SPARK_CONF_FILE, SPARK_LOG_DIR, SPARK_TMP_DIR,
+        # SPARK_WORK_DIR, SPARK_DATA_DIR, SPARK_USER_JARS_DIR) into both
+        # master + worker pod env: blocks to remap the firestream container's
+        # /opt/spark defaults onto the chart's /opt/bitnami/spark/* mounts.
+        # The bare chart doesn't have those. Strip them from BOTH renders.
         normalise() {
           sed -E \
             -e 's,^([[:space:]]*(password|admin-password|keystore-password|truststore-password|key-password|spark-keystore-password|spark-truststore-password|spark-key-password|rpc-authentication-secret):[[:space:]]*).*,\1<RANDOM>,' \
             -e 's,^([[:space:]]*checksum/secret:[[:space:]]*).*,\1<RANDOM>,' \
             -e 's,^([[:space:]]*image:[[:space:]]*).*,\1<IMAGE>,' \
+            -e '/^[[:space:]]+- name: SPARK_(CONF_DIR|CONF_FILE|LOG_DIR|TMP_DIR|WORK_DIR|DATA_DIR|USER_JARS_DIR)$/{N;d;}' \
             "$1"
         }
         normalise bare.raw.yaml     > bare.yaml
@@ -350,11 +403,31 @@
         helm template jupyterhub ${jupyterhubBundle}/chart                                  > bare.raw.yaml
         helm template jupyterhub ${jupyterhubBundle}/chart -f ${jupyterhubBundle}/values.yaml > withVals.raw.yaml
 
+        # Phase B: JupyterHub injects firestream-jupyterhub:5.3.0 for the
+        # `proxy` slot too (Bitnami's bundled bitnami/configurable-http-proxy
+        # was at 5.0.1). The chart's `helm.sh/chart` metadata picks up
+        # `app.kubernetes.io/version` from the image tag — so proxy-related
+        # K8s objects now carry `app.kubernetes.io/version: 5.3.0` instead of
+        # 5.0.1. Normalise the `app.kubernetes.io/version:` label so this
+        # injected divergence does not false-fail the fidelity check.
+        # Phase B: also strip the postgres `.initialized` flag check line
+        # (subchart-image-conditional template content — see postgresql
+        # check header for full rationale).
+        # Phase F: chart-side env-var remap (`jupyterhub.hub|proxy|singleuser
+        # .extraEnvVars` in the flake-module) injects path env vars
+        # (JUPYTERHUB_CONF_FILE, JUPYTERHUB_CONF_DIR, JUPYTERHUB_TMP_DIR,
+        # JUPYTERHUB_PID_FILE, JUPYTERHUB_LOGS_DIR, JUPYTERHUB_LOG_FILE,
+        # JUPYTERHUB_DATA_DIR, JUPYTERHUB_VOLUME_DIR) into all three pod
+        # env: blocks. The bare chart doesn't have those — strip from BOTH
+        # renders.
         normalise() {
           sed -E \
             -e 's,^([[:space:]]*(password|admin-password|postgres-password|replication-password|cookieSecret|hub-cookie-secret|secretToken|proxy-secret-token|proxy-token|api-token|crypt-key|values.yaml|hub.config.JupyterHub.cookie_secret|hub.config.CryptKeeper.keys):[[:space:]]*).*,\1<RANDOM>,' \
             -e 's,^([[:space:]]*checksum/[a-z0-9-]+:[[:space:]]*).*,\1<RANDOM>,' \
             -e 's,^([[:space:]]*image:[[:space:]]*).*,\1<IMAGE>,' \
+            -e 's,^([[:space:]]*app\.kubernetes\.io/version:[[:space:]]*).*,\1<VERSION>,' \
+            -e '/\.initialized/d' \
+            -e '/^[[:space:]]+- name: JUPYTERHUB_(CONF_FILE|CONF_DIR|TMP_DIR|PID_FILE|LOGS_DIR|LOG_FILE|DATA_DIR|VOLUME_DIR)$/{N;d;}' \
             "$1"
         }
         normalise bare.raw.yaml     > bare.yaml
@@ -420,11 +493,22 @@
         helm template superset ${supersetBundle}/chart                              > bare.raw.yaml
         helm template superset ${supersetBundle}/chart -f ${supersetBundle}/values.yaml > withVals.raw.yaml
 
+        # Phase B: superset injects firestream-* images for BOTH the postgres
+        # and redis subcharts. The postgres subchart's `_helpers.tpl`
+        # emits a `.initialized` flag-file check that is omitted once the
+        # firestream image is in use; delete the line from both renders.
+        # Phase F: chart-side env-var remap (`superset.web|worker|init.
+        # extraEnvVars` in the flake-module) injects path env vars
+        # (SUPERSET_HOME_DIR, SUPERSET_CONFIG_PATH, SUPERSET_LOG_DIR,
+        # SUPERSET_TMP_DIR) into web/worker/init pod env: blocks. The bare
+        # chart doesn't have those — strip from BOTH renders.
         normalise() {
           sed -E \
             -e 's,^([[:space:]]*(password|admin-password|postgres-password|replication-password|redis-password|superset-password|superset-secret-key|secret-key|sqlalchemy-database-uri|fab-default-secret):[[:space:]]*).*,\1<RANDOM>,' \
             -e 's,^([[:space:]]*checksum/[a-z0-9-]+:[[:space:]]*).*,\1<RANDOM>,' \
             -e 's,^([[:space:]]*image:[[:space:]]*).*,\1<IMAGE>,' \
+            -e '/\.initialized/d' \
+            -e '/^[[:space:]]+- name: SUPERSET_(HOME_DIR|CONFIG_PATH|LOG_DIR|TMP_DIR)$/{N;d;}' \
             "$1"
         }
         normalise bare.raw.yaml     > bare.yaml
@@ -484,11 +568,29 @@
         helm template odoo ${odooBundle}/chart                      > bare.raw.yaml
         helm template odoo ${odooBundle}/chart -f ${odooBundle}/values.yaml > withVals.raw.yaml
 
+        # Phase B: odoo injects firestream-* images for both odoo + the
+        # postgres subchart. The postgres subchart's `_helpers.tpl`
+        # emits a `.initialized` flag-file check that is omitted once the
+        # firestream image is in use; delete the line from both renders.
+        # Phase F: chart-side env-var remap (top-level `odoo.extraEnvVars`
+        # in the flake-module) injects path env vars (ODOO_VOLUME_DIR,
+        # ODOO_DATA_DIR, ODOO_ADDONS_DIR, ODOO_CONF_DIR, ODOO_CONF_FILE,
+        # ODOO_LOGS_DIR, ODOO_LOG_FILE, ODOO_TMP_DIR, ODOO_PID_FILE) into
+        # the odoo pod env: block. The bare chart doesn't have those —
+        # strip from BOTH renders.
+        # Phase G: odoo also injects POSTGRESQL_* path remaps into its bundled
+        # postgresql subchart pod (`postgresql.primary.extraEnvVars` in the
+        # flake-module) — strip those too, same as the standalone postgresql
+        # check does.
         normalise() {
           sed -E \
             -e 's,^([[:space:]]*(password|admin-password|postgres-password|replication-password|odoo-password|smtp-password):[[:space:]]*).*,\1<RANDOM>,' \
             -e 's,^([[:space:]]*checksum/[a-z0-9-]+:[[:space:]]*).*,\1<RANDOM>,' \
             -e 's,^([[:space:]]*image:[[:space:]]*).*,\1<IMAGE>,' \
+            -e '/\.initialized/d' \
+            -e '/^[[:space:]]+- name: ODOO_(VOLUME_DIR|DATA_DIR|ADDONS_DIR|CONF_DIR|CONF_FILE|LOGS_DIR|LOG_FILE|TMP_DIR|PID_FILE)$/{N;d;}' \
+            -e '/^[[:space:]]+- name: POSTGRESQL_(VOLUME_DIR|DATA_DIR|MOUNTED_CONF_DIR|CONF_DIR|CONF_FILE|PGHBA_FILE|REPLICATION_PASSFILE_PATH|TMP_DIR|PID_FILE|LOG_DIR|LOG_FILE)$/{N;d;}' \
+            -e '/^[[:space:]]+- name: POSTGRESQL_SHARED_PRELOAD_LIBRARIES$/{N;s,value:.*,value: <PRELOAD>,;}' \
             "$1"
         }
         normalise bare.raw.yaml     > bare.yaml
@@ -500,6 +602,52 @@
           cp fidelity.diff "$out/" 2>/dev/null || true
         else
           echo "ODOO RENDER FIDELITY FAILURE - generated values changed the rendered output:"
+          cat fidelity.diff
+          exit 1
+        fi
+      '';
+
+      # ----------------------------------------------------------------------
+      # nextjs render-fidelity check (net-new, non-Bitnami app).
+      #
+      # Unlike the forked charts, nextjs authors BOTH its templates and its
+      # values.yaml defaults, so the bare render already uses firestream-nextjs.
+      # The Firestream overlay only injects: the nextjs image triple (no-op,
+      # already the chart default), the bundled postgresql subchart's
+      # firestream-postgresql image, and global.security.allowInsecureImages.
+      # After normalising images, random subchart secrets, checksums, the
+      # postgres `.initialized` flag-file line (omitted once the firestream
+      # image is in use), and the POSTGRESQL_SHARED_PRELOAD_LIBRARIES env var
+      # (the overlay blanks the chart's "pgaudit" default because the
+      # firestream-postgresql image has no pgaudit extension), the sparse
+      # overlay is a no-op over the bare chart. NO path-env remaps are injected.
+      # ----------------------------------------------------------------------
+      checks.nextjs-render-fidelity = pkgs.runCommand "nextjs-render-fidelity"
+        { nativeBuildInputs = [ pkgs.kubernetes-helm ]; } ''
+        set -euo pipefail
+        export HOME="$TMPDIR"
+
+        helm template nextjs ${nextjsBundle}/chart                          > bare.raw.yaml
+        helm template nextjs ${nextjsBundle}/chart -f ${nextjsBundle}/values.yaml > withVals.raw.yaml
+
+        normalise() {
+          sed -E \
+            -e 's,^([[:space:]]*(password|admin-password|postgres-password|replication-password):[[:space:]]*).*,\1<RANDOM>,' \
+            -e 's,^([[:space:]]*checksum/[a-z0-9-]+:[[:space:]]*).*,\1<RANDOM>,' \
+            -e 's,^([[:space:]]*image:[[:space:]]*).*,\1<IMAGE>,' \
+            -e '/\.initialized/d' \
+            -e '/^[[:space:]]+- name: POSTGRESQL_SHARED_PRELOAD_LIBRARIES$/{N;s,value:.*,value: <PRELOAD>,;}' \
+            "$1"
+        }
+        normalise bare.raw.yaml     > bare.yaml
+        normalise withVals.raw.yaml > withVals.yaml
+
+        if diff -u bare.yaml withVals.yaml > fidelity.diff; then
+          echo "nextjs render fidelity OK: sparse Firestream values are a no-op over the bare chart"
+          mkdir -p "$out"
+          cp fidelity.diff "$out/" 2>/dev/null || true
+        else
+          echo "NEXTJS RENDER FIDELITY FAILURE - generated values changed the rendered output:"
           cat fidelity.diff
           exit 1
         fi

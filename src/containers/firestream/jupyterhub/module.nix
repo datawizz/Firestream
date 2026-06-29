@@ -392,15 +392,20 @@ in firestream.mkPythonContainerModule {
     "/opt/jupyterhub/config/jupyterhub_config.py.template" = jupyterhubConfigTemplate;
   };
 
+  # Per-container helpers: emitted at top-level of libhelpersjupyterhub.sh by the
+  # engine, so chart init containers can `source /opt/firestream/scripts/libjupyterhub.sh`
+  # and use these helpers directly.
+  perContainerHelpers = jupyterhubHelpers;
+
   # Validation function
-  validateFn = jupyterhubHelpers + ''
+  validateFn = ''
     error_code=0
     ${validateScript}
     [[ "$error_code" -eq 0 ]] || exit "$error_code"
   '';
 
   # Activation: Load secrets and process config templates
-  activateFn = jupyterhubHelpers + ''
+  activateFn = ''
     info "Activating JupyterHub configuration..."
 
     # Load secrets from _FILE variables
@@ -460,10 +465,10 @@ in firestream.mkPythonContainerModule {
   '';
 
   # Configuration generation
-  configFn = jupyterhubHelpers + configScript;
+  configFn = configScript;
 
   # Initialization
-  initFn = jupyterhubHelpers + initScript;
+  initFn = initScript;
 
   # Startup command
   runCmd = ''

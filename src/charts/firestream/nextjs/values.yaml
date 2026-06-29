@@ -1,0 +1,199 @@
+# Copyright Firestream. MIT License.
+# Default values for the Firestream Next.js chart.
+
+## @section Global parameters
+global:
+  imageRegistry: ""
+  imagePullSecrets: []
+  defaultStorageClass: ""
+  security:
+    ## Allow Firestream's non-Bitnami images to be used by Bitnami subcharts
+    ## (the bundled postgresql refuses unknown images otherwise). The flake
+    ## image-injection module sets this to true; left false in the bare chart.
+    allowInsecureImages: false
+
+## @section Common parameters
+kubeVersion: ""
+nameOverride: ""
+fullnameOverride: ""
+namespaceOverride: ""
+commonLabels: {}
+commonAnnotations: {}
+clusterDomain: cluster.local
+extraDeploy: []
+
+diagnosticMode:
+  enabled: false
+  command:
+    - sleep
+  args:
+    - infinity
+
+## @section Next.js application parameters
+image:
+  registry: docker.io
+  repository: firestream-nextjs
+  tag: "1.0.0"
+  digest: ""
+  pullPolicy: IfNotPresent
+  pullSecrets: []
+  debug: false
+
+replicaCount: 1
+
+containerPorts:
+  http: 3000
+extraContainerPorts: []
+
+## Extra environment variables. Use this to inject a full DATABASE_URL or any
+## app-specific config. The PG* connection vars are wired automatically below.
+extraEnvVars: []
+extraEnvVarsCM: ""
+extraEnvVarsSecret: ""
+
+command: []
+args: []
+
+resourcesPreset: nano
+resources: {}
+
+podSecurityContext:
+  enabled: true
+  fsGroup: 1001
+  fsGroupChangePolicy: Always
+  supplementalGroups: []
+  sysctls: []
+
+containerSecurityContext:
+  enabled: true
+  seLinuxOptions: {}
+  runAsUser: 1001
+  runAsGroup: 1001
+  runAsNonRoot: true
+  privileged: false
+  readOnlyRootFilesystem: true
+  allowPrivilegeEscalation: false
+  capabilities:
+    drop:
+      - ALL
+  seccompProfile:
+    type: RuntimeDefault
+
+## Probes target the /api/health route served by the app.
+startupProbe:
+  enabled: true
+  path: /api/health
+  initialDelaySeconds: 5
+  periodSeconds: 5
+  timeoutSeconds: 5
+  failureThreshold: 30
+  successThreshold: 1
+livenessProbe:
+  enabled: true
+  path: /api/health
+  initialDelaySeconds: 10
+  periodSeconds: 10
+  timeoutSeconds: 5
+  failureThreshold: 6
+  successThreshold: 1
+readinessProbe:
+  enabled: true
+  path: /api/health
+  initialDelaySeconds: 5
+  periodSeconds: 10
+  timeoutSeconds: 5
+  failureThreshold: 6
+  successThreshold: 1
+customStartupProbe: {}
+customLivenessProbe: {}
+customReadinessProbe: {}
+
+## Pod scheduling / metadata
+updateStrategy:
+  type: RollingUpdate
+automountServiceAccountToken: false
+hostAliases: []
+podLabels: {}
+podAnnotations: {}
+affinity: {}
+nodeSelector: {}
+tolerations: []
+priorityClassName: ""
+lifecycleHooks: {}
+initContainers: []
+sidecars: []
+extraVolumes: []
+extraVolumeMounts: []
+
+autoscaling:
+  enabled: false
+
+## @section Traffic exposure parameters
+service:
+  type: ClusterIP
+  ports:
+    http: 3000
+  nodePorts:
+    http: ""
+  sessionAffinity: None
+  sessionAffinityConfig: {}
+  clusterIP: ""
+  loadBalancerIP: ""
+  loadBalancerSourceRanges: []
+  externalTrafficPolicy: Cluster
+  annotations: {}
+  extraPorts: []
+
+ingress:
+  enabled: false
+  ingressClassName: ""
+  pathType: ImplementationSpecific
+  apiVersion: ""
+  hostname: nextjs.local
+  path: /
+  annotations: {}
+  tls: false
+  selfSigned: false
+  extraHosts: []
+  extraPaths: []
+  extraTls: []
+  secrets: []
+  extraRules: []
+
+networkPolicy:
+  enabled: true
+  allowExternal: true
+  allowExternalEgress: true
+  extraIngress: []
+  extraEgress: []
+  ingressNSMatchLabels: {}
+  ingressNSPodMatchLabels: {}
+
+## @section ServiceAccount parameters
+serviceAccount:
+  create: true
+  name: ""
+  annotations: {}
+  automountServiceAccountToken: false
+
+## @section Database parameters
+## Bundled PostgreSQL subchart (firestream-postgresql image is injected by the
+## flake). The app connects via PGHOST/PGPORT/PGUSER/PGPASSWORD/PGDATABASE.
+postgresql:
+  enabled: true
+  architecture: standalone
+  auth:
+    username: firestream
+    password: ""
+    database: firestream_nextjs
+    existingSecret: ""
+
+## External database, used only when postgresql.enabled = false.
+externalDatabase:
+  host: ""
+  port: 5432
+  user: firestream
+  password: ""
+  database: firestream_nextjs
+  existingSecret: ""
+  existingSecretPasswordKey: ""

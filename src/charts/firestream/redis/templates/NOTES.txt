@@ -26,13 +26,13 @@ In order to replicate the container startup scripts execute this command:
 
 For Redis:
 
-    /opt/bitnami/scripts/redis/entrypoint.sh /opt/bitnami/scripts/redis/run.sh
+    /opt/firestream/scripts/redis/entrypoint.sh /opt/firestream/scripts/redis/run.sh
 
 {{- if .Values.sentinel.enabled }}
 
 For Redis Sentinel:
 
-    /opt/bitnami/scripts/redis-sentinel/entrypoint.sh /opt/bitnami/scripts/redis-sentinel/run.sh
+    /opt/firestream/scripts/redis-sentinel/entrypoint.sh /opt/firestream/scripts/redis-sentinel/run.sh
 
 {{- end }}
 {{- else }}
@@ -64,7 +64,7 @@ For Redis Sentinel:
 
     By specifying ".Values.auth.usePasswordFiles=true" and ".Values.auth.usePasswordFileFromSecret=false"
     Redis is expecting that the password is mounted as a file in each pod
-    (by default in /opt/bitnami/redis/secrets/redis-password)
+    (by default in /opt/firestream/redis/secrets/redis-password)
 
     Ensure that you specify the respective initContainers in
     both .Values.master.initContainers and .Values.replica.initContainers

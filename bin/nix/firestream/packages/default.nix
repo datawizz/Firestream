@@ -98,4 +98,11 @@ in {
     version = "0.1.0";
     description = "In-container health/SBOM HTTP server (/healthz, /readyz, /metadata, /sbom, /closure)";
   };
+
+  # seaweedfs-weed: the SeaweedFS `weed` binary (Apache-2.0, single Go binary,
+  # S3-compatible object store). Built via buildGoModule, NOT a Rust package, so
+  # it is exposed directly (no wrapRustPackage / SBOM metadata wrapper). Consumed
+  # by the seaweedfs container's runtimeBinDeps (threaded via the container
+  # flake-module's extraFactoryArgs).
+  seaweedfs-weed = import ./seaweedfs-weed.nix { inherit pkgs lib; };
 }

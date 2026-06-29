@@ -21,20 +21,25 @@
     # Paths configuration
     # Per-key mkDefault so individual paths can be overridden independently.
     paths = {
-      base = lib.mkDefault "/opt/superset";
-      conf = lib.mkDefault "/opt/superset";
-      data = lib.mkDefault "/opt/superset/superset_home";
-      logs = lib.mkDefault "/opt/superset/logs";
+      base = lib.mkDefault "/opt/firestream/superset";
+      conf = lib.mkDefault "/opt/firestream/superset";
+      data = lib.mkDefault "/opt/firestream/superset/superset_home";
+      logs = lib.mkDefault "/opt/firestream/superset/superset_home/logs";
     };
 
     # Environment variables with defaults (preserving Bitnami compatibility)
     # CRITICAL: per-leaf mkDefault (wrap each value), NOT a whole-set mkDefault.
     env = builtins.mapAttrs (_: lib.mkDefault) {
       # Paths
-      SUPERSET_HOME = "/opt/superset/superset_home";
-      SUPERSET_CONFIG_PATH = "/opt/superset/superset_config.py";
-      SUPERSET_LOG_DIR = "/opt/superset/logs";
-      SUPERSET_TMP_DIR = "/opt/superset/tmp";
+      # Config + logs live UNDER the superset_home subtree so that the chart's
+      # writable superset_home emptyDir covers them (chart enforces
+      # readOnlyRootFilesystem; only superset_home + /tmp are writable). TMP at
+      # /tmp (writable emptyDir in every pod). This makes the previous chart-side
+      # extraEnvVars path-override redundant.
+      SUPERSET_HOME = "/opt/firestream/superset/superset_home";
+      SUPERSET_CONFIG_PATH = "/opt/firestream/superset/superset_home/superset_config.py";
+      SUPERSET_LOG_DIR = "/opt/firestream/superset/superset_home/logs";
+      SUPERSET_TMP_DIR = "/tmp";
       FLASK_APP = "superset.app:create_app()";
       PYTHONPATH = "/app/pythonpath";
 
@@ -68,7 +73,12 @@
       SUPERSET_DATABASE_HOST = "postgresql";
       SUPERSET_DATABASE_PORT_NUMBER = "5432";
       SUPERSET_DATABASE_NAME = "superset";
-      SUPERSET_DATABASE_USERNAME = "superset";
+      # The Bitnami-derived superset chart injects the metadata DB user as
+      # `SUPERSET_DATABASE_USER`, while this container reads
+      # `SUPERSET_DATABASE_USERNAME`. Bridge the two (mirrors the postgresql
+      # POSTGRES_USER -> POSTGRESQL_USERNAME alias pattern) so the K8s-injected
+      # value wins; falls back to the historical "superset" default when unset.
+      SUPERSET_DATABASE_USERNAME = "\${SUPERSET_DATABASE_USER:-superset}";
       SUPERSET_DATABASE_PASSWORD = "";
       SUPERSET_DATABASE_USE_SSL = "no";
 
@@ -101,7 +111,7 @@
       EXAMPLES_DATABASE_USE_SSL = "";
 
       # Python cache
-      PYTHONPYCACHEPREFIX = "/opt/superset/tmp/pycache";
+      PYTHONPYCACHEPREFIX = "/opt/firestream/superset/tmp/pycache";
 
       # Debug mode
       BITNAMI_DEBUG = "false";
@@ -168,14 +178,15 @@
       projectName = "firestream-superset";
       dependencies = [ "postgresql" "redis" ];
 
-      # +20000 host-port offset so the embedded postgres/redis don't collide
-      # with a standalone .#postgresql-up / .#redis-up.
-      #   postgresql 5432 -> host 25432
-      #   redis      6379 -> host 26379
-      #   superset   8088 -> host 28088
-      #   flower     5555 -> host 25555
-      #   healthd    9180 -> host 29180
-      hostPortOffset = 20000;
+      # +32000 host-port offset. Each of the 8 canonical apps gets a DISTINCT
+      # offset (spacing 2000) so all 8 can run simultaneously on docker without
+      # host-port collisions. superset=32000.
+      #   postgresql 5432 -> host 37432
+      #   redis      6379 -> host 38379
+      #   superset   8088 -> host 40088
+      #   flower     5555 -> host 37555
+      #   healthd    9180 -> host 41180
+      hostPortOffset = 32000;
 
       sharedEnv = {
         SUPERSET_DATABASE_HOST = "postgresql";

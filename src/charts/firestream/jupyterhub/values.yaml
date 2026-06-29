@@ -1149,7 +1149,7 @@ proxy:
     public:
       ## @param proxy.service.public.type Public service type
       ##
-      type: LoadBalancer
+      type: ClusterIP
       # HTTP Port
       ## @param proxy.service.public.ports.http Public service HTTP port
       ##
@@ -1606,7 +1606,7 @@ singleuser:
     pullSecrets: []
   ## @param singleuser.notebookDir Notebook directory (it will be the same as the PVC volume mount)
   ##
-  notebookDir: /opt/bitnami/jupyterhub-singleuser
+  notebookDir: /opt/firestream/jupyterhub-singleuser
   ## @param singleuser.allowPrivilegeEscalation Controls whether a process can gain more privileges than its parent process
   ##
   allowPrivilegeEscalation: false
@@ -1854,9 +1854,9 @@ auxiliaryImage:
 postgresql:
   enabled: true
   auth:
-    username: bn_jupyterhub
+    username: firestream
     password: ""
-    database: bitnami_jupyterhub
+    database: firestream_jupyterhub
     existingSecret: ""
   architecture: standalone
   service:

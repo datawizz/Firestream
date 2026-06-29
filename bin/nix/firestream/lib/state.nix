@@ -105,7 +105,12 @@ let
         fi
 
         debug "Saving config hash for $app"
-        ensure_dir_exists "$state_dir"
+        # Tolerate read-only base_dir (Bitnami chart pods). Hash is for change
+        # detection; absence just means change-detection is skipped next boot.
+        ensure_dir_exists "$state_dir" 2>/dev/null || {
+            debug "Skipped save_config_hash: state_dir not writable"
+            return 0
+        }
 
         local hash
         hash="$(get_config_hash "''${files[@]}")"
@@ -114,7 +119,10 @@ let
             return 1
         fi
 
-        ${pkgs.coreutils}/bin/echo "$hash" > "$hash_file"
+        ${pkgs.coreutils}/bin/echo "$hash" > "$hash_file" 2>/dev/null || {
+            debug "Skipped save_config_hash: hash_file not writable"
+            return 0
+        }
         info "Saved config hash for $app: $hash"
     }
 
@@ -211,13 +219,20 @@ let
         state_dir="$(get_state_dir "$app" "$base_dir")"
         local gen_file="''${state_dir}/generation"
 
-        ensure_dir_exists "$state_dir"
+        # Tolerate read-only base_dir; return current generation unchanged.
+        ensure_dir_exists "$state_dir" 2>/dev/null || {
+            ${pkgs.coreutils}/bin/echo "0"
+            return 0
+        }
 
         local current_gen
         current_gen="$(get_generation "$app" "$base_dir")"
         local new_gen=$((current_gen + 1))
 
-        ${pkgs.coreutils}/bin/echo "$new_gen" > "$gen_file"
+        ${pkgs.coreutils}/bin/echo "$new_gen" > "$gen_file" 2>/dev/null || {
+            ${pkgs.coreutils}/bin/echo "$current_gen"
+            return 0
+        }
         debug "Incremented generation for $app: $current_gen -> $new_gen"
         ${pkgs.coreutils}/bin/echo "$new_gen"
     }
@@ -239,16 +254,25 @@ let
         state_dir="$(get_state_dir "$app" "$base_dir")"
         local activation_file="''${state_dir}/activation-time"
 
-        ensure_dir_exists "$state_dir"
+        # Tolerate read-only base_dir (Bitnami chart pods often have no PVC at
+        # /firestream and run with readOnlyRootFilesystem=true). Activation
+        # records are advisory and the app starts fine without them.
+        ensure_dir_exists "$state_dir" 2>/dev/null || {
+            debug "Skipped record_activation: base_dir not writable"
+            return 0
+        }
 
         # Record ISO timestamp
         local timestamp
         timestamp="$(${pkgs.coreutils}/bin/date -Iseconds)"
-        ${pkgs.coreutils}/bin/echo "$timestamp" > "$activation_file"
+        ${pkgs.coreutils}/bin/echo "$timestamp" > "$activation_file" 2>/dev/null || {
+            debug "Skipped record_activation: activation_file not writable"
+            return 0
+        }
 
-        # Increment generation
+        # Increment generation (best-effort)
         local new_gen
-        new_gen="$(increment_generation "$app" "$base_dir")"
+        new_gen="$(increment_generation "$app" "$base_dir" 2>/dev/null)" || new_gen=0
 
         info "Recorded activation for $app at $timestamp (generation $new_gen)"
     }

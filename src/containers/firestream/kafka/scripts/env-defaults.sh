@@ -4,17 +4,17 @@
 # This file is sourced, not executed directly
 
 # Base directories - use absolute paths to avoid variable expansion issues with set -u
-export KAFKA_BASE_DIR="${KAFKA_BASE_DIR:-/opt/bitnami/kafka}"
-export KAFKA_VOLUME_DIR="${KAFKA_VOLUME_DIR:-/bitnami/kafka}"
-export KAFKA_DATA_DIR="${KAFKA_DATA_DIR:-/bitnami/kafka/data}"
-export KAFKA_CONF_DIR="${KAFKA_CONF_DIR:-/opt/bitnami/kafka/config}"
-export KAFKA_MOUNTED_CONF_DIR="${KAFKA_MOUNTED_CONF_DIR:-/bitnami/kafka/config}"
-export KAFKA_CONF_FILE="${KAFKA_CONF_FILE:-/opt/bitnami/kafka/config/server.properties}"
-export KAFKA_LOG_DIR="${KAFKA_LOG_DIR:-/opt/bitnami/kafka/logs}"
-export KAFKA_HOME="${KAFKA_HOME:-/opt/bitnami/kafka}"
-export KAFKA_CERTS_DIR="${KAFKA_CERTS_DIR:-/opt/bitnami/kafka/config/certs}"
-export KAFKA_TMP_DIR="${KAFKA_TMP_DIR:-/opt/bitnami/kafka/tmp}"
-export KAFKA_PID_FILE="${KAFKA_PID_FILE:-/opt/bitnami/kafka/tmp/kafka.pid}"
+export KAFKA_BASE_DIR="${KAFKA_BASE_DIR:-/opt/firestream/kafka}"
+export KAFKA_VOLUME_DIR="${KAFKA_VOLUME_DIR:-/firestream/kafka}"
+export KAFKA_DATA_DIR="${KAFKA_DATA_DIR:-/firestream/kafka/data}"
+export KAFKA_CONF_DIR="${KAFKA_CONF_DIR:-/opt/firestream/kafka/config}"
+export KAFKA_MOUNTED_CONF_DIR="${KAFKA_MOUNTED_CONF_DIR:-/firestream/kafka/config}"
+export KAFKA_CONF_FILE="${KAFKA_CONF_FILE:-/opt/firestream/kafka/config/server.properties}"
+export KAFKA_LOG_DIR="${KAFKA_LOG_DIR:-/opt/firestream/kafka/logs}"
+export KAFKA_HOME="${KAFKA_HOME:-/opt/firestream/kafka}"
+export KAFKA_CERTS_DIR="${KAFKA_CERTS_DIR:-/opt/firestream/kafka/config/certs}"
+export KAFKA_TMP_DIR="${KAFKA_TMP_DIR:-/opt/firestream/kafka/tmp}"
+export KAFKA_PID_FILE="${KAFKA_PID_FILE:-/opt/firestream/kafka/tmp/kafka.pid}"
 export KAFKA_INITSCRIPTS_DIR="${KAFKA_INITSCRIPTS_DIR:-/docker-entrypoint-initdb.d}"
 
 # User and group
@@ -67,7 +67,7 @@ export KAFKA_CONTROLLER_QUORUM_VOTERS_COMMAND="${KAFKA_CONTROLLER_QUORUM_VOTERS_
 
 # Other settings
 export KAFKA_INIT_MAX_TIMEOUT="${KAFKA_INIT_MAX_TIMEOUT:-60}"
-export KAFKA_CFG_LOG_DIRS="${KAFKA_CFG_LOG_DIRS:-/bitnami/kafka/data}"
+export KAFKA_CFG_LOG_DIRS="${KAFKA_CFG_LOG_DIRS:-/firestream/kafka/data}"
 export KAFKA_CFG_MAX_REQUEST_SIZE="${KAFKA_CFG_MAX_REQUEST_SIZE:-}"
 export KAFKA_CFG_MAX_PARTITION_FETCH_BYTES="${KAFKA_CFG_MAX_PARTITION_FETCH_BYTES:-}"
 

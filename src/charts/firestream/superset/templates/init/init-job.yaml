@@ -76,7 +76,7 @@ spec:
               value: {{ .Values.auth.email | quote }}
             {{- if .Values.usePasswordFiles }}
             - name: SUPERSET_PASSWORD_FILE
-              value: "/opt/bitnami/superset/secrets/superset-password"
+              value: "/opt/firestream/superset/secrets/superset-password"
             {{- else }}
             - name: SUPERSET_PASSWORD
               valueFrom:
@@ -108,16 +108,16 @@ spec:
               mountPath: /tmp
               subPath: tmp-dir
             - name: empty-dir
-              mountPath: /opt/bitnami/superset/superset_home
+              mountPath: /opt/firestream/superset/superset_home
               subPath: superset-home
             {{- if .Values.usePasswordFiles }}
             - name: superset-secrets
-              mountPath: /opt/bitnami/superset/secrets
+              mountPath: /opt/firestream/superset/secrets
               readOnly: true
             {{- end }}
             {{- if or .Values.existingConfigmap .Values.config }}
             - name: superset-config
-              mountPath: /bitnami/superset/conf
+              mountPath: /firestream/superset/conf
             {{- end }}
           {{- if .Values.init.extraVolumeMounts }}
             {{- include "common.tplvalues.render" (dict "value" .Values.init.extraVolumeMounts "context" $) | nindent 12 }}

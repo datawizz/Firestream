@@ -64,6 +64,18 @@ help:
 	@echo "  make manifest-validate   # Validate CycloneDX compliance"
 	@echo "  make manifest-clean      # Clean manifest build artifacts"
 	@echo ""
+	@echo "=== App Lifecycle (firestream app) ==="
+	@echo ""
+	@echo "  make app-list                          # List known apps"
+	@echo "  make app-status BACKEND=k8s            # Status of deployed apps"
+	@echo "  make app-up-airflow DEMO=1             # Bring an app up (docker default)"
+	@echo "  make app-up-postgresql BACKEND=k8s EPHEMERAL=1"
+	@echo "  make app-down-airflow                  # Tear an app down"
+	@echo "  make app-health-redis TIMEOUT=120     # Health-check an app"
+	@echo "  make app-test-postgresql BACKEND=k8s  # Deploy + probe one app"
+	@echo "  make app-test-all BACKEND=docker DEMO=1"
+	@echo "  Vars: BACKEND(docker|k8s) TIMEOUT DEMO NO_DEMO WAIT EPHEMERAL EXTRA"
+	@echo ""
 	@echo "=== Documentation ==="
 	@echo ""
 	@echo "  make docs-dev            # Start docs dev server (port 3001)"
@@ -996,3 +1008,123 @@ test-e2e:
 .PHONY: test-e2e-%
 test-e2e-%:
 	FIRESTREAM_E2E_STACKS=$* cargo test -p firestream --test e2e -- --ignored --test-threads=1 --nocapture
+
+# ==============================================================================
+# E2E K8s harness (Phase 4)
+#
+# Fresh k3d cluster per chart, helm install via the bundle, pod-Ready wait
+# + per-chart protocol probe. Local-only; NOT added to CI for the same reasons
+# as the docker harness (cold runs are hours, flake create is multi-minute).
+#
+# Env contract (see src/lib/rust/firestream-e2e-k8s/src/env.rs):
+#   FIRESTREAM_E2E_K8S_STACKS=all|csv      Subset filter (default: canonical 9)
+#   FIRESTREAM_E2E_K8S_KEEP=1              Skip cluster + release teardown
+#   FIRESTREAM_E2E_K8S_STRICT=1            Skip-gate failure becomes hard fail
+#   FIRESTREAM_E2E_K8S_TIMEOUT_SECS=600    Per-chart readiness deadline
+#   FIRESTREAM_E2E_K8S_PRELOAD=0           Skip Nix-built image preload
+#   FIRESTREAM_E2E_K8S_CHARTS_DIR=...      Override bundle path
+#   FIRESTREAM_E2E_K8S_HELM_TIMEOUT=...    Emergency override of the helm
+#                                          install timeout. The chart
+#                                          manifest's deployment.timeout is
+#                                          authoritative; only set when a
+#                                          specific chart needs headroom.
+# ==============================================================================
+
+.PHONY: test-e2e-k8s
+test-e2e-k8s:
+	cargo test -p firestream-e2e-k8s --test e2e_k8s -- --ignored --test-threads=1 --nocapture
+
+.PHONY: test-e2e-k8s-%
+test-e2e-k8s-%:
+	FIRESTREAM_E2E_K8S_STACKS=$* \
+	cargo test -p firestream-e2e-k8s --test e2e_k8s -- --ignored --test-threads=1 --nocapture
+
+# PostgreSQL backup/restore round-trip (multi-chart: seaweedfs + postgresql).
+# Explicit target (wins over the `test-e2e-k8s-%` pattern rule) so we can pin
+# the cargo test name filter to just this scenario. Gated by the `pg-backup`
+# filter token; deploys seaweedfs first (its post-install hook creates the
+# `firestream` bucket), then postgresql with backup.enabled=true.
+.PHONY: test-e2e-k8s-pg-backup
+test-e2e-k8s-pg-backup:
+	FIRESTREAM_E2E_K8S_STACKS=pg-backup \
+	cargo test -p firestream-e2e-k8s --test e2e_k8s -- --ignored --test-threads=1 --nocapture e2e_k8s_pg_backup
+
+# ==============================================================================
+# App lifecycle CLI (`firestream app ...`)
+#
+# Thin Makefile wrappers over the `firestream app` subcommands. Invoked via
+# `cargo run -p firestream --` (the repo doesn't install a binary; same as the
+# e2e targets above). The app stem (`%`) accepts a chart/app name or `all`.
+#
+# Subcommands: up | down | health | test | status | list
+# Backends:    docker (default) | k8s
+#
+# Variables (override on the command line, e.g. `make app-up-airflow BACKEND=k8s`):
+#   BACKEND=docker|k8s   Target backend (default: docker)
+#   TIMEOUT=300          Health probe timeout, seconds (app-health-*)
+#   DEMO=1               Pass --demo (seed demo data)
+#   NO_DEMO=1            Pass --no-demo
+#   WAIT=1               Pass --wait (block until ready) for app-up-*
+#   EPHEMERAL=1          Pass --ephemeral
+#   EXTRA="..."          Extra raw flags appended to app-up-*
+#
+# Examples:
+#   make app-list
+#   make app-status BACKEND=k8s
+#   make app-up-airflow DEMO=1
+#   make app-up-postgresql BACKEND=k8s EPHEMERAL=1
+#   make app-test-postgresql BACKEND=k8s
+#   make app-test-all BACKEND=docker DEMO=1
+#   make app-health-redis TIMEOUT=120
+#   make app-down-airflow
+#   make app-up-all WAIT=1
+# ==============================================================================
+
+BACKEND ?= docker
+TIMEOUT ?= 300
+DEMO ?=
+NO_DEMO ?=
+WAIT ?=
+EPHEMERAL ?=
+EXTRA ?=
+EPHEMERAL_FLAG = $(if $(EPHEMERAL),--ephemeral,)
+
+.PHONY: app-list app-status app-up-all app-down-all app-test-all app-health-all
+
+# List known apps.
+app-list:
+	cargo run -p firestream -- app list
+
+# Status of deployed apps (optionally scoped to a backend).
+app-status:
+	cargo run -p firestream -- app status $(if $(BACKEND),--backend $(BACKEND),)
+
+# Bring a single app up.
+app-up-%:
+	cargo run -p firestream -- app up $* --backend $(BACKEND) $(if $(DEMO),--demo,) $(if $(NO_DEMO),--no-demo,) $(if $(WAIT),--wait,) $(EPHEMERAL_FLAG) $(EXTRA)
+
+# Tear a single app down.
+app-down-%:
+	cargo run -p firestream -- app down $* --backend $(BACKEND) $(EPHEMERAL_FLAG)
+
+# Health-check a single app.
+app-health-%:
+	cargo run -p firestream -- app health $* --backend $(BACKEND) --timeout $(TIMEOUT)
+
+# Test a single app (deploy + probe).
+app-test-%:
+	cargo run -p firestream -- app test $* --backend $(BACKEND) $(if $(DEMO),--demo,) $(if $(NO_DEMO),--no-demo,) --wait $(EPHEMERAL_FLAG)
+
+# Convenience: operate on every app (`all`). Defined explicitly because the
+# `%`-stem targets above won't match the bare word a user reaches for.
+app-up-all:
+	cargo run -p firestream -- app up all --backend $(BACKEND) $(if $(DEMO),--demo,) $(if $(NO_DEMO),--no-demo,) $(if $(WAIT),--wait,) $(EPHEMERAL_FLAG) $(EXTRA)
+
+app-down-all:
+	cargo run -p firestream -- app down all --backend $(BACKEND) $(EPHEMERAL_FLAG)
+
+app-test-all:
+	cargo run -p firestream -- app test all --backend $(BACKEND) $(if $(DEMO),--demo,) $(if $(NO_DEMO),--no-demo,) --wait $(EPHEMERAL_FLAG)
+
+app-health-all:
+	cargo run -p firestream -- app health all --backend $(BACKEND) --timeout $(TIMEOUT)

@@ -1,25 +1,11 @@
 # Airflow initialization logic
 # Copyright Firestream. MIT License.
 # This file is sourced, not executed directly
-
-# Helper function for retry_while - checks if admin user exists
-# Must handle set -e properly by not letting the command trigger immediate exit
-is_airflow_admin_created() {
-    local airflow_users
-    airflow_users="$(airflow users list --output plain 2>&1 | grep -v DEBUG)" || true
-    if echo "${airflow_users}" | grep -q "$AIRFLOW_USERNAME"; then
-        return 0
-    fi
-    return 1
-}
-
-# Helper function for retry_while - checks if DB migrations are complete
-# Must handle set -e properly by not letting the command trigger immediate exit
-is_db_migrated() {
-    local result=0
-    airflow db check-migrations --migration-wait-timeout=0 >/dev/null 2>&1 || result=$?
-    return $result
-}
+#
+# NOTE: Helper function definitions (is_airflow_admin_created, is_db_migrated,
+# airflow_conf_set, airflow_webserver_conf_set, airflow_wait_for_db_connection,
+# airflow_wait_for_db_migrations, airflow_wait_for_admin_user) live in
+# scripts/helpers.sh and are emitted at top-level of libairflow.sh.
 
 info "Initializing Airflow (component: $AIRFLOW_COMPONENT_TYPE)..."
 
@@ -36,9 +22,20 @@ else
   info "Using existing configuration file"
 fi
 
-# Wait for database
-info "Waiting for database at ${AIRFLOW_DATABASE_HOST}:${AIRFLOW_DATABASE_PORT_NUMBER}..."
-wait-for-port --host "$AIRFLOW_DATABASE_HOST" --timeout 120 "$AIRFLOW_DATABASE_PORT_NUMBER"
+# Wait for database.
+# When AIRFLOW_SKIP_DB_SETUP=yes (the Bitnami chart sets this on every component
+# pod) the DB connection details live in the mounted airflow.cfg rather than in
+# AIRFLOW_DATABASE_HOST, and a dedicated wait-for-db-migrations init container has
+# already gated this pod on the database being reachable + migrated. Doing a
+# wait-for-port here would use the container's baked AIRFLOW_DATABASE_HOST default
+# ("postgresql"), which does not resolve to the release-scoped service. So skip
+# the explicit port wait in that mode; the check-migrations / is_db_migrated
+# retry loops below still confirm DB availability via airflow.cfg. In standalone
+# / docker-compose mode (AIRFLOW_SKIP_DB_SETUP=no) the wait runs as before.
+if ! is_boolean_yes "${AIRFLOW_SKIP_DB_SETUP:-no}"; then
+  info "Waiting for database at ${AIRFLOW_DATABASE_HOST}:${AIRFLOW_DATABASE_PORT_NUMBER}..."
+  wait-for-port --host "$AIRFLOW_DATABASE_HOST" --timeout 120 "$AIRFLOW_DATABASE_PORT_NUMBER"
+fi
 
 # Database operations
 major_version=$(airflow_major_version)
@@ -134,17 +131,29 @@ case "$AIRFLOW_COMPONENT_TYPE" in
     ;;
 
   *)
-    # Workers, schedulers, triggerers wait for webserver to init
-    info "Waiting for database migrations..."
-    retry_while --tries 60 --sleep 10 is_db_migrated
+    # Workers, schedulers, triggerers, dag-processors.
+    if is_boolean_yes "${AIRFLOW_SKIP_DB_SETUP:-no}"; then
+      # Chart mode: the setup-db Job ran migrations + created the admin, and a
+      # dedicated wait-for-db-migrations init container already gated this pod on
+      # DB reachability + migrations + admin presence (using the correct
+      # release-scoped host and admin username). The in-pod re-checks below use
+      # the container's baked AIRFLOW_DATABASE_HOST/AIRFLOW_USERNAME defaults
+      # (which are not injected here) and would otherwise hang/fail. The celery
+      # broker connection is retried by the worker process itself at runtime.
+      info "AIRFLOW_SKIP_DB_SETUP=yes - DB/admin readiness handled by chart init containers; skipping in-pod waits"
+    else
+      # Standalone / docker-compose mode: no init containers, so wait here.
+      info "Waiting for database migrations..."
+      retry_while --tries 60 --sleep 10 is_db_migrated
 
-    info "Waiting for admin user..."
-    retry_while --tries 60 --sleep 5 is_airflow_admin_created
+      info "Waiting for admin user..."
+      retry_while --tries 60 --sleep 5 is_airflow_admin_created
 
-    # Celery components wait for Redis
-    if [[ "$AIRFLOW_EXECUTOR" == "CeleryExecutor" || "$AIRFLOW_EXECUTOR" == "CeleryKubernetesExecutor" ]]; then
-      info "Waiting for Redis at ${REDIS_HOST}:${REDIS_PORT_NUMBER}..."
-      wait-for-port --host "$REDIS_HOST" --timeout 60 "$REDIS_PORT_NUMBER"
+      # Celery components wait for Redis
+      if [[ "$AIRFLOW_EXECUTOR" == "CeleryExecutor" || "$AIRFLOW_EXECUTOR" == "CeleryKubernetesExecutor" ]]; then
+        info "Waiting for Redis at ${REDIS_HOST}:${REDIS_PORT_NUMBER}..."
+        wait-for-port --host "$REDIS_HOST" --timeout 60 "$REDIS_PORT_NUMBER"
+      fi
     fi
     ;;
 esac

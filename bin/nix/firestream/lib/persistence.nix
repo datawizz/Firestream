@@ -128,8 +128,19 @@ let
         marker_dir="$(${pkgs.coreutils}/bin/dirname "$marker_file")"
 
         debug "Marking ''${app} as initialized"
-        ensure_dir_exists "$marker_dir"
-        ${pkgs.coreutils}/bin/touch "$marker_file"
+        # Tolerate read-only base_dir (Bitnami chart pods often have no PVC at
+        # /firestream and run with readOnlyRootFilesystem=true). The
+        # is_app_initialized check on next boot will still return false, which
+        # is OK — re-running initialization is idempotent. ensure_dir_exists
+        # and touch failures are non-fatal.
+        ensure_dir_exists "$marker_dir" 2>/dev/null || {
+            debug "Skipped mark_app_initialized: base_dir not writable"
+            return 0
+        }
+        ${pkgs.coreutils}/bin/touch "$marker_file" 2>/dev/null || {
+            debug "Skipped mark_app_initialized: marker_file not writable"
+            return 0
+        }
         info "Application ''${app} marked as initialized"
     }
 

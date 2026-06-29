@@ -77,7 +77,7 @@ diagnosticMode:
   args:
     - infinity
 ## Bitnami Odoo image
-## ref: https://hub.docker.com/r/bitnami/odoo/tags/
+## ref: https://hub.docker.com/r/firestream/odoo/tags/
 ## @param image.registry [default: REGISTRY_NAME] Odoo image registry
 ## @param image.repository [default: REPOSITORY_NAME/odoo] Odoo image repository
 ## @skip image.tag Odoo image tag (immutable tags are recommended)
@@ -108,42 +108,47 @@ image:
   debug: false
 ## @section Odoo Configuration parameters
 ## Odoo settings based on environment variables
-## ref: https://github.com/bitnami/containers/tree/main/bitnami/odoo#environment-variables
+## ref: https://github.com/bitnami/containers/tree/main/firestream/odoo#environment-variables
 ##
 
 ## @param odooEmail Odoo user email
-## ref: https://github.com/bitnami/containers/tree/main/bitnami/odoo#configuration
+## ref: https://github.com/bitnami/containers/tree/main/firestream/odoo#configuration
 ##
 odooEmail: user@example.com
 ## @param odooPassword Odoo user password
 ## Defaults to a random 10-character alphanumeric string if not set
-## ref: https://github.com/bitnami/containers/tree/main/bitnami/odoo#configuration
+## ref: https://github.com/bitnami/containers/tree/main/firestream/odoo#configuration
 ##
 odooPassword: ""
 ## @param odooSkipInstall Skip Odoo installation wizard
 ##
 odooSkipInstall: false
 ## @param odooDatabaseFilter Filter odoo database by using a regex
+## Scoped to the single firestream database (matches the `firestream_odoo`
+## default below). With the bundled PostgreSQL subchart the server hosts more
+## than one database (`postgres` + the app DB); a `.*` filter leaves Odoo unable
+## to auto-select at the web login and rejects valid creds with "Wrong
+## login/password". Override this together with the database name if you change it.
 ##
-odooDatabaseFilter: .*
+odooDatabaseFilter: ^firestream_odoo$
 ## @param loadDemoData Whether to load demo data for all modules during initialization
-## ref: https://github.com/bitnami/containers/tree/main/bitnami/odoo#configuration
+## ref: https://github.com/bitnami/containers/tree/main/firestream/odoo#configuration
 ##
 loadDemoData: false
 ## @param customPostInitScripts Custom post-init.d user scripts
-## ref: https://github.com/bitnami/containers/tree/main/bitnami/odoo
+## ref: https://github.com/bitnami/containers/tree/main/firestream/odoo
 ## NOTE: supported formats are `.sh`, `.sql` or `.php`
 ## NOTE: scripts are exclusively executed during the 1st boot of the container
 ## e.g:
 ## customPostInitScripts:
 ##   enable-logs.sh: |
 ##     #!/bin/bash
-##     sed -i s/;logfile/logfile/ /opt/bitnami/odoo/conf/odoo.conf
+##     sed -i s/;logfile/logfile/ /opt/firestream/odoo/conf/odoo.conf
 ##     ...
 ##
 customPostInitScripts: {}
 ## SMTP mail delivery configuration
-## ref: https://github.com/bitnami/containers/tree/main/bitnami/odoo/#smtp-configuration
+## ref: https://github.com/bitnami/containers/tree/main/firestream/odoo/#smtp-configuration
 ## @param smtpHost SMTP server host
 ## @param smtpPort SMTP server port
 ## @param smtpUser SMTP username
@@ -432,7 +437,7 @@ sidecars: []
 ##  - name: your-image-name
 ##    image: your-image
 ##    imagePullPolicy: Always
-##    command: ['sh', '-c', 'copy addons from git and push to /bitnami/odoo/addons. Should work with extraVolumeMounts and extraVolumes']
+##    command: ['sh', '-c', 'copy addons from git and push to /firestream/odoo/addons. Should work with extraVolumeMounts and extraVolumes']
 ##
 initContainers: []
 ## @section Traffic Exposure Parameters
@@ -442,8 +447,12 @@ initContainers: []
 ##
 service:
   ## @param service.type Odoo service type
+  ## Firestream default: ClusterIP. Firestream exposes services via port-forward
+  ## (see CLAUDE.md), and a port-80 LoadBalancer collides with k3d's built-in
+  ## traefik service-LB on single-node clusters, leaving the LB unprovisioned.
+  ## This matches the other firestream charts (airflow/jupyterhub/postgresql/…).
   ##
-  type: LoadBalancer
+  type: ClusterIP
   ## @param service.ports.http Odoo service HTTP port
   ##
   ports:
@@ -732,9 +741,9 @@ autoscaling:
 postgresql:
   enabled: true
   auth:
-    username: bn_odoo
+    username: firestream
     password: ""
-    database: bitnami_odoo
+    database: firestream_odoo
     existingSecret: ""
   architecture: standalone
 ## External PostgreSQL configuration
@@ -754,9 +763,9 @@ postgresql:
 externalDatabase:
   host: ""
   port: 5432
-  user: bn_odoo
+  user: firestream
   password: ""
-  database: bitnami_odoo
+  database: firestream_odoo
   create: true
   postgresqlPostgresUser: "postgres"
   postgresqlPostgresPassword: ""

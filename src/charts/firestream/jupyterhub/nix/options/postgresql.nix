@@ -6,9 +6,10 @@
 # `auth.existingSecret`, `architecture`, `service.ports.postgresql`,
 # `enabled`) and leave `freeformType` open for the full postgresql values
 # tree (any field the upstream Bitnami postgresql chart accepts).
-{ lib, ... }:
+{ lib, chartTypes, ... }:
 
 let
+  t = chartTypes;
   inherit (lib) mkOption types;
 in {
   options.jupyterhub.postgresql = mkOption {
@@ -33,31 +34,7 @@ in {
         auth = mkOption {
           default = null;
           description = "PostgreSQL auth configuration consumed by the hub";
-          type = types.nullOr (types.submodule {
-            freeformType = types.attrsOf types.anything;
-            options = {
-              username = mkOption {
-                type = types.nullOr types.str;
-                default = null;
-                description = "Name for a custom user to create";
-              };
-              password = mkOption {
-                type = types.nullOr types.str;
-                default = null;
-                description = "Password for the custom user (random if empty)";
-              };
-              database = mkOption {
-                type = types.nullOr types.str;
-                default = null;
-                description = "Name for a custom database to create";
-              };
-              existingSecret = mkOption {
-                type = types.nullOr types.str;
-                default = null;
-                description = "Name of an existing secret to use for PostgreSQL credentials";
-              };
-            };
-          });
+          type = types.nullOr t.secretType;
         };
 
         service = mkOption {

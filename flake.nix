@@ -72,6 +72,9 @@
         ./nix/flake-modules/containers/redis.nix
         ./nix/flake-modules/containers/kafka.nix
         ./nix/flake-modules/containers/spark.nix
+        ./nix/flake-modules/containers/seaweedfs.nix
+        ./nix/flake-modules/containers/os-shell.nix
+        ./nix/flake-modules/containers/nextjs.nix
         ./nix/flake-modules/charts/airflow.nix
         ./nix/flake-modules/charts/postgresql.nix
         ./nix/flake-modules/charts/redis.nix
@@ -80,6 +83,8 @@
         ./nix/flake-modules/charts/jupyterhub.nix
         ./nix/flake-modules/charts/superset.nix
         ./nix/flake-modules/charts/odoo.nix
+        ./nix/flake-modules/charts/seaweedfs.nix
+        ./nix/flake-modules/charts/nextjs.nix
         ./nix/flake-modules/charts/aggregate.nix
         ./nix/flake-modules/charts/checks.nix
       ];

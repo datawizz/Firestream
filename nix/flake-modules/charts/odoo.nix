@@ -1,4 +1,4 @@
-# Odoo chart flake-module (Phase 6b - Agent G7)
+# Odoo chart flake-module (Phase 6b - Agent G7; Phase B image injection)
 # Copyright Firestream. MIT License.
 #
 # Wires the Odoo Helm chart through the options-driven evalChart
@@ -16,20 +16,13 @@
 # consumes the in-repo Bitnami fork at src/charts/bitnami/. The
 # recursive vendoring handles postgresql's own `common` dependency.
 #
-# Image injection is NOT yet wired (no firestreamImages.odoo container
-# in the registry has its image consumed here). The Bitnami chart ships
-# ONE main image (bitnami/odoo); that would be injected
-# (componentPath = [ "image" ]) once a Firestream container exists.
-# For now, `_meta.containerRefs` stays empty and the bundled Bitnami
-# image renders unchanged; no `global.security.allowInsecureImages`
-# flip needed.
-#
-# Milestone marker: odoo is the EIGHTH and final chart wired in this
-# phase. After this lands, `firestreamCharts` has full coverage of the
-# `firestreamStacks.dev` chart set (airflow, jupyterhub, kafka, odoo,
-# postgresql, redis, spark, superset).
+# Phase B image injection: Bitnami Odoo ships ONE main image (bitnami/odoo,
+# top-level `image:` shared by app + init containers) plus the bundled
+# postgresql subchart. We wire both with firestream-* containers.
+# `global.security.allowInsecureImages` is flipped to bypass Bitnami's
+# NOTES.txt whitelist.
 { ... }: {
-  perSystem = { pkgs, lib, config, evalChart, ... }:
+  perSystem = { pkgs, lib, config, evalChart, baseChart, ... }:
     let
       chartSrc = ../../../src/charts/firestream/odoo;
       optionsPath = chartSrc + "/nix/default.nix";
@@ -44,26 +37,81 @@
         { name = "postgresql"; }
       ];
 
+      odooImg =
+        let
+          imgEval = config.firestreamImages.odoo.eval (_: {});
+          imgCfg = imgEval.config.odoo.image;
+        in {
+          registry = imgCfg.registry;
+          repository = imgCfg.repository;
+          tag = imgEval.imageTag;
+        };
+
+      pgImg =
+        let
+          imgEval = config.firestreamImages.postgresql.eval (_: {});
+          imgCfg = imgEval.config.postgresql.image;
+        in {
+          registry = imgCfg.registry;
+          repository = imgCfg.repository;
+          tag = imgEval.imageTag;
+        };
+
+      # Path de-branding: firestream-odoo now bakes its app tree at
+      # /opt/firestream/odoo and its data/volume at /firestream/odoo (see
+      # src/containers/firestream/odoo/options.nix + module.nix). The chart
+      # templates were de-branded to mount the data PVC at /firestream/odoo and
+      # the Secret at /opt/firestream/odoo/secrets — i.e. the chart mount now
+      # EQUALS the container's baked ODOO_VOLUME_DIR/ODOO_DATA_DIR. No
+      # extraEnvVars path-remap is needed (and any remap would re-introduce a
+      # mount/baked mismatch), so the former firestreamPathOverrides is gone.
+
+      # Phase 1 path-de-branding: the postgresql subchart templates + values now
+      # mount/reference firestream paths directly, matching the firestream-postgresql
+      # container's baked *_DIR vars. No subchart pg path-override extraEnvVars needed.
+      imageInjectionModule = { ... }: {
+        config.odoo._meta.containerRefs = {
+          odoo = {
+            inherit (odooImg) registry repository tag;
+            componentPath = [ "image" ];
+          };
+          postgresql = {
+            inherit (pgImg) registry repository tag;
+            componentPath = [ "postgresql" "image" ];
+          };
+        };
+        config.odoo.global.security.allowInsecureImages = true;
+        config.odoo.postgresql.postgresqlSharedPreloadLibraries = "";
+      };
+
       c = evalChart {
         name = "odoo";
         inherit chartSrc subcharts;
-        modules = [ optionsPath ];
+        modules = [ optionsPath imageInjectionModule ];
       };
     in
     {
       packages.odoo-chart = c.chartBundle;
 
+      # Base (un-overlaid) chart: chart's OWN native defaults, no Firestream
+      # values overlay / no image injection. Renders `bitnami/odoo`.
+      packages.odoo-base-chart = baseChart {
+        name = "odoo";
+        inherit chartSrc subcharts;
+      };
+
       # Registry: full evaluated chart result (used by aggregate.nix / flake.lib).
-      firestreamCharts.odoo = c;
+      firestreamCharts.odoo = c // { baseChart = config.packages.odoo-base-chart; };
 
       # Registry: consumer override API exposed via flake.lib.<sys>.charts.odoo.
       firestreamChartImages.odoo = {
         chartBundle = c.chartBundle;
+        baseChart = config.packages.odoo-base-chart;
         render = c.render;
         eval = userMod: evalChart {
           name = "odoo";
           inherit chartSrc subcharts;
-          modules = [ optionsPath userMod ];
+          modules = [ optionsPath imageInjectionModule userMod ];
         };
         options = c.options;
       };

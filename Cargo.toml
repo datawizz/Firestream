@@ -20,6 +20,8 @@ members = [
     "src/lib/rust/docker-manager",
     "src/lib/rust/filesystem-manager",
     "src/lib/rust/firestream-charts",
+    "src/lib/rust/firestream-e2e-core",
+    "src/lib/rust/firestream-e2e-k8s",
     "src/lib/rust/firestream-healthd",
     "src/lib/rust/firestream-metadata",
     "src/lib/rust/firestream-vib",
@@ -38,6 +40,8 @@ firestream-tui = { path = "src/app/firestream-tui" }
 docker-manager = { path = "src/lib/rust/docker-manager" }
 filesystem-manager = { path = "src/lib/rust/filesystem-manager" }
 firestream-charts = { path = "src/lib/rust/firestream-charts" }
+firestream-e2e-core = { path = "src/lib/rust/firestream-e2e-core" }
+firestream-e2e-k8s = { path = "src/lib/rust/firestream-e2e-k8s" }
 firestream-healthd = { path = "src/lib/rust/firestream-healthd" }
 firestream-metadata = { path = "src/lib/rust/firestream-metadata" }
 firestream-vib = { path = "src/lib/rust/firestream-vib" }

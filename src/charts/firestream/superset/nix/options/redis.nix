@@ -10,9 +10,10 @@
 # Mirrors the bundled-subchart pattern from
 # `jupyterhub/nix/options/postgresql.nix` (no jupyterhub redis exists; this
 # is the new bundled-redis sibling for hub-and-spoke superset).
-{ lib, ... }:
+{ lib, chartTypes, ... }:
 
 let
+  t = chartTypes;
   inherit (lib) mkOption types;
 in {
   options.superset.redis = mkOption {
@@ -37,26 +38,7 @@ in {
         auth = mkOption {
           default = null;
           description = "Redis auth configuration consumed by Superset";
-          type = types.nullOr (types.submodule {
-            freeformType = types.attrsOf types.anything;
-            options = {
-              enabled = mkOption {
-                type = types.nullOr types.bool;
-                default = null;
-                description = "Enable password authentication";
-              };
-              password = mkOption {
-                type = types.nullOr types.str;
-                default = null;
-                description = "Redis password (master + replicas; random if empty)";
-              };
-              existingSecret = mkOption {
-                type = types.nullOr types.str;
-                default = null;
-                description = "Name of an existing secret with Redis credentials";
-              };
-            };
-          });
+          type = types.nullOr t.secretType;
         };
 
         master = mkOption {

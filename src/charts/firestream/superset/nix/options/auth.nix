@@ -6,48 +6,15 @@
 # `auth.existingSecret` skips the in-chart secret entirely; the keys
 # `superset-password` and `superset-secret-key` are then read from the
 # external secret.
-{ lib, ... }:
+{ lib, chartTypes, ... }:
 
 let
+  t = chartTypes;
   inherit (lib) mkOption types;
 in {
   options.superset.auth = mkOption {
     default = null;
     description = "Superset admin web-UI authentication configuration";
-    type = types.nullOr (types.submodule {
-      freeformType = types.attrsOf types.anything;
-
-      options = {
-        username = mkOption {
-          type = types.nullOr types.str;
-          default = null;
-          description = "Username to access the Superset web UI";
-        };
-
-        email = mkOption {
-          type = types.nullOr types.str;
-          default = null;
-          description = "Admin user email address";
-        };
-
-        password = mkOption {
-          type = types.nullOr types.str;
-          default = null;
-          description = "Password to access the Superset web UI (random if empty)";
-        };
-
-        secretKey = mkOption {
-          type = types.nullOr types.str;
-          default = null;
-          description = "Flask SECRET_KEY used to sign session cookies (random 42-char if empty)";
-        };
-
-        existingSecret = mkOption {
-          type = types.nullOr types.str;
-          default = null;
-          description = "Name of an existing secret containing `superset-password` and `superset-secret-key`";
-        };
-      };
-    });
+    type = types.nullOr t.secretType;
   };
 }

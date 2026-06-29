@@ -3,7 +3,7 @@
 # Copyright Firestream. MIT License.
 
 # Paths
-export AIRFLOW_HOME="${AIRFLOW_HOME:-/opt/airflow}"
+export AIRFLOW_HOME="${AIRFLOW_HOME:-/opt/firestream/airflow}"
 export AIRFLOW_DAGS_DIR="${AIRFLOW_HOME}/dags"
 export AIRFLOW_LOGS_DIR="${AIRFLOW_HOME}/logs"
 export AIRFLOW_SCHEDULER_LOGS_DIR="${AIRFLOW_LOGS_DIR}/scheduler"
@@ -90,7 +90,7 @@ export AIRFLOW_LDAP_ALLOW_SELF_SIGNED="${AIRFLOW_LDAP_ALLOW_SELF_SIGNED:-True}"
 export AIRFLOW_LDAP_TLS_CA_CERTIFICATE="${AIRFLOW_LDAP_TLS_CA_CERTIFICATE:-}"
 
 # Python cache
-export PYTHONPYCACHEPREFIX="${PYTHONPYCACHEPREFIX:-/opt/airflow/tmp/pycache}"
+export PYTHONPYCACHEPREFIX="${PYTHONPYCACHEPREFIX:-/opt/firestream/airflow/tmp/pycache}"
 
 # Debug mode
 export BITNAMI_DEBUG="${BITNAMI_DEBUG:-false}"

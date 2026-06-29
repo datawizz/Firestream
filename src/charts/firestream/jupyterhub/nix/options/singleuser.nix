@@ -176,31 +176,7 @@ in {
         persistence = mkOption {
           default = null;
           description = "Singleuser PVC configuration";
-          type = types.nullOr (types.submodule {
-            freeformType = types.attrsOf types.anything;
-            options = {
-              enabled = mkOption {
-                type = types.nullOr types.bool;
-                default = null;
-                description = "Enable per-user PVC (else emptyDir)";
-              };
-              storageClass = mkOption {
-                type = types.nullOr types.str;
-                default = null;
-                description = "PVC storage class";
-              };
-              accessModes = mkOption {
-                type = types.nullOr (types.listOf types.str);
-                default = null;
-                description = "PVC access modes";
-              };
-              size = mkOption {
-                type = types.nullOr types.str;
-                default = null;
-                description = "PVC size";
-              };
-            };
-          });
+          type = types.nullOr t.persistenceType;
         };
 
         # Free-form list of KubeSpawner profile dicts (display_name,

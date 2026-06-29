@@ -16,16 +16,91 @@
 
 { lib, config, ... }:
 
+let
+  # Spec for one vendored addon repository. `src` (a derivation/path), when set,
+  # WINS over owner/repo/rev/hash so non-GitHub sources work too. See
+  # ./vendor-addons.nix for how these are turned into a baked
+  # /opt/firestream/odoo/vendor-addons/<module> tree.
+  vendoredAddonSpec = lib.types.submodule {
+    options = {
+      name = lib.mkOption {
+        type = lib.types.str;
+        description = "Label for this repo (used in build logs and collision errors).";
+      };
+      owner = lib.mkOption {
+        type = lib.types.nullOr lib.types.str;
+        default = null;
+        description = "GitHub owner (when fetching via fetchFromGitHub).";
+      };
+      repo = lib.mkOption {
+        type = lib.types.nullOr lib.types.str;
+        default = null;
+        description = "GitHub repo (when fetching via fetchFromGitHub).";
+      };
+      rev = lib.mkOption {
+        type = lib.types.nullOr lib.types.str;
+        default = null;
+        description = "Commit or tag to pin (when fetching via fetchFromGitHub).";
+      };
+      hash = lib.mkOption {
+        type = lib.types.nullOr lib.types.str;
+        default = null;
+        description = "fetchFromGitHub sha256 (SRI string).";
+      };
+      src = lib.mkOption {
+        type = lib.types.nullOr (lib.types.either lib.types.path lib.types.package);
+        default = null;
+        description = ''
+          A prebuilt source tree (derivation or path). When set, it WINS over
+          owner/repo/rev/hash, enabling non-GitHub sources (fetchgit, local path,
+          flake input).
+        '';
+      };
+      sourceRoot = lib.mkOption {
+        type = lib.types.str;
+        default = ".";
+        description = "Subdirectory inside the repo that contains the module dirs.";
+      };
+      modules = lib.mkOption {
+        type = lib.types.nullOr (lib.types.listOf lib.types.str);
+        default = null;
+        description = ''
+          Explicit subset of module directory names to vendor. When null
+          (default), every immediate child dir with an Odoo manifest
+          (__manifest__.py / __openerp__.py) is auto-discovered.
+        '';
+      };
+    };
+  };
+in
 {
+  # Build-time addon vendoring: a list of addon-repo specs baked into the image at
+  # /opt/firestream/odoo/vendor-addons and appended to addons_path (see module.nix). Empty by
+  # default — stock images are unchanged. Forwarded to the container factory via
+  # `extraModuleArgs.vendoredAddons` below (the eval-container.nix seam).
+  options.odoo.vendoredAddons = lib.mkOption {
+    type = lib.types.listOf vendoredAddonSpec;
+    default = [ ];
+    description = ''
+      Third-party Odoo addon repositories to vendor at build time. Each entry is
+      fetched (GitHub by default, or any `src`), and its modules are laid into a
+      baked read-only /opt/firestream/odoo/vendor-addons directory wired into addons_path.
+    '';
+  };
+
   config.odoo = {
+    # Forward the vendored-addons list to module.nix through the factory's
+    # extraModuleArgs seam (eval-container.nix splices this into moduleArgs).
+    extraModuleArgs.vendoredAddons = config.odoo.vendoredAddons;
+
     # Paths configuration
     # Per-key mkDefault so individual paths can be overridden independently.
-    # KEEP "/opt/odoo/log" exactly (do NOT normalise to "logs").
+    # KEEP "/opt/firestream/odoo/log" exactly (do NOT normalise to "logs").
     paths = {
-      base = lib.mkDefault "/opt/odoo";
-      conf = lib.mkDefault "/opt/odoo/conf";
-      data = lib.mkDefault "/opt/odoo/data";
-      logs = lib.mkDefault "/opt/odoo/log";
+      base = lib.mkDefault "/opt/firestream/odoo";
+      conf = lib.mkDefault "/opt/firestream/odoo/conf";
+      data = lib.mkDefault "/firestream/odoo/data";
+      logs = lib.mkDefault "/opt/firestream/odoo/log";
     };
 
     # Environment variables with defaults
@@ -34,19 +109,19 @@
     # flake-module's override module), matching the legacy `ODOO_VERSION = odooVersion`.
     env = builtins.mapAttrs (_: lib.mkDefault) {
       # Paths
-      ODOO_BASE_DIR = "/opt/odoo";
-      ODOO_BIN_DIR = "/opt/odoo/bin";
-      ODOO_CONF_DIR = "/opt/odoo/conf";
-      ODOO_CONF_FILE = "/opt/odoo/conf/odoo.conf";
-      ODOO_DATA_DIR = "/opt/odoo/data";
-      ODOO_ADDONS_DIR = "/opt/odoo/addons";
-      ODOO_TMP_DIR = "/opt/odoo/tmp";
-      ODOO_PID_FILE = "/opt/odoo/tmp/odoo.pid";
-      ODOO_LOGS_DIR = "/opt/odoo/log";
-      ODOO_LOG_FILE = "/opt/odoo/log/odoo-server.log";
+      ODOO_BASE_DIR = "/opt/firestream/odoo";
+      ODOO_BIN_DIR = "/opt/firestream/odoo/bin";
+      ODOO_CONF_DIR = "/opt/firestream/odoo/conf";
+      ODOO_CONF_FILE = "/opt/firestream/odoo/conf/odoo.conf";
+      ODOO_DATA_DIR = "/firestream/odoo/data";
+      ODOO_ADDONS_DIR = "/opt/firestream/odoo/addons";
+      ODOO_TMP_DIR = "/opt/firestream/odoo/tmp";
+      ODOO_PID_FILE = "/opt/firestream/odoo/tmp/odoo.pid";
+      ODOO_LOGS_DIR = "/opt/firestream/odoo/log";
+      ODOO_LOG_FILE = "/opt/firestream/odoo/log/odoo-server.log";
 
       # Volume paths
-      ODOO_VOLUME_DIR = "/opt/odoo";
+      ODOO_VOLUME_DIR = "/firestream/odoo";
 
       # User/group
       ODOO_DAEMON_USER = "odoo";
@@ -136,13 +211,14 @@
       projectName = "firestream-odoo";
       dependencies = [ "postgresql" ];
 
-      # +20000 host-port offset so the embedded postgres doesn't collide with
-      # a standalone .#postgresql-up.
-      #   postgresql 5432 -> host 25432
-      #   odoo       8069 -> host 28069
-      #   odoo gevent 8072 -> host 28072
-      #   healthd    9180 -> host 29180
-      hostPortOffset = 20000;
+      # +34000 host-port offset. Each of the 8 canonical apps gets a DISTINCT
+      # offset (spacing 2000) so all 8 can run simultaneously on docker without
+      # host-port collisions. odoo=34000.
+      #   postgresql 5432 -> host 39432
+      #   odoo       8069 -> host 42069
+      #   odoo gevent 8072 -> host 42072
+      #   healthd    9180 -> host 43180
+      hostPortOffset = 34000;
 
       sharedEnv = {
         ODOO_DATABASE_HOST = "postgresql";

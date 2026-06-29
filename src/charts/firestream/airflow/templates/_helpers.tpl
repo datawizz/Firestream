@@ -356,17 +356,17 @@ Add environment variables to configure airflow common values
   value: {{ ternary "true" "false" (or .Values.image.debug .Values.diagnosticMode.enabled) | quote }}
 {{- if .Values.usePasswordFiles }}
 - name: AIRFLOW__CORE__FERNET_KEY_CMD
-  value: "cat /opt/bitnami/airflow/secrets/airflow-fernet-key"
+  value: "cat /opt/firestream/airflow/secrets/airflow-fernet-key"
 {{- if (include "airflow.isImageMajorVersion3" .) }}
 - name: AIRFLOW__API__SECRET_KEY_CMD
-  value: "cat /opt/bitnami/airflow/secrets/airflow-secret-key"
+  value: "cat /opt/firestream/airflow/secrets/airflow-secret-key"
 {{- else }}
 - name: AIRFLOW__WEBSERVER__SECRET_KEY_CMD
-  value: "cat /opt/bitnami/airflow/secrets/airflow-secret-key"
+  value: "cat /opt/firestream/airflow/secrets/airflow-secret-key"
 {{- end }}
 {{- if (include "airflow.isImageMajorVersion3" .) }}
 - name: AIRFLOW__API_AUTH__JWT_SECRET_CMD
-  value: "cat /opt/bitnami/airflow/secrets/airflow-jwt-secret-key"
+  value: "cat /opt/firestream/airflow/secrets/airflow-jwt-secret-key"
 {{- end }}
 {{- else }}
 - name: AIRFLOW__CORE__FERNET_KEY
@@ -395,6 +395,27 @@ Add environment variables to configure airflow common values
       key: airflow-jwt-secret-key
 {{- end -}}
 {{- end -}}
+{{- /*
+  Skip in-pod database setup on every component when the setup-db hook Job is
+  enabled: that Job runs migrations + creates the admin user, and each pod's
+  wait-for-db-migrations init container gates startup on the DB being reachable,
+  migrated, and the admin user present. Without this, scheduler/worker/triggerer/
+  dag-processor pods run the container's full first-run init (which port-waits on
+  the baked AIRFLOW_DATABASE_HOST default "postgresql" and re-checks the admin
+  user by the wrong name), and crash. The web pod previously set this inline;
+  emitting it here covers all components from one place.
+*/}}
+- name: AIRFLOW_SKIP_DB_SETUP
+  value: {{ ternary "yes" "no" .Values.setupDBJob.enabled | quote }}
+{{- /*
+  Expose AIRFLOW_HOME as a pod env var so the component readiness/liveness probes
+  (which run `airflow jobs check ...` in a fresh shell that does NOT go through
+  the container entrypoint / env-defaults) point at the mounted config dir. Without
+  it, the airflow CLI falls back to ~/airflow and tries to create it on the
+  read-only root filesystem, failing the probe even though the process is healthy.
+*/}}
+- name: AIRFLOW_HOME
+  value: "/opt/firestream/airflow"
 {{- end -}}
 
 {{/*

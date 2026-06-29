@@ -154,10 +154,10 @@ loadExamples: false
 ## Use YAML format, then it's transformed to .cfg format by the chart. e.g:
 ##    configuration:
 ##      core:
-##        dags_folder: "/opt/bitnami/airflow/dags"
+##        dags_folder: "/opt/firestream/airflow/dags"
 ## ... will be transformed to:
 ##    [core]
-##    dags_folder = "/opt/bitnami/airflow/dags"
+##    dags_folder = "/opt/firestream/airflow/dags"
 ##
 configuration: {}
 ## @param overrideConfiguration Airflow common configuration override. Values defined here takes precedence over the ones defined at `configuration`
@@ -2663,7 +2663,7 @@ ldap:
     enabled: false
     allowSelfSigned: true
     certificatesSecret: ""
-    certificatesMountPath: /opt/bitnami/airflow/conf/certs
+    certificatesMountPath: /opt/firestream/airflow/conf/certs
     CAFilename: ""
 ## @section Traffic Exposure Parameters
 
@@ -3235,9 +3235,9 @@ postgresql:
   enabled: true
   auth:
     enablePostgresUser: true
-    username: bn_airflow
+    username: firestream
     password: ""
-    database: bitnami_airflow
+    database: firestream_airflow
     existingSecret: ""
   architecture: standalone
   primary:
@@ -3273,8 +3273,8 @@ postgresql:
 externalDatabase:
   host: localhost
   port: 5432
-  user: bn_airflow
-  database: bitnami_airflow
+  user: firestream
+  database: firestream_airflow
   password: ""
   sqlConnection: ""
   existingSecret: ""

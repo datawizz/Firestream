@@ -36,6 +36,16 @@
 # because Nix attribute sets are sorted alphabetically, which would cause
 # dependent variables (e.g., DATA_DIR referencing VOLUME_DIR) to be exported
 # before their dependencies, failing with "unbound variable" under set -u.
+#
+# EXCEPTION: the auth/replication/initdb defaults below intentionally read
+# through the Bitnami chart's docker-style `POSTGRES_*` env names (e.g.
+# `${POSTGRES_USER:-postgres}`). The Bitnami postgresql chart injects
+# credentials as `POSTGRES_USER`/`POSTGRES_DATABASE`/`POSTGRES_PASSWORD[_FILE]`
+# etc., but every init/helper script in this container reads the `POSTGRESQL_*`
+# prefix. mkEnvDefaults emits `export VAR="${VAR:-<value>}"`, so embedding a
+# `${POSTGRES_*:-default}` fallback produces the alias bridge upstream Bitnami
+# ships in its `postgresql-env.sh`. Each reference is `:-`-guarded, so it is
+# safe under `set -u` regardless of attribute ordering (no unbound variable).
 , envVars ? {
     # Base directories (pre-expanded to avoid alphabetical ordering issues)
     POSTGRESQL_BASE_DIR = "/opt/firestream/postgresql";
@@ -66,21 +76,30 @@
     # Default to ALLOW_EMPTY_PASSWORD=yes so the out-of-the-box image runs
     # in local/dev/e2e environments without a password override. Production
     # callers override these via the standard envVars override seam.
-    POSTGRESQL_PASSWORD = "";
-    POSTGRESQL_USERNAME = "postgres";
-    POSTGRESQL_DATABASE = "";
-    POSTGRESQL_POSTGRES_PASSWORD = "";
+    #
+    # Values alias the Bitnami chart's `POSTGRES_*` env names (see NOTE above);
+    # the `_FILE` aliases below are exported before the secrets file-loader runs
+    # so chart-mounted password files are honoured.
+    POSTGRESQL_PASSWORD = "\${POSTGRES_PASSWORD:-}";
+    POSTGRESQL_USERNAME = "\${POSTGRES_USER:-postgres}";
+    POSTGRESQL_DATABASE = "\${POSTGRES_DATABASE:-}";
+    POSTGRESQL_POSTGRES_PASSWORD = "\${POSTGRES_POSTGRES_PASSWORD:-}";
+    POSTGRESQL_PASSWORD_FILE = "\${POSTGRES_PASSWORD_FILE:-}";
+    POSTGRESQL_POSTGRES_PASSWORD_FILE = "\${POSTGRES_POSTGRES_PASSWORD_FILE:-}";
+    POSTGRESQL_INITSCRIPTS_USERNAME = "\${POSTGRES_INITSCRIPTS_USERNAME:-}";
+    POSTGRESQL_INITSCRIPTS_PASSWORD = "\${POSTGRES_INITSCRIPTS_PASSWORD:-}";
     ALLOW_EMPTY_PASSWORD = "yes";
 
-    # Replication
-    POSTGRESQL_REPLICATION_MODE = "";
-    POSTGRESQL_REPLICATION_USER = "";
-    POSTGRESQL_REPLICATION_PASSWORD = "";
-    POSTGRESQL_MASTER_HOST = "";
-    POSTGRESQL_MASTER_PORT_NUMBER = "5432";
-    POSTGRESQL_NUM_SYNCHRONOUS_REPLICAS = "0";
-    POSTGRESQL_SYNCHRONOUS_COMMIT_MODE = "on";
-    POSTGRESQL_CLUSTER_APP_NAME = "walreceiver";
+    # Replication (values alias the chart's `POSTGRES_*` names — see NOTE above)
+    POSTGRESQL_REPLICATION_MODE = "\${POSTGRES_REPLICATION_MODE:-}";
+    POSTGRESQL_REPLICATION_USER = "\${POSTGRES_REPLICATION_USER:-}";
+    POSTGRESQL_REPLICATION_PASSWORD = "\${POSTGRES_REPLICATION_PASSWORD:-}";
+    POSTGRESQL_REPLICATION_PASSWORD_FILE = "\${POSTGRES_REPLICATION_PASSWORD_FILE:-}";
+    POSTGRESQL_MASTER_HOST = "\${POSTGRES_MASTER_HOST:-}";
+    POSTGRESQL_MASTER_PORT_NUMBER = "\${POSTGRES_MASTER_PORT_NUMBER:-5432}";
+    POSTGRESQL_NUM_SYNCHRONOUS_REPLICAS = "\${POSTGRES_NUM_SYNCHRONOUS_REPLICAS:-0}";
+    POSTGRESQL_SYNCHRONOUS_COMMIT_MODE = "\${POSTGRES_SYNCHRONOUS_COMMIT_MODE:-on}";
+    POSTGRESQL_CLUSTER_APP_NAME = "\${POSTGRES_CLUSTER_APP_NAME:-walreceiver}";
     POSTGRESQL_WAL_LEVEL = "replica";
     POSTGRESQL_REPLICATION_USE_PASSFILE = "no";
     POSTGRESQL_REPLICATION_PASSFILE_PATH = "/opt/firestream/postgresql/conf/.pgpass";
@@ -112,8 +131,9 @@
     POSTGRESQL_SHUTDOWN_MODE = "fast";
     POSTGRESQL_PGCTLTIMEOUT = "60";
     POSTGRESQL_FIRST_BOOT = "yes";
-    POSTGRESQL_INITDB_ARGS = "";
-    POSTGRESQL_INITDB_WAL_DIR = "";
+    # Alias the chart's `POSTGRES_INITDB_*` names (note WALDIR vs WAL_DIR).
+    POSTGRESQL_INITDB_ARGS = "\${POSTGRES_INITDB_ARGS:-}";
+    POSTGRESQL_INITDB_WAL_DIR = "\${POSTGRES_INITDB_WALDIR:-}";
     POSTGRESQL_SHARED_PRELOAD_LIBRARIES = "";
     POSTGRESQL_FSYNC = "on";
     POSTGRESQL_DEFAULT_TOAST_COMPRESSION = "";
@@ -162,6 +182,10 @@ let
   configScript = builtins.readFile ./scripts/config.sh;
   initScript = builtins.readFile ./scripts/init.sh;
   secretsScript = builtins.readFile ./scripts/secrets.sh;
+  # Pure helper-function definitions extracted from init.sh — emitted at
+  # top-level of libhelperspostgresql.sh so chart init containers can invoke
+  # them after `source /opt/bitnami/scripts/libpostgresql.sh`.
+  helpersInitScript = builtins.readFile ./scripts/helpers.sh;
 
   # PostgreSQL-specific helper functions (needed by scripts)
   # These supplement the core library functions
@@ -282,12 +306,21 @@ let
     ########################
     postgresql_create_config() {
       info "Creating postgresql.conf..."
+      # unix_socket_directories defaults to /run/postgresql in this build of
+      # postgres, but that path lives in the image's read-only root layer.
+      # When the consumer chart sets readOnlyRootFilesystem (Bitnami chart
+      # default), postgres can't write its socket lock file there and dies.
+      # Pin the socket dir to POSTGRESQL_TMP_DIR — chart consumers route that
+      # to a writable mount; for the standalone-docker use case it stays at
+      # the firestream FHS default which is owned by postgres on first boot.
+      local socket_dir="''${POSTGRESQL_SOCKET_DIR:-$POSTGRESQL_TMP_DIR}"
       cat > "$POSTGRESQL_CONF_FILE" <<EOF
 # PostgreSQL configuration file
 # Generated by Firestream Nix-based PostgreSQL container
 
 listen_addresses = '*'
 port = $POSTGRESQL_PORT_NUMBER
+unix_socket_directories = '$socket_dir'
 max_connections = 100
 shared_buffers = 128MB
 dynamic_shared_memory_type = posix
@@ -483,6 +516,14 @@ EOF
       postgresql_set_property "primary_conninfo" "host=$POSTGRESQL_MASTER_HOST port=$POSTGRESQL_MASTER_PORT_NUMBER user=$POSTGRESQL_REPLICATION_USER $conninfo_password application_name=$POSTGRESQL_CLUSTER_APP_NAME"
       touch "$POSTGRESQL_DATA_DIR/standby.signal"
     }
+
+    # ----------------------------------------------------------------------
+    # Helpers relocated from scripts/init.sh so they're visible at top-level
+    # of libpostgresql.sh (chart init containers source the lib and call
+    # postgresql_execute, postgresql_initialize, etc. directly).
+    # Bodies are unchanged from the original scripts/init.sh definitions.
+    # ----------------------------------------------------------------------
+    ${helpersInitScript}
   '';
 
   # System dependencies (libs needed in the container)
@@ -514,6 +555,9 @@ EOF
   runtimeBinDeps = with pkgs; [
     coreutils bash gnused gnugrep gawk findutils which
     postgresql gzip netcat-gnu
+    # S3 client for the pg_dumpall backup CronJob (reuses the server image) —
+    # streams logical dumps straight into SeaweedFS via `aws s3 cp -`.
+    awscli2
   ];
 
 in firestream.mkContainerModule {
@@ -621,16 +665,20 @@ in firestream.mkContainerModule {
     };
   };
 
+  # Per-container helpers: emitted at top-level of libhelperspostgresql.sh by the
+  # engine, so chart init containers can `source /opt/bitnami/scripts/libpostgresql.sh`
+  # and use these helpers directly.
+  perContainerHelpers = postgresqlHelpers;
+
   # Validation function
-  # Prepend PostgreSQL helpers so functions are available
-  validateFn = postgresqlHelpers + ''
+  validateFn = ''
     error_code=0
     ${validateScript}
     [[ "$error_code" -eq 0 ]] || exit "$error_code"
   '';
 
   # Activation: Load secrets and enable NSS wrapper
-  activateFn = postgresqlHelpers + ''
+  activateFn = ''
     info "Activating PostgreSQL configuration..."
 
     # Enable NSS wrapper for arbitrary UID support
@@ -643,10 +691,10 @@ in firestream.mkContainerModule {
   '';
 
   # Configuration generation
-  configFn = postgresqlHelpers + configScript;
+  configFn = configScript;
 
   # Initialization (database setup, users, replication)
-  initFn = postgresqlHelpers + initScript;
+  initFn = initScript;
 
   # Startup command
   runCmd = ''

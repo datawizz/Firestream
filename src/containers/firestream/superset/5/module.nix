@@ -23,19 +23,22 @@
 
 # Paths configuration
 , paths ? {
-    base = "/opt/superset";
-    conf = "/opt/superset";
-    data = "/opt/superset/superset_home";
-    logs = "/opt/superset/logs";
+    base = "/opt/firestream/superset";
+    conf = "/opt/firestream/superset";
+    data = "/opt/firestream/superset/superset_home";
+    logs = "/opt/firestream/superset/superset_home/logs";
   }
 
 # Environment variables with defaults (preserving Bitnami compatibility)
 , envVars ? {
     # Paths
-    SUPERSET_HOME = "/opt/superset/superset_home";
-    SUPERSET_CONFIG_PATH = "/opt/superset/superset_config.py";
-    SUPERSET_LOG_DIR = "/opt/superset/logs";
-    SUPERSET_TMP_DIR = "/opt/superset/tmp";
+    # Config + logs live UNDER superset_home so the chart's writable
+    # superset_home emptyDir covers them under readOnlyRootFilesystem; TMP at
+    # /tmp (writable emptyDir in every pod).
+    SUPERSET_HOME = "/opt/firestream/superset/superset_home";
+    SUPERSET_CONFIG_PATH = "/opt/firestream/superset/superset_home/superset_config.py";
+    SUPERSET_LOG_DIR = "/opt/firestream/superset/superset_home/logs";
+    SUPERSET_TMP_DIR = "/tmp";
     FLASK_APP = "superset.app:create_app()";
     PYTHONPATH = "/app/pythonpath";
 
@@ -69,7 +72,13 @@
     SUPERSET_DATABASE_HOST = "postgresql";
     SUPERSET_DATABASE_PORT_NUMBER = "5432";
     SUPERSET_DATABASE_NAME = "superset";
-    SUPERSET_DATABASE_USERNAME = "superset";
+    # The Bitnami-derived superset chart injects the metadata DB user as
+    # `SUPERSET_DATABASE_USER`, while this container reads
+    # `SUPERSET_DATABASE_USERNAME`. Bridge the two (mirrors the postgresql
+    # POSTGRES_USER -> POSTGRESQL_USERNAME alias pattern) so the K8s-injected
+    # value wins; falls back to the historical "superset" default for
+    # docker-compose / standalone use where SUPERSET_DATABASE_USER is unset.
+    SUPERSET_DATABASE_USERNAME = "\${SUPERSET_DATABASE_USER:-superset}";
     SUPERSET_DATABASE_PASSWORD = "";
     SUPERSET_DATABASE_USE_SSL = "no";
 
@@ -102,7 +111,7 @@
     EXAMPLES_DATABASE_USE_SSL = "";
 
     # Python cache
-    PYTHONPYCACHEPREFIX = "/opt/superset/tmp/pycache";
+    PYTHONPYCACHEPREFIX = "/opt/firestream/superset/tmp/pycache";
 
     # Debug mode
     BITNAMI_DEBUG = "false";
@@ -389,7 +398,7 @@ in firestream.mkPythonContainerModule {
   # Runtime directories with declarative schema
   runtimeDirs = {
     home = {
-      path = "/opt/superset";
+      path = "/opt/firestream/superset";
       type = "conf";
       persistence = "ephemeral";
       mode = "0755";
@@ -398,7 +407,7 @@ in firestream.mkPythonContainerModule {
       description = "Superset base directory";
     };
     supersetHome = {
-      path = "/opt/superset/superset_home";
+      path = "/opt/firestream/superset/superset_home";
       type = "data";
       persistence = "persistent";
       mode = "0755";
@@ -407,7 +416,7 @@ in firestream.mkPythonContainerModule {
       description = "Superset home directory for user data";
     };
     logs = {
-      path = "/opt/superset/logs";
+      path = "/opt/firestream/superset/superset_home/logs";
       type = "logs";
       persistence = "persistent";
       mode = "0755";
@@ -416,14 +425,14 @@ in firestream.mkPythonContainerModule {
       description = "Superset log files";
     };
     tmp = {
-      path = "/opt/superset/tmp";
+      path = "/opt/firestream/superset/tmp";
       type = "tmp";
       persistence = "ephemeral";
       mode = "1777";
       description = "Temporary files";
     };
     pycache = {
-      path = "/opt/superset/tmp/pycache";
+      path = "/opt/firestream/superset/tmp/pycache";
       type = "cache";
       persistence = "ephemeral";
       mode = "0755";
@@ -462,11 +471,16 @@ in firestream.mkPythonContainerModule {
 
   # Build-time: Static config templates
   prepopulateFiles = {
-    "/opt/superset/superset_config.py.template" = supersetConfigTemplate;
+    "/opt/firestream/superset/superset_config.py.template" = supersetConfigTemplate;
   };
 
+  # Per-container helpers: emitted at top-level of libhelperssuperset.sh by the
+  # engine, so chart init containers can `source /opt/firestream/scripts/libsuperset.sh`
+  # and use these helpers directly.
+  perContainerHelpers = supersetHelpers;
+
   # Validation function
-  validateFn = supersetHelpers + validateScript;
+  validateFn = validateScript;
 
   # Activation: Replace {{PLACEHOLDERS}} with runtime values
   activateFn = ''
@@ -515,8 +529,8 @@ in firestream.mkPythonContainerModule {
     local cache_url="''${redis_base_url}/''${REDIS_CACHE_DATABASE:-2}"
 
     # Process config template
-    local config_template="/opt/superset/superset_config.py.template"
-    local config_file="''${SUPERSET_CONFIG_PATH:-/opt/superset/superset_config.py}"
+    local config_template="/opt/firestream/superset/superset_config.py.template"
+    local config_file="''${SUPERSET_CONFIG_PATH:-/opt/firestream/superset/superset_home/superset_config.py}"
 
     if [[ -f "$config_template" ]]; then
       ${pkgs.gnused}/bin/sed \
@@ -542,10 +556,10 @@ in firestream.mkPythonContainerModule {
   '';
 
   # Initialization - from init.sh
-  initFn = supersetHelpers + initScript;
+  initFn = initScript;
 
   # Runtime config adjustments - from config.sh
-  configFn = supersetHelpers + configScript;
+  configFn = configScript;
 
   # Startup command based on role
   runCmd = ''
@@ -577,8 +591,8 @@ in firestream.mkPythonContainerModule {
 
       celery-beat)
         info "Starting Celery beat scheduler..."
-        beat_pid="/opt/superset/tmp/superset-celerybeat.pid"
-        beat_schedule="/opt/superset/tmp/superset-celerybeat-schedule"
+        beat_pid="/opt/firestream/superset/tmp/superset-celerybeat.pid"
+        beat_schedule="/opt/firestream/superset/tmp/superset-celerybeat-schedule"
         rm -f "$beat_pid"
         exec celery --app=superset.tasks.celery_app:app beat \
           --pidfile "$beat_pid" \
@@ -614,7 +628,7 @@ in firestream.mkPythonContainerModule {
 
   inherit exposedPorts;
   inherit health;
-  volumes = [ "/opt/superset/superset_home" "/opt/superset/logs" ];
+  volumes = [ "/opt/firestream/superset/superset_home" "/opt/firestream/superset/superset_home/logs" ];
 
   # Python-specific options
   compileByteCode = false;  # Skip for faster builds

@@ -152,7 +152,7 @@ Returns an init-container that prepares the Kafka configuration files for main c
   args:
     - -ec
     - |
-      . /opt/bitnami/scripts/libkafka.sh
+      . /opt/firestream/scripts/libkafka.sh
 
       {{- if $externalAccessEnabled }}
       configure_external_access() {
@@ -315,14 +315,14 @@ Returns an init-container that prepares the Kafka configuration files for main c
 
       # Configure node.id
       ID=$((POD_ID + KAFKA_MIN_ID))
-      [[ -f "/bitnami/kafka/data/meta.properties" ]] && ID="$(grep "node.id" /bitnami/kafka/data/meta.properties | awk -F '=' '{print $2}')"
+      [[ -f "/firestream/kafka/data/meta.properties" ]] && ID="$(grep "node.id" /firestream/kafka/data/meta.properties | awk -F '=' '{print $2}')"
       kafka_server_conf_set "node.id" "$ID"
       # Configure initial controllers
       if [[ "controller" =~ "$POD_ROLE" ]]; then
           INITIAL_CONTROLLERS=()
           for ((i = 0; i < {{ int .context.Values.controller.replicaCount }}; i++)); do
               var="KAFKA_CONTROLLER_${i}_DIR_ID"; DIR_ID="${!var}"
-              [[ $i -eq $POD_ID ]] && [[ -f "/bitnami/kafka/data/meta.properties" ]] && DIR_ID="$(grep "directory.id" /bitnami/kafka/data/meta.properties | awk -F '=' '{print $2}')"
+              [[ $i -eq $POD_ID ]] && [[ -f "/firestream/kafka/data/meta.properties" ]] && DIR_ID="$(grep "directory.id" /firestream/kafka/data/meta.properties | awk -F '=' '{print $2}')"
               INITIAL_CONTROLLERS+=("${i}@${KAFKA_FULLNAME}-${POD_ROLE}-${i}.${KAFKA_CONTROLLER_SVC_NAME}.${MY_POD_NAMESPACE}.svc.${CLUSTER_DOMAIN}:${KAFKA_CONTROLLER_PORT}:${DIR_ID}")
           done
           echo "${INITIAL_CONTROLLERS[*]}" | awk -v OFS=',' '{$1=$1}1' > /shared/initial-controllers.txt
@@ -484,7 +484,7 @@ Returns an init-container that prepares the Kafka configuration files for main c
     {{- end }}
   volumeMounts:
     - name: data
-      mountPath: /bitnami/kafka
+      mountPath: /firestream/kafka
     - name: kafka-config
       mountPath: /config
     - name: kafka-configmaps
@@ -506,7 +506,7 @@ Returns an init-container that prepares the Kafka configuration files for main c
     {{- end }}
     {{- if and .context.Values.usePasswordFiles (include "kafka.saslEnabled" .context) }}
     - name: kafka-sasl
-      mountPath: /opt/bitnami/kafka/config/secrets
+      mountPath: /opt/firestream/kafka/config/secrets
       readOnly: true
     {{- end }}
 {{- end -}}

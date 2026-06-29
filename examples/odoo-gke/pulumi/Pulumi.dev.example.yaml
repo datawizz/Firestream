@@ -1,0 +1,17 @@
+# Copy to Pulumi.dev.yaml and fill in. Secret values are set separately with
+# `pulumi config set --secret` so they never appear in plaintext here:
+#
+#   pulumi stack init dev
+#   pulumi config set gcp:project   my-gcp-project
+#   pulumi config set gcp:region    us-central1
+#   pulumi config set clusterName   firestream-odoo
+#   pulumi config set arRepo        firestream
+#   pulumi config set --secret odooPassword        "$(openssl rand -base64 24)"
+#   pulumi config set --secret dbPassword          "$(openssl rand -base64 24)"
+#   pulumi config set --secret dbPostgresPassword  "$(openssl rand -base64 24)"
+config:
+  gcp:project: my-gcp-project
+  gcp:region: us-central1
+  firestream-odoo-gke:clusterName: firestream-odoo
+  firestream-odoo-gke:arRepo: firestream
+  # odooPassword / dbPassword / dbPostgresPassword: set with `--secret`.

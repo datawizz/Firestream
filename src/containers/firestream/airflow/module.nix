@@ -26,25 +26,25 @@
 # NOTE: these defaults are intentionally duplicated in options.nix for Phase 2;
 # a later phase removes the duplication. Keep them identical.
 
-# Paths configuration (Airflow uses /opt/airflow structure)
+# Paths configuration (Airflow uses /opt/firestream/airflow structure)
 , paths ? {
-    base = "/opt/airflow";
-    conf = "/opt/airflow";
-    data = "/opt/airflow/dags";
-    logs = "/opt/airflow/logs";
+    base = "/opt/firestream/airflow";
+    conf = "/opt/firestream/airflow";
+    data = "/opt/firestream/airflow/dags";
+    logs = "/opt/firestream/airflow/logs";
   }
 
 # Environment variables with defaults (from env-defaults.sh)
 , envVars ? {
     # Paths
-    AIRFLOW_HOME = "/opt/airflow";
-    AIRFLOW_DAGS_DIR = "/opt/airflow/dags";
-    AIRFLOW_LOGS_DIR = "/opt/airflow/logs";
-    AIRFLOW_SCHEDULER_LOGS_DIR = "/opt/airflow/logs/scheduler";
-    AIRFLOW_PLUGINS_DIR = "/opt/airflow/plugins";
-    AIRFLOW_TMP_DIR = "/opt/airflow/tmp";
-    AIRFLOW_CONF_FILE = "/opt/airflow/airflow.cfg";
-    AIRFLOW_WEBSERVER_CONF_FILE = "/opt/airflow/webserver_config.py";
+    AIRFLOW_HOME = "/opt/firestream/airflow";
+    AIRFLOW_DAGS_DIR = "/opt/firestream/airflow/dags";
+    AIRFLOW_LOGS_DIR = "/opt/firestream/airflow/logs";
+    AIRFLOW_SCHEDULER_LOGS_DIR = "/opt/firestream/airflow/logs/scheduler";
+    AIRFLOW_PLUGINS_DIR = "/opt/firestream/airflow/plugins";
+    AIRFLOW_TMP_DIR = "/opt/firestream/airflow/tmp";
+    AIRFLOW_CONF_FILE = "/opt/firestream/airflow/airflow.cfg";
+    AIRFLOW_WEBSERVER_CONF_FILE = "/opt/firestream/airflow/webserver_config.py";
 
     # User configuration
     AIRFLOW_USERNAME = "admin";
@@ -97,7 +97,7 @@
     AIRFLOW_LDAP_ALLOW_SELF_SIGNED = "True";
 
     # Python cache
-    PYTHONPYCACHEPREFIX = "/opt/airflow/tmp/pycache";
+    PYTHONPYCACHEPREFIX = "/opt/firestream/airflow/tmp/pycache";
 
     # Debug mode
     BITNAMI_DEBUG = "false";
@@ -170,14 +170,33 @@
 # Image naming passthrough (parity defaults).
 , imageName ? "firestream-airflow"
 , imageTag ? airflowVersion
+
+# Build-time vendored DAG sources (list of specs from
+# options.airflow.vendoredDags, forwarded via extraModuleArgs). Empty ⇒ no
+# vendoring, stock image unchanged.
+, vendoredDags ? [ ]
 }:
 
 let
+  # Build the baked-DAGs derivation when any source is declared. Lays files at
+  # /opt/firestream/airflow/dags (Airflow's dags_folder). See ./vendor-dags.nix.
+  vendoredDagsDrv =
+    import ./vendor-dags.nix { inherit pkgs lib; } {
+      version = airflowVersion;
+      specs = vendoredDags;
+    };
+
   # Read external script files
   validateScript = builtins.readFile ./scripts/validate.sh;
   configScript = builtins.readFile ./scripts/config.sh;
   initScript = builtins.readFile ./scripts/init.sh;
   secretsScript = builtins.readFile ./scripts/secrets.sh;
+  # Pure helper-function definitions extracted from init.sh + new
+  # init-container helpers (airflow_conf_set, airflow_wait_for_db_*,
+  # airflow_wait_for_admin_user, airflow_webserver_conf_set). Emitted at
+  # top-level of libhelpersairflow.sh so chart init containers can invoke
+  # them after `source /opt/firestream/scripts/libairflow.sh`.
+  helpersScript = builtins.readFile ./scripts/helpers.sh;
 
   # Airflow-specific helper functions (needed by scripts)
   # These are adapted from Bitnami's libairflow.sh and libversion.sh
@@ -219,6 +238,46 @@ let
     airflow_encode_url() {
         local string="''${1:-}"
         printf '%s' "$string" | python3 -c "import sys, urllib.parse; print(urllib.parse.quote(sys.stdin.read(), safe=str()))"
+    }
+
+    ########################
+    # Execute an Airflow CLI subcommand. Bitnami chart jobs/init containers
+    # (setup-db, etc.) call `airflow_execute <subcommand>` after sourcing
+    # libairflow.sh. The firestream container already runs as the airflow user
+    # with PATH/PYTHONPATH + airflow.cfg in place, so this is a thin wrapper.
+    # Arguments:
+    #   $@ - airflow CLI args (e.g. "db migrate", "sync-perm --include-dags")
+    ########################
+    airflow_execute() {
+        airflow "$@"
+    }
+
+    ########################
+    # Create the Airflow admin (FAB) user from AIRFLOW_USERNAME/PASSWORD/etc.
+    # Idempotent: a pre-existing user makes `airflow users create` warn, which
+    # we tolerate. Mirrors the inline logic in scripts/init.sh so the chart's
+    # setup-db job (which calls airflow_create_admin_user) behaves identically.
+    # Arguments:
+    #   None (reads AIRFLOW_USERNAME/PASSWORD/EMAIL/FIRSTNAME/LASTNAME)
+    ########################
+    airflow_create_admin_user() {
+        if [[ -z "''${AIRFLOW_USERNAME:-}" || -z "''${AIRFLOW_PASSWORD:-}" ]]; then
+            debug "AIRFLOW_USERNAME/PASSWORD unset - skipping admin user creation"
+            return 0
+        fi
+        if airflow users list --output plain 2>&1 | grep -v DEBUG | grep -q "''${AIRFLOW_USERNAME}"; then
+            info "Airflow admin user ''${AIRFLOW_USERNAME} already exists"
+            return 0
+        fi
+        info "Creating Airflow admin user ''${AIRFLOW_USERNAME}..."
+        airflow users create \
+            -r "Admin" \
+            -u "''${AIRFLOW_USERNAME}" \
+            -e "''${AIRFLOW_EMAIL:-user@example.com}" \
+            -p "''${AIRFLOW_PASSWORD}" \
+            -f "''${AIRFLOW_FIRSTNAME:-Firstname}" \
+            -l "''${AIRFLOW_LASTNAME:-Lastname}" 2>&1 || \
+            warn "Failed to create admin user (it may already exist)"
     }
 
     ########################
@@ -324,6 +383,14 @@ let
 
         info "All secrets processed successfully"
     }
+
+    # ----------------------------------------------------------------------
+    # Helpers relocated from scripts/init.sh + new init-container helpers
+    # (airflow_conf_set, airflow_webserver_conf_set, airflow_wait_for_*)
+    # required by Bitnami's chart init containers. Visible at top-level of
+    # libairflow.sh so chart init containers can call them directly.
+    # ----------------------------------------------------------------------
+    ${helpersScript}
   '';
 
   # System dependencies (libs needed in the container)
@@ -354,6 +421,7 @@ let
   runtimeBinDeps = with pkgs; [
     coreutils bash gnused gnugrep gawk findutils which
     postgresql git crudini curl netcat-gnu openssh jq
+    hostname  # Celery worker readiness probe runs `celery ... -d celery@$(hostname)`
     firestream.waitForPortPkg  # Required by init.sh for database/redis readiness checks
   ];
 
@@ -365,8 +433,8 @@ let
 
     [core]
     executor = {{AIRFLOW_EXECUTOR}}
-    dags_folder = /opt/airflow/dags
-    plugins_folder = /opt/airflow/plugins
+    dags_folder = /opt/firestream/airflow/dags
+    plugins_folder = /opt/firestream/airflow/plugins
     load_examples = {{AIRFLOW_LOAD_EXAMPLES}}
     fernet_key = {{AIRFLOW_FERNET_KEY}}
     auth_manager = airflow.providers.fab.auth_manager.fab_auth_manager.FabAuthManager
@@ -401,11 +469,11 @@ let
     capacity = {{AIRFLOW_TRIGGERER_DEFAULT_CAPACITY}}
 
     [logging]
-    base_log_folder = /opt/airflow/logs
+    base_log_folder = /opt/firestream/airflow/logs
     logging_level = {{AIRFLOW_LOGGING_LEVEL}}
 
     [fab]
-    config_file = /opt/airflow/webserver_config.py
+    config_file = /opt/firestream/airflow/webserver_config.py
   '';
 
   # Default webserver_config.py template
@@ -433,12 +501,16 @@ in firestream.mkPythonContainerModule {
   # Image naming passthrough.
   inherit imageName imageTag;
 
+  # Build-time vendored DAGs: lay the baked /opt/firestream/airflow/dags tree
+  # into the image. No-op (empty list) ⇒ no extra dep ⇒ stock image unchanged.
+  extraDeps = lib.optional (vendoredDags != [ ]) vendoredDagsDrv;
+
   # Runtime directories with declarative schema
   # These are created at container startup with proper permissions
   # Uses numeric UID/GID (1001) for portability - no /etc/passwd dependency
   runtimeDirs = {
     home = {
-      path = "/opt/airflow";
+      path = "/opt/firestream/airflow";
       type = "conf";
       persistence = "ephemeral";
       mode = "0755";
@@ -447,7 +519,7 @@ in firestream.mkPythonContainerModule {
       description = "Airflow home directory";
     };
     dags = {
-      path = "/opt/airflow/dags";
+      path = "/opt/firestream/airflow/dags";
       type = "data";
       persistence = "persistent";
       mode = "0755";
@@ -456,7 +528,7 @@ in firestream.mkPythonContainerModule {
       description = "DAG definition files";
     };
     plugins = {
-      path = "/opt/airflow/plugins";
+      path = "/opt/firestream/airflow/plugins";
       type = "plugins";
       persistence = "persistent";
       mode = "0755";
@@ -465,7 +537,7 @@ in firestream.mkPythonContainerModule {
       description = "Airflow plugins";
     };
     logs = {
-      path = "/opt/airflow/logs";
+      path = "/opt/firestream/airflow/logs";
       type = "logs";
       persistence = "persistent";
       mode = "0755";
@@ -474,7 +546,7 @@ in firestream.mkPythonContainerModule {
       description = "Airflow task and scheduler logs";
     };
     schedulerLogs = {
-      path = "/opt/airflow/logs/scheduler";
+      path = "/opt/firestream/airflow/logs/scheduler";
       type = "logs";
       persistence = "persistent";
       mode = "0755";
@@ -483,14 +555,14 @@ in firestream.mkPythonContainerModule {
       description = "Scheduler-specific logs";
     };
     tmp = {
-      path = "/opt/airflow/tmp";
+      path = "/opt/firestream/airflow/tmp";
       type = "tmp";
       persistence = "ephemeral";
       mode = "1777";
       description = "Temporary files, cleared on restart";
     };
     pycache = {
-      path = "/opt/airflow/tmp/pycache";
+      path = "/opt/firestream/airflow/tmp/pycache";
       type = "cache";
       persistence = "ephemeral";
       mode = "0755";
@@ -520,18 +592,62 @@ in firestream.mkPythonContainerModule {
 
   # Build-time: Static config templates
   prepopulateFiles = {
-    "/opt/airflow/airflow.cfg.template" = airflowConfigTemplate;
-    "/opt/airflow/webserver_config.py.template" = webserverConfigTemplate;
+    "/opt/firestream/airflow/airflow.cfg.template" = airflowConfigTemplate;
+    "/opt/firestream/airflow/webserver_config.py.template" = webserverConfigTemplate;
   };
 
+  # Build-time: materialize a venv directory at /opt/firestream/airflow/venv.
+  #
+  # The Bitnami-derived airflow chart's `prepare-venv` init container does:
+  #   cp -r --preserve=mode /opt/firestream/airflow/venv /emptydir/venv-base-dir
+  # and the main containers (web/scheduler/worker/triggerer/dag-processor)
+  # then remount that copy (emptyDir subPath venv-base-dir) at
+  # /opt/firestream/airflow/venv, sourcing /opt/firestream/airflow/venv/bin/activate
+  # and resolving the `airflow` CLI from venv/bin.
+  #
+  # The Nix python env is a /nix/store venv path (not at /opt/...). We expose it
+  # at the chart-expected location by creating a REAL directory whose top-level
+  # entries (bin, lib, pyvenv.cfg, ...) are absolute symlinks into ${pythonEnv}.
+  # Why a real dir of symlinks rather than a single `venv -> ${pythonEnv}`
+  # symlink:
+  #   * `cp -r` copies a symlink-to-dir as a symlink, producing a broken/relative
+  #     link; a real dir is recursed into and its symlink entries copied verbatim
+  #     (absolute, into the in-image /nix/store).
+  #   * Kubernetes refuses a subPath that is itself a symlink escaping the volume,
+  #     so venv-base-dir must be a real directory; symlinks *inside* it are fine.
+  pythonPrepopulateFn = ''
+    echo "Materializing airflow venv at /opt/firestream/airflow/venv -> ${pythonEnv}"
+    mkdir -p "$out/opt/firestream/airflow/venv"
+    for entry in ${pythonEnv}/*; do
+      ln -s "$entry" "$out/opt/firestream/airflow/venv/$(basename "$entry")"
+    done
+  '';
+
+  # Per-container helpers: emitted at top-level of libhelpersairflow.sh by the
+  # engine, so chart init containers can `source /opt/firestream/scripts/libairflow.sh`
+  # and use these helpers (airflow_conf_set, airflow_wait_for_db_connection, etc.) directly.
+  perContainerHelpers = airflowHelpers;
+
   # Validation function (from validate.sh)
-  # Prepend airflow helpers so secret processing functions are available
-  validateFn = airflowHelpers + validateScript;
+  validateFn = validateScript;
 
   # Activation: Replace {{PLACEHOLDERS}} with runtime values
   # This runs after validation but before init/config
   activateFn = ''
     info "Activating Airflow configuration..."
+
+    # Chart mode: the Bitnami chart's prepare-config init container has already
+    # rendered a complete airflow.cfg (correct release-scoped DB host, celery
+    # broker/result backend, executor, auth manager, secrets) and mounts it
+    # read-only-ish into this pod. Regenerating it here from the container's
+    # baked template would clobber those values with standalone defaults (DB host
+    # "postgresql", LocalExecutor, etc.) and the crudini-based configFn would
+    # additionally fail trying to write a temp file in the read-only config dir.
+    # So when AIRFLOW_SKIP_DB_SETUP=yes we trust the chart-provided airflow.cfg.
+    if is_boolean_yes "''${AIRFLOW_SKIP_DB_SETUP:-no}"; then
+      info "AIRFLOW_SKIP_DB_SETUP=yes - using chart-provided airflow.cfg; skipping in-container config generation"
+      return 0
+    fi
 
     # Build computed values (use :- for optional/secret variables)
     local db_user db_pass db_ssl_opt scheme base_url
@@ -579,7 +695,7 @@ in firestream.mkPythonContainerModule {
     is_boolean_yes "''${BITNAMI_DEBUG:-false}" && logging_level="DEBUG"
 
     # Process config template - replace placeholders with runtime values
-    if [[ -f "''${AIRFLOW_HOME:-/opt/airflow}/airflow.cfg.template" ]]; then
+    if [[ -f "''${AIRFLOW_HOME:-/opt/firestream/airflow}/airflow.cfg.template" ]]; then
       ${pkgs.gnused}/bin/sed \
         -e "s|{{AIRFLOW_EXECUTOR}}|''${executor}|g" \
         -e "s|{{AIRFLOW_LOAD_EXAMPLES}}|''${load_examples_val}|g" \
@@ -597,17 +713,24 @@ in firestream.mkPythonContainerModule {
         -e "s|{{AIRFLOW_CELERY_RESULT_BACKEND}}|''${celery_result_backend}|g" \
         -e "s|{{AIRFLOW_TRIGGERER_DEFAULT_CAPACITY}}|''${AIRFLOW_TRIGGERER_DEFAULT_CAPACITY:-1000}|g" \
         -e "s|{{AIRFLOW_LOGGING_LEVEL}}|''${logging_level}|g" \
-        "''${AIRFLOW_HOME:-/opt/airflow}/airflow.cfg.template" > "''${AIRFLOW_HOME:-/opt/airflow}/airflow.cfg"
+        "''${AIRFLOW_HOME:-/opt/firestream/airflow}/airflow.cfg.template" > "''${AIRFLOW_HOME:-/opt/firestream/airflow}/airflow.cfg"
 
       info "Generated airflow.cfg from template"
     fi
 
     # Process webserver config template
-    local home="''${AIRFLOW_HOME:-/opt/airflow}"
+    local home="''${AIRFLOW_HOME:-/opt/firestream/airflow}"
     local webserver_conf="''${AIRFLOW_WEBSERVER_CONF_FILE:-$home/webserver_config.py}"
     if [[ -f "$home/webserver_config.py.template" ]] && [[ ! -f "$webserver_conf" ]]; then
-      cp "$home/webserver_config.py.template" "$webserver_conf"
-      info "Generated webserver_config.py from template"
+      # Tolerate a read-only target: in the Bitnami chart only the web/api-server
+      # pod mounts a writable webserver_config.py; scheduler/worker/triggerer/
+      # dag-processor run with readOnlyRootFilesystem and do not need it. Treat a
+      # write failure as a skip rather than aborting the entrypoint (EROFS).
+      if cp "$home/webserver_config.py.template" "$webserver_conf" 2>/dev/null; then
+        info "Generated webserver_config.py from template"
+      else
+        debug "Skipped webserver_config.py generation (read-only filesystem)"
+      fi
     fi
 
     # Save config hash for change detection (using state module)
@@ -617,12 +740,10 @@ in firestream.mkPythonContainerModule {
   '';
 
   # Initialization (database, users, pools) - from init.sh
-  # Prepend airflow helpers so functions are available
-  initFn = airflowHelpers + initScript;
+  initFn = initScript;
 
   # Runtime config adjustments (crudini-based) - from config.sh
-  # Prepend airflow helpers so functions are available
-  configFn = airflowHelpers + configScript;
+  configFn = configScript;
 
   # Startup command based on component type
   runCmd = ''
@@ -678,7 +799,7 @@ in firestream.mkPythonContainerModule {
 
   inherit exposedPorts;
   inherit health;
-  volumes = [ "/opt/airflow/dags" "/opt/airflow/logs" "/opt/airflow/plugins" ];
+  volumes = [ "/opt/firestream/airflow/dags" "/opt/firestream/airflow/logs" "/opt/firestream/airflow/plugins" ];
 
   # Python-specific options
   compileByteCode = false;  # Airflow has many packages, skip compilation for faster builds

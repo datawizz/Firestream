@@ -36,8 +36,8 @@ webserver:
   base_url: {{ include "airflow.baseUrl" . | quote }}
   enable_proxy_fix: {{ ternary "True" "False" (and .Values.ingress.enabled .Values.ingress.tls) | squote }}
   {{- if .Values.web.tls.enabled }}
-  web_server_ssl_cert: "/opt/bitnami/airflow/certs/tls.crt"
-  web_server_ssl_key: "/opt/bitnami/airflow/certs/tls.key"
+  web_server_ssl_cert: "/opt/firestream/airflow/certs/tls.crt"
+  web_server_ssl_key: "/opt/firestream/airflow/certs/tls.key"
   {{- end }}
   {{- if (include "airflow.isImageMajorVersion2" .) }}
   web_server_port: {{ .Values.web.containerPorts.http | quote }}
@@ -54,7 +54,7 @@ kubernetes_executor:
   worker_container_tag: {{ .Values.image.tag | quote }}
   delete_worker_pods: 'True'
   delete_worker_pods_on_failure: 'True'
-  pod_template_file: "/opt/bitnami/airflow/config/pod_template.yaml"
+  pod_template_file: "/opt/firestream/airflow/config/pod_template.yaml"
 {{- end }}
 {{- end }}
 {{- end }}

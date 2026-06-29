@@ -147,6 +147,32 @@ impl KubectlClient {
         Ok(String::from_utf8_lossy(&output.stdout).to_string())
     }
 
+    /// Get a resource as JSON (`kubectl get <kind> <name> -n <ns> -o json`).
+    ///
+    /// Unlike `-o jsonpath`, this emits valid JSON for nested structures
+    /// (env/volumes/securityContext), so callers can `serde_json`-parse it and
+    /// re-use sub-objects verbatim. Mirrors [`Self::get_resource_yaml`].
+    pub async fn get_resource_json(&self, kind: &str, name: &str, namespace: &str) -> Result<String> {
+        let mut cmd = self.base_command();
+        cmd.arg("get")
+            .arg(kind)
+            .arg(name)
+            .arg("-n").arg(namespace)
+            .arg("-o").arg("json");
+
+        let output = cmd.output().await?;
+
+        if !output.status.success() {
+            let stderr = String::from_utf8_lossy(&output.stderr);
+            return Err(Error::KubectlCommandFailed(format!(
+                "Failed to get resource: {}",
+                stderr
+            )));
+        }
+
+        Ok(String::from_utf8_lossy(&output.stdout).to_string())
+    }
+
     /// Apply a resource from YAML
     pub async fn apply_yaml(&self, yaml: &str, namespace: Option<&str>) -> Result<()> {
         let mut cmd = self.base_command();
@@ -202,6 +228,157 @@ impl KubectlClient {
         }
 
         Ok(())
+    }
+
+    /// Create a one-shot Job from an existing CronJob's job template.
+    ///
+    /// Shells out to
+    /// `kubectl create job <job_name> --from=cronjob/<cronjob_name> -n <ns>`.
+    /// The created Job reuses the CronJob's pod spec verbatim (image, env,
+    /// volumes, command), which is exactly what we want for an on-demand
+    /// backup that mirrors the scheduled one.
+    pub async fn create_job_from_cronjob(
+        &self,
+        namespace: &str,
+        cronjob_name: &str,
+        job_name: &str,
+    ) -> Result<()> {
+        let mut cmd = self.base_command();
+        cmd.arg("create")
+            .arg("job")
+            .arg(job_name)
+            .arg(format!("--from=cronjob/{}", cronjob_name))
+            .arg("-n").arg(namespace);
+
+        let output = cmd.output().await?;
+
+        if !output.status.success() {
+            let stderr = String::from_utf8_lossy(&output.stderr);
+            return Err(Error::KubectlCommandFailed(format!(
+                "Failed to create job '{}' from cronjob '{}': {}",
+                job_name, cronjob_name, stderr
+            )));
+        }
+
+        Ok(())
+    }
+
+    /// Wait for a Job to finish, returning `Ok(())` on success and an error if
+    /// the Job fails or the timeout elapses.
+    ///
+    /// `kubectl wait` can only block on a single condition, so we race a
+    /// `condition=complete` wait against a `condition=failed` wait and surface
+    /// whichever fires first. This means a failed Job is reported promptly
+    /// instead of stalling until the timeout.
+    pub async fn wait_for_job(&self, namespace: &str, job_name: &str, timeout: u64) -> Result<()> {
+        let complete = self.run_job_wait(namespace, job_name, "complete", timeout);
+        let failed = self.run_job_wait(namespace, job_name, "failed", timeout);
+
+        tokio::select! {
+            res = complete => match res? {
+                true => Ok(()),
+                false => Err(Error::KubectlCommandFailed(format!(
+                    "Timed out after {}s waiting for job '{}' to complete",
+                    timeout, job_name
+                ))),
+            },
+            res = failed => match res? {
+                true => Err(Error::KubectlCommandFailed(format!(
+                    "Job '{}' failed before completing",
+                    job_name
+                ))),
+                false => Err(Error::KubectlCommandFailed(format!(
+                    "Timed out after {}s waiting for job '{}'",
+                    timeout, job_name
+                ))),
+            },
+        }
+    }
+
+    /// Run a single `kubectl wait --for=condition=<condition> job/<name>`.
+    ///
+    /// Returns `Ok(true)` if the condition was met, `Ok(false)` if the wait
+    /// timed out (condition not yet met), and `Err` for any other failure.
+    async fn run_job_wait(
+        &self,
+        namespace: &str,
+        job_name: &str,
+        condition: &str,
+        timeout: u64,
+    ) -> Result<bool> {
+        let mut cmd = self.base_command();
+        cmd.arg("wait")
+            .arg(format!("--for=condition={}", condition))
+            .arg(format!("job/{}", job_name))
+            .arg("-n").arg(namespace)
+            .arg(format!("--timeout={}s", timeout));
+
+        let output = cmd.output().await?;
+        if output.status.success() {
+            return Ok(true);
+        }
+
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        // kubectl prints "timed out waiting for the condition" on timeout.
+        if stderr.contains("timed out") || stderr.contains("timeout") {
+            Ok(false)
+        } else {
+            Err(Error::KubectlCommandFailed(format!(
+                "kubectl wait (condition={}) for job '{}' failed: {}",
+                condition, job_name, stderr
+            )))
+        }
+    }
+
+    /// Fetch logs for a resource (e.g. `job/<name>`) in a namespace.
+    pub async fn get_logs(&self, namespace: &str, resource: &str) -> Result<String> {
+        let mut cmd = self.base_command();
+        cmd.arg("logs")
+            .arg(resource)
+            .arg("-n").arg(namespace);
+
+        let output = cmd.output().await?;
+
+        if !output.status.success() {
+            let stderr = String::from_utf8_lossy(&output.stderr);
+            return Err(Error::KubectlCommandFailed(format!(
+                "Failed to get logs for '{}': {}",
+                resource, stderr
+            )));
+        }
+
+        Ok(String::from_utf8_lossy(&output.stdout).to_string())
+    }
+
+    /// Read a single `jsonpath` field from a named resource.
+    ///
+    /// Returns the trimmed stdout (empty string if the path resolves to
+    /// nothing). Errors only when the `kubectl get` itself fails.
+    pub async fn get_jsonpath(
+        &self,
+        kind: &str,
+        name: &str,
+        namespace: &str,
+        jsonpath: &str,
+    ) -> Result<String> {
+        let mut cmd = self.base_command();
+        cmd.arg("get")
+            .arg(kind)
+            .arg(name)
+            .arg("-n").arg(namespace)
+            .arg("-o").arg(format!("jsonpath={}", jsonpath));
+
+        let output = cmd.output().await?;
+
+        if !output.status.success() {
+            let stderr = String::from_utf8_lossy(&output.stderr);
+            return Err(Error::KubectlCommandFailed(format!(
+                "Failed to read jsonpath '{}' from {}/{}: {}",
+                jsonpath, kind, name, stderr
+            )));
+        }
+
+        Ok(String::from_utf8_lossy(&output.stdout).trim().to_string())
     }
 
     /// Create base command with common arguments

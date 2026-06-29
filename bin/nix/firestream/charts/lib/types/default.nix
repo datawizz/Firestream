@@ -26,6 +26,8 @@ let
   autoscaling = import ./autoscaling.nix { inherit lib; };
   networkPolicy = import ./network-policy.nix { inherit lib; };
   tls = import ./tls.nix { inherit lib; };
+  persistence = import ./persistence.nix { inherit lib; };
+  secrets = import ./secrets.nix { inherit lib; };
 
 in {
   # Re-export all named types
@@ -57,6 +59,12 @@ in {
   inherit (tls)
     tlsType
     certManagerType;
+
+  inherit (persistence)
+    persistenceType;
+
+  inherit (secrets)
+    secretType;
 
   # Airflow component base type - shared across web, scheduler, worker, etc.
   #

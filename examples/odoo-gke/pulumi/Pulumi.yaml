@@ -1,0 +1,13 @@
+name: firestream-odoo-gke
+description: >-
+  GKE Autopilot cluster, Artifact Registry, and GCP Secret Manager secrets for
+  the Firestream Odoo deployment example.
+runtime:
+  name: python
+  options:
+    toolchain: pip
+    virtualenv: venv
+config:
+  pulumi:tags:
+    value:
+      pulumi:template: python

@@ -7,7 +7,9 @@
 # byte-for-byte identical to the legacy flake.nix build path.
 #
 # NOTE: Redis is MULTI-VERSION (7/8). `version` varies per build and is supplied
-# by the flake-module via an inline override module, NOT here.
+# by the flake-module via an inline override module, NOT here. The Phase B
+# default alias (`redis`) now points at v8 — matching the Bitnami redis chart's
+# expected protocol — while `redis-7` remains available for consumer downgrade.
 #
 # IMPORTANT: env defaults use a PER-LEAF mkDefault (each value wrapped
 # individually). A single mkDefault around the whole attrset would be replaced
@@ -109,6 +111,12 @@
     ];
 
     exposedPorts = lib.mkDefault [ 6379 ];
+
+    # Distinct host-port offset (spacing 2000) so all 8 canonical apps can run
+    # simultaneously on docker without colliding. redis=24000.
+    #   redis   6379 -> host 30379
+    #   healthd 9180 -> host 33180
+    compose.hostPortOffset = lib.mkDefault 24000;
 
     # Phase 4: enable in-image firestream-healthd. The readinessCmd is passed
     # to healthd as a single string and evaluated via `sh -c` at probe time,

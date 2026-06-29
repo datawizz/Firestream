@@ -840,9 +840,9 @@ There are cases where you may want to deploy extra objects, such a ConfigMap con
 | Name                                         | Description                                                             | Value                |
 | -------------------------------------------- | ----------------------------------------------------------------------- | -------------------- |
 | `postgresql.enabled`                         | Switch to enable or disable the PostgreSQL helm chart                   | `true`               |
-| `postgresql.auth.username`                   | Name for a custom user to create                                        | `bn_jupyterhub`      |
+| `postgresql.auth.username`                   | Name for a custom user to create                                        | `firestream`      |
 | `postgresql.auth.password`                   | Password for the custom user to create                                  | `""`                 |
-| `postgresql.auth.database`                   | Name for a custom database to create                                    | `bitnami_jupyterhub` |
+| `postgresql.auth.database`                   | Name for a custom database to create                                    | `firestream_jupyterhub` |
 | `postgresql.auth.existingSecret`             | Name of existing secret to use for PostgreSQL credentials               | `""`                 |
 | `postgresql.architecture`                    | PostgreSQL architecture (`standalone` or `replication`)                 | `standalone`         |
 | `postgresql.service.ports.postgresql`        | PostgreSQL service port                                                 | `5432`               |

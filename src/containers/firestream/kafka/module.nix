@@ -26,27 +26,27 @@
 
 # Paths configuration (Bitnami compatibility)
 , paths ? {
-    base = "/opt/bitnami/kafka";
-    conf = "/opt/bitnami/kafka/config";
-    data = "/bitnami/kafka/data";
-    logs = "/opt/bitnami/kafka/logs";
+    base = "/opt/firestream/kafka";
+    conf = "/opt/firestream/kafka/config";
+    data = "/firestream/kafka/data";
+    logs = "/opt/firestream/kafka/logs";
   }
 
 # Environment variables with defaults
 # NOTE: Use absolute paths, NOT variable references like \${VAR} - bash strict mode (set -u) fails on those
 , envVars ? {
     # Base directories
-    KAFKA_BASE_DIR = "/opt/bitnami/kafka";
-    KAFKA_VOLUME_DIR = "/bitnami/kafka";
-    KAFKA_DATA_DIR = "/bitnami/kafka/data";
-    KAFKA_CONF_DIR = "/opt/bitnami/kafka/config";
-    KAFKA_MOUNTED_CONF_DIR = "/bitnami/kafka/config";
-    KAFKA_CONF_FILE = "/opt/bitnami/kafka/config/server.properties";
-    KAFKA_LOG_DIR = "/opt/bitnami/kafka/logs";
-    KAFKA_HOME = "/opt/bitnami/kafka";
-    KAFKA_CERTS_DIR = "/opt/bitnami/kafka/config/certs";
-    KAFKA_TMP_DIR = "/opt/bitnami/kafka/tmp";
-    KAFKA_PID_FILE = "/opt/bitnami/kafka/tmp/kafka.pid";
+    KAFKA_BASE_DIR = "/opt/firestream/kafka";
+    KAFKA_VOLUME_DIR = "/firestream/kafka";
+    KAFKA_DATA_DIR = "/firestream/kafka/data";
+    KAFKA_CONF_DIR = "/opt/firestream/kafka/config";
+    KAFKA_MOUNTED_CONF_DIR = "/firestream/kafka/config";
+    KAFKA_CONF_FILE = "/opt/firestream/kafka/config/server.properties";
+    KAFKA_LOG_DIR = "/opt/firestream/kafka/logs";
+    KAFKA_HOME = "/opt/firestream/kafka";
+    KAFKA_CERTS_DIR = "/opt/firestream/kafka/config/certs";
+    KAFKA_TMP_DIR = "/opt/firestream/kafka/tmp";
+    KAFKA_PID_FILE = "/opt/firestream/kafka/tmp/kafka.pid";
     KAFKA_INITSCRIPTS_DIR = "/docker-entrypoint-initdb.d";
 
     # User and group
@@ -105,7 +105,7 @@
 
     # Other settings
     KAFKA_INIT_MAX_TIMEOUT = "60";
-    KAFKA_CFG_LOG_DIRS = "/bitnami/kafka/data";
+    KAFKA_CFG_LOG_DIRS = "/firestream/kafka/data";
     KAFKA_CFG_MAX_REQUEST_SIZE = "";
     KAFKA_CFG_MAX_PARTITION_FETCH_BYTES = "";
 
@@ -157,6 +157,11 @@ let
   configScript = builtins.readFile ./scripts/config.sh;
   initScript = builtins.readFile ./scripts/init.sh;
   secretsScript = builtins.readFile ./scripts/secrets.sh;
+  # Pure helper-function definitions extracted from {validate,config,init}.sh —
+  # emitted at top-level of libhelperskafka.sh so chart init containers can
+  # invoke kafka_server_conf_set, kafka_common_conf_set, etc. after
+  # `source /opt/bitnami/scripts/libkafka.sh`.
+  helpersScript = builtins.readFile ./scripts/helpers.sh;
 
   # Kafka-specific helper functions (needed by scripts)
   # These supplement the core library functions
@@ -353,6 +358,14 @@ let
         "$@"
       fi
     }
+
+    # ----------------------------------------------------------------------
+    # Helpers relocated from scripts/{validate,config,init}.sh so they're
+    # visible at top-level of libkafka.sh (chart init containers source the
+    # lib and call kafka_server_conf_set, kafka_common_conf_set, etc. directly).
+    # Bodies are unchanged from the original script definitions.
+    # ----------------------------------------------------------------------
+    ${helpersScript}
   '';
 
   # System dependencies (Kafka-specific extras)
@@ -401,7 +414,7 @@ in firestream.mkJavaContainerModule {
   # Declarative directory schema
   runtimeDirs = {
     data = {
-      path = "/bitnami/kafka/data";
+      path = "/firestream/kafka/data";
       type = "data";
       persistence = "persistent";
       mode = "0700";
@@ -410,7 +423,7 @@ in firestream.mkJavaContainerModule {
       description = "Kafka data directory (log.dirs)";
     };
     conf = {
-      path = "/opt/bitnami/kafka/config";
+      path = "/opt/firestream/kafka/config";
       type = "conf";
       persistence = "persistent";
       mode = "0755";
@@ -419,7 +432,7 @@ in firestream.mkJavaContainerModule {
       description = "Kafka configuration directory";
     };
     confDefault = {
-      path = "/opt/bitnami/kafka/config.default";
+      path = "/opt/firestream/kafka/config.default";
       type = "conf";
       persistence = "ephemeral";
       mode = "0755";
@@ -428,7 +441,7 @@ in firestream.mkJavaContainerModule {
       description = "Default configuration templates";
     };
     logs = {
-      path = "/opt/bitnami/kafka/logs";
+      path = "/opt/firestream/kafka/logs";
       type = "logs";
       persistence = "ephemeral";
       mode = "0755";
@@ -437,14 +450,14 @@ in firestream.mkJavaContainerModule {
       description = "Kafka log directory";
     };
     tmp = {
-      path = "/opt/bitnami/kafka/tmp";
+      path = "/opt/firestream/kafka/tmp";
       type = "tmp";
       persistence = "ephemeral";
       mode = "1777";
       description = "Temporary files and PID file";
     };
     certs = {
-      path = "/opt/bitnami/kafka/config/certs";
+      path = "/opt/firestream/kafka/config/certs";
       type = "conf";
       persistence = "persistent";
       mode = "0755";
@@ -453,7 +466,7 @@ in firestream.mkJavaContainerModule {
       description = "TLS certificates directory";
     };
     volumeDir = {
-      path = "/bitnami/kafka";
+      path = "/firestream/kafka";
       type = "data";
       persistence = "persistent";
       mode = "0755";
@@ -462,7 +475,7 @@ in firestream.mkJavaContainerModule {
       description = "Persistent volume root";
     };
     mountedConf = {
-      path = "/bitnami/kafka/config";
+      path = "/firestream/kafka/config";
       type = "conf";
       persistence = "persistent";
       mode = "0755";
@@ -488,9 +501,13 @@ in firestream.mkJavaContainerModule {
     };
   };
 
+  # Per-container helpers: emitted at top-level of libhelperskafka.sh by the
+  # engine, so chart init containers can `source /opt/bitnami/scripts/libkafka.sh`
+  # and use these helpers (kafka_server_conf_set, etc.) directly.
+  perContainerHelpers = kafkaHelpers;
+
   # Validation function
-  # Prepend Kafka helpers so functions are available
-  validateFn = kafkaHelpers + ''
+  validateFn = ''
     error_code=0
     ${validateScript}
     [[ "$error_code" -eq 0 ]] || exit "$error_code"
@@ -498,7 +515,7 @@ in firestream.mkJavaContainerModule {
 
   # Activation: Load secrets
   # Note: NSS wrapper is automatically enabled by mkJavaContainerModule
-  activateFn = kafkaHelpers + ''
+  activateFn = ''
     info "Activating Kafka configuration..."
 
     # Load secrets from _FILE variables
@@ -508,11 +525,11 @@ in firestream.mkJavaContainerModule {
   '';
 
   # Configuration generation
-  configFn = kafkaHelpers + configScript;
+  configFn = configScript;
 
   # Initialization (KRaft storage setup, directory creation)
   # Include configScript for helper functions like kafka_configure_default_truststore_locations
-  initFn = kafkaHelpers + configScript + initScript;
+  initFn = configScript + initScript;
 
   # Startup command
   # Note: NSS wrapper is automatically enabled by mkJavaContainerModule before runCmd
@@ -527,7 +544,7 @@ in firestream.mkJavaContainerModule {
 
   inherit exposedPorts;
   inherit health;
-  volumes = [ "/bitnami/kafka" "/docker-entrypoint-initdb.d" ];
+  volumes = [ "/firestream/kafka" "/docker-entrypoint-initdb.d" ];
 
   user = { name = "kafka"; group = "kafka"; uid = 1001; gid = 1001; };
 

@@ -116,7 +116,7 @@ spec:
             - name: AIRFLOW_EXECUTOR
               value: {{ include "airflow.worker.executor" . }}
             - name: PYTHONPYCACHEPREFIX
-              value: "/opt/bitnami/airflow/venv/tmp"
+              value: "/opt/firestream/airflow/venv/tmp"
             {{- if or (eq .Values.executor "CeleryExecutor") (eq .Values.executor "CeleryKubernetesExecutor") }}
             - name: REDIS_HOST
               value: {{ include "airflow.redis.host" . | quote }}
@@ -187,7 +187,7 @@ spec:
                 - sh
                 - -c
                 - |
-                  . /opt/bitnami/airflow/venv/bin/activate && \
+                  . /opt/firestream/airflow/venv/bin/activate && \
                   CONNECTION_CHECK_MAX_COUNT=0 python -m celery --app airflow.providers.celery.executors.celery_executor.app inspect ping -d celery@$(hostname)
           {{- end }}
           {{- end }}
@@ -204,32 +204,32 @@ spec:
               mountPath: /tmp
               subPath: tmp-dir
             - name: empty-dir
-              mountPath: /opt/bitnami/airflow/nss-wrapper
+              mountPath: /opt/firestream/airflow/nss-wrapper
               subPath: app-nss-wrapper-dir
             - name: empty-dir
-              mountPath: /opt/bitnami/airflow/logs
+              mountPath: /opt/firestream/airflow/logs
               subPath: app-logs-dir
             - name: empty-dir
-              mountPath: /opt/bitnami/airflow/tmp
+              mountPath: /opt/firestream/airflow/tmp
               subPath: app-tmp-dir
             - name: empty-dir
-              mountPath: /opt/bitnami/airflow/airflow.db
+              mountPath: /opt/firestream/airflow/airflow.db
               subPath: app-base-dir/airflow.db
             - name: empty-dir
-              mountPath: /opt/bitnami/airflow/airflow.cfg
+              mountPath: /opt/firestream/airflow/airflow.cfg
               subPath: app-base-dir/airflow.cfg
             - name: empty-dir
-              mountPath: /opt/bitnami/airflow/config/airflow_local_settings.py
+              mountPath: /opt/firestream/airflow/config/airflow_local_settings.py
               subPath: app-conf-dir/airflow_local_settings.py
             - name: empty-dir
-              mountPath: /opt/bitnami/airflow/webserver_config.py
+              mountPath: /opt/firestream/airflow/webserver_config.py
               subPath: app-base-dir/webserver_config.py
             - name: empty-dir
-              mountPath: /opt/bitnami/airflow/venv
+              mountPath: /opt/firestream/airflow/venv
               subPath: venv-base-dir
             {{- if  .Values.usePasswordFiles }}
             - name: airflow-secrets
-              mountPath: /opt/bitnami/airflow/secrets
+              mountPath: /opt/firestream/airflow/secrets
             {{- end }}
             {{- if .Values.dags.enabled }}
             {{- include "airflow.dags.volumeMounts" . | nindent 12 }}
@@ -239,7 +239,7 @@ spec:
             {{- end }}
             {{- if .Values.web.tls.enabled }}
             - name: tls-certificates
-              mountPath: /opt/bitnami/airflow/certs
+              mountPath: /opt/firestream/airflow/certs
               readOnly: true
             {{- end }}
             {{- if .Values.extraVolumeMounts }}

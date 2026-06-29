@@ -75,8 +75,8 @@ spec:
           args:
             - -ec
             - |
-              mkdir -p /bitnami/odoo
-              find /bitnami/odoo -mindepth 1 -maxdepth 1 -not -name ".snapshot" -not -name "lost+found" | xargs -r chown -R odoo:root
+              mkdir -p /firestream/odoo
+              find /firestream/odoo -mindepth 1 -maxdepth 1 -not -name ".snapshot" -not -name "lost+found" | xargs -r chown -R odoo:root
           {{- if .Values.volumePermissions.containerSecurityContext.enabled }}
           securityContext: {{- include "common.compatibility.renderSecurityContext" (dict "secContext" .Values.volumePermissions.containerSecurityContext "context" $) | nindent 12 }}
           {{- end }}
@@ -87,7 +87,7 @@ spec:
           {{- end }}
           volumeMounts:
             - name: odoo-data
-              mountPath: /bitnami/odoo
+              mountPath: /firestream/odoo
               {{- if .Values.persistence.subPath }}
               subPath: {{ .Values.persistence.subPath }}
               {{- end }}
@@ -133,7 +133,7 @@ spec:
               value: {{ template "odoo.databaseUser" . }}
             {{- if .Values.usePasswordFiles }}
             - name: ODOO_DATABASE_PASSWORD_FILE
-              value: {{ printf "/opt/bitnami/odoo/secrets/%s" (include "odoo.databaseSecretPasswordKey" .) }}
+              value: {{ printf "/opt/firestream/odoo/secrets/%s" (include "odoo.databaseSecretPasswordKey" .) }}
             {{- else }}
             - name: ODOO_DATABASE_PASSWORD
               valueFrom:
@@ -150,7 +150,7 @@ spec:
               value: {{ .Values.externalDatabase.postgresqlPostgresUser }}
             {{- if .Values.usePasswordFiles }}
             - name: POSTGRESQL_CLIENT_POSTGRES_PASSWORD_FILE
-              value: {{ printf "/opt/bitnami/odoo/secrets/%s" (include "odoo.databaseSecretPostgresPasswordKey" .) }}
+              value: {{ printf "/opt/firestream/odoo/secrets/%s" (include "odoo.databaseSecretPostgresPasswordKey" .) }}
             {{- else }}
             - name: POSTGRESQL_CLIENT_POSTGRES_PASSWORD
               valueFrom:
@@ -164,7 +164,7 @@ spec:
               value: {{ template "odoo.databaseUser" . }}
             {{- if .Values.usePasswordFiles }}
             - name: POSTGRESQL_CLIENT_CREATE_DATABASE_PASSWORD_FILE
-              value: {{ printf "/opt/bitnami/odoo/secrets/%s" (include "odoo.databaseSecretPasswordKey" .) }}
+              value: {{ printf "/opt/firestream/odoo/secrets/%s" (include "odoo.databaseSecretPasswordKey" .) }}
             {{- else }}
             - name: POSTGRESQL_CLIENT_CREATE_DATABASE_PASSWORD
               valueFrom:
@@ -177,7 +177,7 @@ spec:
               value: {{ .Values.odooEmail | quote }}
             {{- if .Values.usePasswordFiles }}
             - name: ODOO_PASSWORD_FILE
-              value: "/opt/bitnami/odoo/secrets/odoo-password"
+              value: "/opt/firestream/odoo/secrets/odoo-password"
             {{- else }}
             - name: ODOO_PASSWORD
               valueFrom:
@@ -208,7 +208,7 @@ spec:
             {{- if or .Values.smtpPassword .Values.smtpExistingSecret }}
             {{- if .Values.usePasswordFiles }}
             - name: ODOO_SMTP_PASSWORD_FILE
-              value: "/opt/bitnami/odoo/secrets/smtp-password"
+              value: "/opt/firestream/odoo/secrets/smtp-password"
             {{- else }}
             - name: ODOO_SMTP_PASSWORD
               valueFrom:
@@ -271,13 +271,13 @@ spec:
           {{- end }}
           volumeMounts:
             - name: odoo-data
-              mountPath: /bitnami/odoo
+              mountPath: /firestream/odoo
               {{- if .Values.persistence.subPath }}
               subPath: {{ .Values.persistence.subPath }}
               {{- end }}
             {{- if .Values.usePasswordFiles }}
             - name: odoo-secrets
-              mountPath: /opt/bitnami/odoo/secrets
+              mountPath: /opt/firestream/odoo/secrets
             {{- end }}
             {{- if .Values.customPostInitScripts }}
             - mountPath: /docker-entrypoint-init.d

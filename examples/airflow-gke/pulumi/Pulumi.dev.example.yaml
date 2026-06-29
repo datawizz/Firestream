@@ -1,0 +1,22 @@
+# Copy to Pulumi.dev.yaml and fill in. Secret values are set separately with
+# `pulumi config set --secret` so they never appear in plaintext here:
+#
+#   pulumi stack init dev
+#   pulumi config set gcp:project   my-gcp-project
+#   pulumi config set gcp:region    us-central1
+#   pulumi config set clusterName   firestream-airflow
+#   pulumi config set arRepo        firestream
+#   pulumi config set --secret airflowPassword     "$(openssl rand -base64 24)"
+#   pulumi config set --secret fernetKey           "$(python3 -c 'from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())')"
+#   pulumi config set --secret secretKey           "$(openssl rand -base64 24)"
+#   pulumi config set --secret jwtSecretKey        "$(openssl rand -base64 24)"
+#   pulumi config set --secret dbPassword          "$(openssl rand -base64 24)"
+#   pulumi config set --secret dbPostgresPassword  "$(openssl rand -base64 24)"
+#   pulumi config set --secret redisPassword       "$(openssl rand -base64 24)"
+config:
+  gcp:project: my-gcp-project
+  gcp:region: us-central1
+  firestream-airflow-gke:clusterName: firestream-airflow
+  firestream-airflow-gke:arRepo: firestream
+  # airflowPassword / fernetKey / secretKey / jwtSecretKey / dbPassword /
+  # dbPostgresPassword / redisPassword: set with `--secret`.
