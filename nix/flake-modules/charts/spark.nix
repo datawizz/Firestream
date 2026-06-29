@@ -21,7 +21,7 @@
 # `global.security.allowInsecureImages` is flipped to bypass Bitnami's
 # NOTES.txt whitelist.
 { ... }: {
-  perSystem = { pkgs, lib, config, evalChart, ... }:
+  perSystem = { pkgs, lib, config, evalChart, baseChart, ... }:
     let
       chartSrc = ../../../src/charts/firestream/spark;
       optionsPath = chartSrc + "/nix/default.nix";
@@ -43,58 +43,78 @@
           tag = imgEval.imageTag;
         };
 
-      # Phase F: firestream-spark container bakes SPARK_* dirs under /opt/spark
-      # (see src/containers/firestream/spark/options.nix). The Bitnami chart
-      # mounts emptyDirs at /opt/bitnami/spark/{conf,tmp,logs,work} and /tmp.
-      # Remap every SPARK_*_DIR / SPARK_*_FILE to the chart's actual mounts.
-      #
-      # readOnlyRootFilesystem is enforced on master + worker, so any write
-      # outside the explicit mounts fails. SPARK_DATA_DIR / SPARK_USER_JARS_DIR
-      # have no chart mount — co-locate them under /opt/bitnami/spark/work
-      # (an emptyDir present on both pods) so jar-staging + scratch data
-      # land on writable storage.
-      firestreamPathOverrides = [
-        { name = "SPARK_CONF_DIR";  value = "/opt/bitnami/spark/conf"; }
-        { name = "SPARK_CONF_FILE"; value = "/opt/bitnami/spark/conf/spark-defaults.conf"; }
-        { name = "SPARK_LOG_DIR";   value = "/opt/bitnami/spark/logs"; }
-        { name = "SPARK_TMP_DIR";   value = "/opt/bitnami/spark/tmp"; }
-        { name = "SPARK_WORK_DIR";  value = "/opt/bitnami/spark/work"; }
-        { name = "SPARK_DATA_DIR";  value = "/opt/bitnami/spark/work/data"; }
-        { name = "SPARK_USER_JARS_DIR"; value = "/opt/bitnami/spark/work/jars"; }
-      ];
-
+      # Phase 1 path-de-branding: the firestream-spark container now bakes its
+      # SPARK_* dirs under /opt/firestream/spark and /firestream/spark (see
+      # src/containers/firestream/spark/options.nix), and the chart templates
+      # mount their emptyDirs at the matching /opt/firestream/spark/{conf,tmp,
+      # logs,work} paths. Container bake == chart mount, so the per-component
+      # SPARK_*_DIR extraEnvVars remaps are no longer needed and were removed.
       imageInjectionModule = { ... }: {
         config.spark._meta.containerRefs.spark = {
           inherit (sparkImg) registry repository tag;
           componentPath = [ "image" ];
         };
         config.spark.global.security.allowInsecureImages = true;
-        # Bitnami spark splits master + worker into their own pod specs but
-        # shares a single top-level `image:`. extraEnvVars is per-component.
-        config.spark.master.extraEnvVars = firestreamPathOverrides;
-        config.spark.worker.extraEnvVars = firestreamPathOverrides;
+      };
+
+      # Phase E: make SeaweedFS the default local S3 backend. etl_lib's Spark
+      # client (src/lib/python/etl-lib/src/etl_lib/services/spark/client.py)
+      # reads S3_LOCAL_* env vars and sets spark.hadoop.fs.s3a.* (path-style,
+      # ssl disabled) — purely data-driven, so no Python change is needed. We
+      # inject the five env vars as PLAIN literal values (NOT secretKeyRef):
+      # the seaweedfs Secret lives in the `seaweedfs` namespace and a
+      # secretKeyRef cannot cross namespaces. Since these are deterministic dev
+      # credentials for a single-node store that is not exposed to the internet,
+      # literal injection is the robust, simple choice. (Per-tenant secret
+      # replication for the hosted/cloud tier is a documented follow-on.)
+      #
+      # Injected into BOTH master and worker pods (the spark-submit driver may
+      # run on a worker in cluster mode; over-injection of these vars is
+      # harmless). These set master/worker.extraEnvVars, which currently carry
+      # no Firestream values (the old SPARK_*_DIR path remaps were removed), so
+      # there is nothing to clobber; if a consumer adds its own extraEnvVars via
+      # the re-eval `userMod`, the NixOS module system concatenates the lists.
+      s3LocalEnvVars = [
+        { name = "S3_LOCAL_ENDPOINT_URL"; value = "http://seaweedfs-all-in-one.seaweedfs.svc.cluster.local:8333"; }
+        { name = "S3_LOCAL_ACCESS_KEY_ID"; value = "firestream"; }
+        { name = "S3_LOCAL_SECRET_ACCESS_KEY"; value = "firestream-secret"; }
+        { name = "S3_LOCAL_BUCKET_NAME"; value = "firestream"; }
+        { name = "S3_LOCAL_DEFAULT_REGION"; value = "us-east-1"; }
+      ];
+
+      s3EnvInjectionModule = { ... }: {
+        config.spark.master.extraEnvVars = s3LocalEnvVars;
+        config.spark.worker.extraEnvVars = s3LocalEnvVars;
       };
 
       c = evalChart {
         name = "spark";
         inherit chartSrc subcharts;
-        modules = [ optionsPath imageInjectionModule ];
+        modules = [ optionsPath imageInjectionModule s3EnvInjectionModule ];
       };
     in
     {
       packages.spark-chart = c.chartBundle;
 
+      # Base (un-overlaid) chart: chart's OWN native defaults, no Firestream
+      # values overlay / no image injection. Renders `bitnami/spark`.
+      packages.spark-base-chart = baseChart {
+        name = "spark";
+        inherit chartSrc subcharts;
+      };
+
       # Registry: full evaluated chart result (used by aggregate.nix / flake.lib).
-      firestreamCharts.spark = c;
+      firestreamCharts.spark = c // { baseChart = config.packages.spark-base-chart; };
 
       # Registry: consumer override API exposed via flake.lib.<sys>.charts.spark.
       firestreamChartImages.spark = {
         chartBundle = c.chartBundle;
+        baseChart = config.packages.spark-base-chart;
         render = c.render;
         eval = userMod: evalChart {
           name = "spark";
           inherit chartSrc subcharts;
-          modules = [ optionsPath imageInjectionModule userMod ];
+          modules = [ optionsPath imageInjectionModule s3EnvInjectionModule userMod ];
         };
         options = c.options;
       };

@@ -35,7 +35,7 @@
 # `global.security.allowInsecureImages` is flipped to bypass Bitnami's
 # NOTES.txt whitelist.
 { ... }: {
-  perSystem = { pkgs, lib, config, evalChart, ... }:
+  perSystem = { pkgs, lib, config, evalChart, baseChart, ... }:
     let
       chartSrc = ../../../src/charts/firestream/jupyterhub;
       optionsPath = chartSrc + "/nix/default.nix";
@@ -101,6 +101,9 @@
         { name = "JUPYTERHUB_VOLUME_DIR"; value = "/tmp"; }
       ];
 
+      # Phase 1 path-de-branding: the postgresql subchart templates + values now
+      # mount/reference firestream paths directly, matching the firestream-postgresql
+      # container's baked *_DIR vars. No subchart pg path-override extraEnvVars needed.
       imageInjectionModule = { ... }: {
         config.jupyterhub._meta.containerRefs = {
           hub = {
@@ -125,11 +128,28 @@
           };
         };
         config.jupyterhub.global.security.allowInsecureImages = true;
+        # The bundled Bitnami postgresql subchart defaults to preloading the
+        # `pgaudit` extension, which the firestream-postgresql image does not
+        # ship (server start fails with `could not access file "pgaudit"`).
+        # Mirror the standalone postgresql overlay and clear it for the subchart.
+        config.jupyterhub.postgresql.postgresqlSharedPreloadLibraries = "";
         # Per-component extraEnvVars. singleuser pods are user-spawned but
         # also benefit from consistent env (config_files_path inheritance).
         config.jupyterhub.hub.extraEnvVars = firestreamPathOverrides;
         config.jupyterhub.proxy.extraEnvVars = firestreamPathOverrides;
         config.jupyterhub.singleuser.extraEnvVars = firestreamPathOverrides;
+
+        # The proxy component runs the Bitnami configurable-http-proxy. Upstream
+        # ships a dedicated `bitnami/configurable-http-proxy` image whose
+        # entrypoint IS the CHP binary; Firestream points every jupyterhub
+        # component at the single firestream-jupyterhub image, whose entrypoint
+        # is the firestream lifecycle wrapper (validate/activate/config-hash).
+        # For the proxy that wrapper has no jupyterhub_config.py to hash and the
+        # CHP flags it receives as args are not a runnable command, so it crashes.
+        # The hub already overrides command to `jupyterhub`; mirror that for the
+        # proxy by running the CHP binary directly (bypassing the wrapper). The
+        # firestream-jupyterhub image bundles `configurable-http-proxy` on PATH.
+        config.jupyterhub.proxy.command = [ "configurable-http-proxy" ];
       };
 
       c = evalChart {
@@ -141,12 +161,20 @@
     {
       packages.jupyterhub-chart = c.chartBundle;
 
+      # Base (un-overlaid) chart: chart's OWN native defaults, no Firestream
+      # values overlay / no image injection. Renders `bitnami/jupyterhub`.
+      packages.jupyterhub-base-chart = baseChart {
+        name = "jupyterhub";
+        inherit chartSrc subcharts;
+      };
+
       # Registry: full evaluated chart result (used by aggregate.nix / flake.lib).
-      firestreamCharts.jupyterhub = c;
+      firestreamCharts.jupyterhub = c // { baseChart = config.packages.jupyterhub-base-chart; };
 
       # Registry: consumer override API exposed via flake.lib.<sys>.charts.jupyterhub.
       firestreamChartImages.jupyterhub = {
         chartBundle = c.chartBundle;
+        baseChart = config.packages.jupyterhub-base-chart;
         render = c.render;
         eval = userMod: evalChart {
           name = "jupyterhub";

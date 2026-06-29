@@ -22,7 +22,7 @@
 # `global.security.allowInsecureImages` is flipped to bypass Bitnami's
 # NOTES.txt whitelist.
 { ... }: {
-  perSystem = { pkgs, lib, config, evalChart, ... }:
+  perSystem = { pkgs, lib, config, evalChart, baseChart, ... }:
     let
       chartSrc = ../../../src/charts/firestream/odoo;
       optionsPath = chartSrc + "/nix/default.nix";
@@ -57,45 +57,18 @@
           tag = imgEval.imageTag;
         };
 
-      # Phase F: firestream-odoo bakes ODOO_*_DIR under /opt/odoo by default
-      # (see src/containers/firestream/odoo/options.nix). The Bitnami chart
-      # mounts the PVC at /bitnami/odoo and a Secret at /opt/bitnami/odoo/secrets.
-      # readOnlyRootFilesystem is false on the main odoo container — so the
-      # only paths that strictly NEED remapping are the volume/data dirs that
-      # must land on the PVC. We remap conf/logs/tmp/addons to /bitnami/odoo/...
-      # too so they persist + share the same writable mount.
-      firestreamPathOverrides = [
-        # PVC mount (top-level)
-        { name = "ODOO_VOLUME_DIR"; value = "/bitnami/odoo"; }
-        { name = "ODOO_DATA_DIR";   value = "/bitnami/odoo/data"; }
-        { name = "ODOO_ADDONS_DIR"; value = "/bitnami/odoo/addons"; }
-        { name = "ODOO_CONF_DIR";   value = "/bitnami/odoo/conf"; }
-        { name = "ODOO_CONF_FILE";  value = "/bitnami/odoo/conf/odoo.conf"; }
-        { name = "ODOO_LOGS_DIR";   value = "/bitnami/odoo/log"; }
-        { name = "ODOO_LOG_FILE";   value = "/bitnami/odoo/log/odoo-server.log"; }
-        { name = "ODOO_TMP_DIR";    value = "/bitnami/odoo/tmp"; }
-        { name = "ODOO_PID_FILE";   value = "/bitnami/odoo/tmp/odoo.pid"; }
-      ];
+      # Path de-branding: firestream-odoo now bakes its app tree at
+      # /opt/firestream/odoo and its data/volume at /firestream/odoo (see
+      # src/containers/firestream/odoo/options.nix + module.nix). The chart
+      # templates were de-branded to mount the data PVC at /firestream/odoo and
+      # the Secret at /opt/firestream/odoo/secrets — i.e. the chart mount now
+      # EQUALS the container's baked ODOO_VOLUME_DIR/ODOO_DATA_DIR. No
+      # extraEnvVars path-remap is needed (and any remap would re-introduce a
+      # mount/baked mismatch), so the former firestreamPathOverrides is gone.
 
-      # Phase G fix: subchart postgres also needs path remap so its
-      # /opt/firestream/postgresql/conf (baked, read-only when
-      # readOnlyRootFilesystem=true) is redirected to the chart-mounted
-      # emptyDir at /opt/bitnami/postgresql/conf. Same set as the
-      # standalone postgresql chart (nix/flake-modules/charts/postgresql.nix:72-88).
-      pgFirestreamPathOverrides = [
-        { name = "POSTGRESQL_VOLUME_DIR"; value = "/bitnami/postgresql"; }
-        { name = "POSTGRESQL_DATA_DIR";   value = "/bitnami/postgresql/data"; }
-        { name = "POSTGRESQL_MOUNTED_CONF_DIR"; value = "/bitnami/postgresql/conf"; }
-        { name = "POSTGRESQL_CONF_DIR";  value = "/opt/bitnami/postgresql/conf"; }
-        { name = "POSTGRESQL_CONF_FILE"; value = "/opt/bitnami/postgresql/conf/postgresql.conf"; }
-        { name = "POSTGRESQL_PGHBA_FILE"; value = "/opt/bitnami/postgresql/conf/pg_hba.conf"; }
-        { name = "POSTGRESQL_REPLICATION_PASSFILE_PATH"; value = "/opt/bitnami/postgresql/conf/.pgpass"; }
-        { name = "POSTGRESQL_TMP_DIR";   value = "/opt/bitnami/postgresql/tmp"; }
-        { name = "POSTGRESQL_PID_FILE";  value = "/opt/bitnami/postgresql/tmp/postgresql.pid"; }
-        { name = "POSTGRESQL_LOG_DIR";   value = "/bitnami/postgresql/logs"; }
-        { name = "POSTGRESQL_LOG_FILE";  value = "/bitnami/postgresql/logs/postgresql.log"; }
-      ];
-
+      # Phase 1 path-de-branding: the postgresql subchart templates + values now
+      # mount/reference firestream paths directly, matching the firestream-postgresql
+      # container's baked *_DIR vars. No subchart pg path-override extraEnvVars needed.
       imageInjectionModule = { ... }: {
         config.odoo._meta.containerRefs = {
           odoo = {
@@ -108,12 +81,6 @@
           };
         };
         config.odoo.global.security.allowInsecureImages = true;
-        # Bitnami odoo is single-component (no master/worker split).
-        # extraEnvVars sits at the top level of values.yaml.
-        config.odoo.extraEnvVars = firestreamPathOverrides;
-        # Subchart postgres: inject path overrides on the subchart's
-        # primary.extraEnvVars (mirrors standalone postgresql chart).
-        config.odoo.postgresql.primary.extraEnvVars = pgFirestreamPathOverrides;
         config.odoo.postgresql.postgresqlSharedPreloadLibraries = "";
       };
 
@@ -126,12 +93,20 @@
     {
       packages.odoo-chart = c.chartBundle;
 
+      # Base (un-overlaid) chart: chart's OWN native defaults, no Firestream
+      # values overlay / no image injection. Renders `bitnami/odoo`.
+      packages.odoo-base-chart = baseChart {
+        name = "odoo";
+        inherit chartSrc subcharts;
+      };
+
       # Registry: full evaluated chart result (used by aggregate.nix / flake.lib).
-      firestreamCharts.odoo = c;
+      firestreamCharts.odoo = c // { baseChart = config.packages.odoo-base-chart; };
 
       # Registry: consumer override API exposed via flake.lib.<sys>.charts.odoo.
       firestreamChartImages.odoo = {
         chartBundle = c.chartBundle;
+        baseChart = config.packages.odoo-base-chart;
         render = c.render;
         eval = userMod: evalChart {
           name = "odoo";

@@ -45,6 +45,15 @@
 
       chartNames = lib.attrNames chartsWithBundle;
 
+      # Filter to charts that ALSO carry a `baseChart` derivation (the
+      # un-overlaid, native-defaults chart surfaced in Phase 5). Defensive:
+      # only chart entries that actually have the attr are included.
+      chartsWithBase = lib.filterAttrs
+        (_: v: lib.isAttrs v && v ? baseChart)
+        config.firestreamCharts;
+
+      baseChartNames = lib.attrNames chartsWithBase;
+
       # index.json schema (v1):
       #   {
       #     "schemaVersion": "1",
@@ -61,6 +70,15 @@
             value = { manifestPath = "${n}/chart-manifest.json"; };
           })
           chartNames);
+        # Base (un-overlaid) charts. Each `<name>-base` symlink points at the
+        # chart's own native-defaults derivation; `baseChartPath` is RELATIVE
+        # to the farm root, like `manifestPath` above.
+        baseCharts = lib.listToAttrs (map
+          (n: {
+            name = n;
+            value = { baseChartPath = "${n}-base"; };
+          })
+          baseChartNames);
         stacks = config.firestreamStacks;
       };
 
@@ -74,12 +92,18 @@
       symlinkLines = lib.concatMapStringsSep "\n"
         (n: "ln -s ${chartsWithBundle.${n}.chartBundle} \"$out/${n}\"")
         chartNames;
+
+      # Per-base-chart symlinks: $out/<name>-base -> <baseChart store path>.
+      baseSymlinkLines = lib.concatMapStringsSep "\n"
+        (n: "ln -s ${chartsWithBase.${n}.baseChart} \"$out/${n}-base\"")
+        baseChartNames;
     in
     {
       # Stack declarations. The `dev` stack lists the full local data-platform
       # target order (charts deploy in this sequence). Phase 3 only resolves
       # `airflow`; the other names are placeholders for Wave-3 charts.
       firestreamStacks.dev = [
+        "seaweedfs"
         "postgresql"
         "redis"
         "airflow"
@@ -88,6 +112,7 @@
         "jupyterhub"
         "superset"
         "odoo"
+        "nextjs"
       ];
 
       packages.firestream-charts-bundle = pkgs.runCommand "firestream-charts-bundle"
@@ -105,6 +130,9 @@
 
         # Per-chart symlinks: $out/<name> -> <chartBundle store path>
         ${symlinkLines}
+
+        # Per-base-chart symlinks: $out/<name>-base -> <baseChart store path>
+        ${baseSymlinkLines}
 
         # Top-level index.json catalogues charts + stacks.
         cp ${indexJsonDrv} "$out/index.json"

@@ -22,7 +22,7 @@
 # `global.security.allowInsecureImages` is flipped to bypass Bitnami's
 # NOTES.txt whitelist.
 { ... }: {
-  perSystem = { pkgs, lib, config, evalChart, ... }:
+  perSystem = { pkgs, lib, config, evalChart, baseChart, ... }:
     let
       chartSrc = ../../../src/charts/firestream/superset;
       optionsPath = chartSrc + "/nix/default.nix";
@@ -67,20 +67,17 @@
           tag = imgEval.imageTag;
         };
 
-      # Phase F: firestream-superset bakes SUPERSET_* dirs under /opt/superset
-      # (see src/containers/firestream/superset/5/options.nix). The Bitnami
-      # chart mounts an emptyDir at /opt/bitnami/superset/superset_home
-      # (subPath superset-home) and /tmp; a Secret at
-      # /opt/bitnami/superset/secrets. readOnlyRootFilesystem is enforced.
-      # Co-locate logs/config under the superset_home emptyDir so they share
-      # writable storage; redirect TMP_DIR to /tmp.
-      firestreamPathOverrides = [
-        { name = "SUPERSET_HOME_DIR";    value = "/opt/bitnami/superset/superset_home"; }
-        { name = "SUPERSET_CONFIG_PATH"; value = "/opt/bitnami/superset/superset_home/superset_config.py"; }
-        { name = "SUPERSET_LOG_DIR";     value = "/opt/bitnami/superset/superset_home/logs"; }
-        { name = "SUPERSET_TMP_DIR";     value = "/tmp"; }
-      ];
+      # Phase 3 path-de-branding: firestream-superset now bakes its SUPERSET_*
+      # dirs under /opt/firestream/superset, co-locating config + logs under the
+      # superset_home emptyDir (writable) and TMP at /tmp — see
+      # src/containers/firestream/superset/5/options.nix. The chart templates
+      # mount the superset_home emptyDir at /opt/firestream/superset/superset_home
+      # (matching the container), so the previous chart-side path-override
+      # extraEnvVars are no longer needed and have been removed.
 
+      # Phase 1 path-de-branding: the postgresql subchart templates + values now
+      # mount/reference firestream paths directly, matching the firestream-postgresql
+      # container's baked *_DIR vars. No subchart pg path-override extraEnvVars needed.
       imageInjectionModule = { ... }: {
         config.superset._meta.containerRefs = {
           superset = {
@@ -97,12 +94,12 @@
           };
         };
         config.superset.global.security.allowInsecureImages = true;
-        # Superset chart components: web (Flask webserver), worker (Celery),
-        # init (DB bootstrap job). Apply remap to all three so init/migrate
-        # writes go to the right mount and workers can read the same config.
-        config.superset.web.extraEnvVars = firestreamPathOverrides;
-        config.superset.worker.extraEnvVars = firestreamPathOverrides;
-        config.superset.init.extraEnvVars = firestreamPathOverrides;
+        # The bundled Bitnami postgresql subchart defaults to preloading the
+        # `pgaudit` extension (postgresqlSharedPreloadLibraries: "pgaudit"), which
+        # the firestream-postgresql image does not ship, causing the server start
+        # to fail with `could not access file "pgaudit"`. Mirror the standalone
+        # postgresql overlay and clear it for the subchart.
+        config.superset.postgresql.postgresqlSharedPreloadLibraries = "";
       };
 
       c = evalChart {
@@ -114,12 +111,20 @@
     {
       packages.superset-chart = c.chartBundle;
 
+      # Base (un-overlaid) chart: chart's OWN native defaults, no Firestream
+      # values overlay / no image injection. Renders `bitnami/superset`.
+      packages.superset-base-chart = baseChart {
+        name = "superset";
+        inherit chartSrc subcharts;
+      };
+
       # Registry: full evaluated chart result (used by aggregate.nix / flake.lib).
-      firestreamCharts.superset = c;
+      firestreamCharts.superset = c // { baseChart = config.packages.superset-base-chart; };
 
       # Registry: consumer override API exposed via flake.lib.<sys>.charts.superset.
       firestreamChartImages.superset = {
         chartBundle = c.chartBundle;
+        baseChart = config.packages.superset-base-chart;
         render = c.render;
         eval = userMod: evalChart {
           name = "superset";

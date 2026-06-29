@@ -35,6 +35,8 @@
         firestream-integration-tests = tests.integrationTests;
         firestream-config-tests = tests.configTests;
         firestream-container-tests = tests.containerTests;
+        firestream-postgresql-env-alias-tests = tests.postgresqlEnvAliasTests;
+        firestream-seaweedfs-chart-values-tests = tests.seaweedfsChartValuesTests;
       };
     };
 }

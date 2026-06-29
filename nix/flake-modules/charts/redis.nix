@@ -21,7 +21,7 @@
 # `global.security.allowInsecureImages` is flipped to bypass Bitnami's
 # NOTES.txt whitelist (which rejects the `firestream-redis` repo name).
 { ... }: {
-  perSystem = { pkgs, lib, config, evalChart, ... }:
+  perSystem = { pkgs, lib, config, evalChart, baseChart, ... }:
     let
       chartSrc = ../../../src/charts/firestream/redis;
       optionsPath = chartSrc + "/nix/default.nix";
@@ -60,12 +60,20 @@
     {
       packages.redis-chart = c.chartBundle;
 
+      # Base (un-overlaid) chart: chart's OWN native defaults, no Firestream
+      # values overlay / no image injection. Renders `bitnami/redis`.
+      packages.redis-base-chart = baseChart {
+        name = "redis";
+        inherit chartSrc subcharts;
+      };
+
       # Registry: full evaluated chart result (used by aggregate.nix / flake.lib).
-      firestreamCharts.redis = c;
+      firestreamCharts.redis = c // { baseChart = config.packages.redis-base-chart; };
 
       # Registry: consumer override API exposed via flake.lib.<sys>.charts.redis.
       firestreamChartImages.redis = {
         chartBundle = c.chartBundle;
+        baseChart = config.packages.redis-base-chart;
         render = c.render;
         eval = userMod: evalChart {
           name = "redis";

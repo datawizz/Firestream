@@ -242,6 +242,8 @@ ${user.name}:!:::::::
       appModule.scripts.fileLoader
       appModule.scripts.libHelpers   # libhelpers<name>.sh: top-level helpers
       appModule.scripts.lib          # lib<name>.sh: phase wrappers (sources libHelpers)
+      appModule.scripts.genericLibs  # libos.sh/liblog.sh/... : Bitnami-compat shims (source libHelpers)
+      appModule.scripts.appEnv       # <name>-env.sh : Bitnami-compat env-setup shim for chart probes/jobs
       finalEntrypoint           # CRITICAL: was missing from metadataEnv
       appModule.scripts.setup
       appModule.scripts.run
@@ -282,12 +284,27 @@ ${user.name}:!:::::::
       }) exposedPorts
     );
 
-    # Build volumes config
+    # Build volumes config.
+    #
+    # Drop any declared volume path that is a STRICT CHILD of another declared
+    # volume (or of a default volume). A nested image VOLUME is honoured by
+    # containerd/CRI as an anonymous *ephemeral* mount that SHADOWS the parent
+    # volume — so when a chart binds a PVC at the parent (e.g. kafka mounts its
+    # data PVC at /firestream/kafka), the nested image VOLUME at
+    # /firestream/kafka/data masks the PVC subdir and silently discards anything
+    # written there (Kafka's meta.properties) on every container restart. Only
+    # the top-most paths should be declared as image volumes; children then live
+    # on whatever volume is mounted at the parent.
+    declaredVolumePaths = lib.unique (
+      (lib.attrNames defaultVolumes) ++ [ paths.data paths.logs ] ++ volumes
+    );
+    isStrictChildOfAnother = p:
+      lib.any (q: q != p && lib.hasPrefix (q + "/") p) declaredVolumePaths;
     volumesConfig = lib.listToAttrs (
       map (path: {
         name = path;
         value = {};
-      }) ([ paths.data paths.logs ] ++ volumes)
+      }) (lib.filter (p: !(isStrictChildOfAnother p)) ([ paths.data paths.logs ] ++ volumes))
     );
 
     # MUST KEEP: runtimeEnv is exported and used by:

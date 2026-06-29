@@ -25,7 +25,7 @@
 # zookeeper subchart). vendor-subcharts.nix handles the (trivial) common
 # dependency.
 { ... }: {
-  perSystem = { pkgs, lib, config, evalChart, ... }:
+  perSystem = { pkgs, lib, config, evalChart, baseChart, ... }:
     let
       chartSrc = ../../../src/charts/firestream/kafka;
       optionsPath = chartSrc + "/nix/default.nix";
@@ -44,31 +44,16 @@
           tag = imgEval.imageTag;
         };
 
-      # Phase F: firestream-kafka container defaults mostly match Bitnami's
-      # `/opt/bitnami/kafka` + `/bitnami/kafka` layout (verified against
-      # src/containers/firestream/kafka/options.nix). The only gap: the chart
-      # does NOT mount `/opt/bitnami/kafka/tmp`, but the container's default
-      # KAFKA_TMP_DIR points there. With `readOnlyRootFilesystem: true` on
-      # both `prepare-config` init and main `kafka` pods, that write fails.
-      # Redirect KAFKA_TMP_DIR + KAFKA_PID_FILE to `/tmp` (chart mounts an
-      # emptyDir there for both init + main).
-      #
-      # All the other Bitnami-aligned paths (VOLUME=/bitnami/kafka,
-      # DATA=/bitnami/kafka/data, CONF=/opt/bitnami/kafka/config,
-      # CONF_FILE=/opt/bitnami/kafka/config/server.properties,
-      # LOG=/opt/bitnami/kafka/logs) match the container defaults; setting
-      # them again here is harmless and documents the chart contract.
-      firestreamPathOverrides = [
-        # PVC mount
-        { name = "KAFKA_VOLUME_DIR"; value = "/bitnami/kafka"; }
-        { name = "KAFKA_DATA_DIR";   value = "/bitnami/kafka/data"; }
-        # Config (subPath mount for server.properties; rest of dir is read-only)
-        { name = "KAFKA_CONF_DIR";  value = "/opt/bitnami/kafka/config"; }
-        { name = "KAFKA_CONF_FILE"; value = "/opt/bitnami/kafka/config/server.properties"; }
-        # Log dir (emptyDir mount)
-        { name = "KAFKA_LOG_DIR"; value = "/opt/bitnami/kafka/logs"; }
-        # Tmp dir / pid file — no chart mount at /opt/bitnami/kafka/tmp,
-        # redirect to /tmp (mounted as emptyDir in both init + main).
+      # Phase 3 de-brand: the firestream-kafka container now bakes its
+      # functional paths under `/opt/firestream/kafka` + `/firestream/kafka`
+      # (src/containers/firestream/kafka/{options,module}.nix) and the chart
+      # templates/values mount the exact same paths, so no path-remap
+      # extraEnvVars are needed any more — the binding + both injections were
+      # removed. KAFKA_TMP_DIR / KAFKA_PID_FILE still point at the chart's
+      # `/tmp` emptyDir (the chart does not mount the container's tmp dir and
+      # the pods run readOnlyRootFilesystem) — these are functional, not
+      # de-branding, redirects.
+      firestreamTmpOverrides = [
         { name = "KAFKA_TMP_DIR"; value = "/tmp"; }
         { name = "KAFKA_PID_FILE"; value = "/tmp/kafka.pid"; }
       ];
@@ -81,11 +66,11 @@
         config.kafka.global.security.allowInsecureImages = true;
         # Kafka 4.x KRaft uses combined controller+broker pods by default.
         # The `controller` StatefulSet runs both roles; `broker` StatefulSet
-        # is disabled in Bitnami's default values. Set extraEnvVars on both
-        # so a values-override that flips controllerOnly=true (split mode)
-        # still gets the path remap.
-        config.kafka.controller.extraEnvVars = firestreamPathOverrides;
-        config.kafka.broker.extraEnvVars = firestreamPathOverrides;
+        # is disabled in Bitnami's default values. Set the tmp redirect on
+        # both so a values-override that flips controllerOnly=true (split
+        # mode) still gets it.
+        config.kafka.controller.extraEnvVars = firestreamTmpOverrides;
+        config.kafka.broker.extraEnvVars = firestreamTmpOverrides;
       };
 
       c = evalChart {
@@ -97,12 +82,20 @@
     {
       packages.kafka-chart = c.chartBundle;
 
+      # Base (un-overlaid) chart: chart's OWN native defaults, no Firestream
+      # values overlay / no image injection. Renders `bitnami/kafka`.
+      packages.kafka-base-chart = baseChart {
+        name = "kafka";
+        inherit chartSrc subcharts;
+      };
+
       # Registry: full evaluated chart result (used by aggregate.nix / flake.lib).
-      firestreamCharts.kafka = c;
+      firestreamCharts.kafka = c // { baseChart = config.packages.kafka-base-chart; };
 
       # Registry: consumer override API exposed via flake.lib.<sys>.charts.kafka.
       firestreamChartImages.kafka = {
         chartBundle = c.chartBundle;
+        baseChart = config.packages.kafka-base-chart;
         render = c.render;
         eval = userMod: evalChart {
           name = "kafka";
