@@ -280,17 +280,23 @@ The project maintains a fork of Bitnami charts in `src/charts/` and containers i
 - Bitnami charts commit hash in Nix flake: `9bc801b4caa0b2fff6ae3392f6b417877a056965`
 
 ### Helm Chart Contract (Nix -> JSON -> Rust)
-The flake is the source of truth for helm. Each chart at `src/charts/firestream/<name>/nix/` is a typed-options overlay using `lib.evalModules`. The shared option types live in `bin/nix/firestream/charts/lib/types/`; the per-chart evaluator is `bin/nix/firestream/charts/eval-chart.nix`.
+The flake is the source of truth for helm. Each chart at `src/charts/firestream/<name>/nix/` is a typed-options overlay using `lib.evalModules`. The shared option types live in `bin/nix/firestream/charts/lib/types/` (image, kubernetes, autoscaling, network-policy, tls, **persistence**, **secrets**); the per-chart evaluator is `bin/nix/firestream/charts/eval-chart.nix`. The forked Bitnami chart YAML (`Chart.yaml`, `templates/`, `values.yaml`) is vendored unmodified-by-Nix under `src/charts/firestream/<name>/` and is the source of truth for templates — Nix never regenerates templates. See the full architecture spec: `docs/firestream-supported-app.md`.
 
 **Manifest emission (schema v1):**
 - Each chart emits a `chart-manifest.json` (chart name, version, repo, vendored subchart paths, default `values.yaml`, and a `_meta` block).
-- `_meta.containerRefs` is the per-chart image-injection seam. All 8 charts now inject `firestream-*` images via the canonical pattern in `nix/flake-modules/charts/airflow.nix` (lines 75-137); subchart slots (postgresql/redis) ship on airflow, superset, odoo, jupyterhub.
+- `_meta.containerRefs` is the per-chart image-injection seam. All 9 charts now inject `firestream-*` images via the canonical pattern in `nix/flake-modules/charts/airflow.nix` (lines 75-137); subchart slots (postgresql/redis) ship on airflow, superset, odoo, jupyterhub.
 - Subchart vendoring helper: `bin/nix/firestream/charts/lib/vendor-subcharts.nix`. Values rendering helper: `bin/nix/firestream/charts/lib/to-values-yaml.nix`.
 
 **Aggregate bundle:**
-- `packages.firestream-charts-bundle` (see `nix/flake-modules/charts/`) is a symlink farm with a top-level `index.json` listing every chart and the `firestreamStacks.dev` composition.
+- `packages.firestream-charts-bundle` (see `nix/flake-modules/charts/`) is a symlink farm with a top-level `index.json` listing every chart (`charts`), every base chart (`baseCharts`), and the `firestreamStacks.dev` composition (`stacks`).
 - Default deploy path: `/opt/firestream/charts/`. Dev-shell sets `FIRESTREAM_CHARTS_DIR=$PWD/.firestream/charts` and best-effort builds the bundle on shell entry.
-- 8 charts have typed overlays and are in `firestreamCharts` + `firestreamStacks.dev`: `airflow`, `postgresql`, `redis`, `kafka`, `spark`, `jupyterhub`, `superset`, `odoo`.
+- 9 charts have typed overlays and are in `firestreamCharts` + `firestreamStacks.dev`: `airflow`, `postgresql`, `redis`, `kafka`, `spark`, `jupyterhub`, `superset`, `odoo`, `seaweedfs`.
+- **SeaweedFS is the exception to the Bitnami pattern.** It is a non-Bitnami, Apache-2.0 chart (forked from upstream `seaweedfs/seaweedfs`) whose pods invoke the `weed` binary directly via a `command:` block — so it uses NONE of the Bitnami-compat machinery: no `perContainerHelpers`, no `libhelpers<chart>.sh` emission, no `extraEnvVars` path-remaps, no `firestreamPathOverrides`, and no `global.security.allowInsecureImages` guard. The container is simply "`weed` on PATH". Image injection still uses the canonical `_meta.containerRefs` seam (`componentPath = [ "image" ]` → `.Values.image.{registry,repository,tag}`). SeaweedFS is the **default local S3 object store**: it is deployed FIRST in `firestreamStacks.dev` (object store up before consumers), runs all-in-one single-pod (`weed server -master -volume -filer -s3`) with S3 on 8333, auth on, default bucket `firestream`, creds `firestream`/`firestream-secret`. Its `S3_LOCAL_*` env (`S3_LOCAL_ENDPOINT_URL`, `S3_LOCAL_ACCESS_KEY_ID`, `S3_LOCAL_SECRET_ACCESS_KEY`, `S3_LOCAL_BUCKET_NAME`, `S3_LOCAL_DEFAULT_REGION`) is injected into the spark and airflow charts so Spark/`etl_lib` consume it out of the box (data-driven; no Rust/Python change). Chart data is `emptyDir` by default (ephemeral — fine for dev; a PVC toggle is a production follow-on).
+
+**Two chart outputs per app (both downstream-importable):**
+- `packages.<app>-chart` / `firestream.lib.<sys>.charts.<app>.chartBundle` — the **Firestream-overlaid** chart (image injection + path remaps + `chart-manifest.json`). Has the chart nested at `<bundle>/chart`.
+- `packages.<app>-base-chart` / `firestream.lib.<sys>.charts.<app>.baseChart` — the **plain forked chart with its own native default `values.yaml`**, no overlay, built by `bin/nix/firestream/charts/lib/base-chart.nix`. `$out` IS the chart dir (Chart.yaml at root), so a consumer can `helm install <release> /nix/store/…-<app>-base-chart` directly. Self-contained (subcharts vendored into the store path).
+- The per-app consumer API is `firestream.lib.<sys>.charts.<app> = { chartBundle; baseChart; render; eval; options; }`; `eval` deep-merges consumer overrides onto the Firestream defaults.
 
 **Rust consumers:**
 - `firestream-charts` crate (`src/lib/rust/firestream-charts/`): reader for the bundle (`index.json` + per-chart `chart-manifest.json`).
@@ -329,11 +335,11 @@ firestream helm deploy <chart> --charts-dir /custom/path
 The `firestream-e2e-k8s` crate (`src/lib/rust/firestream-e2e-k8s/`) provides per-chart fresh-cluster k3d e2e tests that drive the same `deploy_chart_lifecycle` path the CLI uses. Sister crate to `firestream-e2e-core` (shared primitives) and the docker `firestream/tests/e2e.rs` harness.
 
 **Run via make**:
-- `make test-e2e-k8s` — full 8-chart sweep, serialized, fresh cluster per chart.
-- `make test-e2e-k8s-<chart>` — single chart (postgresql/redis/kafka/airflow/spark/jupyterhub/superset/odoo).
+- `make test-e2e-k8s` — full 9-chart sweep, serialized, fresh cluster per chart.
+- `make test-e2e-k8s-<chart>` — single chart (postgresql/redis/kafka/airflow/spark/jupyterhub/superset/odoo/seaweedfs).
 
 **Env contract** (defaults in parens):
-- `FIRESTREAM_E2E_K8S_STACKS=all|csv` — subset filter (canonical 8)
+- `FIRESTREAM_E2E_K8S_STACKS=all|csv` — subset filter (canonical 9)
 - `FIRESTREAM_E2E_K8S_KEEP=1` — skip teardown (unset)
 - `FIRESTREAM_E2E_K8S_STRICT=1` — skip-gate → hard fail (unset)
 - `FIRESTREAM_E2E_K8S_TIMEOUT_SECS` — per-chart deadline (600)
