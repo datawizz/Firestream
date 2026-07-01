@@ -9,7 +9,13 @@ use crate::deploy::helm_lifecycle::{
 pub struct ExternalDnsChart;
 
 impl ExternalDnsChart {
-    /// Create External DNS chart with default configuration
+    /// Create External DNS chart with default configuration.
+    ///
+    /// NOTE: external-dns is NOT part of the Firestream Nix-built chart
+    /// bundle. `repository` is set to the `bitnami` helm repo alias matching
+    /// how `helm.rs`'s `add_repositories()` registers repos; callers must
+    /// `helm repo add bitnami https://charts.bitnami.com/bitnami` first.
+    /// Previously `None`, which made `helm upgrade --install` ambiguous.
     pub fn default() -> CommonChart {
         let chart_info = ChartInfo {
             name: "external-dns".to_string(),

@@ -1,0 +1,247 @@
+syntax = "proto3";
+
+package firestream_v1;
+
+import "google/protobuf/struct.proto";
+
+// Template specification proto — replaces template.toml.
+// Maps 1:1 to Rust structs in src/lib/rust/templatizer/src/metadata.rs.
+// This is the declarative schema for Firestream project templates.
+
+// =============================================================================
+// Enums
+// =============================================================================
+
+// Variable data type for template variables.
+// Maps to VariableDef.var_type string values in metadata.rs.
+enum VariableType {
+  VARIABLE_TYPE_UNSPECIFIED = 0;
+  VARIABLE_TYPE_STRING = 1;
+  VARIABLE_TYPE_BOOLEAN = 2;
+  VARIABLE_TYPE_INTEGER = 3;
+  VARIABLE_TYPE_FLOAT = 4;
+  VARIABLE_TYPE_CHOICE = 5;
+  VARIABLE_TYPE_ARRAY = 6;
+  VARIABLE_TYPE_OBJECT = 7;
+}
+
+// Case transformation applied to derived variables.
+// Maps to VariableDef.transform string values ("snake_case", etc.) in metadata.rs.
+enum CaseTransform {
+  CASE_TRANSFORM_UNSPECIFIED = 0;
+  CASE_TRANSFORM_SNAKE_CASE = 1;
+  CASE_TRANSFORM_PASCAL_CASE = 2;
+  CASE_TRANSFORM_CAMEL_CASE = 3;
+  CASE_TRANSFORM_KEBAB_CASE = 4;
+}
+
+// Template category.
+// Maps to TemplateInfo.category string in metadata.rs.
+enum TemplateCategory {
+  TEMPLATE_CATEGORY_UNSPECIFIED = 0;
+  TEMPLATE_CATEGORY_APPLICATION = 1;
+  TEMPLATE_CATEGORY_DATA_ENGINEERING = 2;
+  TEMPLATE_CATEGORY_INFRASTRUCTURE = 3;
+  TEMPLATE_CATEGORY_SERVICE = 4;
+}
+
+// =============================================================================
+// Messages
+// =============================================================================
+
+// Top-level template metadata.
+// Maps to: TemplateMetadata struct in metadata.rs
+message TemplateMetadata {
+  // Template identity information.
+  // Maps to: TemplateMetadata.template (TemplateInfo)
+  TemplateIdentity identity = 1;
+
+  // Variable group definitions.
+  // Maps to: TemplateMetadata.groups (HashMap<String, GroupDef>)
+  // Key is the group name (e.g., "identity", "platforms").
+  repeated VariableGroup groups = 2;
+
+  // Variable definitions.
+  // Maps to: TemplateMetadata.variables (HashMap<String, VariableDef>)
+  // Key is the variable name (e.g., "app_name", "enable_web").
+  repeated TemplateVariable variables = 3;
+
+  // Conditional directory exclusions.
+  // Maps to: TemplateMetadata.conditions (HashMap<String, Vec<String>>)
+  // When a boolean variable is false, exclude the listed directory paths.
+  repeated ConditionalExclusion conditions = 4;
+
+  // Validation rules.
+  // Maps to: TemplateMetadata.validation (Vec<ValidationRule>)
+  repeated ValidationRule validations = 5;
+}
+
+// Template identity information.
+// Maps to: TemplateInfo struct in metadata.rs
+message TemplateIdentity {
+  // Template name (e.g., "multi-platform-app").
+  string name = 1;
+
+  // Human-readable description.
+  string description = 2;
+
+  // Template category.
+  TemplateCategory category = 3;
+
+  // Semantic version string (e.g., "1.0.0").
+  string version = 4;
+}
+
+// Variable group definition — used to organize variables in the TUI.
+// Maps to: GroupDef struct in metadata.rs
+message VariableGroup {
+  // Group identifier key (e.g., "identity", "platforms").
+  string name = 1;
+
+  // Human-readable display name (e.g., "Project Identity").
+  string display_name = 2;
+
+  // Optional description of the group.
+  string description = 3;
+
+  // Display order (lower = first).
+  int32 order = 4;
+
+  // Whether the group is collapsed by default in the TUI.
+  bool collapsed = 5;
+}
+
+// Template variable definition.
+// Maps to: VariableDef struct in metadata.rs
+message TemplateVariable {
+  // Variable name (e.g., "app_name", "enable_web").
+  string name = 1;
+
+  // Variable data type.
+  // Maps to: VariableDef.var_type
+  VariableType type = 2;
+
+  // Whether this variable must be provided.
+  // Maps to: VariableDef.required
+  bool required = 3;
+
+  // Group this variable belongs to (references VariableGroup.name).
+  // Maps to: VariableDef.group
+  string group = 4;
+
+  // Display order within the group.
+  // Maps to: VariableDef.order
+  int32 order = 5;
+
+  // Human-readable description.
+  // Maps to: VariableDef.description
+  string description = 6;
+
+  // Default value. Uses google.protobuf.Value to support string, number,
+  // bool, list, and struct — matching the runtime serde_json::Value used
+  // by metadata.rs (originally toml::Value).
+  // Maps to: VariableDef.default (Option<toml::Value>)
+  google.protobuf.Value default_value = 7;
+
+  // Valid choices for VARIABLE_TYPE_CHOICE variables.
+  // Maps to: VariableDef.choices (Option<Vec<String>>)
+  repeated string choices = 8;
+
+  // Element type for VARIABLE_TYPE_ARRAY variables.
+  // Maps to: VariableDef.items (Option<String>)
+  VariableType items_type = 9;
+
+  // Derived variable configuration.
+  // Maps to: VariableDef.derived_from + transform + format fields
+  DerivedConfig derived = 10;
+
+  // Conditional visibility rules.
+  // Maps to: VariableDef.show_if (Option<HashMap<String, toml::Value>>)
+  repeated ShowIfCondition show_if = 11;
+}
+
+// Configuration for derived (computed) variables.
+// Maps to: VariableDef.derived_from, VariableDef.transform, VariableDef.format
+message DerivedConfig {
+  // Source variable name to derive from.
+  // Maps to: VariableDef.derived_from
+  string derived_from = 1;
+
+  // Case transformation to apply.
+  // Maps to: VariableDef.transform
+  CaseTransform transform = 2;
+
+  // Tera format template string. Opaque expression not parsed by proto.
+  // Example: "{{ bundle_prefix }}.{{ app_name | snake_case | replace(from='_', to='') }}"
+  // Maps to: VariableDef.format
+  string format_template = 3;
+}
+
+// Conditional visibility: show a variable only when another field has a specific value.
+// Maps to: entries in VariableDef.show_if HashMap
+message ShowIfCondition {
+  // Field path of the controlling variable.
+  string field_path = 1;
+
+  // Value that the controlling field must have.
+  // Uses google.protobuf.Value to support true, "python", 42, etc.
+  google.protobuf.Value value = 2;
+}
+
+// Conditional directory exclusion.
+// Maps to: entries in TemplateMetadata.conditions HashMap
+// When the boolean variable is false, the listed paths are excluded from output.
+message ConditionalExclusion {
+  // Boolean variable name that controls inclusion.
+  string variable = 1;
+
+  // Directory paths to exclude when the variable is false.
+  repeated string exclude_paths = 2;
+}
+
+// Validation rule for template variable values.
+// Maps to: ValidationRule struct in metadata.rs
+message ValidationRule {
+  // Error message shown when validation fails.
+  // Maps to: ValidationRule.message
+  string message = 1;
+
+  // The specific validation type.
+  oneof rule {
+    // Regex pattern validation on a single field.
+    PatternValidation pattern = 2;
+
+    // At least one of the listed boolean fields must be true.
+    AtLeastOneValidation at_least_one = 3;
+
+    // Custom validation rule (extensibility).
+    CustomValidation custom = 4;
+  }
+}
+
+// Regex pattern validation for a single field.
+// Maps to: ValidationRule.field + ValidationRule.pattern
+message PatternValidation {
+  // Field name to validate.
+  string field = 1;
+
+  // Regex pattern the field value must match.
+  string pattern = 2;
+}
+
+// Multi-field validation: at least one boolean field must be true.
+// Maps to: ValidationRule.rule == "at_least_one" + ValidationRule.fields
+message AtLeastOneValidation {
+  // List of boolean field names.
+  repeated string fields = 1;
+}
+
+// Custom validation rule for future extensibility.
+// Maps to: ValidationRule.rule (arbitrary string) + ValidationRule.fields
+message CustomValidation {
+  // Rule type identifier (e.g., "at_least_one").
+  string rule_type = 1;
+
+  // Fields involved in the rule.
+  repeated string fields = 2;
+}

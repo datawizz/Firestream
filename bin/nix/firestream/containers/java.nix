@@ -32,6 +32,10 @@
     name,
     version ? "1.0.0",
 
+    # Docker image naming (parity-preserving defaults match the historical literals)
+    imageName ? "firestream-${name}",
+    imageTag ? version,
+
     # Java configuration
     jdk ? pkgs.temurin-bin-17,   # Default JDK (Eclipse Temurin 17 LTS)
     javaHome ? null,             # Override JAVA_HOME (defaults to jdk package path)
@@ -72,6 +76,10 @@
     initFn ? "",
     runCmd ? "",
 
+    # Per-container helpers emitted at top-level of libhelpers<name>.sh.
+    # Forwarded to mkContainerModule (and through to mkAppModule).
+    perContainerHelpers ? "",
+
     # Container dependencies
     systemDeps ? [],
     runtimeBinDeps ? [],
@@ -81,6 +89,12 @@
     dockerConfig ? {},
     exposedPorts ? [],
     volumes ? [],
+
+    # In-image firestream-healthd configuration (Phase 4). Forwarded verbatim
+    # to mkContainerModule, which wraps the entrypoint with a healthd launcher
+    # when `enable = true`. Default-off preserves byte-identical pre-Phase-3
+    # behaviour for any container that does not opt in.
+    health ? { enable = false; port = 9180; readinessCmd = null; },
 
     # Build-time (prepopulate phase)
     prepopulateFn ? "",
@@ -261,6 +275,7 @@
     # Create the container module
     containerModule = mkContainerModule {
       inherit name version paths user;
+      inherit imageName imageTag;
       envVars = javaEnvVars;
       inherit envVarsWithSecrets;
 
@@ -272,7 +287,7 @@
       prepopulateFn = combinedPrepopulateFn;
       inherit prepopulateFiles prepopulateDirs runtimeDirs;
       activateFn = combinedActivateFn;
-      inherit enableStateTracking;
+      inherit enableStateTracking perContainerHelpers;
 
       systemDeps = allSystemDeps;
       runtimeBinDeps = javaRuntimeBins;
@@ -281,6 +296,12 @@
       dockerConfig = javaDockerConfig;
       inherit exposedPorts;
       volumes = volumes ++ lib.optionals (jarDirs != []) jarDirs;
+
+      # Forward health config so the base entrypoint wrapper can layer
+      # firestream-healthd onto the java entrypoint wrapper. base.nix wraps
+      # finalEntrypoint = if health.enable then healthWrapper else
+      # innerEntrypoint, where innerEntrypoint already includes javaEntrypointWrapper.
+      inherit health;
 
       entrypointWrapper = javaEntrypointWrapper;
 

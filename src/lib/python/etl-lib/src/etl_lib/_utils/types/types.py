@@ -1,28 +1,17 @@
+"""Type inference helpers bridging Python type hints to PySpark schemas.
+
+Vanilla Python lacks fixed-width integer types and a single distinction
+between ``date`` and ``datetime``. These helpers infer the appropriate Spark
+DataType for an annotated class field so that a ``@struct``-decorated
+NamedTuple or dataclass can be materialized as a ``StructType`` without the
+caller writing schema definitions by hand.
 """
-Vanilla Python is missing some important data type definitions.
-These missing types are provide by Numpy and Compatible with Pandas
-There is missing compatibility with Spark DataTypes
-There is missing compatibility with Avro DataTypes
-
-For continuity these should be combined in form that is equally useful.
-"""
-
-
-import numpy as np
-from pyspark.sql import types as spark_types
-from dataclasses_avroschema import types as avro_types
-
-
-types = [(np.int64, spark_types.LongType, avro_types.long)]
-
-
-from typing import Optional, Union, List, Tuple, Dict
-from typing import TypeVar, Generic, Dict, Tuple
-
 
 from datetime import date, datetime
 from decimal import Decimal
+from typing import Dict, Generic, List, Optional, Tuple, TypeVar, Union
 
+import pyspark.sql.types as t
 
 NoneType = type(None)
 byte = TypeVar("byte")
@@ -43,14 +32,14 @@ class FunctorLike(Generic[T_co]):
 
 
 def decimal(prec: int, rounding: int) -> type:
+    """Return (and memoize) a ``BoundDecimal`` subclass with the given precision."""
     name = f"BoundDecimal_{prec}_{rounding}"
     if name in __type_cache:
         return __type_cache[name]
-    else:
-        cls = type(name, (BoundDecimal, Decimal), {})
-        cls.__constraints__ = (prec, rounding)
-        __type_cache[name] = cls
-        return cls
+    cls = type(name, (BoundDecimal, Decimal), {})
+    cls.__constraints__ = (prec, rounding)
+    __type_cache[name] = cls
+    return cls
 
 
 def is_pyspark_class(cls: type) -> bool:
@@ -67,41 +56,32 @@ def is_container(cls: type) -> bool:
 
 
 def struct(cls: type) -> type:
-    """
-    Marks NamedTuple as suitable for ``tinsel.transform``
-
-    :param cls: Typed NamedTuple
-    """
+    """Decorator marking a NamedTuple or dataclass as Spark-schema-compatible."""
     if not is_container(cls):
         raise ValueError(
-            f"Only NamedTuple instances can be decorated with @struct, not {cls.__name__}"
+            f"Only NamedTuple or dataclass instances can be decorated with @struct, not {cls.__name__}"
         )
-    # Overwrite type with augmented one
     return type(
         cls.__name__, cls.__bases__, dict(__pyspark_struct__=..., **cls.__dict__)
     )
 
 
-def check_pyspark_struct(cls: type):
+def check_pyspark_struct(cls: type) -> None:
     if not isinstance(cls, type):
         raise TypeError(
             f"Expected type, but got instance {cls} of type {type(cls).__name__}"
         )
-    if is_container(cls):
-        if not is_pyspark_class(cls):
-            raise ValueError(f"Looks like type {cls.__name__} missed @struct decorator")
-    else:
+    if not is_container(cls):
         raise ValueError(f"Type {cls.__name__} can't be used as structure")
+    if not is_pyspark_class(cls):
+        raise ValueError(f"Looks like type {cls.__name__} missed @struct decorator")
 
 
 def infer_nullability(typeclass) -> bool:
-    import typing
-
-    is_union = (
-        isinstance(typeclass, getattr(typing, "_Union", type(T)))
-        or getattr(typeclass, "__origin__", None) is Union
+    return (
+        getattr(typeclass, "__origin__", None) is Union
+        and NoneType in set(typeclass.__args__)
     )
-    return is_union and NoneType in set(typeclass.__args__)
 
 
 def unlift_optional(typeclass: Optional[T]) -> T:
@@ -109,68 +89,67 @@ def unlift_optional(typeclass: Optional[T]) -> T:
 
 
 def maybe_unlift_optional(
-    typeclass: Union[T_co, FunctorLike[T_co]]
+    typeclass: Union[T_co, FunctorLike[T_co]],
 ) -> Tuple[bool, T_co]:
     is_nullable = infer_nullability(typeclass)
     return is_nullable, (unlift_optional(typeclass) if is_nullable else typeclass)
 
 
-def infer_complex_spark_type(typeclass):
+def infer_complex_spark_type(typeclass) -> t.DataType:
     if typeclass.__origin__ in {list, List}:
-        co_T, *_ = typeclass.__args__
-        is_nullable, py_type = maybe_unlift_optional(co_T)
+        (item_T, *_) = typeclass.__args__
+        is_nullable, py_type = maybe_unlift_optional(item_T)
         return t.ArrayType(infer_spark_type(py_type), is_nullable)
-    elif typeclass.__origin__ in {dict, Dict}:
-        k_T, v_T, *_ = typeclass.__args__
+    if typeclass.__origin__ in {dict, Dict}:
+        (k_T, v_T, *_) = typeclass.__args__
         is_nullable_key, py_key_type = maybe_unlift_optional(k_T)
         is_nullable_value, py_value_type = maybe_unlift_optional(v_T)
         if is_nullable_key:
             raise TypeError(
-                f"Nullable keys of type {py_key_type} don't allowed in {typeclass}"
+                f"Nullable keys of type {py_key_type} are not allowed in {typeclass}"
             )
         return t.MapType(
             infer_spark_type(py_key_type),
             infer_spark_type(py_value_type),
             is_nullable_value,
         )
-    else:
-        raise TypeError(f"Don't know how to represent {typeclass} in Spark")
+    raise TypeError(f"Don't know how to represent {typeclass} in Spark")
 
 
 def infer_spark_type(typeclass) -> t.DataType:
+    """Map a Python typing annotation to its corresponding Spark DataType."""
     if typeclass in (None, NoneType):
         return t.NullType()
-    elif typeclass is str:
+    if typeclass is str:
         return t.StringType()
-    elif typeclass in {bytes, bytearray}:
+    if typeclass in {bytes, bytearray}:
         return t.BinaryType()
-    elif typeclass is bool:
+    if typeclass is bool:
         return t.BooleanType()
-    elif typeclass is date:
+    if typeclass is date:
         return t.DateType()
-    elif typeclass is datetime:
+    if typeclass is datetime:
         return t.TimestampType()
-    elif typeclass is Decimal:
+    if typeclass is Decimal:
         return t.DecimalType(precision=36, scale=6)
-    elif isinstance(typeclass, type) and issubclass(typeclass, BoundDecimal):
+    if isinstance(typeclass, type) and issubclass(typeclass, BoundDecimal):
         (precision, scale) = typeclass.__constraints__
         return t.DecimalType(precision=precision, scale=scale)
-    elif typeclass is float:
+    if typeclass is float:
         return t.DoubleType()
-    elif typeclass is int:
+    if typeclass is int:
         return t.IntegerType()
-    elif typeclass is long:
+    if typeclass is long:
         return t.LongType()
-    elif typeclass is short:
+    if typeclass is short:
         return t.ShortType()
-    elif typeclass is byte:
+    if typeclass is byte:
         return t.ByteType()
-    elif getattr(typeclass, "__origin__", None) is not None:
+    if getattr(typeclass, "__origin__", None) is not None:
         return infer_complex_spark_type(typeclass)
-    elif is_pyspark_class(typeclass):
+    if is_pyspark_class(typeclass):
         return transform(typeclass)
-    else:
-        raise TypeError(f"Don't know how to represent {typeclass} in Spark")
+    raise TypeError(f"Don't know how to represent {typeclass} in Spark")
 
 
 def transform_field(name: str, typeclass: type) -> t.StructField:
@@ -179,13 +158,9 @@ def transform_field(name: str, typeclass: type) -> t.StructField:
 
 
 def transform(typeclass: type) -> t.StructType:
-    """
-    Infer PySpark SQL types from namedtuple class fields
+    """Infer a PySpark ``StructType`` from a ``@struct``-marked class.
 
-    Note: do not forget mark classes with ``@struct`` decorator!
-
-    :param typeclass: @struct-annotated NamedTuple class
-    :return: PySpark data structure
+    The class must be a NamedTuple or dataclass with type-annotated fields.
     """
     check_pyspark_struct(typeclass)
     return t.StructType(

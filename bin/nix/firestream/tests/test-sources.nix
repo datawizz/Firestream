@@ -12,7 +12,10 @@ let
 
   # Get the manifest library
   manifestLib = firestream.manifest;
-  metadataLib = firestream.lib.metadata;
+  # metadata is a top-level firestream attr (firestream.metadata), not under
+  # firestream.lib (which is coreLibs). Pre-existing test bug, fixed during the
+  # flake-parts migration so `nix flake check` evaluates green.
+  metadataLib = firestream.metadata;
 
   # Create test packages with known sources
   testPackageA = pkgs.hello;

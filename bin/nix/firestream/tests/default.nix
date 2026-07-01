@@ -22,18 +22,20 @@ let
   containerTests = import ./test-containers.nix { inherit pkgs firestream; };
   stateTests = import ./test-state.nix { inherit pkgs firestream; };
   sourceTests = import ./test-sources.nix { inherit pkgs firestream; };
+  postgresqlEnvAliasTests = import ./test-postgresql-env-aliases.nix { inherit pkgs firestream; };
+  seaweedfsChartValuesTests = import ./test-seaweedfs-chart-values.nix { inherit pkgs firestream; };
 
 in {
   # Individual test derivations
   inherit logTests validationsTests fsTests osTests netTests serviceTests fileTests persistenceTests integrationTests;
-  inherit configTests containerTests stateTests sourceTests;
+  inherit configTests containerTests stateTests sourceTests postgresqlEnvAliasTests seaweedfsChartValuesTests;
 
   # All tests combined
   all = pkgs.runCommand "firestream-all-tests" {
     buildInputs = [
       logTests validationsTests fsTests osTests netTests serviceTests
       fileTests persistenceTests integrationTests configTests containerTests
-      stateTests sourceTests
+      stateTests sourceTests postgresqlEnvAliasTests seaweedfsChartValuesTests
     ];
   } ''
     echo "================================================"
@@ -52,6 +54,8 @@ in {
     echo "Container tests:    PASSED"
     echo "State tests:        PASSED"
     echo "Source tests:       PASSED"
+    echo "PG env-alias tests: PASSED"
+    echo "SeaweedFS chart:    PASSED"
     echo "================================================"
     touch $out
   '';

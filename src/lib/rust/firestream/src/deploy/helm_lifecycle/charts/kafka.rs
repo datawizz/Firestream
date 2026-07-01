@@ -1,10 +1,16 @@
-//! Apache Kafka chart implementation
+//! Apache Kafka chart implementation.
+//!
+//! Note: `strimzi_operator()` ships the Strimzi operator chart (not the
+//! Bitnami Kafka chart). `firestreamCharts.kafka` will eventually wire the
+//! Bitnami chart; `kafka_bitnami()` is the seam for that. Until Wave 3,
+//! `strimzi_operator()` remains the canonical Kafka entry point.
 
 use crate::core::Result;
 use crate::deploy::helm_lifecycle::{
+    from_manifest::chart_info_for,
     HelmChart, ChartInfo, ChartSetValue, HelmChartNamespace,
     ChartPayload, ValidationResult, BaseHelmChart,
-    values_path, HelmAction,
+    values_path, HelmAction, CommonChart,
 };
 use std::path::Path;
 use tracing::{info, warn};
@@ -16,7 +22,12 @@ pub struct KafkaChart {
 }
 
 impl KafkaChart {
-    /// Create Kafka chart using Strimzi operator
+    /// The Firestream name under which kafka would be registered in the
+    /// chart index (Bitnami Kafka chart). Used by `kafka_bitnami()`.
+    pub const NAME: &'static str = "kafka";
+
+    /// Create Kafka chart using Strimzi operator (hand-rolled — Strimzi is
+    /// not part of the Firestream chart bundle).
     pub fn strimzi_operator() -> Self {
         let chart_info = ChartInfo {
             name: "strimzi-kafka-operator".to_string(),
@@ -49,77 +60,19 @@ impl KafkaChart {
             ],
             ..Default::default()
         };
-        
+
         Self { chart_info }
     }
-    
-    /// Create Kafka using Bitnami chart (simpler but less flexible)
-    pub fn bitnami() -> CommonChart {
-        use crate::deploy::helm_lifecycle::CommonChart;
-        
-        let chart_info = ChartInfo {
-            name: "kafka".to_string(),
-            repository: Some("bitnami".to_string()),
-            chart: "kafka".to_string(),
-            version: Some("26.8.3".to_string()),
-            namespace: HelmChartNamespace::Default,
-            values_files: vec![values_path("kafka.yaml")],
-            values: vec![
-                // Broker configuration
-                ChartSetValue {
-                    key: "broker.replicaCount".to_string(),
-                    value: "3".to_string(),
-                },
-                ChartSetValue {
-                    key: "broker.resources.limits.cpu".to_string(),
-                    value: "1000m".to_string(),
-                },
-                ChartSetValue {
-                    key: "broker.resources.requests.cpu".to_string(),
-                    value: "500m".to_string(),
-                },
-                ChartSetValue {
-                    key: "broker.resources.limits.memory".to_string(),
-                    value: "2Gi".to_string(),
-                },
-                ChartSetValue {
-                    key: "broker.resources.requests.memory".to_string(),
-                    value: "1Gi".to_string(),
-                },
-                // Storage
-                ChartSetValue {
-                    key: "broker.persistence.enabled".to_string(),
-                    value: "true".to_string(),
-                },
-                ChartSetValue {
-                    key: "broker.persistence.size".to_string(),
-                    value: "20Gi".to_string(),
-                },
-                // ZooKeeper mode (will be deprecated in favor of KRaft)
-                ChartSetValue {
-                    key: "zookeeper.enabled".to_string(),
-                    value: "true".to_string(),
-                },
-                ChartSetValue {
-                    key: "zookeeper.replicaCount".to_string(),
-                    value: "3".to_string(),
-                },
-                // Metrics
-                ChartSetValue {
-                    key: "metrics.kafka.enabled".to_string(),
-                    value: "true".to_string(),
-                },
-                ChartSetValue {
-                    key: "metrics.jmx.enabled".to_string(),
-                    value: "true".to_string(),
-                },
-            ],
-            depends_on: vec!["zookeeper".to_string()],
-            ..Default::default()
-        };
-        
-        CommonChart::new(chart_info)
+
+    /// Construct the Bitnami Kafka chart from the manifest registry. Returns
+    /// `None` if `firestreamCharts.kafka` isn't registered. Wraps as a
+    /// `CommonChart` because the Strimzi-specific lifecycle hooks
+    /// (`pre_exec` adding the helm repo, etc.) are not relevant for the
+    /// Nix-built bundle chart.
+    pub fn kafka_bitnami() -> Option<CommonChart> {
+        chart_info_for(Self::NAME).map(CommonChart::new)
     }
+
 }
 
 #[async_trait]
@@ -388,5 +341,4 @@ impl KafkaChart {
     }
 }
 
-// Re-export CommonChart for Bitnami Kafka
-pub use crate::deploy::helm_lifecycle::CommonChart;
+// CommonChart is already in scope from the top-of-file `use`.

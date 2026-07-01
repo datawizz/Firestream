@@ -45,12 +45,18 @@
     export FIRESTREAM_QUIET="''${FIRESTREAM_QUIET:-false}"
     export FIRESTREAM_COLOR="''${FIRESTREAM_COLOR:-true}"
 
-    # Application paths
-    export ${lib.toUpper appName}_BASE_DIR="${paths.base}"
-    export ${lib.toUpper appName}_CONF_DIR="${paths.conf}"
-    export ${lib.toUpper appName}_DATA_DIR="${paths.data}"
-    export ${lib.toUpper appName}_LOG_DIR="${paths.logs}"
-    export ${lib.toUpper appName}_HOME="${paths.base}"
+    # Application paths. Use `${VAR:-default}` so the entrypoint respects
+    # caller-injected overrides (Kubernetes env, docker run -e, etc.) before
+    # falling back to the firestream-FHS defaults. Without this, charts that
+    # set e.g. `POSTGRESQL_DATA_DIR=/bitnami/postgresql/data` to align with
+    # Bitnami chart volume mounts would be silently overwritten back to
+    # /firestream/postgresql/data and the data would land on the wrong
+    # (non-persistent) filesystem.
+    export ${lib.toUpper appName}_BASE_DIR="''${${lib.toUpper appName}_BASE_DIR:-${paths.base}}"
+    export ${lib.toUpper appName}_CONF_DIR="''${${lib.toUpper appName}_CONF_DIR:-${paths.conf}}"
+    export ${lib.toUpper appName}_DATA_DIR="''${${lib.toUpper appName}_DATA_DIR:-${paths.data}}"
+    export ${lib.toUpper appName}_LOG_DIR="''${${lib.toUpper appName}_LOG_DIR:-${paths.logs}}"
+    export ${lib.toUpper appName}_HOME="''${${lib.toUpper appName}_HOME:-${paths.base}}"
 
     # Daemon user/group
     export ${lib.toUpper appName}_DAEMON_USER="${user.name}"

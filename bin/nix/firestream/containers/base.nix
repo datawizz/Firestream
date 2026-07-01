@@ -23,7 +23,7 @@
 #     };
 #   in container.dockerImage
 
-{ pkgs, lib, mkAppModule, coreLibs, waitForPortPkg, firestreamVibPkg }:
+{ pkgs, lib, mkAppModule, coreLibs, waitForPortPkg, firestreamVibPkg, firestreamHealthdPkg }:
 
 let
   # Import metadata library for SBOM and container metadata generation
@@ -51,6 +51,10 @@ in
     name,
     version ? "1.0.0",
 
+    # Docker image naming (parity-preserving defaults match the historical literals)
+    imageName ? "firestream-${name}",
+    imageTag ? version,
+
     # Environment configuration (passed to mkAppModule)
     envVars ? {},
     envVarsWithSecrets ? [],
@@ -77,6 +81,12 @@ in
     initFn ? "",
     runCmd ? "",
 
+    # Per-container helpers emitted at top-level of libhelpers<name>.sh.
+    # Forwarded to mkAppModule so chart init containers can source
+    # /opt/bitnami/scripts/lib<name>.sh and call helpers like
+    # kafka_server_conf_set / airflow_conf_set directly.
+    perContainerHelpers ? "",
+
     # Build-time (prepopulate phase) - passed to mkAppModule
     prepopulateFn ? "",
     prepopulateFiles ? {},
@@ -100,6 +110,17 @@ in
     # Optional custom entrypoint wrapper
     entrypointWrapper ? null, # Function: entrypoint -> wrapped entrypoint
 
+    # In-image health/SBOM service configuration (Phase 3).
+    # When `health.enable == true`, a one-shot shell wrapper is layered ONTO
+    # the existing entrypoint that backgrounds firestream-healthd and then
+    # `exec`s the inner entrypoint. When false (the default), the image is
+    # byte-identical to a pre-Phase-3 image and no health server is launched.
+    health ? {
+      enable = false;
+      port = 9180;
+      readinessCmd = null;
+    },
+
     # Optional additional scripts
     customScripts ? {},       # { name = script; } - additional scripts to include
 
@@ -114,7 +135,7 @@ in
       inherit name version envVars envVarsWithSecrets paths user;
       inherit validateFn configFn initFn runCmd;
       inherit prepopulateFn prepopulateFiles prepopulateDirs runtimeDirs;
-      inherit activateFn enableStateTracking;
+      inherit activateFn enableStateTracking perContainerHelpers;
       extraDeps = extraDeps ++ runtimeBinDeps;
     };
 
@@ -126,6 +147,7 @@ in
         pkgs.cacert
         pkgs.stdenv.cc.cc.lib
         waitForPortPkg  # Rust-based port checker - available in all containers
+        firestreamHealthdPkg  # In-image /healthz, /readyz, /sbom, /metadata server (Phase 2: present, not yet launched)
       ]
     );
 
@@ -150,11 +172,45 @@ nobody:!x:::::::
 ${user.name}:!:::::::
 '';
 
-    # Get the entrypoint, optionally wrapped
-    finalEntrypoint =
+    # Get the entrypoint, optionally wrapped by the runtime's custom wrapper
+    # (e.g. mkJavaContainerModule's JVM wrapper).
+    innerEntrypoint =
       if entrypointWrapper != null
       then entrypointWrapper appModule.scripts.entrypoint
       else appModule.scripts.entrypoint;
+
+    # Phase 3: layer a health-launching wrapper ONTO the existing entrypoint
+    # when `health.enable == true`. The wrapper:
+    #   1. Honors FIRESTREAM_HEALTHD_DISABLE as an escape hatch (skips healthd).
+    #   2. Launches `firestream-healthd` in the background (output -> stderr),
+    #      passing `--readiness-cmd` only when configured so the binary's
+    #      default behavior is preserved otherwise.
+    #   3. exec's the inner entrypoint with its original args so the app stays
+    #      PID-target (single-exec PID-1 semantics preserved). Healthd is
+    #      reaped by Docker when the container stops.
+    # The wrapper binary is named exactly `${name}-entrypoint` so the Docker
+    # Entrypoint config (`${finalEntrypoint}/bin/${name}-entrypoint`) stays
+    # consistent whether or not health is enabled.
+    healthWrapper = pkgs.writeShellScriptBin "${name}-entrypoint" ''
+      set -euo pipefail
+
+      # Escape hatch: skip healthd entirely.
+      if [ -n "''${FIRESTREAM_HEALTHD_DISABLE:-}" ]; then
+        exec "${innerEntrypoint}/bin/${name}-entrypoint" "$@"
+      fi
+
+      "${firestreamHealthdPkg}/bin/firestream-healthd" \
+        --port "${toString health.port}" \
+        --bind 0.0.0.0 \
+        --metadata-path /opt/firestream \
+        ${lib.optionalString (health.readinessCmd != null)
+          "--readiness-cmd ${lib.escapeShellArg health.readinessCmd}"} \
+        >&2 2>&1 &
+
+      exec "${innerEntrypoint}/bin/${name}-entrypoint" "$@"
+    '';
+
+    finalEntrypoint = if health.enable then healthWrapper else innerEntrypoint;
 
     # Build custom scripts
     customScriptPackages = lib.mapAttrsToList (
@@ -179,11 +235,15 @@ ${user.name}:!:::::::
       pkgs.cacert
       pkgs.stdenv.cc.cc.lib
       waitForPortPkg
+      firestreamHealthdPkg  # Phase 2: binary present in /nix/store; entrypoint unchanged.
     ] ++ systemDeps ++ runtimeBinDeps ++ extraDeps ++ [
       # Layer group 2: App scripts (change with code updates)
       appModule.scripts.envDefaults
       appModule.scripts.fileLoader
-      appModule.scripts.lib
+      appModule.scripts.libHelpers   # libhelpers<name>.sh: top-level helpers
+      appModule.scripts.lib          # lib<name>.sh: phase wrappers (sources libHelpers)
+      appModule.scripts.genericLibs  # libos.sh/liblog.sh/... : Bitnami-compat shims (source libHelpers)
+      appModule.scripts.appEnv       # <name>-env.sh : Bitnami-compat env-setup shim for chart probes/jobs
       finalEntrypoint           # CRITICAL: was missing from metadataEnv
       appModule.scripts.setup
       appModule.scripts.run
@@ -224,12 +284,27 @@ ${user.name}:!:::::::
       }) exposedPorts
     );
 
-    # Build volumes config
+    # Build volumes config.
+    #
+    # Drop any declared volume path that is a STRICT CHILD of another declared
+    # volume (or of a default volume). A nested image VOLUME is honoured by
+    # containerd/CRI as an anonymous *ephemeral* mount that SHADOWS the parent
+    # volume — so when a chart binds a PVC at the parent (e.g. kafka mounts its
+    # data PVC at /firestream/kafka), the nested image VOLUME at
+    # /firestream/kafka/data masks the PVC subdir and silently discards anything
+    # written there (Kafka's meta.properties) on every container restart. Only
+    # the top-most paths should be declared as image volumes; children then live
+    # on whatever volume is mounted at the parent.
+    declaredVolumePaths = lib.unique (
+      (lib.attrNames defaultVolumes) ++ [ paths.data paths.logs ] ++ volumes
+    );
+    isStrictChildOfAnother = p:
+      lib.any (q: q != p && lib.hasPrefix (q + "/") p) declaredVolumePaths;
     volumesConfig = lib.listToAttrs (
       map (path: {
         name = path;
         value = {};
-      }) ([ paths.data paths.logs ] ++ volumes)
+      }) (lib.filter (p: !(isStrictChildOfAnother p)) ([ paths.data paths.logs ] ++ volumes))
     );
 
     # MUST KEEP: runtimeEnv is exported and used by:
@@ -244,8 +319,8 @@ ${user.name}:!:::::::
 
     # Docker image
     dockerImage = pkgs.dockerTools.buildLayeredImage {
-      name = "firestream-${name}";
-      tag = version;
+      name = imageName;
+      tag = imageTag;
       maxLayers = 100;  # Modern Docker supports 128, use 100 for fine-grained caching
 
       # Contents = imageContents + metadata
@@ -300,6 +375,22 @@ ${user.name}:!:::::::
           app_dir="$base_dir/${name}"
           resolve_symlink "$app_dir"
         done
+
+        # Bitnami chart compat: the upstream charts source helper scripts
+        # from `/opt/bitnami/scripts/lib<name>.sh`. Mirror the firestream
+        # scripts at the Bitnami path so chart command/args overrides Just
+        # Work without patching every chart's templates.
+        #
+        # We deliberately do NOT symlink /opt/bitnami/${name} → /opt/firestream/${name}:
+        # several Bitnami charts mount configmaps/secrets inside that path
+        # (e.g. `/opt/bitnami/airflow/airflow.cfg`), and Kubernetes can't
+        # overlay mounts onto a symlink target. Instead we create an empty
+        # writable directory there so volume mounts have a real target.
+        if [ -d "./opt/firestream/scripts" ] && [ ! -e "./opt/bitnami/scripts" ]; then
+          mkdir -p ./opt/bitnami
+          ln -s /opt/firestream/scripts ./opt/bitnami/scripts
+        fi
+        mkdir -p ./opt/bitnami/${name}
 
         # Ensure home directory exists
         mkdir -p ./home/${user.name}

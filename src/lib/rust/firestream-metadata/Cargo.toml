@@ -1,0 +1,21 @@
+[package]
+name = "firestream-metadata"
+version = "0.1.0"
+edition = "2024"
+description = "Shared metadata types, reader, and validator for Firestream container artifacts"
+license = "MIT"
+
+[dependencies]
+# Serialization
+serde = { workspace = true }
+serde_json = { workspace = true }
+
+# Error handling
+thiserror = { workspace = true }
+
+[dev-dependencies]
+tempfile = { workspace = true }
+
+[lib]
+name = "firestream_metadata"
+path = "src/lib.rs"

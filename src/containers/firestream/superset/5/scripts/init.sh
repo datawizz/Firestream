@@ -5,9 +5,9 @@
 info "Initializing Superset (role: ${SUPERSET_ROLE:-webserver})..."
 
 # Create required directories
-for dir in "${SUPERSET_HOME:-/opt/superset/superset_home}" \
-           "${SUPERSET_LOG_DIR:-/opt/superset/logs}" \
-           "${SUPERSET_TMP_DIR:-/opt/superset/tmp}" \
+for dir in "${SUPERSET_HOME:-/opt/firestream/superset/superset_home}" \
+           "${SUPERSET_LOG_DIR:-/opt/firestream/superset/superset_home/logs}" \
+           "${SUPERSET_TMP_DIR:-/tmp}" \
            "/app/pythonpath"; do
   ensure_dir_exists "$dir"
 done

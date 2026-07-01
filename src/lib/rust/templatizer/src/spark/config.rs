@@ -106,6 +106,15 @@ pub struct SparkAppConfig {
     /// S3 region
     #[serde(default = "default_s3_region")]
     pub s3_region: String,
+    /// S3 endpoint URL (defaults to the local SeaweedFS object store)
+    #[serde(default = "default_s3_endpoint")]
+    pub s3_endpoint: String,
+    /// S3 access key ID (defaults to the local SeaweedFS dev credentials)
+    #[serde(default = "default_s3_access_key")]
+    pub s3_access_key: String,
+    /// S3 secret access key (defaults to the local SeaweedFS dev credentials)
+    #[serde(default = "default_s3_secret_key")]
+    pub s3_secret_key: String,
 
     // Delta Lake configuration
     /// Enable Delta Lake support
@@ -186,6 +195,22 @@ fn default_s3_region() -> String {
     "us-east-1".to_string()
 }
 
+// SeaweedFS is the Firestream default local S3 backend. These mirror the
+// deterministic dev credentials and the all-in-one Service endpoint emitted by
+// the seaweedfs chart (release/namespace = "seaweedfs"), and the S3_LOCAL_*
+// env vars injected into Spark/Airflow pods by the consumer chart overlays.
+fn default_s3_endpoint() -> String {
+    "http://seaweedfs-all-in-one.seaweedfs.svc.cluster.local:8333".to_string()
+}
+
+fn default_s3_access_key() -> String {
+    "firestream".to_string()
+}
+
+fn default_s3_secret_key() -> String {
+    "firestream-secret".to_string()
+}
+
 fn default_driver_memory() -> String {
     "1g".to_string()
 }
@@ -232,6 +257,9 @@ impl Default for SparkAppConfig {
             s3_enabled: false,
             s3_bucket: String::new(),
             s3_region: default_s3_region(),
+            s3_endpoint: default_s3_endpoint(),
+            s3_access_key: default_s3_access_key(),
+            s3_secret_key: default_s3_secret_key(),
             delta_enabled: false,
             delta_table_path: String::new(),
             kafka_enabled: false,
@@ -344,6 +372,19 @@ impl SparkAppConfigBuilder {
         self.config.s3_enabled = true;
         self.config.s3_bucket = bucket.to_string();
         self.config.s3_region = region.to_string();
+        self
+    }
+
+    /// Override the S3 endpoint and credentials.
+    ///
+    /// Defaults already target the local SeaweedFS object store
+    /// (`firestream` / `firestream-secret` at the all-in-one Service); use this
+    /// only to point a generated app at a different S3-compatible backend.
+    pub fn s3_endpoint(mut self, endpoint: &str, access_key: &str, secret_key: &str) -> Self {
+        self.config.s3_enabled = true;
+        self.config.s3_endpoint = endpoint.to_string();
+        self.config.s3_access_key = access_key.to_string();
+        self.config.s3_secret_key = secret_key.to_string();
         self
     }
 
@@ -518,6 +559,38 @@ mod tests {
     fn test_validation_fails_without_required_fields() {
         let config = SparkAppConfig::default();
         assert!(config.validate().is_err());
+    }
+
+    #[test]
+    fn test_s3_defaults_target_seaweedfs() {
+        // A default config must point S3 at the local SeaweedFS object store so
+        // generated Spark apps use it out of the box when S3 is enabled.
+        let config = SparkAppConfig::default();
+        assert_eq!(
+            config.s3_endpoint,
+            "http://seaweedfs-all-in-one.seaweedfs.svc.cluster.local:8333"
+        );
+        assert_eq!(config.s3_access_key, "firestream");
+        assert_eq!(config.s3_secret_key, "firestream-secret");
+        assert_eq!(config.s3_region, "us-east-1");
+
+        // The builder keeps these defaults unless explicitly overridden.
+        let built = SparkAppConfigBuilder::new("test", "1.0.0")
+            .s3_config("bucket", "us-east-1")
+            .build_unchecked();
+        assert_eq!(
+            built.s3_endpoint,
+            "http://seaweedfs-all-in-one.seaweedfs.svc.cluster.local:8333"
+        );
+
+        // ...and an explicit override wins.
+        let overridden = SparkAppConfigBuilder::new("test", "1.0.0")
+            .s3_endpoint("http://minio:9000", "ak", "sk")
+            .build_unchecked();
+        assert_eq!(overridden.s3_endpoint, "http://minio:9000");
+        assert_eq!(overridden.s3_access_key, "ak");
+        assert_eq!(overridden.s3_secret_key, "sk");
+        assert!(overridden.s3_enabled);
     }
 
     #[test]

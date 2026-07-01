@@ -17,10 +17,120 @@
 { pkgs
 , lib
 , firestream
-, redisVersion ? "7"
+# Canonical version arg (matches eval-container's system runtime contract).
+# `redisVersion` is derived below so the body logic is unchanged. Bumped from
+# "7" to "8" in Phase B to match the Bitnami redis chart's expected protocol;
+# the v7 build is still produced under .#redis-7 for explicit downgrade.
+, version ? "8"
+
+# Externalized core-surface config. Defaults below are EXACTLY today's literals
+# so the legacy flake.nix path (which does not pass these) and evalContainer
+# (which passes the same values from options.nix) yield identical factory args.
+
+# Paths configuration (Bitnami compatibility)
+, paths ? {
+    base = "/opt/firestream/redis";
+    conf = "/opt/firestream/redis/etc";
+    data = "/firestream/redis/data";
+    logs = "/opt/firestream/redis/logs";
+  }
+
+# Environment variables with defaults
+, envVars ? {
+    # Base directories
+    REDIS_BASE_DIR = "/opt/firestream/redis";
+    REDIS_VOLUME_DIR = "/firestream/redis";
+    REDIS_DATA_DIR = "/firestream/redis/data";
+    REDIS_CONF_DIR = "/opt/firestream/redis/etc";
+    REDIS_DEFAULT_CONF_DIR = "/opt/firestream/redis/etc.default";
+    REDIS_MOUNTED_CONF_DIR = "/opt/firestream/redis/mounted-etc";
+    REDIS_OVERRIDES_FILE = "/opt/firestream/redis/mounted-etc/overrides.conf";
+    REDIS_CONF_FILE = "/opt/firestream/redis/etc/redis.conf";
+    REDIS_LOG_DIR = "/opt/firestream/redis/logs";
+    REDIS_LOG_FILE = "/opt/firestream/redis/logs/redis.log";
+    REDIS_TMP_DIR = "/opt/firestream/redis/tmp";
+    REDIS_PID_FILE = "/opt/firestream/redis/tmp/redis.pid";
+    REDIS_BIN_DIR = "/opt/firestream/redis/bin";
+
+    # User and group
+    REDIS_DAEMON_USER = "redis";
+    REDIS_DAEMON_GROUP = "redis";
+
+    # Connection settings
+    REDIS_PORT_NUMBER = "6379";
+    REDIS_ALLOW_REMOTE_CONNECTIONS = "yes";
+    REDIS_EXTRA_FLAGS = "";
+
+    # Authentication
+    # Default ALLOW_EMPTY_PASSWORD=yes for out-of-the-box local/dev/e2e use;
+    # production overrides via the standard envVars override seam.
+    REDIS_PASSWORD = "";
+    ALLOW_EMPTY_PASSWORD = "yes";
+
+    # Persistence
+    REDIS_AOF_ENABLED = "yes";
+    REDIS_RDB_POLICY = "";
+    REDIS_RDB_POLICY_DISABLED = "no";
+
+    # Replication
+    REDIS_REPLICATION_MODE = "";
+    REDIS_MASTER_HOST = "";
+    REDIS_MASTER_PORT_NUMBER = "6379";
+    REDIS_MASTER_PASSWORD = "";
+    REDIS_REPLICA_IP = "";
+    REDIS_REPLICA_PORT = "";
+
+    # ACL
+    REDIS_ACLFILE = "";
+    REDIS_DISABLE_COMMANDS = "";
+
+    # Multi-threading
+    REDIS_IO_THREADS = "";
+    REDIS_IO_THREADS_DO_READS = "";
+
+    # TLS
+    REDIS_TLS_ENABLED = "no";
+    REDIS_TLS_PORT_NUMBER = "6379";
+    REDIS_TLS_CERT_FILE = "";
+    REDIS_TLS_KEY_FILE = "";
+    REDIS_TLS_KEY_FILE_PASS = "";
+    REDIS_TLS_CA_FILE = "";
+    REDIS_TLS_CA_DIR = "";
+    REDIS_TLS_DH_PARAMS_FILE = "";
+    REDIS_TLS_AUTH_CLIENTS = "yes";
+
+    # Sentinel
+    REDIS_SENTINEL_HOST = "";
+    REDIS_SENTINEL_PORT_NUMBER = "26379";
+    REDIS_SENTINEL_MASTER_NAME = "";
+
+    # Debug mode
+    BITNAMI_DEBUG = "false";
+  }
+
+# Variables supporting _FILE suffix for Docker secrets
+, envVarsWithSecrets ? [
+    "REDIS_PASSWORD"
+    "REDIS_MASTER_PASSWORD"
+    "REDIS_TLS_KEY_FILE_PASS"
+  ]
+
+, exposedPorts ? [ 6379 ]
+
+# In-image health/SBOM service configuration (Phase 4). Forwarded to
+# mkContainerModule, which wraps the entrypoint with a healthd launcher when
+# enabled. Default-off preserves byte-identical legacy-flake behaviour.
+, health ? { enable = false; port = 9180; readinessCmd = null; }
+
+# Image naming passthrough (parity defaults).
+, imageName ? "firestream-redis"
+, imageTag ? version
 }:
 
 let
+  # Alias to keep the body logic identical to the legacy redisVersion-based code.
+  redisVersion = version;
+
   # Select Redis package based on version
   redis = if redisVersion == "8" then pkgs.redis else pkgs.redis;
 
@@ -276,91 +386,14 @@ in firestream.mkContainerModule {
   name = "redis";
   version = redisVersion;
 
-  # Paths configuration (Bitnami compatibility)
-  paths = {
-    base = "/opt/firestream/redis";
-    conf = "/opt/firestream/redis/etc";
-    data = "/firestream/redis/data";
-    logs = "/opt/firestream/redis/logs";
-  };
+  # Paths, environment variables, and secret-aware variables are externalized
+  # as function arguments (defaults equal to the historical literals). The
+  # legacy flake.nix path uses the defaults; evalContainer passes the same
+  # values from options.nix, yielding identical factory args.
+  inherit paths envVars envVarsWithSecrets;
 
-  # Environment variables with defaults
-  envVars = {
-    # Base directories
-    REDIS_BASE_DIR = "/opt/firestream/redis";
-    REDIS_VOLUME_DIR = "/firestream/redis";
-    REDIS_DATA_DIR = "/firestream/redis/data";
-    REDIS_CONF_DIR = "/opt/firestream/redis/etc";
-    REDIS_DEFAULT_CONF_DIR = "/opt/firestream/redis/etc.default";
-    REDIS_MOUNTED_CONF_DIR = "/opt/firestream/redis/mounted-etc";
-    REDIS_OVERRIDES_FILE = "/opt/firestream/redis/mounted-etc/overrides.conf";
-    REDIS_CONF_FILE = "/opt/firestream/redis/etc/redis.conf";
-    REDIS_LOG_DIR = "/opt/firestream/redis/logs";
-    REDIS_LOG_FILE = "/opt/firestream/redis/logs/redis.log";
-    REDIS_TMP_DIR = "/opt/firestream/redis/tmp";
-    REDIS_PID_FILE = "/opt/firestream/redis/tmp/redis.pid";
-    REDIS_BIN_DIR = "/opt/firestream/redis/bin";
-
-    # User and group
-    REDIS_DAEMON_USER = "redis";
-    REDIS_DAEMON_GROUP = "redis";
-
-    # Connection settings
-    REDIS_PORT_NUMBER = "6379";
-    REDIS_ALLOW_REMOTE_CONNECTIONS = "yes";
-    REDIS_EXTRA_FLAGS = "";
-
-    # Authentication
-    REDIS_PASSWORD = "";
-    ALLOW_EMPTY_PASSWORD = "no";
-
-    # Persistence
-    REDIS_AOF_ENABLED = "yes";
-    REDIS_RDB_POLICY = "";
-    REDIS_RDB_POLICY_DISABLED = "no";
-
-    # Replication
-    REDIS_REPLICATION_MODE = "";
-    REDIS_MASTER_HOST = "";
-    REDIS_MASTER_PORT_NUMBER = "6379";
-    REDIS_MASTER_PASSWORD = "";
-    REDIS_REPLICA_IP = "";
-    REDIS_REPLICA_PORT = "";
-
-    # ACL
-    REDIS_ACLFILE = "";
-    REDIS_DISABLE_COMMANDS = "";
-
-    # Multi-threading
-    REDIS_IO_THREADS = "";
-    REDIS_IO_THREADS_DO_READS = "";
-
-    # TLS
-    REDIS_TLS_ENABLED = "no";
-    REDIS_TLS_PORT_NUMBER = "6379";
-    REDIS_TLS_CERT_FILE = "";
-    REDIS_TLS_KEY_FILE = "";
-    REDIS_TLS_KEY_FILE_PASS = "";
-    REDIS_TLS_CA_FILE = "";
-    REDIS_TLS_CA_DIR = "";
-    REDIS_TLS_DH_PARAMS_FILE = "";
-    REDIS_TLS_AUTH_CLIENTS = "yes";
-
-    # Sentinel
-    REDIS_SENTINEL_HOST = "";
-    REDIS_SENTINEL_PORT_NUMBER = "26379";
-    REDIS_SENTINEL_MASTER_NAME = "";
-
-    # Debug mode
-    BITNAMI_DEBUG = "false";
-  };
-
-  # Variables supporting _FILE suffix for Docker secrets
-  envVarsWithSecrets = [
-    "REDIS_PASSWORD"
-    "REDIS_MASTER_PASSWORD"
-    "REDIS_TLS_KEY_FILE_PASS"
-  ];
+  # Image naming passthrough.
+  inherit imageName imageTag;
 
   # Declarative directory schema
   runtimeDirs = {
@@ -437,15 +470,20 @@ in firestream.mkContainerModule {
     };
   };
 
+  # Per-container helpers: emitted at top-level of libhelpersredis.sh by the
+  # engine, so chart init containers can `source /opt/bitnami/scripts/libredis.sh`
+  # and use these helpers directly.
+  perContainerHelpers = redisHelpers;
+
   # Validation function
-  validateFn = redisHelpers + ''
+  validateFn = ''
     error_code=0
     ${validateScript}
     [[ "$error_code" -eq 0 ]] || exit "$error_code"
   '';
 
   # Activation: Load secrets
-  activateFn = redisHelpers + ''
+  activateFn = ''
     info "Activating Redis configuration..."
 
     # Load secrets from _FILE variables
@@ -455,10 +493,10 @@ in firestream.mkContainerModule {
   '';
 
   # Configuration generation
-  configFn = redisHelpers + configScript;
+  configFn = configScript;
 
   # Initialization (replication setup)
-  initFn = redisHelpers + initScript;
+  initFn = initScript;
 
   # Startup command
   runCmd = ''
@@ -482,7 +520,8 @@ in firestream.mkContainerModule {
 
   inherit systemDeps runtimeBinDeps;
 
-  exposedPorts = [ 6379 ];
+  inherit exposedPorts;
+  inherit health;
   volumes = [ "/firestream/redis" ];
 
   user = { name = "redis"; group = "redis"; uid = 1001; gid = 1001; };

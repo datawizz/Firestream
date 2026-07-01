@@ -33,6 +33,10 @@
     name,
     version ? "1.0.0",
 
+    # Docker image naming (parity-preserving defaults match the historical literals)
+    imageName ? "firestream-${name}",
+    imageTag ? version,
+
     # Python configuration (required)
     pythonEnv,               # The virtual environment from uv2nix/pyproject-nix
     python ? pkgs.python312, # Python interpreter
@@ -63,6 +67,10 @@
     initFn ? "",
     runCmd ? "",
 
+    # Per-container helpers emitted at top-level of libhelpers<name>.sh.
+    # Forwarded to mkContainerModule (and through to mkAppModule).
+    perContainerHelpers ? "",
+
     # Container dependencies
     systemDeps ? [],
     runtimeBinDeps ? [],
@@ -72,6 +80,12 @@
     dockerConfig ? {},
     exposedPorts ? [],
     volumes ? [],
+
+    # In-image firestream-healthd configuration (Phase 4). Forwarded verbatim
+    # to mkContainerModule, which wraps the entrypoint with a healthd launcher
+    # when `enable = true`. Default-off preserves byte-identical pre-Phase-3
+    # behaviour for any container that does not opt in.
+    health ? { enable = false; port = 9180; readinessCmd = null; },
 
     # Python-specific options
     requirementsPath ? "/bitnami/python/requirements.txt",  # Runtime requirements
@@ -160,13 +174,14 @@
     # Create the container module
     containerModule = mkContainerModule {
       inherit name version envVars envVarsWithSecrets paths user;
+      inherit imageName imageTag;
       inherit validateFn configFn runCmd;
       initFn = pythonInitFn;
 
       # Pass through two-phase lifecycle parameters
       prepopulateFn = combinedPrepopulateFn;
       inherit prepopulateFiles prepopulateDirs runtimeDirs;
-      inherit activateFn enableStateTracking;
+      inherit activateFn enableStateTracking perContainerHelpers;
 
       systemDeps = systemDeps ++ [
         pkgs.cacert
@@ -181,6 +196,12 @@
       volumes = volumes ++ [
         (builtins.dirOf requirementsPath)  # Allow mounting requirements
       ];
+
+      # Forward health config so the base entrypoint wrapper can layer
+      # firestream-healthd onto the python entrypoint wrapper. base.nix wraps
+      # finalEntrypoint = if health.enable then healthWrapper else
+      # innerEntrypoint, where innerEntrypoint already includes pythonEntrypointWrapper.
+      inherit health;
 
       entrypointWrapper = pythonEntrypointWrapper;
 

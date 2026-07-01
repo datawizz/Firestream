@@ -1,0 +1,4 @@
+# Versions track the repo's existing Pulumi tooling
+# (src/deployment/host/gcp/deploy_standard/requirements.txt).
+pulumi>=3.143.0,<4.0.0
+pulumi-gcp>=8.11.0,<9.0.0

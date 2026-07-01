@@ -6,6 +6,9 @@ description = "Container verification harness for Nix-built containers"
 license = "MIT"
 
 [dependencies]
+# Shared metadata schema/reader/validator (moved out of this crate)
+firestream-metadata = { workspace = true }
+
 # CLI
 clap = { workspace = true, features = ["derive", "env"] }
 

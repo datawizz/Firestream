@@ -1,5 +1,6 @@
 //! Specific chart implementations
 
+pub mod airflow;
 pub mod common;
 pub mod prometheus;
 pub mod external_dns;
@@ -8,6 +9,7 @@ pub mod postgresql;
 pub mod kafka;
 
 // Re-export all chart implementations
+pub use airflow::AirflowChart;
 pub use common::CommonChart;
 pub use prometheus::PrometheusOperatorChart;
 pub use external_dns::ExternalDnsChart;

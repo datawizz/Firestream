@@ -257,7 +257,7 @@ mod tests {
         // Add a deployment to desired state
         state2.deployments.insert("test-app".to_string(), DeploymentState {
             release_name: "test-app".to_string(),
-            chart: "bitnami/postgresql".to_string(),
+            chart: "postgresql".to_string(),
             chart_version: "12.0.0".to_string(),
             namespace: "default".to_string(),
             status: DeploymentStatus::Pending,

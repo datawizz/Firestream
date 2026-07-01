@@ -15,6 +15,8 @@ use crate::progress::{BuildPhase, BuildProgress};
 use crate::strategy::{find_repo_root, BoxedProgressCallback, BuildMode, BuildStrategy, ContainerBuildStrategy};
 use async_trait::async_trait;
 use std::path::{Path, PathBuf};
+use std::process::Stdio;
+use tokio::io::AsyncWriteExt;
 use tokio::process::Command;
 use tracing::{debug, info, warn};
 
@@ -80,6 +82,9 @@ impl DockerNixStrategy {
     }
 
     /// Run the Docker-based Nix build
+    ///
+    /// Uses tar streaming to pass the workspace to Docker, avoiding bind mount
+    /// issues on macOS where /var/folders is not in Docker Desktop's file sharing.
     async fn run_docker_nix_build(
         &self,
         container: &ContainerInfo,
@@ -95,35 +100,41 @@ impl DockerNixStrategy {
             config.nix_attribute
         );
 
-        // Create a temporary file for the output
-        let temp_dir = tempfile::tempdir()?;
-        let output_path = temp_dir.path().join("image.tar.gz");
-
-        // Build the Docker command
+        // Build the nix script that will run inside the container
+        // The script first extracts the workspace from stdin, then runs nix build
         let nix_script = format!(
             r#"
 set -e
 
+# Extract workspace from stdin (tar streaming)
+mkdir -p /workspace
+cd /workspace
+tar -xf -
+
+# Mark workspace as safe for Git (files are owned by host user, not container user)
+git config --global --add safe.directory /workspace
+
 # Enable flakes
 echo "experimental-features = nix-command flakes" >> /etc/nix/nix.conf
 
+# Change to container directory
+cd /workspace/{relative_path}
+
 # Debug: Show current directory and contents
-echo "Working directory: $(pwd)"
-echo "Contents:"
-ls -la
+echo "Working directory: $(pwd)" >&2
+echo "Contents:" >&2
+ls -la >&2
 
 # Verify flake.nix exists before building
 if [ ! -f flake.nix ]; then
     echo "ERROR: flake.nix not found in $(pwd)" >&2
-    echo "Available files:" >&2
-    find . -name "flake.nix" 2>/dev/null | head -20 >&2
     exit 1
 fi
 
-echo "Building {}#{}..."
+echo "Building {relative_path}#{nix_attr}..." >&2
 
 # Run nix build and capture output separately
-if ! nix build .#{} --no-link --print-out-paths > /tmp/nix-output.txt 2>&1; then
+if ! nix build .#{nix_attr} --no-link --print-out-paths > /tmp/nix-output.txt 2>&1; then
     echo "ERROR: Nix build failed:" >&2
     cat /tmp/nix-output.txt >&2
     exit 1
@@ -145,22 +156,41 @@ if [ ! -f "$image_path" ]; then
     exit 1
 fi
 
-echo "Build complete: $image_path"
+echo "Build complete: $image_path" >&2
 cat "$image_path"
 "#,
-            relative_path, config.nix_attribute, config.nix_attribute
+            relative_path = relative_path,
+            nix_attr = config.nix_attribute
         );
 
-        let mut cmd = Command::new("docker");
-        cmd.args([
+        // Create tar archive of workspace
+        info!("Creating tar archive of workspace...");
+        let tar_output = Command::new("tar")
+            .args(["-C", repo_root.to_str().unwrap(), "-cf", "-", "."])
+            .output()
+            .await?;
+
+        if !tar_output.status.success() {
+            let stderr = String::from_utf8_lossy(&tar_output.stderr);
+            return Err(NixContainerError::Other(format!(
+                "Failed to create tar archive of workspace: {}",
+                stderr
+            )));
+        }
+
+        info!(
+            "Tar archive created ({} bytes), streaming to Docker...",
+            tar_output.stdout.len()
+        );
+
+        // Run docker with tar piped to stdin (no bind mount needed)
+        let mut docker_cmd = Command::new("docker");
+        docker_cmd.args([
             "run",
+            "-i", // Keep stdin open for tar input
             "--rm",
-            "-v",
-            &format!("{}:/workspace", repo_root.display()),
             "--mount",
             &format!("type=volume,source={},target=/nix", self.nix_store_volume),
-            "-w",
-            &format!("/workspace/{}", relative_path),
             "--platform",
             self.platform.docker_platform(),
             "nixos/nix:latest",
@@ -169,9 +199,21 @@ cat "$image_path"
             &nix_script,
         ]);
 
-        debug!("Running Docker command: {:?}", cmd);
+        docker_cmd.stdin(Stdio::piped());
+        docker_cmd.stdout(Stdio::piped());
+        docker_cmd.stderr(Stdio::piped());
 
-        let output = cmd.output().await?;
+        debug!("Running Docker command: {:?}", docker_cmd);
+
+        let mut child = docker_cmd.spawn()?;
+
+        // Write tar archive to docker's stdin
+        if let Some(mut stdin) = child.stdin.take() {
+            stdin.write_all(&tar_output.stdout).await?;
+            // Drop stdin to signal EOF - this happens automatically when stdin goes out of scope
+        }
+
+        let output = child.wait_with_output().await?;
 
         if !output.status.success() {
             let stderr = String::from_utf8_lossy(&output.stderr);
@@ -192,20 +234,19 @@ cat "$image_path"
             });
         }
 
-        // Write the tarball to the temp file
-        std::fs::write(&output_path, &tarball_data)?;
-
-        debug!("Wrote {} bytes to {}", tarball_data.len(), output_path.display());
-
-        // We need to keep the temp dir alive, so we "leak" it into a permanent path
-        // by copying to a new location
+        // Write to permanent location
         let permanent_path = std::env::temp_dir().join(format!(
             "nix-container-{}-{}.tar.gz",
             container.name,
             std::process::id()
         ));
-        std::fs::copy(&output_path, &permanent_path)?;
+        std::fs::write(&permanent_path, &tarball_data)?;
 
+        debug!(
+            "Wrote {} bytes to {}",
+            tarball_data.len(),
+            permanent_path.display()
+        );
         Ok(permanent_path)
     }
 

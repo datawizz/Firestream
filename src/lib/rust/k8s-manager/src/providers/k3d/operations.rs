@@ -792,6 +792,16 @@ async fn create_cluster(config: &K3dConfig) -> Result<()> {
         &format!("{}:{}", config.registry_name, config.registry_port),
         "--k3s-arg",
         "--disable=traefik@server:*",
+        // Lower kubelet eviction thresholds so a host disk at 90% used
+        // (common on dev machines) doesn't taint nodes with
+        // disk-pressure:NoSchedule and block all chart pod scheduling.
+        // The k3d node's filesystem view IS the host's filesystem, so the
+        // default `nodefs.available<10%` taints the node any time the
+        // host is over 90% full.
+        "--k3s-arg",
+        "--kubelet-arg=eviction-hard=nodefs.available<2%,imagefs.available<2%@agent:*",
+        "--k3s-arg",
+        "--kubelet-arg=eviction-hard=nodefs.available<2%,imagefs.available<2%@server:*",
         "--wait",
     ]);
     

@@ -16,6 +16,158 @@
 , supersetVersion    # e.g., "5" (major version)
 , python ? pkgs.python311
 , waitForPortPkg     # Rust-based port checker for init scripts
+
+# Externalized core-surface config. Defaults below are EXACTLY today's literals
+# so the legacy flake.nix path (which does not pass these) and evalContainer
+# (which passes the same values from options.nix) yield identical factory args.
+
+# Paths configuration
+, paths ? {
+    base = "/opt/firestream/superset";
+    conf = "/opt/firestream/superset";
+    data = "/opt/firestream/superset/superset_home";
+    logs = "/opt/firestream/superset/superset_home/logs";
+  }
+
+# Environment variables with defaults (preserving Bitnami compatibility)
+, envVars ? {
+    # Paths
+    # Config + logs live UNDER superset_home so the chart's writable
+    # superset_home emptyDir covers them under readOnlyRootFilesystem; TMP at
+    # /tmp (writable emptyDir in every pod).
+    SUPERSET_HOME = "/opt/firestream/superset/superset_home";
+    SUPERSET_CONFIG_PATH = "/opt/firestream/superset/superset_home/superset_config.py";
+    SUPERSET_LOG_DIR = "/opt/firestream/superset/superset_home/logs";
+    SUPERSET_TMP_DIR = "/tmp";
+    FLASK_APP = "superset.app:create_app()";
+    PYTHONPATH = "/app/pythonpath";
+
+    # User configuration
+    SUPERSET_USERNAME = "admin";
+    SUPERSET_PASSWORD = "admin";
+    SUPERSET_FIRSTNAME = "Superset";
+    SUPERSET_LASTNAME = "Admin";
+    SUPERSET_EMAIL = "admin@superset.local";
+
+    # Webserver configuration
+    SUPERSET_WEBSERVER_HOST = "0.0.0.0";
+    SUPERSET_WEBSERVER_PORT_NUMBER = "8088";
+    SUPERSET_WEBSERVER_WORKERS = "4";
+    SUPERSET_WEBSERVER_WORKER_CLASS = "gthread";
+    SUPERSET_WEBSERVER_THREADS = "20";
+    SUPERSET_WEBSERVER_TIMEOUT = "60";
+    SUPERSET_WEBSERVER_KEEPALIVE = "2";
+    SUPERSET_WEBSERVER_MAX_REQUESTS = "0";
+    SUPERSET_WEBSERVER_MAX_REQUESTS_JITTER = "0";
+    SUPERSET_WEBSERVER_LIMIT_REQUEST_LINE = "0";
+    SUPERSET_WEBSERVER_LIMIT_REQUEST_FIELD_SIZE = "0";
+    SUPERSET_WEBSERVER_ACCESS_LOG_FILE = "-";
+    SUPERSET_WEBSERVER_ERROR_LOG_FILE = "-";
+
+    # Celery Flower configuration
+    FLOWER_BASIC_AUTH = "";
+
+    # Database configuration (metadata database)
+    SUPERSET_DATABASE_DIALECT = "postgresql";
+    SUPERSET_DATABASE_HOST = "postgresql";
+    SUPERSET_DATABASE_PORT_NUMBER = "5432";
+    SUPERSET_DATABASE_NAME = "superset";
+    # The Bitnami-derived superset chart injects the metadata DB user as
+    # `SUPERSET_DATABASE_USER`, while this container reads
+    # `SUPERSET_DATABASE_USERNAME`. Bridge the two (mirrors the postgresql
+    # POSTGRES_USER -> POSTGRESQL_USERNAME alias pattern) so the K8s-injected
+    # value wins; falls back to the historical "superset" default for
+    # docker-compose / standalone use where SUPERSET_DATABASE_USER is unset.
+    SUPERSET_DATABASE_USERNAME = "\${SUPERSET_DATABASE_USER:-superset}";
+    SUPERSET_DATABASE_PASSWORD = "";
+    SUPERSET_DATABASE_USE_SSL = "no";
+
+    # Redis configuration (cache and Celery broker)
+    REDIS_HOST = "redis";
+    REDIS_PORT_NUMBER = "6379";
+    REDIS_USER = "";
+    REDIS_PASSWORD = "";
+    REDIS_CELERY_DATABASE = "0";
+    REDIS_RESULTS_DATABASE = "1";
+    REDIS_CACHE_DATABASE = "2";
+    REDIS_USE_SSL = "no";
+
+    # Role configuration (webserver, celery-worker, celery-beat, celery-flower, init)
+    SUPERSET_ROLE = "webserver";
+
+    # Init configuration
+    SUPERSET_LOAD_EXAMPLES = "true";  # Default to loading demo data
+    SUPERSET_SKIP_DATABASE_WAIT = "no";
+    SUPERSET_IMPORT_DATASOURCES = "";
+
+    # Examples database (defaults to metadata DB if empty)
+    # Used by SUPERSET_LOAD_EXAMPLES to store demo data
+    EXAMPLES_DATABASE_DIALECT = "";  # Empty = use SUPERSET_DATABASE_DIALECT
+    EXAMPLES_DATABASE_HOST = "";     # Empty = use SUPERSET_DATABASE_HOST
+    EXAMPLES_DATABASE_PORT_NUMBER = "";
+    EXAMPLES_DATABASE_NAME = "";     # Empty = use SUPERSET_DATABASE_NAME
+    EXAMPLES_DATABASE_USER = "";
+    EXAMPLES_DATABASE_PASSWORD = "";
+    EXAMPLES_DATABASE_USE_SSL = "";
+
+    # Python cache
+    PYTHONPYCACHEPREFIX = "/opt/firestream/superset/tmp/pycache";
+
+    # Debug mode
+    BITNAMI_DEBUG = "false";
+  }
+
+# Variables that support Docker secrets (_FILE suffix)
+, envVarsWithSecrets ? [
+    "SUPERSET_SECRET_KEY"
+    "SUPERSET_USERNAME"
+    "SUPERSET_PASSWORD"
+    "SUPERSET_FIRSTNAME"
+    "SUPERSET_LASTNAME"
+    "SUPERSET_EMAIL"
+    "SUPERSET_DATABASE_HOST"
+    "SUPERSET_DATABASE_PORT_NUMBER"
+    "SUPERSET_DATABASE_NAME"
+    "SUPERSET_DATABASE_USERNAME"
+    "SUPERSET_DATABASE_PASSWORD"
+    "SUPERSET_DATABASE_USE_SSL"
+    "REDIS_HOST"
+    "REDIS_PORT_NUMBER"
+    "REDIS_USER"
+    "REDIS_PASSWORD"
+    "REDIS_CELERY_DATABASE"
+    "REDIS_RESULTS_DATABASE"
+    "REDIS_CACHE_DATABASE"
+    "REDIS_USE_SSL"
+    "FLOWER_BASIC_AUTH"
+    "SUPERSET_LOAD_EXAMPLES"
+    "SUPERSET_SKIP_DATABASE_WAIT"
+    "SUPERSET_IMPORT_DATASOURCES"
+    "SUPERSET_ROLE"
+    "SUPERSET_WEBSERVER_HOST"
+    "SUPERSET_WEBSERVER_PORT_NUMBER"
+    "SUPERSET_WEBSERVER_WORKERS"
+    "SUPERSET_WEBSERVER_TIMEOUT"
+    # Examples database (for demo data)
+    "EXAMPLES_DATABASE_DIALECT"
+    "EXAMPLES_DATABASE_HOST"
+    "EXAMPLES_DATABASE_PORT_NUMBER"
+    "EXAMPLES_DATABASE_NAME"
+    "EXAMPLES_DATABASE_USER"
+    "EXAMPLES_DATABASE_PASSWORD"
+    "EXAMPLES_DATABASE_USE_SSL"
+  ]
+
+, exposedPorts ? [ 8088 5555 ]  # 8088=webserver, 5555=flower
+
+# In-image health/SBOM service configuration (Phase 4). Forwarded to
+# mkPythonContainerModule (which forwards to mkContainerModule). Default-off
+# preserves byte-identical legacy-flake behaviour.
+, health ? { enable = false; port = 9180; readinessCmd = null; }
+
+# Image naming passthrough (parity defaults).
+, imageName ? "firestream-superset"
+, imageTag ? supersetVersion
 }:
 
 let
@@ -234,138 +386,19 @@ in firestream.mkPythonContainerModule {
   version = supersetVersion;
   inherit pythonEnv python;
 
-  # Paths configuration
-  paths = {
-    base = "/opt/superset";
-    conf = "/opt/superset";
-    data = "/opt/superset/superset_home";
-    logs = "/opt/superset/logs";
-  };
+  # Paths, environment variables, and secret-aware variables are externalized
+  # as function arguments (defaults equal to the historical literals). The
+  # legacy flake.nix path uses the defaults; evalContainer passes the same
+  # values from options.nix, yielding identical factory args.
+  inherit paths envVars envVarsWithSecrets;
 
-  # Environment variables with defaults (preserving Bitnami compatibility)
-  envVars = {
-    # Paths
-    SUPERSET_HOME = "/opt/superset/superset_home";
-    SUPERSET_CONFIG_PATH = "/opt/superset/superset_config.py";
-    SUPERSET_LOG_DIR = "/opt/superset/logs";
-    SUPERSET_TMP_DIR = "/opt/superset/tmp";
-    FLASK_APP = "superset.app:create_app()";
-    PYTHONPATH = "/app/pythonpath";
-
-    # User configuration
-    SUPERSET_USERNAME = "admin";
-    SUPERSET_PASSWORD = "admin";
-    SUPERSET_FIRSTNAME = "Superset";
-    SUPERSET_LASTNAME = "Admin";
-    SUPERSET_EMAIL = "admin@superset.local";
-
-    # Webserver configuration
-    SUPERSET_WEBSERVER_HOST = "0.0.0.0";
-    SUPERSET_WEBSERVER_PORT_NUMBER = "8088";
-    SUPERSET_WEBSERVER_WORKERS = "4";
-    SUPERSET_WEBSERVER_WORKER_CLASS = "gthread";
-    SUPERSET_WEBSERVER_THREADS = "20";
-    SUPERSET_WEBSERVER_TIMEOUT = "60";
-    SUPERSET_WEBSERVER_KEEPALIVE = "2";
-    SUPERSET_WEBSERVER_MAX_REQUESTS = "0";
-    SUPERSET_WEBSERVER_MAX_REQUESTS_JITTER = "0";
-    SUPERSET_WEBSERVER_LIMIT_REQUEST_LINE = "0";
-    SUPERSET_WEBSERVER_LIMIT_REQUEST_FIELD_SIZE = "0";
-    SUPERSET_WEBSERVER_ACCESS_LOG_FILE = "-";
-    SUPERSET_WEBSERVER_ERROR_LOG_FILE = "-";
-
-    # Celery Flower configuration
-    FLOWER_BASIC_AUTH = "";
-
-    # Database configuration (metadata database)
-    SUPERSET_DATABASE_DIALECT = "postgresql";
-    SUPERSET_DATABASE_HOST = "postgresql";
-    SUPERSET_DATABASE_PORT_NUMBER = "5432";
-    SUPERSET_DATABASE_NAME = "superset";
-    SUPERSET_DATABASE_USERNAME = "superset";
-    SUPERSET_DATABASE_PASSWORD = "";
-    SUPERSET_DATABASE_USE_SSL = "no";
-
-    # Redis configuration (cache and Celery broker)
-    REDIS_HOST = "redis";
-    REDIS_PORT_NUMBER = "6379";
-    REDIS_USER = "";
-    REDIS_PASSWORD = "";
-    REDIS_CELERY_DATABASE = "0";
-    REDIS_RESULTS_DATABASE = "1";
-    REDIS_CACHE_DATABASE = "2";
-    REDIS_USE_SSL = "no";
-
-    # Role configuration (webserver, celery-worker, celery-beat, celery-flower, init)
-    SUPERSET_ROLE = "webserver";
-
-    # Init configuration
-    SUPERSET_LOAD_EXAMPLES = "true";  # Default to loading demo data
-    SUPERSET_SKIP_DATABASE_WAIT = "no";
-    SUPERSET_IMPORT_DATASOURCES = "";
-
-    # Examples database (defaults to metadata DB if empty)
-    # Used by SUPERSET_LOAD_EXAMPLES to store demo data
-    EXAMPLES_DATABASE_DIALECT = "";  # Empty = use SUPERSET_DATABASE_DIALECT
-    EXAMPLES_DATABASE_HOST = "";     # Empty = use SUPERSET_DATABASE_HOST
-    EXAMPLES_DATABASE_PORT_NUMBER = "";
-    EXAMPLES_DATABASE_NAME = "";     # Empty = use SUPERSET_DATABASE_NAME
-    EXAMPLES_DATABASE_USER = "";
-    EXAMPLES_DATABASE_PASSWORD = "";
-    EXAMPLES_DATABASE_USE_SSL = "";
-
-    # Python cache
-    PYTHONPYCACHEPREFIX = "/opt/superset/tmp/pycache";
-
-    # Debug mode
-    BITNAMI_DEBUG = "false";
-  };
-
-  # Variables that support Docker secrets (_FILE suffix)
-  envVarsWithSecrets = [
-    "SUPERSET_SECRET_KEY"
-    "SUPERSET_USERNAME"
-    "SUPERSET_PASSWORD"
-    "SUPERSET_FIRSTNAME"
-    "SUPERSET_LASTNAME"
-    "SUPERSET_EMAIL"
-    "SUPERSET_DATABASE_HOST"
-    "SUPERSET_DATABASE_PORT_NUMBER"
-    "SUPERSET_DATABASE_NAME"
-    "SUPERSET_DATABASE_USERNAME"
-    "SUPERSET_DATABASE_PASSWORD"
-    "SUPERSET_DATABASE_USE_SSL"
-    "REDIS_HOST"
-    "REDIS_PORT_NUMBER"
-    "REDIS_USER"
-    "REDIS_PASSWORD"
-    "REDIS_CELERY_DATABASE"
-    "REDIS_RESULTS_DATABASE"
-    "REDIS_CACHE_DATABASE"
-    "REDIS_USE_SSL"
-    "FLOWER_BASIC_AUTH"
-    "SUPERSET_LOAD_EXAMPLES"
-    "SUPERSET_SKIP_DATABASE_WAIT"
-    "SUPERSET_IMPORT_DATASOURCES"
-    "SUPERSET_ROLE"
-    "SUPERSET_WEBSERVER_HOST"
-    "SUPERSET_WEBSERVER_PORT_NUMBER"
-    "SUPERSET_WEBSERVER_WORKERS"
-    "SUPERSET_WEBSERVER_TIMEOUT"
-    # Examples database (for demo data)
-    "EXAMPLES_DATABASE_DIALECT"
-    "EXAMPLES_DATABASE_HOST"
-    "EXAMPLES_DATABASE_PORT_NUMBER"
-    "EXAMPLES_DATABASE_NAME"
-    "EXAMPLES_DATABASE_USER"
-    "EXAMPLES_DATABASE_PASSWORD"
-    "EXAMPLES_DATABASE_USE_SSL"
-  ];
+  # Image naming passthrough.
+  inherit imageName imageTag;
 
   # Runtime directories with declarative schema
   runtimeDirs = {
     home = {
-      path = "/opt/superset";
+      path = "/opt/firestream/superset";
       type = "conf";
       persistence = "ephemeral";
       mode = "0755";
@@ -374,7 +407,7 @@ in firestream.mkPythonContainerModule {
       description = "Superset base directory";
     };
     supersetHome = {
-      path = "/opt/superset/superset_home";
+      path = "/opt/firestream/superset/superset_home";
       type = "data";
       persistence = "persistent";
       mode = "0755";
@@ -383,7 +416,7 @@ in firestream.mkPythonContainerModule {
       description = "Superset home directory for user data";
     };
     logs = {
-      path = "/opt/superset/logs";
+      path = "/opt/firestream/superset/superset_home/logs";
       type = "logs";
       persistence = "persistent";
       mode = "0755";
@@ -392,14 +425,14 @@ in firestream.mkPythonContainerModule {
       description = "Superset log files";
     };
     tmp = {
-      path = "/opt/superset/tmp";
+      path = "/opt/firestream/superset/tmp";
       type = "tmp";
       persistence = "ephemeral";
       mode = "1777";
       description = "Temporary files";
     };
     pycache = {
-      path = "/opt/superset/tmp/pycache";
+      path = "/opt/firestream/superset/tmp/pycache";
       type = "cache";
       persistence = "ephemeral";
       mode = "0755";
@@ -438,11 +471,16 @@ in firestream.mkPythonContainerModule {
 
   # Build-time: Static config templates
   prepopulateFiles = {
-    "/opt/superset/superset_config.py.template" = supersetConfigTemplate;
+    "/opt/firestream/superset/superset_config.py.template" = supersetConfigTemplate;
   };
 
+  # Per-container helpers: emitted at top-level of libhelperssuperset.sh by the
+  # engine, so chart init containers can `source /opt/firestream/scripts/libsuperset.sh`
+  # and use these helpers directly.
+  perContainerHelpers = supersetHelpers;
+
   # Validation function
-  validateFn = supersetHelpers + validateScript;
+  validateFn = validateScript;
 
   # Activation: Replace {{PLACEHOLDERS}} with runtime values
   activateFn = ''
@@ -491,8 +529,8 @@ in firestream.mkPythonContainerModule {
     local cache_url="''${redis_base_url}/''${REDIS_CACHE_DATABASE:-2}"
 
     # Process config template
-    local config_template="/opt/superset/superset_config.py.template"
-    local config_file="''${SUPERSET_CONFIG_PATH:-/opt/superset/superset_config.py}"
+    local config_template="/opt/firestream/superset/superset_config.py.template"
+    local config_file="''${SUPERSET_CONFIG_PATH:-/opt/firestream/superset/superset_home/superset_config.py}"
 
     if [[ -f "$config_template" ]]; then
       ${pkgs.gnused}/bin/sed \
@@ -518,10 +556,10 @@ in firestream.mkPythonContainerModule {
   '';
 
   # Initialization - from init.sh
-  initFn = supersetHelpers + initScript;
+  initFn = initScript;
 
   # Runtime config adjustments - from config.sh
-  configFn = supersetHelpers + configScript;
+  configFn = configScript;
 
   # Startup command based on role
   runCmd = ''
@@ -553,8 +591,8 @@ in firestream.mkPythonContainerModule {
 
       celery-beat)
         info "Starting Celery beat scheduler..."
-        beat_pid="/opt/superset/tmp/superset-celerybeat.pid"
-        beat_schedule="/opt/superset/tmp/superset-celerybeat-schedule"
+        beat_pid="/opt/firestream/superset/tmp/superset-celerybeat.pid"
+        beat_schedule="/opt/firestream/superset/tmp/superset-celerybeat-schedule"
         rm -f "$beat_pid"
         exec celery --app=superset.tasks.celery_app:app beat \
           --pidfile "$beat_pid" \
@@ -588,8 +626,9 @@ in firestream.mkPythonContainerModule {
 
   inherit systemDeps runtimeBinDeps;
 
-  exposedPorts = [ 8088 5555 ];  # 8088=webserver, 5555=flower
-  volumes = [ "/opt/superset/superset_home" "/opt/superset/logs" ];
+  inherit exposedPorts;
+  inherit health;
+  volumes = [ "/opt/firestream/superset/superset_home" "/opt/firestream/superset/superset_home/logs" ];
 
   # Python-specific options
   compileByteCode = false;  # Skip for faster builds

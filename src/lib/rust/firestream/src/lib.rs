@@ -18,6 +18,7 @@
 //! use firestream::{k8s_manager, docker_manager, helm_manager};
 //! ```
 
+pub mod app;
 pub mod cli;
 pub mod config;
 pub mod core;

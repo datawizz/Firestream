@@ -1,0 +1,188 @@
+syntax = "proto3";
+
+package firestream_v1;
+
+// Nix flake specification proto — parameterizable skeleton for flake.nix.
+// Captures only the structure that's consistent across containers.
+// Complex overrides (wheel builds with postPatch, source overrides with
+// arbitrary shell code) stay in hand-written Nix referenced by path.
+//
+// What the proto covers vs. what stays in Nix:
+//   In Proto:          flake inputs, supported systems, Python version,
+//                      uv workspace flag, source preference, simple wheel
+//                      overrides (package -> buildInputs), output spec.
+//   In Hand-Written Nix: complex overrides (postPatch, preBuild with shell),
+//                        addSetuptools list (50+ packages), overlay composition
+//                        order, mkVirtualEnv call.
+
+// =============================================================================
+// Top-level flake specification
+// =============================================================================
+
+// Parameterizable flake.nix skeleton.
+message NixFlakeSpec {
+  // Flake description string.
+  string description = 1;
+
+  // Primary nixpkgs input.
+  NixpkgsInput nixpkgs = 2;
+
+  // Additional flake inputs (e.g., flake-utils, pyproject-nix, uv2nix).
+  repeated FlakeInput additional_inputs = 3;
+
+  // Supported systems list (e.g., ["x86_64-linux", "aarch64-linux"]).
+  repeated string supported_systems = 4;
+
+  // Language-specific build configuration.
+  oneof build_config {
+    PythonBuildConfig python = 10;
+    RustBuildConfig rust = 11;
+    NodeBuildConfig node = 12;
+    JavaBuildConfig java = 13;
+  }
+
+  // Flake outputs configuration.
+  FlakeOutputs outputs = 20;
+
+  // Development shell configuration.
+  NixDevShell dev_shell = 21;
+
+  // ESCAPE HATCH: Relative path to hand-written Nix overlay file.
+  // For complex overrides that cannot be expressed in proto.
+  // The generator reads and includes this file verbatim.
+  string nix_override_path = 30;
+}
+
+// =============================================================================
+// Flake inputs
+// =============================================================================
+
+// Primary nixpkgs input.
+message NixpkgsInput {
+  // Nixpkgs URL (e.g., "github:NixOS/nixpkgs/release-25.11").
+  string url = 1;
+}
+
+// Additional flake input.
+message FlakeInput {
+  // Input name (e.g., "flake-utils", "pyproject-nix", "uv2nix").
+  string name = 1;
+
+  // Flake URL.
+  string url = 2;
+
+  // follows declarations (e.g., ["nixpkgs"] means inputs.nixpkgs.follows = "nixpkgs").
+  repeated FlakeInputFollows follows = 3;
+}
+
+// Follows declaration for flake input deduplication.
+message FlakeInputFollows {
+  // Input path to follow (e.g., "nixpkgs", "pyproject-nix").
+  string input = 1;
+
+  // Target to follow (e.g., "nixpkgs"). If empty, follows the parent flake's input.
+  string follows = 2;
+}
+
+// =============================================================================
+// Language-specific build configurations
+// =============================================================================
+
+// Python build configuration — covers the parameterizable parts of uv2nix flakes.
+message PythonBuildConfig {
+  // Python version (e.g., "3.11", "3.12").
+  // Generator resolves to pkgs.python3XX.
+  string python_version = 1;
+
+  // Path to pyproject.toml (relative to flake root).
+  string pyproject_path = 2;
+
+  // Whether this is a uv workspace.
+  bool uv_workspace = 3;
+
+  // Source preference for uv2nix overlay ("wheel" or "sdist").
+  string source_preference = 4;
+
+  // Simple wheel overrides — covers ~80% of cases (addBuildInputs pattern).
+  // Complex overrides (postPatch, preBuild with shell code) belong in
+  // hand-written Nix referenced by source_overrides_path.
+  repeated WheelOverride wheel_overrides = 5;
+
+  // Path to hand-written Nix file for complex source build overrides.
+  // Covers packages like python-ldap (needs postPatch with sed),
+  // mysqlclient (needs pkg-config), and the addSetuptools list.
+  string source_overrides_path = 6;
+}
+
+// Simple wheel override: package needs system libs at runtime.
+// Covers the `overrideAttrs (old: { buildInputs = ... })` pattern.
+message WheelOverride {
+  // Python package name (e.g., "cryptography", "psycopg2-binary").
+  string package_name = 1;
+
+  // Runtime build inputs — Nix package names (e.g., ["openssl", "libffi"]).
+  // Generator maps to: pkgs.${name} in buildInputs.
+  repeated string build_inputs = 2;
+
+  // Build-time only dependencies.
+  // Generator maps to: pkgs.${name} in nativeBuildInputs.
+  repeated string native_build_inputs = 3;
+}
+
+// Rust build configuration.
+message RustBuildConfig {
+  // Rust toolchain version (e.g., "stable", "1.75.0").
+  string toolchain_version = 1;
+
+  // Use crane for building (alternative: naersk, buildRustPackage).
+  bool use_crane = 2;
+}
+
+// Node.js build configuration.
+message NodeBuildConfig {
+  // Node.js major version (e.g., "18", "20", "22").
+  string node_version = 1;
+
+  // Package manager ("npm", "pnpm", "yarn").
+  string package_manager = 2;
+}
+
+// Java build configuration.
+message JavaBuildConfig {
+  // Java version (e.g., "17", "21").
+  string java_version = 1;
+
+  // Build tool ("maven", "gradle", "sbt").
+  string build_tool = 2;
+}
+
+// =============================================================================
+// Flake outputs
+// =============================================================================
+
+// Configuration for what the flake produces.
+message FlakeOutputs {
+  // Whether to produce a Docker image output.
+  bool docker_image = 1;
+
+  // Whether to produce a runtime environment output.
+  bool runtime_env = 2;
+
+  // Whether to produce an entrypoint script output.
+  bool entrypoint = 3;
+
+  // Docker image name (e.g., "firestream-superset").
+  string image_name = 4;
+
+  // Docker image tag (e.g., version string).
+  string image_tag = 5;
+}
+
+// Development shell configuration for the flake.
+message NixDevShell {
+  // Additional Nix packages for the dev shell (package names).
+  repeated string packages = 1;
+
+  // Shell hook bash code.
+  string shell_hook = 2;
+}

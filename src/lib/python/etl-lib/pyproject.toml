@@ -5,17 +5,23 @@ description = "A framework for developing models at scale"
 authors = [{name = "datawizz", email = "36938650+datawizz@users.noreply.github.com"}]
 requires-python = "==3.12.10"
 dependencies = [
-    "confluent-kafka==2.10.0",
+    "boto3==1.38.27",
+    "confluent-kafka[avro,schemaregistry]==2.10.0",
+    "fastavro>=1.9.0",
+    "google-cloud-secret-manager>=2.20.0",
     "pandas==2.2.3",
     "pyspark==3.5.4",
-    #"torch==2.7.0",
-    "boto3==1.38.27",
-    "pydantic==2.11.5"
+    "pydantic==2.11.5",
+    "pydantic-avro>=0.6.0",
+    "pydantic-spark>=0.2.0",
+    "pytz>=2023.0",
+    "requests>=2.28.0",
 ]
 
 [project.optional-dependencies]
 dev = [
-    "pytest>=5.2",
+    "pytest>=7.0",
+    "responses>=0.23.0",
 ]
 
 [build-system]

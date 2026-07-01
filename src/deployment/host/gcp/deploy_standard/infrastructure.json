@@ -1,0 +1,44 @@
+[
+  {
+    "access": {
+      "domain": "pleasantrees.centerpoint.consulting",
+      "id": "8d89da60-cda0-4fc2-83e6-8211de40c0e6"
+    },
+    "storage": {
+      "app_bucket": "gs://app_bucket-511604a",
+      "machine_images": "gs://machine_images-98a458b"
+    },
+    "compute": {
+      "image": {
+        "name": "nixos-images/nixos-image-x86_64-linux.raw.tar.gz",
+        "self_link": "https://www.googleapis.com/storage/v1/b/machine_images-98a458b/o/nixos-images%2Fnixos-image-x86_64-linux.raw.tar.gz",
+        "info": {
+          "gcs_url": "https://www.googleapis.com/storage/v1/b/machine_images-98a458b/o/nixos-images%2Fnixos-image-x86_64-linux.raw.tar.gz",
+          "hash": "31676f76afaf77ae3e805470ab485e60003d99a416d264560d1dd2c387d3eeed",
+          "size": 1536527296,
+          "path": "/workspace/_build/out/nixos-image-x86_64-linux.raw.tar.gz"
+        }
+      },
+      "instance": {
+        "name": "nixos-vm",
+        "external_ip": "34.58.100.144",
+        "self_link": "https://www.googleapis.com/compute/v1/projects/pleasantrees-dev/zones/us-central1-a/instances/nixos-vm"
+      }
+    },
+    "security": {
+      "service_account": "nodeone@pleasantrees-dev.iam.gserviceaccount.com",
+      "deployment_secret": "deployment-secrets",
+      "tunnel": {
+        "id": "7e9decaa-ff48-4082-beb0-a8a98f16c3fe",
+        "credentials": "{\n  \"AccountTag\": \"eb7122e7cd9a9ef517a0e977dedda371\",\n  \"TunnelID\": \"7e9decaa-ff48-4082-beb0-a8a98f16c3fe\",\n  \"TunnelSecret\": \"g0yKB8oSzbFBFRHrH5pnMWA6TcKWalhV\"\n}",
+        "secrets": null
+      },
+      "tailscale": {
+        "auth_key": "tskey-auth-kZvSQrjq3D11CNTRL-n3PpwTZE3cUEtfhYP2SFcUHXwEvNs3gUG",
+        "expiry_date": "2025-02-20",
+        "next_rotation": "2025-02-20",
+        "secrets": null
+      }
+    }
+  }
+]

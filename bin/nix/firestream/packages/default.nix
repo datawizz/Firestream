@@ -20,6 +20,7 @@ let
     firestream = import ./firestream.nix { inherit pkgs lib mkRustPackage; };
     wait-for-port = import ./wait-for-port.nix { inherit pkgs lib mkRustPackage; };
     firestream-vib = import ./firestream-vib.nix { inherit pkgs lib mkRustPackage; };
+    firestream-healthd = import ./firestream-healthd.nix { inherit pkgs lib mkRustPackage; };
   };
 
   # Import metadata library for generating Rust package metadata
@@ -87,4 +88,21 @@ in {
     version = "0.1.0";
     description = "Container verification harness and metadata generator";
   };
+
+  # firestream-healthd: tiny in-image health / SBOM HTTP server
+  # Usage: firestream-healthd [--port 9180] [--readiness-cmd '...'|--readiness-port N|--readiness-http URL]
+  # Phase 2: shipped in every container's Nix store but NOT yet launched by the entrypoint.
+  firestream-healthd = wrapRustPackage {
+    name = "firestream-healthd";
+    package = rawPackages.firestream-healthd;
+    version = "0.1.0";
+    description = "In-container health/SBOM HTTP server (/healthz, /readyz, /metadata, /sbom, /closure)";
+  };
+
+  # seaweedfs-weed: the SeaweedFS `weed` binary (Apache-2.0, single Go binary,
+  # S3-compatible object store). Built via buildGoModule, NOT a Rust package, so
+  # it is exposed directly (no wrapRustPackage / SBOM metadata wrapper). Consumed
+  # by the seaweedfs container's runtimeBinDeps (threaded via the container
+  # flake-module's extraFactoryArgs).
+  seaweedfs-weed = import ./seaweedfs-weed.nix { inherit pkgs lib; };
 }

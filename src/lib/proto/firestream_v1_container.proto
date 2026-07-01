@@ -1,0 +1,449 @@
+syntax = "proto3";
+
+package firestream_v1;
+
+import "google/protobuf/duration.proto";
+
+// Container specification proto — declarative spec that a codegen layer reads
+// to generate module.nix files. Does NOT replace module.nix; it is the input
+// to a Rust generator that produces Nix expressions.
+//
+// Proto → Nix Codegen Boundary:
+//   repeated string system_deps      → with pkgs; [ name1 name2 ]
+//   repeated string runtime_bin_deps → pkgs.${name} mapping
+//   string jdk_package               → pkgs.temurin-bin-17
+//   string python_version            → pkgs.python311
+//   Lifecycle script strings          → Nix string literals verbatim
+//   map<string, string> env_vars     → Nix attrset { PORT = "8088"; }
+
+// =============================================================================
+// Enums
+// =============================================================================
+
+// Container runtime type — selects which mk*ContainerModule factory to use.
+// Maps to the four factories in bin/nix/firestream/containers/.
+enum ContainerRuntimeType {
+  CONTAINER_RUNTIME_TYPE_UNSPECIFIED = 0;
+  CONTAINER_RUNTIME_TYPE_SYSTEM = 1;   // mkContainerModule (containers/base.nix)
+  CONTAINER_RUNTIME_TYPE_PYTHON = 2;   // mkPythonContainerModule (containers/python.nix)
+  CONTAINER_RUNTIME_TYPE_JAVA = 3;     // mkJavaContainerModule (containers/java.nix)
+  CONTAINER_RUNTIME_TYPE_NODE = 4;     // mkNodeContainerModule (containers/node.nix)
+}
+
+// Runtime directory type classification.
+// Maps to runtimeDirs.*.type string values in module.nix.
+enum RuntimeDirType {
+  RUNTIME_DIR_TYPE_UNSPECIFIED = 0;
+  RUNTIME_DIR_TYPE_DATA = 1;
+  RUNTIME_DIR_TYPE_CONF = 2;
+  RUNTIME_DIR_TYPE_LOGS = 3;
+  RUNTIME_DIR_TYPE_CACHE = 4;
+  RUNTIME_DIR_TYPE_TMP = 5;
+  RUNTIME_DIR_TYPE_STATE = 6;
+  RUNTIME_DIR_TYPE_WORK = 7;
+  RUNTIME_DIR_TYPE_PLUGINS = 8;
+  RUNTIME_DIR_TYPE_CUSTOM = 9;
+}
+
+// Persistence type for runtime directories.
+// Maps to runtimeDirs.*.persistence string values.
+enum PersistenceType {
+  PERSISTENCE_TYPE_UNSPECIFIED = 0;
+  PERSISTENCE_TYPE_PERSISTENT = 1;
+  PERSISTENCE_TYPE_EPHEMERAL = 2;
+  PERSISTENCE_TYPE_TMPFS = 3;
+}
+
+// Runtime language for the container (used only here, not common.proto).
+enum RuntimeLanguage {
+  RUNTIME_LANGUAGE_UNSPECIFIED = 0;
+  RUNTIME_LANGUAGE_PYTHON = 1;
+  RUNTIME_LANGUAGE_JAVA = 2;
+  RUNTIME_LANGUAGE_SCALA = 3;
+  RUNTIME_LANGUAGE_NODE = 4;
+  RUNTIME_LANGUAGE_RUST = 5;
+  RUNTIME_LANGUAGE_SYSTEM = 6;
+}
+
+// =============================================================================
+// Top-level container specification
+// =============================================================================
+
+// Complete container specification.
+// Maps to the args of mkContainerModule in containers/base.nix:49-109,
+// with language-specific extensions via the oneof.
+message ContainerSpec {
+  // ── Basic metadata ──
+  // Maps to: name, version args
+  string name = 1;
+  string version = 2;
+
+  // Selects which factory function to use for Nix generation.
+  ContainerRuntimeType runtime_type = 3;
+
+  // ── Paths configuration ──
+  // Maps to: paths arg (default: /opt/firestream/${name}/*)
+  ContainerPaths paths = 4;
+
+  // ── Environment configuration ──
+  // Maps to: envVars arg — the largest block per module.nix (50-100 vars)
+  map<string, string> env_vars = 5;
+
+  // Variables supporting Docker secrets (_FILE suffix pattern).
+  // Maps to: envVarsWithSecrets arg
+  repeated string env_vars_with_secrets = 6;
+
+  // ── Runtime directories ──
+  // Declarative directory specifications (preferred over prepopulate_dirs).
+  // Maps to: runtimeDirs arg
+  repeated RuntimeDir runtime_dirs = 7;
+
+  // ── Container networking ──
+  // Maps to: exposedPorts arg
+  repeated int32 exposed_ports = 8;
+
+  // Maps to: volumes arg
+  repeated string volumes = 9;
+
+  // ── User/group configuration ──
+  // Maps to: user arg (default: 1001:1001)
+  ContainerUser user = 10;
+
+  // ── Dependencies (Nix package names as strings) ──
+  // System packages for the container (libs, tools).
+  // Generator maps to: with pkgs; [ name1 name2 ]
+  // Maps to: systemDeps arg
+  repeated string system_deps = 11;
+
+  // Packages that need to be in PATH at runtime.
+  // Maps to: runtimeBinDeps arg
+  repeated string runtime_bin_deps = 12;
+
+  // Additional deps for mkAppModule.
+  // Maps to: extraDeps arg
+  repeated string extra_deps = 13;
+
+  // ── Lifecycle scripts ──
+  // All lifecycle phases from apps/base.nix:92-107.
+  LifecycleScripts lifecycle = 14;
+
+  // ── Build-time prepopulation ──
+  // Static files to embed at build time (path -> content template).
+  // Maps to: prepopulateFiles arg
+  map<string, string> prepopulate_files = 15;
+
+  // Legacy backward compat: simple list of dir paths.
+  // Maps to: prepopulateDirs arg
+  repeated string prepopulate_dirs = 16;
+
+  // ── Roles ──
+  // Container roles (e.g., webserver, celery-worker for Superset).
+  repeated ContainerRole roles = 17;
+
+  // ── Health check ──
+  HealthCheck health_check = 18;
+
+  // ── Docker configuration overrides ──
+  // Maps to: dockerConfig arg
+  DockerConfig docker_config = 19;
+
+  // Optional bash script that wraps the entrypoint.
+  // Maps to: entrypointWrapper arg
+  string entrypoint_wrapper_script = 20;
+
+  // Additional scripts to include (name -> bash content).
+  // Maps to: customScripts arg
+  map<string, string> custom_scripts = 21;
+
+  // Track config changes via state module.
+  // Maps to: enableStateTracking arg (default true)
+  bool enable_state_tracking = 22;
+
+  // ── Development shell ──
+  DevShellConfig dev_shell = 23;
+
+  // ── Language-specific options ──
+  // Only one applies based on runtime_type.
+  oneof language_options {
+    PythonContainerOptions python = 30;
+    JavaContainerOptions java = 31;
+    NodeContainerOptions node = 32;
+  }
+}
+
+// =============================================================================
+// Lifecycle scripts
+// =============================================================================
+
+// All lifecycle phases from apps/base.nix:92-107.
+// Each field contains bash code passed through verbatim as Nix string literals.
+message LifecycleScripts {
+  // Pre-startup validation. Receives print_validation_error helper.
+  // Maps to: validateFn arg
+  string validate_fn = 1;
+
+  // Runs AFTER validation, BEFORE init — template substitution phase.
+  // Maps to: activateFn arg
+  string activate_fn = 2;
+
+  // One-time initialization — DB setup, user creation.
+  // Maps to: initFn arg
+  string init_fn = 3;
+
+  // Runtime configuration generation.
+  // Maps to: configFn arg
+  string config_fn = 4;
+
+  // Build-time shell code, rarely used.
+  // Maps to: prepopulateFn arg
+  string prepopulate_fn = 5;
+
+  // Main entrypoint / startup command.
+  // Maps to: runCmd arg
+  string run_cmd = 6;
+
+  // External script file references as alternative to inline bash.
+  repeated ScriptFileRef script_files = 7;
+}
+
+// Reference to an external script file.
+message ScriptFileRef {
+  // Script role: "validate", "config", "init", "secrets", "activate".
+  string name = 1;
+
+  // Relative path to the script file (e.g., "./scripts/validate.sh").
+  string path = 2;
+}
+
+// =============================================================================
+// Language-specific options
+// =============================================================================
+
+// Python container options.
+// Maps to ALL params from containers/python.nix:31-99.
+message PythonContainerOptions {
+  // Python version string (e.g., "3.11", "3.12").
+  // Generator resolves to pkgs.python3XX.
+  string python_version = 1;
+
+  // Pre-compile .pyc files at build time for faster startup.
+  // Maps to: compileByteCode arg
+  bool compile_byte_code = 2;
+
+  // Allow pip install at runtime.
+  // Maps to: enablePip arg
+  bool enable_pip = 3;
+
+  // Path to runtime requirements.txt.
+  // Maps to: requirementsPath arg
+  string requirements_path = 4;
+
+  // Override site-packages location.
+  // Maps to: sitePackagesPath arg
+  string site_packages_path = 5;
+
+  // Python-specific build setup bash.
+  // Maps to: pythonPrepopulateFn arg
+  string python_prepopulate_fn = 6;
+}
+
+// Java container options.
+// Maps to ALL params from containers/java.nix:30-102.
+message JavaContainerOptions {
+  // Nix package attribute name for the JDK.
+  // Generator resolves to pkgs.${jdk_package}.
+  // Maps to: jdk arg (e.g., "temurin-bin-17")
+  string jdk_package = 1;
+
+  // JAVA_HOME override (optional, defaults to JDK package path).
+  // Maps to: javaHome arg
+  string java_home = 2;
+
+  // JVM heap options (e.g., "-Xmx1024m -Xms512m").
+  // Maps to: heapOpts arg
+  string heap_opts = 3;
+
+  // GC options (e.g., "-XX:+UseG1GC ...").
+  // Maps to: gcOpts arg
+  string gc_opts = 4;
+
+  // JMX configuration (optional).
+  // Maps to: jmxOpts arg
+  string jmx_opts = 5;
+
+  // Additional JAVA_OPTS.
+  // Maps to: extraJavaOpts arg
+  string extra_java_opts = 6;
+
+  // Explicit CLASSPATH entries.
+  // Maps to: classPath arg
+  repeated string class_path = 7;
+
+  // Directories containing JARs (appended as dir/*).
+  // Maps to: jarDirs arg
+  repeated string jar_dirs = 8;
+
+  // Enable NSS wrapper for Kubernetes arbitrary UID support.
+  // Maps to: enableNssWrapper arg (default true)
+  bool enable_nss_wrapper = 9;
+}
+
+// Node.js container options.
+// Maps to ALL params from containers/node.nix:34-103.
+message NodeContainerOptions {
+  // Node.js major version (e.g., "18", "20", "22").
+  // Generator resolves to pkgs.nodejs_XX.
+  string node_version = 1;
+
+  // Nix attribute for the built Node.js package.
+  // Maps to: nodePackage arg
+  string node_package_attr = 2;
+
+  // NODE_ENV value (e.g., "production", "development").
+  // Maps to: nodeEnv arg
+  string node_env = 3;
+
+  // Allow npm/pnpm install at runtime.
+  // Maps to: enableRuntimeInstall arg
+  bool enable_runtime_install = 4;
+
+  // Path to runtime packages spec.
+  // Maps to: runtimePackagesPath arg
+  string runtime_packages_path = 5;
+
+  // Node-specific HTTP health check port.
+  // Maps to: healthCheckPort arg
+  int32 health_check_port = 6;
+
+  // Health check endpoint path (e.g., "/health").
+  // Maps to: healthCheckPath arg
+  string health_check_path = 7;
+
+  // Seconds between health checks.
+  // Maps to: healthCheckInterval arg
+  int32 health_check_interval = 8;
+}
+
+// =============================================================================
+// Supporting messages
+// =============================================================================
+
+// Runtime directory specification.
+// Maps to entries in the runtimeDirs attrset in module.nix.
+message RuntimeDir {
+  // Directory logical name (e.g., "home", "logs", "tmp").
+  string name = 1;
+
+  // Filesystem path (e.g., "/opt/superset/logs").
+  string path = 2;
+
+  // Directory type classification.
+  RuntimeDirType type = 3;
+
+  // Persistence type.
+  PersistenceType persistence = 4;
+
+  // Unix permission mode (e.g., "0755", "1777").
+  string mode = 5;
+
+  // Owner UID (default 1001).
+  int32 owner = 6;
+
+  // Group GID (default 1001).
+  int32 group = 7;
+
+  // Human-readable description.
+  string description = 8;
+}
+
+// Container user/group configuration.
+// Maps to: user arg in mkContainerModule.
+message ContainerUser {
+  // Username.
+  string name = 1;
+
+  // Group name.
+  string group = 2;
+
+  // User ID (default 1001).
+  int32 uid = 3;
+
+  // Group ID (default 1001).
+  int32 gid = 4;
+}
+
+// Container filesystem paths.
+// Maps to: paths arg in mkContainerModule.
+message ContainerPaths {
+  // Base directory (e.g., "/opt/firestream/${name}").
+  string base = 1;
+
+  // Configuration directory.
+  string conf = 2;
+
+  // Data directory.
+  string data = 3;
+
+  // Logs directory.
+  string logs = 4;
+}
+
+// Container role definition (e.g., webserver, worker).
+message ContainerRole {
+  // Role name (e.g., "webserver", "celery-worker", "init").
+  string name = 1;
+
+  // Startup command for this role.
+  string run_command = 2;
+
+  // Human-readable description.
+  string description = 3;
+
+  // Ports exposed by this role.
+  repeated int32 ports = 4;
+
+  // Role-specific health check.
+  HealthCheck health_check = 5;
+}
+
+// Health check configuration.
+// Maps to Docker HEALTHCHECK and Kubernetes readiness/liveness probes.
+message HealthCheck {
+  // Health check command (e.g., "curl -sf http://localhost:8088/health").
+  string command = 1;
+
+  // Interval between health checks.
+  google.protobuf.Duration interval = 2;
+
+  // Timeout for each check.
+  google.protobuf.Duration timeout = 3;
+
+  // Number of retries before marking unhealthy.
+  int32 retries = 4;
+
+  // Grace period before starting health checks.
+  google.protobuf.Duration start_period = 5;
+}
+
+// Docker image configuration overrides.
+// Maps to: dockerConfig arg in mkContainerModule.
+message DockerConfig {
+  // Working directory in the container.
+  string working_dir = 1;
+
+  // Additional Docker environment entries.
+  repeated string env = 2;
+
+  // Docker labels.
+  map<string, string> labels = 3;
+}
+
+// Development shell configuration.
+// Maps to: devShellPackages + devShellHook args.
+message DevShellConfig {
+  // Additional Nix packages for the dev shell (package names).
+  repeated string additional_packages = 1;
+
+  // Additional shell hook bash code.
+  string shell_hook = 2;
+}

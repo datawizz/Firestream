@@ -31,6 +31,17 @@ pub struct Cli {
     #[arg(long, global = true)]
     pub json: bool,
 
+    /// Path to the Firestream chart bundle (the symlink farm produced by
+    /// `nix build .#firestream-charts-bundle`). Mirrors the
+    /// `firestream-healthd` pattern of a clap-level default + env override.
+    #[arg(
+        long,
+        global = true,
+        env = "FIRESTREAM_CHARTS_DIR",
+        default_value = "/opt/firestream/charts"
+    )]
+    pub charts_dir: PathBuf,
+
     #[command(subcommand)]
     pub command: Option<Command>,
 }
@@ -199,6 +210,28 @@ pub enum Command {
         timeout: u64,
     },
 
+    /// Deploy Helm charts driven by the Nix-emitted chart bundle.
+    ///
+    /// `helm deploy <chart>` resolves a single chart manifest via
+    /// `FIRESTREAM_CHARTS_DIR` and runs it through the lifecycle executor.
+    /// `helm deploy-stack <stack>` does the same for every chart in a named
+    /// stack (e.g. `dev`), skipping entries that aren't yet registered.
+    Helm {
+        #[command(subcommand)]
+        command: HelmCommand,
+    },
+
+    /// Deploy/test/demo an app against docker or kubernetes.
+    ///
+    /// `app list` enumerates the eight canonical Firestream apps and
+    /// their backend / demo-data support. The remaining subcommands
+    /// (`up`/`down`/`health`/`test`/`status`) drive the docker or k8s
+    /// backend; their orchestration is filled in by a later phase.
+    App {
+        #[command(subcommand)]
+        command: AppCommand,
+    },
+
     /// Generate a new project from templates
     Template {
         /// Project name
@@ -331,6 +364,222 @@ pub enum ClusterCommand {
         #[arg(short, long, default_value = "all")]
         namespace: String,
     },
+}
+
+#[derive(Subcommand, Debug)]
+pub enum HelmCommand {
+    /// Deploy a single chart by Firestream name (from the index).
+    Deploy {
+        /// Chart name as registered in `index.json` (e.g. `airflow`).
+        chart: String,
+
+        /// Kubernetes namespace override. Falls back to the manifest's
+        /// `release.namespace`, then to `default`.
+        #[arg(long)]
+        namespace: Option<String>,
+
+        /// Pass `--dry-run` to the underlying `helm upgrade --install`.
+        #[arg(long)]
+        dry_run: bool,
+    },
+
+    /// Deploy every chart in a named stack, in declaration order.
+    DeployStack {
+        /// Stack name as registered in `index.json` (e.g. `dev`).
+        stack: String,
+
+        /// Kubernetes namespace override applied to every chart in the
+        /// stack. Falls back to per-chart `release.namespace` then to
+        /// `default`.
+        #[arg(long)]
+        namespace: Option<String>,
+
+        /// Pass `--dry-run` to the underlying `helm upgrade --install` for
+        /// each chart.
+        #[arg(long)]
+        dry_run: bool,
+    },
+
+    /// Run an on-demand PostgreSQL logical backup now.
+    ///
+    /// Creates a one-shot Job from the chart's `<release>-pgdumpall` CronJob
+    /// (which streams a `pg_dumpall` dump straight into SeaweedFS S3) and waits
+    /// for it to complete.
+    Backup {
+        /// Chart name as registered in `index.json` (e.g. `postgresql`).
+        chart: String,
+
+        /// Kubernetes namespace override. Falls back to the manifest's
+        /// `release.namespace`, then to `default`.
+        #[arg(long)]
+        namespace: Option<String>,
+    },
+
+    /// Restore a PostgreSQL logical backup from SeaweedFS S3.
+    ///
+    /// Renders a one-shot Job that streams the chosen object out of SeaweedFS,
+    /// gunzips it, and pipes it into `psql` against the running primary.
+    Restore {
+        /// Chart name as registered in `index.json` (e.g. `postgresql`).
+        chart: String,
+
+        /// S3 object key (relative to the backup bucket) to restore from,
+        /// e.g. `pg-backups/pg_dumpall-2026-06-28-12-00-00.sql.gz`.
+        #[arg(long)]
+        from: String,
+
+        /// Kubernetes namespace override. Falls back to the manifest's
+        /// `release.namespace`, then to `default`.
+        #[arg(long)]
+        namespace: Option<String>,
+    },
+}
+
+/// Target backend for an `app` subcommand.
+///
+/// `docker` drives the Nix-emitted compose stack (`.#<app>-compose` /
+/// `.#<app>-up`); `k8s` drives the chart bundle through the helm
+/// lifecycle against a (host or ephemeral) k3d cluster.
+#[derive(clap::ValueEnum, Clone, Copy, Debug, PartialEq, Eq, Default)]
+pub enum Backend {
+    /// Local docker / docker-compose backend (default).
+    #[default]
+    Docker,
+    /// Kubernetes (k3d) backend.
+    K8s,
+}
+
+#[derive(Subcommand, Debug)]
+pub enum AppCommand {
+    /// Bring an app up (deploy + wait for readiness).
+    Up {
+        /// App name (one of the canonical apps) or the literal `all`.
+        app: String,
+
+        /// Backend to deploy against.
+        #[arg(long, value_enum, default_value_t = Backend::Docker)]
+        backend: Backend,
+
+        /// Force demo/example data ON (overrides the app default).
+        #[arg(long)]
+        demo: bool,
+
+        /// Force demo/example data OFF (overrides the app default).
+        #[arg(long)]
+        no_demo: bool,
+
+        /// Block until the app reports healthy.
+        #[arg(long)]
+        wait: bool,
+
+        /// Readiness/operation timeout in seconds.
+        #[arg(long, default_value = "300")]
+        timeout: u64,
+
+        /// (k8s only) Create an ephemeral per-run k3d cluster instead of
+        /// using the ambient/host cluster.
+        #[arg(long)]
+        ephemeral: bool,
+
+        /// Kubernetes namespace override (k8s backend).
+        #[arg(long)]
+        namespace: Option<String>,
+
+        /// (k8s only) Skip preloading the chart's `firestream-*` images
+        /// into the target cluster's containerd before the helm deploy.
+        /// By default `up --backend k8s` builds + side-loads the images so
+        /// pods don't `ImagePullBackOff`. Also disabled via
+        /// `FIRESTREAM_APP_PRELOAD=0`.
+        #[arg(long)]
+        no_preload: bool,
+    },
+
+    /// Tear an app down.
+    Down {
+        /// App name or the literal `all`.
+        app: String,
+
+        /// Backend the app was deployed against.
+        #[arg(long, value_enum, default_value_t = Backend::Docker)]
+        backend: Backend,
+
+        /// (k8s only) Also delete the ephemeral cluster created for the
+        /// app, if any.
+        #[arg(long)]
+        ephemeral: bool,
+
+        /// Kubernetes namespace override (k8s backend).
+        #[arg(long)]
+        namespace: Option<String>,
+    },
+
+    /// Probe an app's health.
+    Health {
+        /// App name or the literal `all`.
+        app: String,
+
+        /// Backend to probe.
+        #[arg(long, value_enum, default_value_t = Backend::Docker)]
+        backend: Backend,
+
+        /// Probe timeout in seconds.
+        #[arg(long, default_value = "300")]
+        timeout: u64,
+
+        /// Kubernetes namespace override (k8s backend).
+        #[arg(long)]
+        namespace: Option<String>,
+    },
+
+    /// Up + health (+ optional demo data) as a single test cycle.
+    Test {
+        /// App name or the literal `all`.
+        app: String,
+
+        /// Backend to test against.
+        #[arg(long, value_enum, default_value_t = Backend::Docker)]
+        backend: Backend,
+
+        /// Force demo/example data ON (overrides the app default).
+        #[arg(long)]
+        demo: bool,
+
+        /// Force demo/example data OFF (overrides the app default).
+        #[arg(long)]
+        no_demo: bool,
+
+        /// Block until the app reports healthy (default: true).
+        #[arg(long, default_value = "true")]
+        wait: bool,
+
+        /// Timeout in seconds for each step.
+        #[arg(long, default_value = "300")]
+        timeout: u64,
+
+        /// (k8s only) Create an ephemeral per-run k3d cluster.
+        #[arg(long)]
+        ephemeral: bool,
+
+        /// Kubernetes namespace override (k8s backend).
+        #[arg(long)]
+        namespace: Option<String>,
+
+        /// (k8s only) Skip preloading the chart's `firestream-*` images
+        /// into the target cluster's containerd before the helm deploy.
+        /// Also disabled via `FIRESTREAM_APP_PRELOAD=0`.
+        #[arg(long)]
+        no_preload: bool,
+    },
+
+    /// Show the status of deployed apps.
+    Status {
+        /// Restrict status to a single backend (shows both if omitted).
+        #[arg(long, value_enum)]
+        backend: Option<Backend>,
+    },
+
+    /// List the canonical apps and their backend / demo support.
+    List,
 }
 
 #[derive(Subcommand, Debug)]

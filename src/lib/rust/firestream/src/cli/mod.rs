@@ -5,5 +5,5 @@
 pub mod commands;
 pub mod args;
 
-pub use args::{Cli, Command, ClusterCommand};
+pub use args::{Cli, Command, ClusterCommand, HelmCommand};
 pub use commands::execute_command;

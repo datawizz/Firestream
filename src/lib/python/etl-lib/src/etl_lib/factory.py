@@ -1,24 +1,19 @@
-from enum import unique
-from multiprocessing.sharedctypes import Value
-from typing import List, Dict, Union, Optional, Type
-
-from pyspark.sql import DataFrame as SparkDataFrame
-from datetime import timedelta, datetime
+import traceback
+from datetime import datetime, timedelta
+from typing import List, Type, Union
 
 from etl_lib.context import DataContext
 from etl_lib.model import DataModel
-
 from etl_lib.services.spark.client import SparkClient
-
-# Supported sources for data
+from etl_lib.sink import Console_DataSink, DataSink
 from etl_lib.source import (
-    DataSource,
-    SparkDataFrame_DataSource,
-    Random_DataSource,
     BrownianMotion_DataSource,
-    REST_DataSource,
-    SparkREST_DataSource,
+    DataSource,
     Kafka_DataSource,
+    REST_DataSource,
+    Random_DataSource,
+    SparkDataFrame_DataSource,
+    SparkREST_DataSource,
 )
 
 VALID_SOURCES = [
@@ -26,15 +21,9 @@ VALID_SOURCES = [
     BrownianMotion_DataSource,
     REST_DataSource,
     SparkREST_DataSource,
-    # Kafka_DataSource,
+    Kafka_DataSource,
     SparkDataFrame_DataSource,
 ]
-
-import typing
-import traceback
-
-# Supported sinks for data
-from etl_lib.sink import DataSink, Console_DataSink  # , Kafka_DataSink
 
 VALID_SINKS = [
     Console_DataSink,
@@ -42,46 +31,11 @@ VALID_SINKS = [
 
 
 class DataFactory(DataContext):
-    """
-    The DataFactory makes Data to order.
+    """Build DataModels by composing DataSources.
 
-    It controls recursively building models and parameterizing them.
-
-    The DataFactory will summon Data from Data Sources
-
-    Uses provided model and access method to
-
-    DataFactorys are to DataModels as the RNA is to DNA.
-        i.e. it is a state that is used to translate DNA into Protien (something useable).
-
-    Provides required fields which define a universal representation of data
-
-    * * Locations * *
-
-    * If data is at rest it is stored in Kafka encoded in Avro (with it's schema registered to the topic name)
-    * If data is being computed it is stored in the memory of a Spark worker node as a Spark Dataframe
-    * If data is being transfered it is usually Avro (Spark -> Kafka -> Spark) or text (Vendor -> Kafka)
-    * If data is in a vendor's system
-         it is encoded per their policy and delivered usually as JSON, XML, TEXT, etc
-         it is consistent with the Avro Schema of the referenced model (dataclass)
-            for speed this fact is not always checked.
-
-
-    ### Fields ###
-
-    model:
-        An instance of the DataModel which should be built by the Factory.
-
-    cache:
-        If cached results should be used.
-
-    source:
-        May be set at DataSource (or subclass) OR a DataContext OR another DataFacory?
-
-    sink:
-        The destination to write data to.
-        Defaults to StandardOut
-
+    A factory holds shared parameters (time window, intervals, tickers) and a
+    cache of already-built models, so a model referenced multiple times in a
+    composition graph is only constructed once.
     """
 
     def __init__(
@@ -89,24 +43,13 @@ class DataFactory(DataContext):
         start: Union[str, datetime],
         end: Union[str, datetime],
         model: Union[DataModel, None] = None,
-        source: Union[Type[DataSource], List[Type[DataContext]]] = None,
+        source: Union[Type[DataSource], List[Type[DataContext]], None] = None,
         sink: Union[Type[DataSink], List[Type[DataContext]]] = Console_DataSink,
         intervals: Union[List[timedelta], None] = None,
         tickers: Union[List[str], None] = None,
         cache: bool = True,
+        app_name: str = "etl-lib",
     ):
-
-        # self.spark_client = SparkClient()
-
-        # super().__init__(
-        #     model=model | DataModel,
-        #     start=start,
-        #     end=end,
-        #     cache=cache,
-        #     intervals=intervals,
-        #     # spark_client=self.spark_client,
-        # )
-        print("init")
         self.source = source
         self.sink = sink
         self.start = start
@@ -115,9 +58,7 @@ class DataFactory(DataContext):
         self.tickers = tickers
         self.cache = cache
         self.model = model
-        # assert self.source in VALID_SOURCES
-        # assert self.sink in VALID_SINKS
-        self.spark_client = SparkClient(app_name="TODO_FIX_ME")
+        self.spark_client = SparkClient(app_name=app_name)
         self.built_contexts = {}
 
     def make(
@@ -129,113 +70,71 @@ class DataFactory(DataContext):
         intervals: Union[List[timedelta], None] = None,
         tickers: Union[List[str], None] = None,
     ) -> DataSource:
+        """Build ``model`` from ``source``, reusing cached results when possible.
 
+        ``source`` may be a single ``DataSource`` subclass — in which case it is
+        instantiated and ``.make()`` called directly — or a list of already-built
+        ``DataSource`` instances composed via ``SparkDataFrame_DataSource``.
         """
-        Build the provided model using the provided parameters.
-
-        If a optional parameter is not included substitute the parameter from self.
-
-        If the provided model has already been built using the same parameters
-        (including sources!) then return it rather than rebuiling it.
-
-        If the provided source is a subclass of DataSource then directly build and return it.
-
-        If the provided source is a list of DataContexts use the SparkDataFrame_DataSource
-        to match the built models with the expected inputs.
-
-        Raise an error if there is ambiguity in the requested build.
-
-        Return a DataContext with the built model and a reference to the chain used to build it.
-        """
-
         start = start or self.start
         end = end or self.end
         intervals = intervals or self.intervals
         tickers = tickers or self.tickers
 
-        uniqueness = str([model, source, start, end, intervals, tickers])
-        print(uniqueness)
-        _uuid = hash(uniqueness)
+        cache_key = hash(str([model, source, start, end, intervals, tickers]))
+        if cache_key in self.built_contexts:
+            return self.built_contexts[cache_key]
 
-        # If the exact model has already been built then return the built DataSource
-        if _uuid in self.built_contexts.keys():
-            return self.built_contexts.get(_uuid)
-
+        if isinstance(source, list):
+            for _source in source:
+                if not isinstance(_source, DataSource):
+                    raise ValueError(f"Expected DataSource but got {type(_source)}")
+                if not _source.spark_df:
+                    raise ValueError("Expected source DataFrame to have been built")
+            built = SparkDataFrame_DataSource(
+                sources=source,
+                model=model,
+                start=start,
+                end=end,
+                intervals=intervals,
+                tickers=tickers,
+                spark_client=self.spark_client,
+            ).make()
+        elif isinstance(source, type) and issubclass(source, DataSource):
+            built = source(
+                model=model,
+                start=start,
+                end=end,
+                intervals=intervals,
+                tickers=tickers,
+                spark_client=self.spark_client,
+            )
+            built.make()
         else:
+            raise ValueError(f"Invalid source: {source!r}")
 
-            if isinstance(source, list):
-                for _source in source:
-                    if not isinstance(_source, DataSource):
-                        raise ValueError(
-                            f"Expected data context but got {type(_source)}"
-                        )
+        self.built_contexts[cache_key] = built
+        return built
 
-                    if not _source.spark_df:
-                        raise ValueError(f"Expected dataframe to have been built")
+    def show(self) -> None:
+        """Print every model built by this factory along with its schema."""
+        for key, source in self.built_contexts.items():
+            print(key)
+            print(source)
+            source.spark_df.show()
+            source.spark_df.printSchema()
 
-                # Try to construct the model from the provided sources
-                # and spark dataframes
-                _source = SparkDataFrame_DataSource(
-                    sources=source,
-                    model=model,
-                    start=start,
-                    end=end,
-                    intervals=intervals,
-                    tickers=tickers,
-                    spark_client=self.spark_client,
-                )
-                _source = _source.make()
-                self.built_contexts.update({_uuid: _source})
-                # _source_list = [x for x in self.built_contexts.values()]
-                # return _source_list
+    def run(self, sink: DataSink) -> bool:
+        """Execute the built model graph and write to ``sink``.
 
-            # If the provided source is a DataSource use that directly
-            elif issubclass(source, DataSource):
-                _source = source(
-                    model=model,
-                    start=start,
-                    end=end,
-                    intervals=intervals,
-                    tickers=tickers,
-                    spark_client=self.spark_client,
-                )
-                _source.make()
-                self.built_contexts.update({_uuid: _source})
-                return _source
-
-            else:
-                raise ValueError(f"Invalid input")
-
-        return _source
-
-    def show(self):
+        The end-to-end execution pipeline is not yet implemented.
         """
-        Print details about the built models in self
-        """
+        raise NotImplementedError("DataFactory.run is not yet implemented")
 
-        for k, v in self.built_contexts.items():
-
-            print(k)
-            print(v)
-            v.spark_df.show()
-            v.spark_df.printSchema()
-
-    def run(self, sink: DataSink):
-        """
-        The command to run the built models
-        """
-        return True
-
-    def __enter__(self, **kwargs):
-        """
-        Implements the startup routine when the factory is specified as a context.
-        """
-
+    def __enter__(self) -> "DataFactory":
         return self
 
-    def __exit__(self, exc_type, exc_value, tb):
+    def __exit__(self, exc_type, exc_value, tb) -> bool:
         if exc_type is not None:
             traceback.print_exception(exc_type, exc_value, tb)
-            # return False # uncomment to pass exception through
-
         return True

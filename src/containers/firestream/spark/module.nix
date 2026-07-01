@@ -13,12 +13,121 @@
 { pkgs
 , lib
 , firestream
-, sparkVersion ? "4.0.0"
+# Canonical version arg (matches eval-container's java runtime contract).
+# `sparkVersion` is derived below so the body logic is unchanged.
+, version ? "4.0.0"
 , jdk ? pkgs.temurin-bin-17
 , python ? pkgs.python312
+
+# Externalized core-surface config. Defaults below are EXACTLY today's literals
+# so the legacy flake.nix path (which does not pass these) and evalContainer
+# (which passes the same values from options.nix) yield identical factory args.
+
+# Paths configuration
+, paths ? {
+    base = "/opt/firestream/spark";
+    conf = "/opt/firestream/spark/conf";
+    data = "/firestream/spark/data";
+    logs = "/opt/firestream/spark/logs";
+  }
+
+# Environment variables with defaults
+, envVars ? {
+    # Paths (Bitnami compatibility)
+    BITNAMI_ROOT_DIR = "/opt/bitnami";
+    BITNAMI_VOLUME_DIR = "/bitnami";
+
+    # Firestream paths
+    FIRESTREAM_ROOT_DIR = "/opt/firestream";
+    FIRESTREAM_VOLUME_DIR = "/firestream";
+
+    # Spark paths
+    SPARK_HOME = "/opt/firestream/spark";
+    SPARK_BASE_DIR = "/opt/firestream/spark";
+    SPARK_CONF_DIR = "/opt/firestream/spark/conf";
+    SPARK_DEFAULT_CONF_DIR = "/opt/firestream/spark/conf.default";
+    SPARK_CONF_FILE = "/opt/firestream/spark/conf/spark-defaults.conf";
+    SPARK_WORK_DIR = "/opt/firestream/spark/work";
+    SPARK_LOG_DIR = "/opt/firestream/spark/logs";
+    SPARK_TMP_DIR = "/opt/firestream/spark/tmp";
+    SPARK_JARS_DIR = "/opt/firestream/spark/jars";
+    SPARK_USER_JARS_DIR = "/firestream/spark/jars";
+    SPARK_DATA_DIR = "/firestream/spark/data";
+    SPARK_INITSCRIPTS_DIR = "/docker-entrypoint-initdb.d";
+
+    # Spark mode
+    SPARK_MODE = "master";
+    SPARK_MASTER_URL = "spark://spark-master:7077";
+    SPARK_NO_DAEMONIZE = "true";
+
+    # User configuration
+    SPARK_USER = "spark";
+    SPARK_DAEMON_USER = "spark";
+    SPARK_DAEMON_GROUP = "spark";
+
+    # Security defaults (disabled)
+    SPARK_RPC_AUTHENTICATION_ENABLED = "no";
+    SPARK_RPC_ENCRYPTION_ENABLED = "no";
+    SPARK_LOCAL_STORAGE_ENCRYPTION_ENABLED = "no";
+    SPARK_SSL_ENABLED = "no";
+    SPARK_SSL_NEED_CLIENT_AUTH = "yes";
+    SPARK_SSL_PROTOCOL = "TLSv1.2";
+    SPARK_METRICS_ENABLED = "false";
+
+    # Note: JAVA_HOME is auto-set by mkJavaContainerModule
+
+    # Python configuration
+    PYTHONPATH = "/opt/firestream/spark/python:/opt/firestream/spark/python/lib/py4j-0.10.9.7-src.zip";
+    PYSPARK_PYTHON = "${python}/bin/python3";
+    PYSPARK_DRIVER_PYTHON = "${python}/bin/python3";
+
+    # Debug mode
+    BITNAMI_DEBUG = "false";
+    MODULE = "spark";
+  }
+
+# Variables that support Docker secrets (_FILE suffix)
+, envVarsWithSecrets ? [
+    "SPARK_MODE"
+    "SPARK_MASTER_URL"
+    "SPARK_RPC_AUTHENTICATION_ENABLED"
+    "SPARK_RPC_AUTHENTICATION_SECRET"
+    "SPARK_RPC_ENCRYPTION_ENABLED"
+    "SPARK_LOCAL_STORAGE_ENCRYPTION_ENABLED"
+    "SPARK_SSL_ENABLED"
+    "SPARK_SSL_KEY_PASSWORD"
+    "SPARK_SSL_KEYSTORE_PASSWORD"
+    "SPARK_SSL_KEYSTORE_FILE"
+    "SPARK_SSL_TRUSTSTORE_PASSWORD"
+    "SPARK_SSL_TRUSTSTORE_FILE"
+    "SPARK_SSL_NEED_CLIENT_AUTH"
+    "SPARK_SSL_PROTOCOL"
+    "SPARK_WEBUI_SSL_PORT"
+    "SPARK_METRICS_ENABLED"
+  ]
+
+, exposedPorts ? [
+    7077   # Spark master
+    8080   # Spark master UI
+    8081   # Spark worker UI
+    4040   # Spark application UI
+    6066   # Spark REST submission port
+  ]
+
+# In-image health/SBOM service configuration (Phase 4). Forwarded to
+# mkJavaContainerModule (which forwards to mkContainerModule). Default-off
+# preserves byte-identical legacy-flake behaviour.
+, health ? { enable = false; port = 9180; readinessCmd = null; }
+
+# Image naming passthrough (parity defaults).
+, imageName ? "firestream-spark"
+, imageTag ? version
 }:
 
 let
+  # Alias to keep the body logic identical to the legacy sparkVersion-based code.
+  sparkVersion = version;
+
   # Read external script files
   validateScript = builtins.readFile ./scripts/validate.sh;
   configScript = builtins.readFile ./scripts/config.sh;
@@ -124,15 +233,16 @@ in firestream.mkJavaContainerModule {
   gcOpts = "-XX:+UseG1GC -XX:MaxGCPauseMillis=20 -XX:InitiatingHeapOccupancyPercent=35";
 
   # Classpath: Spark JAR directories
-  jarDirs = [ "/opt/spark/jars" "/firestream/spark/jars" ];
+  jarDirs = [ "/opt/firestream/spark/jars" "/firestream/spark/jars" ];
 
-  # Paths configuration
-  paths = {
-    base = "/opt/spark";
-    conf = "/opt/spark/conf";
-    data = "/firestream/spark/data";
-    logs = "/opt/spark/logs";
-  };
+  # Paths, environment variables, and secret-aware variables are externalized
+  # as function arguments (defaults equal to the historical literals). The
+  # legacy flake.nix path uses the defaults; evalContainer passes the same
+  # values from options.nix, yielding identical factory args.
+  inherit paths envVars envVarsWithSecrets;
+
+  # Image naming passthrough.
+  inherit imageName imageTag;
 
   # User configuration (UID 1001 for Bitnami compatibility)
   user = {
@@ -142,85 +252,10 @@ in firestream.mkJavaContainerModule {
     gid = 1001;
   };
 
-  # Environment variables with defaults
-  envVars = {
-    # Paths (Bitnami compatibility)
-    BITNAMI_ROOT_DIR = "/opt/bitnami";
-    BITNAMI_VOLUME_DIR = "/bitnami";
-
-    # Firestream paths
-    FIRESTREAM_ROOT_DIR = "/opt/firestream";
-    FIRESTREAM_VOLUME_DIR = "/firestream";
-
-    # Spark paths
-    SPARK_HOME = "/opt/spark";
-    SPARK_BASE_DIR = "/opt/spark";
-    SPARK_CONF_DIR = "/opt/spark/conf";
-    SPARK_DEFAULT_CONF_DIR = "/opt/spark/conf.default";
-    SPARK_CONF_FILE = "/opt/spark/conf/spark-defaults.conf";
-    SPARK_WORK_DIR = "/opt/spark/work";
-    SPARK_LOG_DIR = "/opt/spark/logs";
-    SPARK_TMP_DIR = "/opt/spark/tmp";
-    SPARK_JARS_DIR = "/opt/spark/jars";
-    SPARK_USER_JARS_DIR = "/firestream/spark/jars";
-    SPARK_DATA_DIR = "/firestream/spark/data";
-    SPARK_INITSCRIPTS_DIR = "/docker-entrypoint-initdb.d";
-
-    # Spark mode
-    SPARK_MODE = "master";
-    SPARK_MASTER_URL = "spark://spark-master:7077";
-    SPARK_NO_DAEMONIZE = "true";
-
-    # User configuration
-    SPARK_USER = "spark";
-    SPARK_DAEMON_USER = "spark";
-    SPARK_DAEMON_GROUP = "spark";
-
-    # Security defaults (disabled)
-    SPARK_RPC_AUTHENTICATION_ENABLED = "no";
-    SPARK_RPC_ENCRYPTION_ENABLED = "no";
-    SPARK_LOCAL_STORAGE_ENCRYPTION_ENABLED = "no";
-    SPARK_SSL_ENABLED = "no";
-    SPARK_SSL_NEED_CLIENT_AUTH = "yes";
-    SPARK_SSL_PROTOCOL = "TLSv1.2";
-    SPARK_METRICS_ENABLED = "false";
-
-    # Note: JAVA_HOME is auto-set by mkJavaContainerModule
-
-    # Python configuration
-    PYTHONPATH = "/opt/spark/python:/opt/spark/python/lib/py4j-0.10.9.7-src.zip";
-    PYSPARK_PYTHON = "${python}/bin/python3";
-    PYSPARK_DRIVER_PYTHON = "${python}/bin/python3";
-
-    # Debug mode
-    BITNAMI_DEBUG = "false";
-    MODULE = "spark";
-  };
-
-  # Variables that support Docker secrets (_FILE suffix)
-  envVarsWithSecrets = [
-    "SPARK_MODE"
-    "SPARK_MASTER_URL"
-    "SPARK_RPC_AUTHENTICATION_ENABLED"
-    "SPARK_RPC_AUTHENTICATION_SECRET"
-    "SPARK_RPC_ENCRYPTION_ENABLED"
-    "SPARK_LOCAL_STORAGE_ENCRYPTION_ENABLED"
-    "SPARK_SSL_ENABLED"
-    "SPARK_SSL_KEY_PASSWORD"
-    "SPARK_SSL_KEYSTORE_PASSWORD"
-    "SPARK_SSL_KEYSTORE_FILE"
-    "SPARK_SSL_TRUSTSTORE_PASSWORD"
-    "SPARK_SSL_TRUSTSTORE_FILE"
-    "SPARK_SSL_NEED_CLIENT_AUTH"
-    "SPARK_SSL_PROTOCOL"
-    "SPARK_WEBUI_SSL_PORT"
-    "SPARK_METRICS_ENABLED"
-  ];
-
   # Runtime directories with declarative schema
   runtimeDirs = {
     home = {
-      path = "/opt/spark";
+      path = "/opt/firestream/spark";
       type = "conf";
       persistence = "ephemeral";
       mode = "0755";
@@ -229,7 +264,7 @@ in firestream.mkJavaContainerModule {
       description = "Spark installation directory";
     };
     conf = {
-      path = "/opt/spark/conf";
+      path = "/opt/firestream/spark/conf";
       type = "conf";
       persistence = "ephemeral";
       mode = "0755";
@@ -238,7 +273,7 @@ in firestream.mkJavaContainerModule {
       description = "Spark configuration files";
     };
     confDefault = {
-      path = "/opt/spark/conf.default";
+      path = "/opt/firestream/spark/conf.default";
       type = "conf";
       persistence = "ephemeral";
       mode = "0755";
@@ -247,7 +282,7 @@ in firestream.mkJavaContainerModule {
       description = "Default configuration templates";
     };
     work = {
-      path = "/opt/spark/work";
+      path = "/opt/firestream/spark/work";
       type = "work";
       persistence = "ephemeral";
       mode = "0755";
@@ -256,7 +291,7 @@ in firestream.mkJavaContainerModule {
       description = "Spark executor work directory";
     };
     logs = {
-      path = "/opt/spark/logs";
+      path = "/opt/firestream/spark/logs";
       type = "logs";
       persistence = "persistent";
       mode = "0755";
@@ -265,14 +300,14 @@ in firestream.mkJavaContainerModule {
       description = "Spark application and daemon logs";
     };
     tmp = {
-      path = "/opt/spark/tmp";
+      path = "/opt/firestream/spark/tmp";
       type = "tmp";
       persistence = "ephemeral";
       mode = "1777";
       description = "Temporary files";
     };
     jars = {
-      path = "/opt/spark/jars";
+      path = "/opt/firestream/spark/jars";
       type = "data";
       persistence = "ephemeral";
       mode = "0755";
@@ -320,12 +355,16 @@ in firestream.mkJavaContainerModule {
 
   # Build-time: Static config templates
   prepopulateFiles = {
-    "/opt/spark/conf/spark-defaults.conf.template" = sparkDefaultsTemplate;
+    "/opt/firestream/spark/conf/spark-defaults.conf.template" = sparkDefaultsTemplate;
   };
 
+  # Per-container helpers: emitted at top-level of libhelpersspark.sh by the
+  # engine, so chart init containers can `source /opt/bitnami/scripts/libspark.sh`
+  # and use these helpers directly.
+  perContainerHelpers = sparkHelpers;
+
   # Validation function (runs first)
-  # Prepend helpers so functions are available
-  validateFn = sparkHelpers + secretsScript + validateScript + ''
+  validateFn = secretsScript + validateScript + ''
     # Load secrets from files first
     spark_load_secrets
 
@@ -337,9 +376,15 @@ in firestream.mkJavaContainerModule {
   activateFn = ''
     info "Activating Spark configuration..."
 
-    # Process config template if exists
-    local template_file="/opt/spark/conf/spark-defaults.conf.template"
-    local conf_file="/opt/spark/conf/spark-defaults.conf"
+    # Process config template if exists. The template is baked into the image
+    # at /opt/firestream/spark/conf/spark-defaults.conf.template (read-only), but the
+    # output conf_file must live at SPARK_CONF_FILE so K8s-injected env
+    # (Bitnami chart sets /opt/firestream/spark/conf) wins over the baked default.
+    # Without this, charts that mount an emptyDir at /opt/firestream/spark/conf
+    # and enforce readOnlyRootFilesystem would fail with
+    # "/opt/firestream/spark/conf/spark-defaults.conf: Read-only file system".
+    local template_file="/opt/firestream/spark/conf/spark-defaults.conf.template"
+    local conf_file="''${SPARK_CONF_FILE:-/opt/firestream/spark/conf/spark-defaults.conf}"
 
     if [[ -f "$template_file" ]] && [[ ! -f "$conf_file" ]]; then
       ${pkgs.gnused}/bin/sed \
@@ -349,7 +394,9 @@ in firestream.mkJavaContainerModule {
       info "Generated spark-defaults.conf from template"
     fi
 
-    # Save config hash for change detection
+    # Save config hash for change detection. save_config_hash itself is
+    # tolerant of read-only state dirs (Bitnami chart pods); no extra wrapper
+    # needed here.
     if [[ -f "$conf_file" ]]; then
       save_config_hash "spark" "$conf_file"
     fi
@@ -358,8 +405,7 @@ in firestream.mkJavaContainerModule {
   '';
 
   # Initialization (directory setup, first-run config)
-  # Prepend helpers so functions are available
-  initFn = sparkHelpers + configScript + initScript + ''
+  initFn = configScript + initScript + ''
     # Run initialization
     spark_initialize
 
@@ -368,13 +414,20 @@ in firestream.mkJavaContainerModule {
   '';
 
   # Runtime config adjustments
-  configFn = sparkHelpers + configScript;
+  configFn = configScript;
 
   # Startup command based on mode
   runCmd = ''
     ${sparkHelpers}
 
     info "Starting Spark in ''${SPARK_MODE:-master} mode..."
+
+    # The env-defaults set SPARK_HOME=/opt/firestream/spark for bitnami compatibility, but
+    # /opt/firestream/spark only holds writable runtime dirs (conf/, jars/, logs/, work/).
+    # The spark-class wrapper sources $SPARK_HOME/bin/load-spark-env.sh, which
+    # only exists under the nix-store spark package — override SPARK_HOME to
+    # point there before exec.
+    export SPARK_HOME=${pkgs.spark}
 
     case "''${SPARK_MODE:-master}" in
       master)
@@ -383,7 +436,13 @@ in firestream.mkJavaContainerModule {
         ;;
       worker)
         info "Starting Spark Worker connecting to ''${SPARK_MASTER_URL}..."
-        exec ${pkgs.spark}/bin/spark-class org.apache.spark.deploy.worker.Worker "''${SPARK_MASTER_URL}"
+        # Pass --work-dir explicitly so the Worker writes to a writable path.
+        # Bitnami chart sets SPARK_WORK_DIR=/opt/firestream/spark/work (emptyDir);
+        # without --work-dir, spark defaults to $SPARK_HOME/work which is
+        # /nix/store/...spark.../work (read-only).
+        exec ${pkgs.spark}/bin/spark-class org.apache.spark.deploy.worker.Worker \
+          --work-dir "''${SPARK_WORK_DIR:-/opt/firestream/spark/work}" \
+          "''${SPARK_MASTER_URL}"
         ;;
       driver)
         # Kubernetes driver mode
@@ -410,7 +469,7 @@ in firestream.mkJavaContainerModule {
           "''${java_opts[@]}" \
           "-Xms''${SPARK_EXECUTOR_MEMORY:-1g}" \
           "-Xmx''${SPARK_EXECUTOR_MEMORY:-1g}" \
-          -cp '/opt/spark/conf::/opt/spark/jars/*' \
+          -cp '/opt/firestream/spark/conf::/opt/firestream/spark/jars/*' \
           org.apache.spark.scheduler.cluster.k8s.KubernetesExecutorBackend \
           --driver-url "''${SPARK_DRIVER_URL}" \
           --executor-id "''${SPARK_EXECUTOR_ID}" \
@@ -430,18 +489,15 @@ in firestream.mkJavaContainerModule {
   inherit systemDeps runtimeBinDeps;
 
   # Exposed ports
-  exposedPorts = [
-    7077   # Spark master
-    8080   # Spark master UI
-    8081   # Spark worker UI
-    4040   # Spark application UI
-    6066   # Spark REST submission port
-  ];
+  inherit exposedPorts;
+
+  # In-image firestream-healthd (Phase 4).
+  inherit health;
 
   # Volume paths
   volumes = [
-    "/opt/spark/work"
-    "/opt/spark/logs"
+    "/opt/firestream/spark/work"
+    "/opt/firestream/spark/logs"
     "/firestream/spark/data"
     "/firestream/spark/jars"
   ];
