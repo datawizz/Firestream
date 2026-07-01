@@ -81,6 +81,12 @@ help:
 	@echo "  make docs-dev            # Start docs dev server (port 3001)"
 	@echo "  make docs-build          # Build documentation site"
 	@echo "  make docs-clean          # Clean docs build artifacts"
+	@echo ""
+	@echo "=== Homepage ==="
+	@echo ""
+	@echo "  make homepage-dev        # Start homepage dev server (auto port)"
+	@echo "  make homepage-build      # Build homepage site"
+	@echo "  make homepage-clean      # Clean homepage build artifacts"
 
 # ==============================================================================
 # Core Variables
@@ -94,6 +100,9 @@ DEVCONTAINER_PREINIT := docker/firestream/docker_preinit.sh
 
 # Documentation
 DOCS_DIR := src/app/firestream-docs
+
+# Homepage (Lakehouse TCO calculator landing)
+HOMEPAGE_DIR := src/app/firestream-homepage
 
 # Container build script (handles cross-platform Nix builds)
 BUILD_CONTAINER := bin/build-container.sh
