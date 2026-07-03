@@ -148,6 +148,7 @@ in
       REDIS_HOST = "redis";
       REDIS_PORT_NUMBER = "6379";
       REDIS_DATABASE = "1";
+      REDIS_USER = "";
       REDIS_PASSWORD = "";
       AIRFLOW_REDIS_USE_SSL = "no";
 
