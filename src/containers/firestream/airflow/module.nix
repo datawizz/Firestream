@@ -176,6 +176,11 @@
 # options.airflow.vendoredDags, forwarded via extraModuleArgs). Empty ⇒ no
 # vendoring, stock image unchanged.
 , vendoredDags ? [ ]
+
+# Guest-DAG venvs from options.airflow.dagWorkspace, built by the factory as
+# separate uv2nix venvs (list of { name; pythonEnv; mountPath; }). Empty ⇒ no
+# guest venv, stock image unchanged.
+, extraPythonEnvs ? [ ]
 }:
 
 let
@@ -504,7 +509,11 @@ in firestream.mkPythonContainerModule {
 
   # Build-time vendored DAGs: lay the baked /opt/firestream/airflow/dags tree
   # into the image. No-op (empty list) ⇒ no extra dep ⇒ stock image unchanged.
-  extraDeps = lib.optional (vendoredDags != [ ]) vendoredDagsDrv;
+  # Guest venvs: ship each venv's store closure so its materialized symlinks
+  # resolve in-image. lib.optionals keeps the map unforced when the list is empty.
+  extraDeps =
+    lib.optional (vendoredDags != [ ]) vendoredDagsDrv
+    ++ lib.optionals (extraPythonEnvs != [ ]) (map (e: e.pythonEnv) extraPythonEnvs);
 
   # Runtime directories with declarative schema
   # These are created at container startup with proper permissions
@@ -616,13 +625,23 @@ in firestream.mkPythonContainerModule {
   #     (absolute, into the in-image /nix/store).
   #   * Kubernetes refuses a subPath that is itself a symlink escaping the volume,
   #     so venv-base-dir must be a real directory; symlinks *inside* it are fine.
+  # Guest venvs materialize identically at their sibling mountPath (e.g.
+  # /opt/firestream/airflow/dags-venv): a REAL directory of absolute symlinks,
+  # same rationale as the base venv above (cp -r + subPath semantics). Empty
+  # extraPythonEnvs ⇒ concatMapStrings yields "" ⇒ base block unchanged.
   pythonPrepopulateFn = ''
     echo "Materializing airflow venv at /opt/firestream/airflow/venv -> ${pythonEnv}"
     mkdir -p "$out/opt/firestream/airflow/venv"
     for entry in ${pythonEnv}/*; do
       ln -s "$entry" "$out/opt/firestream/airflow/venv/$(basename "$entry")"
     done
-  '';
+  '' + lib.concatMapStrings (e: ''
+    echo "Materializing guest venv at ${e.mountPath} -> ${e.pythonEnv}"
+    mkdir -p "$out${e.mountPath}"
+    for entry in ${e.pythonEnv}/*; do
+      ln -s "$entry" "$out${e.mountPath}/$(basename "$entry")"
+    done
+  '') extraPythonEnvs;
 
   # Per-container helpers: emitted at top-level of libhelpersairflow.sh by the
   # engine, so chart init containers can `source /opt/firestream/scripts/libairflow.sh`

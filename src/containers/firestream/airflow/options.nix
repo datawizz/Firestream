@@ -77,10 +77,43 @@ in
     '';
   };
 
+  # Opt-in guest-DAG Python dependency workspace. When set, its uv2nix
+  # workspace (pyproject.toml + uv.lock, + optional overrides.nix) is resolved
+  # into a SEPARATE venv baked at /opt/firestream/airflow/dags-venv, isolated
+  # from Airflow's own venv. null (default) => stock image byte-for-byte
+  # unchanged — same opt-in discipline as vendoredDags above. Lowered into the
+  # generic `extraWorkspaces` option below (the eval-container.nix seam).
+  options.airflow.dagWorkspace = lib.mkOption {
+    type = lib.types.nullOr (lib.types.submodule {
+      options = {
+        src = lib.mkOption {
+          type = lib.types.path;
+          description = "Directory containing the guest DAG pyproject.toml + uv.lock (+ optional overrides.nix). Resolved via uv2nix into a separate venv baked at /opt/firestream/airflow/dags-venv, isolated from Airflow's own venv.";
+        };
+        overrides = lib.mkOption {
+          type = lib.types.nullOr lib.types.path;
+          default = null;
+          description = "Optional path to an overrides.nix for the guest venv's C-extension packages.";
+        };
+      };
+    });
+    default = null;
+    description = "Opt-in: declare guest-DAG Python dependencies as their own uv2nix workspace. null (default) => stock image unchanged.";
+  };
+
   config.airflow = {
     # Forward the vendored-dags list to module.nix through the factory's
     # extraModuleArgs seam (eval-container.nix splices this into moduleArgs).
     extraModuleArgs.vendoredDags = config.airflow.vendoredDags;
+
+    # Lower the opt-in dagWorkspace into the generic extraWorkspaces option
+    # (declared in eval-container.nix). One entry named "dags" => a separate
+    # venv baked at /opt/firestream/airflow/dags-venv. `python` is omitted so
+    # eval-container's resolver defaults it to cfg.python.
+    extraWorkspaces = lib.optional (config.airflow.dagWorkspace != null) {
+      name = "dags";
+      inherit (config.airflow.dagWorkspace) src overrides;
+    };
 
     version = lib.mkDefault "3.0.3";
 
@@ -97,7 +130,7 @@ in
 
     # Environment variables with defaults (from env-defaults.sh)
     # CRITICAL: per-leaf mkDefault (wrap each value), NOT a whole-set mkDefault.
-    env = builtins.mapAttrs (_: lib.mkDefault) {
+    env = builtins.mapAttrs (_: lib.mkDefault) ({
       # Paths
       AIRFLOW_HOME = "/opt/firestream/airflow";
       AIRFLOW_DAGS_DIR = "/opt/firestream/airflow/dags";
@@ -164,7 +197,12 @@ in
 
       # Debug mode
       BITNAMI_DEBUG = "false";
-    };
+    } // lib.optionalAttrs (config.airflow.dagWorkspace != null) {
+      # Guest-DAG venv (baked only when dagWorkspace is opted in). Points DAG
+      # code at its own isolated interpreter, separate from Airflow's venv.
+      FIRESTREAM_DAGS_VENV = "/opt/firestream/airflow/dags-venv";
+      FIRESTREAM_DAGS_PYTHON = "/opt/firestream/airflow/dags-venv/bin/python";
+    });
 
     # Variables that support Docker secrets (_FILE suffix).
     # Whole-value mkDefault is correct for lists (replacement semantics).

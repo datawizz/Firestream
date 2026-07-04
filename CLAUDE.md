@@ -228,6 +228,41 @@ make airflow
 
 DAGs are located in deployment packages and examples directories.
 
+#### Guest-DAG dependencies: `options.airflow.dagWorkspace`
+
+Guest DAGs that need their **own** Python dependencies declare them as a
+**separate uv2nix workspace**, opt-in via `options.airflow.dagWorkspace = { src;
+overrides ? null; }` (`src/containers/firestream/airflow/options.nix`). `src` is a
+directory holding `pyproject.toml` + `uv.lock` (+ optional `overrides.nix`, auto-loaded
+from the dir). It is resolved through the generic `extraWorkspaces` seam on
+`eval-container.nix`/`python-workspace.nix` into a **separate baked venv** at
+`/opt/firestream/airflow/dags-venv`, isolated from Airflow's own venv
+(`/opt/firestream/airflow/venv`) and its resolution closure. Guest deps are still
+first-class in downstream Nix builds (they flow through the same wheel+sdist overlays and
+appear in the source archive / SBOM). Stock image is byte-identical when unset (same
+discipline as `vendoredDags`); `requires-python` must admit `python312` or the factory
+throws a legible error.
+
+When configured, two env vars are baked into every Airflow pod:
+- `FIRESTREAM_DAGS_VENV=/opt/firestream/airflow/dags-venv`
+- `FIRESTREAM_DAGS_PYTHON=/opt/firestream/airflow/dags-venv/bin/python`
+
+Airflow's scheduler/dag-processor parse DAGs with Airflow's **own** interpreter, so the
+guest venv is deliberately kept off their `PYTHONPATH`. DAGs reach it across a process
+boundary via two tiers:
+- **Tier A / recommended** — `BashOperator` (or `@task.bash`) running
+  `$FIRESTREAM_DAGS_VENV/bin/<console-script>`: separate process, guest venv needs nothing
+  from Airflow. (BashOperator pushes only the *last* stdout line to XCom — emit a single
+  final line or write a file for structured output.) `@task.external_python(python=os.environ["FIRESTREAM_DAGS_PYTHON"])`
+  with **no** `apache-airflow` in the guest is also Tier A: serializable-args-in /
+  return-value-out, no live Airflow context.
+- **Tier B** — the guest pins `apache-airflow==3.0.3` in `external_python` to regain live
+  context + in-callable XCom, at the cost of re-coupling to Airflow's closure and
+  image/build-time blowup. A deliberate tradeoff, not free.
+
+Copy-and-adapt fixture (a working example workspace + DAG showing both shapes):
+`src/templates/airflow_dags_workspace/`.
+
 ## Data Stack Technologies
 
 ### Storage & Catalog

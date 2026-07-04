@@ -1,0 +1,29 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "airflow-guest-dags"
+version = "0.1.0"
+description = "Guest-DAG Python dependencies for the Firestream airflow-dag-dependencies example (config.airflow.dagWorkspace)"
+# MUST admit 3.12: Firestream's factory (python-workspace.nix) throws if the
+# effective interpreter (Airflow's python312) does not satisfy this constraint.
+requires-python = ">=3.12,<3.13"
+dependencies = [
+    # Isolation marker: a light, PURE-PYTHON, wheel-available dependency that is
+    # NOT part of Airflow's own closure. Proves the guest venv is built and
+    # baked separately from /opt/firestream/airflow/venv. (Do NOT use `requests`
+    # here — Airflow depends on it transitively, so it could not prove isolation.)
+    "cowsay>=6.1",
+]
+
+[project.scripts]
+# Console-script exercised by the example DAG's BashOperator via
+# $FIRESTREAM_DAGS_VENV/bin/airflow-guest-dag-demo
+airflow-guest-dag-demo = "airflow_guest_dags.cli:main"
+
+# UV uses PyPI by default and prefers pre-built wheels automatically.
+# Platform detection is automatic - do not hard-code, to allow cross-arch builds.
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/airflow_guest_dags"]
