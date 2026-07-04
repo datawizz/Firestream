@@ -43,7 +43,49 @@ let
         description = ''
           buildNpmPackage `npmDepsHash` for the vendored app's lockfile. Obtain
           it by building once with lib.fakeHash and copying the reported
-          `got: sha256-...`. Required whenever `src` is set.
+          `got: sha256-...`. Required for an npm app (committed package-lock.json).
+        '';
+      };
+
+      # --- pnpm workspace (monorepo) seam ---------------------------------------
+      # Setting pnpmDepsHash switches module.nix to the pnpm builder. Then `src`
+      # is the WORKSPACE ROOT (holds pnpm-workspace.yaml + pnpm-lock.yaml), and
+      # the target Next.js app lives at `appDir` inside it. next.config must set
+      # `output:"standalone"` AND `outputFileTracingRoot` = workspace root, so the
+      # standalone server lands at .next/standalone/<appDir>/server.js.
+      pnpmDepsHash = mkOption {
+        type = types.nullOr types.str;
+        default = null;
+        description = ''
+          `pkgs.pnpm.fetchDeps` FOD hash for the workspace lockfile. Obtain it by
+          building once (fakeHash) and copying the reported `got: sha256-...`.
+          When set, the app is built with pnpm (workspace-aware) instead of npm.
+        '';
+      };
+      appDir = mkOption {
+        type = types.str;
+        default = ".";
+        description = ''
+          Path of the target Next.js package relative to the workspace root
+          (`src`), e.g. "src/app/web". Used for the pnpm `--filter` and for the
+          nested standalone paths (.next/standalone/<appDir>/server.js).
+        '';
+      };
+      packageName = mkOption {
+        type = types.nullOr types.str;
+        default = null;
+        description = ''
+          The target app's package.json `name` for `pnpm --filter` (e.g. "web").
+          Defaults to baseNameOf appDir.
+        '';
+      };
+      buildBefore = mkOption {
+        type = types.listOf types.str;
+        default = [ ];
+        description = ''
+          Workspace packages to build (their `build` script) BEFORE the app, e.g.
+          Vite libraries the app imports: [ "@scope/shared" "@scope/auth" ]. These
+          are also included in the pnpm install filter so their devDeps are present.
         '';
       };
     };
