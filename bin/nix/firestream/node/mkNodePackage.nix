@@ -43,12 +43,18 @@ let
         let
           name = baseNameOf path;
         in
-        # Exclude common build artifacts and dependencies
+        # Exclude common build artifacts and dependencies. `result`/`result-*`
+        # (nix build out-links) and `.direnv` matter when the src is a repo root
+        # that also holds Nix outputs — they'd otherwise become dangling symlinks
+        # in the sandbox.
         !(name == "node_modules" ||
           name == "dist" ||
           name == ".git" ||
+          name == ".direnv" ||
           name == ".pnpm-store" ||
           name == "coverage" ||
+          name == "result" ||
+          lib.hasPrefix "result-" name ||
           lib.hasSuffix ".log" name);
     };
 
@@ -62,6 +68,12 @@ in {
     version,
     src,
     npmDepsHash ? lib.fakeHash,
+
+    # pnpm path (used when a pnpm-lock.yaml is present or packageManager="pnpm").
+    # pnpmDepsHash is the FOD hash of `pkgs.pnpm.fetchDeps`; pnpmWorkspaces is the
+    # set of workspace packages to install (`pnpm --filter`), enabling monorepos.
+    pnpmDepsHash ? null,
+    pnpmWorkspaces ? [ ],
 
     # Optional: Override Node.js version
     nodejs ? defaultNodejs,
@@ -187,30 +199,8 @@ EOF
         runHook postInstall
       '';
 
-    in pkgs.buildNpmPackage ({
-      inherit pname version nodejs npmDepsHash;
-      src = cleanedSrc;
-
-      buildInputs = buildInputs;
-      nativeBuildInputs = nativeBuildInputs ++ lib.optionals isTypeScript [
-        pkgs.nodePackages.typescript
-      ];
-
-      buildPhase = if buildPhase != null then buildPhase else defaultBuildPhase;
-      installPhase = if installPhase != null then installPhase else defaultInstallPhase;
-
-      # Pass through npm flags
-      npmFlags = npmFlags;
-
-      # Merge environment
-      env = {
-        # Disable Puppeteer download (common issue)
-        PUPPETEER_SKIP_CHROMIUM_DOWNLOAD = "true";
-        # Skip optional dependencies that may fail on different platforms
-        npm_config_optional = "false";
-      } // env;
-
-      meta = {
+      # Metadata shared by both package-manager branches
+      commonMeta = {
         description = args.description or "Firestream ${pname}";
         homepage = args.homepage or "https://github.com/Cogent-Creation-Co/Firestream";
         license = lib.licenses.mit;
@@ -219,10 +209,80 @@ EOF
         platforms = lib.platforms.unix;
       } // meta;
 
-    } // (builtins.removeAttrs args [
-      "pname" "version" "src" "npmDepsHash" "nodejs" "packageManager"
-      "typescript" "buildPhase" "installPhase" "entryPoint" "binName"
-      "buildInputs" "nativeBuildInputs" "env" "npmFlags" "skipBinWrapper" "meta"
-      "description" "homepage"
-    ]));
+      # Wrapper-only / builder-specific attrs stripped before pass-through so they
+      # aren't forwarded as derivation attrs to either underlying builder.
+      passthruArgs = builtins.removeAttrs args [
+        "pname" "version" "src" "npmDepsHash" "pnpmDepsHash" "pnpmWorkspaces"
+        "nodejs" "packageManager" "typescript" "buildPhase" "installPhase"
+        "entryPoint" "binName" "buildInputs" "nativeBuildInputs" "env"
+        "npmFlags" "skipBinWrapper" "meta" "description" "homepage"
+      ];
+
+    in
+    if detectedPackageManager == "pnpm"
+    then
+      # pnpm path: offline install via pkgs.pnpm.fetchDeps + configHook. Supports
+      # pnpm WORKSPACES (monorepos) via pnpmWorkspaces (the `pnpm --filter` set),
+      # so a single target package plus its workspace:* deps can be built.
+      let
+        pnpmDeps = pkgs.pnpm.fetchDeps {
+          inherit pname version;
+          src = cleanedSrc;
+          hash = if pnpmDepsHash != null then pnpmDepsHash else lib.fakeHash;
+          inherit pnpmWorkspaces;
+          # Required by this nixpkgs; v1 preserves the original layout.
+          fetcherVersion = 1;
+        };
+      in pkgs.stdenv.mkDerivation ({
+        inherit pname version pnpmDeps pnpmWorkspaces;
+        src = cleanedSrc;
+
+        # pkgs.pnpm.configHook runs `pnpm install --offline --frozen-lockfile`
+        # (with --filter per pnpmWorkspaces) from the fetched store.
+        nativeBuildInputs = [ nodejs pkgs.pnpm pkgs.pnpm.configHook ]
+          ++ nativeBuildInputs
+          ++ lib.optionals isTypeScript [ pkgs.nodePackages.typescript ];
+        inherit buildInputs;
+
+        buildPhase = if buildPhase != null then buildPhase else defaultBuildPhase;
+        installPhase = if installPhase != null then installPhase else defaultInstallPhase;
+
+        # pnpm's node_modules is a symlink farm into .pnpm/; Next.js standalone
+        # tracing copies a subset, leaving harmless dangling links (e.g. semver)
+        # that the default fixup check would otherwise reject.
+        dontCheckForBrokenSymlinks = true;
+
+        env = {
+          PUPPETEER_SKIP_CHROMIUM_DOWNLOAD = "true";
+        } // env;
+
+        meta = commonMeta;
+      } // passthruArgs)
+    else
+      # npm path (unchanged): buildNpmPackage with a committed package-lock.json.
+      pkgs.buildNpmPackage ({
+        inherit pname version nodejs npmDepsHash;
+        src = cleanedSrc;
+
+        buildInputs = buildInputs;
+        nativeBuildInputs = nativeBuildInputs ++ lib.optionals isTypeScript [
+          pkgs.nodePackages.typescript
+        ];
+
+        buildPhase = if buildPhase != null then buildPhase else defaultBuildPhase;
+        installPhase = if installPhase != null then installPhase else defaultInstallPhase;
+
+        # Pass through npm flags
+        npmFlags = npmFlags;
+
+        # Merge environment
+        env = {
+          # Disable Puppeteer download (common issue)
+          PUPPETEER_SKIP_CHROMIUM_DOWNLOAD = "true";
+          # Skip optional dependencies that may fail on different platforms
+          npm_config_optional = "false";
+        } // env;
+
+        meta = commonMeta;
+      } // passthruArgs);
 }
