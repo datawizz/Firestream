@@ -66,6 +66,18 @@ CeleryExecutor + bundled PostgreSQL & Redis.
 | [`airflow-k3s/`](./airflow-k3s) | Local k3s / k3d | Baked DAG; side-load 3 images into containerd → helm → port-forward; inline credentials; `local-path` |
 | [`airflow-docker-compose/`](./airflow-docker-compose) | Docker Compose | Baked DAG; reuses Firestream's generated multi-service compose stack |
 
+A separate Airflow example demonstrates a *different* customization —
+**guest DAG dependencies as a separate uv2nix venv** (`config.airflow.dagWorkspace`).
+Where the trio above bakes a *DAG* into the image, this bakes the *Python
+dependencies* your DAGs need into a **separate, isolated** venv at
+`/opt/firestream/airflow/dags-venv` (Airflow's own closure untouched), reached
+from DAG code via the baked `FIRESTREAM_DAGS_VENV` / `FIRESTREAM_DAGS_PYTHON`
+env vars.
+
+| Example | Target | Highlights |
+|---------|--------|------------|
+| [`airflow-dag-dependencies/`](./airflow-dag-dependencies) | Local k3s / k3d | Guest deps as a `dags-workspace/` uv2nix workspace (committed `uv.lock`) → separate venv via `config.airflow.dagWorkspace`; both consumption shapes (BashOperator → console-script, `@task.external_python`); side-load 3 images; inline credentials; `local-path` |
+
 **Next.js** — a **net-new (non-Bitnami) supported app**: a production Next.js
 server built to standalone output by the Firestream Node factory
 (`mkNodePackage` + `mkNodeContainerModule`), with your app baked into the image

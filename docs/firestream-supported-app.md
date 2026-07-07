@@ -238,6 +238,27 @@ fetches and bakes into `/opt/odoo/vendor-addons` (wired into `addons_path`); a
 downstream repo sets it via `images.odoo.eval` to get a custom image with its
 addons baked in. See `examples/odoo/firestream/odoo-image-overrides.nix`.
 
+Airflow's `options.airflow.dagWorkspace` (`src/containers/firestream/airflow/options.nix`)
+is the same pattern for **guest-DAG Python dependencies**. It takes a directory that is the
+consumer's **own uv2nix workspace** (`pyproject.toml` + `uv.lock`, plus an optional
+`overrides.nix` auto-loaded from the dir). The generic `extraWorkspaces` seam on
+`eval-container.nix` resolves it through uv2nix into a **separate** baked venv at
+`/opt/firestream/airflow/dags-venv` — isolated from Airflow's own venv
+(`/opt/firestream/airflow/venv`) and its resolution closure, yet first-class in downstream
+Nix builds (the guest deps flow through the same wheel+sdist overlays, so they appear in the
+source archive / SBOM). When set, two env vars are baked into every Airflow pod:
+`FIRESTREAM_DAGS_VENV=/opt/firestream/airflow/dags-venv` and
+`FIRESTREAM_DAGS_PYTHON=/opt/firestream/airflow/dags-venv/bin/python`. Because Airflow's
+scheduler/dag-processor parse DAGs with Airflow's own interpreter, the guest venv is
+deliberately kept off their `PYTHONPATH`; DAGs reach it across a process boundary via two
+tiers: **(A)** a `BashOperator`/`@task.bash` running `$FIRESTREAM_DAGS_VENV/bin/<console-script>`
+— separate process, guest venv needs nothing from Airflow (recommended; note BashOperator
+pushes only the *last* stdout line to XCom); or **(B)** `@task.external_python(python=os.environ["FIRESTREAM_DAGS_PYTHON"])`
+— Tier A ships no `apache-airflow` (serializable-in / value-out, no live context, genuinely
+cheap), Tier B pins `apache-airflow==3.0.3` for full context/XCom fidelity at the cost of
+re-coupling to Airflow's closure. `requires-python` must admit `python312`, or the factory
+throws. Copy-and-adapt fixture: `src/templates/airflow_dags_workspace/`.
+
 ---
 
 ## 8. Authoring a new Supported App

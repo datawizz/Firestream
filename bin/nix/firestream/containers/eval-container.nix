@@ -101,6 +101,23 @@ let
         description = "Additional arguments forwarded to the container factory/module.";
       };
 
+      # Additional uv2nix workspaces (beyond the primary one at workspacePath)
+      # built into separate venvs baked into the image. Each entry is resolved
+      # in the `let` block below into the plain factory-arg shape expected by
+      # python-workspace.nix's `extraWorkspaces` (name/src/overrides/python).
+      extraWorkspaces = lib.mkOption {
+        type = lib.types.listOf (lib.types.submodule {
+          options = {
+            name = lib.mkOption { type = lib.types.str; description = "Venv name (becomes /opt/firestream/<container>/<name>-venv)."; };
+            src = lib.mkOption { type = lib.types.path; description = "Directory with pyproject.toml + uv.lock (+ optional overrides.nix)."; };
+            overrides = lib.mkOption { type = lib.types.nullOr lib.types.path; default = null; description = "Optional path to an overrides.nix; if null, <src>/overrides.nix is auto-loaded when present."; };
+            python = lib.mkOption { type = lib.types.nullOr lib.types.package; default = null; description = "Optional Python interpreter for this workspace; defaults to the container's python."; };
+          };
+        });
+        default = [];
+        description = "Additional uv2nix workspaces built into separate venvs baked into the image (e.g. guest DAG deps).";
+      };
+
       # In-image health/SBOM service (firestream-healthd). Phase 3: opt-in per
       # container. When enabled, the base.nix entrypoint wrapper launches
       # firestream-healthd in the background before exec'ing the inner
@@ -281,6 +298,21 @@ let
     then import (workspacePath + "/overrides.nix") { inherit pkgs lib; }
     else {};
 
+  # Resolve cfg.extraWorkspaces into the plain factory-arg shape consumed by
+  # python-workspace.nix (Phase 1): concrete `python` (the factory's
+  # `w.python or python` is an attribute-default, NOT null-coalescing, so a null
+  # here would break mkVirtualEnv) and the OVERRIDES ATTRSET (imported with the
+  # same `{ inherit pkgs lib; }` call contract as the primary `overrides`).
+  # With the default `extraWorkspaces = []`, this is `[]` — a provable no-op.
+  resolvedExtraWorkspaces = map (w: {
+    inherit (w) name src;
+    python = if w.python != null then w.python else cfg.python;
+    overrides =
+      if w.overrides != null then import w.overrides { inherit pkgs lib; }
+      else if builtins.pathExists (w.src + "/overrides.nix") then import (w.src + "/overrides.nix") { inherit pkgs lib; }
+      else {};
+  }) cfg.extraWorkspaces;
+
   # When health.enable is true, the healthd port joins the container's exposed
   # ports so:
   #   (a) the docker image's ExposedPorts includes it,
@@ -313,6 +345,7 @@ let
         inherit workspacePath name;
         version = cfg.version;
         python = cfg.python;
+        extraWorkspaces = resolvedExtraWorkspaces;
         inherit overrides;
         moduleArgs = {
           envVars = cfg.env;
