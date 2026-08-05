@@ -58,6 +58,8 @@
       imports = [
         ./nix/flake-modules/framework.nix
         ./nix/flake-modules/rust.nix
+        ./nix/flake-modules/util.nix
+        ./nix/flake-modules/ci-profile.nix
         ./nix/flake-modules/devshell.nix
         ./nix/flake-modules/checks.nix
         ./nix/flake-modules/registry.nix
@@ -75,6 +77,7 @@
         ./nix/flake-modules/containers/seaweedfs.nix
         ./nix/flake-modules/containers/os-shell.nix
         ./nix/flake-modules/containers/nextjs.nix
+        ./nix/flake-modules/containers/nginx.nix
         ./nix/flake-modules/charts/airflow.nix
         ./nix/flake-modules/charts/postgresql.nix
         ./nix/flake-modules/charts/redis.nix
@@ -85,6 +88,10 @@
         ./nix/flake-modules/charts/odoo.nix
         ./nix/flake-modules/charts/seaweedfs.nix
         ./nix/flake-modules/charts/nextjs.nix
+        ./nix/flake-modules/charts/nginx.nix
+        # cloudflared has NO containers/ counterpart: the connector is
+        # Cloudflare's upstream image, not a Firestream-built one.
+        ./nix/flake-modules/charts/cloudflared.nix
         ./nix/flake-modules/charts/aggregate.nix
         ./nix/flake-modules/charts/checks.nix
       ];

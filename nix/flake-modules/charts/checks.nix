@@ -44,6 +44,8 @@
       supersetBundle = config.firestreamCharts.superset.chartBundle;
       odooBundle = config.firestreamCharts.odoo.chartBundle;
       nextjsBundle = config.firestreamCharts.nextjs.chartBundle;
+      nginxBundle = config.firestreamCharts.nginx.chartBundle;
+      cloudflaredBundle = config.firestreamCharts.cloudflared.chartBundle;
     in {
       checks.airflow-render-fidelity = pkgs.runCommand "airflow-render-fidelity"
         { nativeBuildInputs = [ pkgs.kubernetes-helm ]; } ''
@@ -94,6 +96,11 @@
         # chart's mountPaths. The bare chart obviously doesn't have those,
         # so strip them from BOTH renders before diffing. Match on exact
         # env-var name (trailing `$`) so `AIRFLOW_DATABASE_*` etc. survive.
+        # Phase E: SeaweedFS is the default local S3 backend, so the
+        # flake-module injects five S3_LOCAL_* env vars into every airflow pod
+        # (nix/flake-modules/charts/airflow.nix). The bare chart has no such
+        # block. Strip them from BOTH renders — scoped to these exact five names
+        # so any other S3_* or unexpected env var still shows up as a diff.
         normalise() {
           sed -E \
             -e 's,^([[:space:]]*(postgres-password|password|redis-password|airflow-password|airflow-fernet-key|airflow-secret-key|airflow-jwt-secret-key):[[:space:]]*).*,\1<RANDOM>,' \
@@ -101,6 +108,8 @@
             -e 's,^([[:space:]]*image:[[:space:]]*).*,\1<IMAGE>,' \
             -e '/\.initialized/d' \
             -e '/^[[:space:]]+- name: AIRFLOW_(CONF_FILE|WEBSERVER_CONF_FILE|LOGS_DIR|SCHEDULER_LOGS_DIR|TMP_DIR|DAGS_DIR|PLUGINS_DIR)$/{N;d;}' \
+            -e '/^[[:space:]]+- name: S3_LOCAL_(ENDPOINT_URL|ACCESS_KEY_ID|SECRET_ACCESS_KEY|BUCKET_NAME|DEFAULT_REGION)$/{N;d;}' \
+            -e '/^[[:space:]]+- name: POSTGRESQL_SHARED_PRELOAD_LIBRARIES$/{N;s,value:.*,value: <PRELOAD>,;}' \
             "$1"
         }
         normalise bare.raw.yaml     > bare.yaml
@@ -337,6 +346,7 @@
             -e 's,^([[:space:]]*checksum/secret:[[:space:]]*).*,\1<RANDOM>,' \
             -e 's,^([[:space:]]*image:[[:space:]]*).*,\1<IMAGE>,' \
             -e '/^[[:space:]]+- name: SPARK_(CONF_DIR|CONF_FILE|LOG_DIR|TMP_DIR|WORK_DIR|DATA_DIR|USER_JARS_DIR)$/{N;d;}' \
+            -e '/^[[:space:]]+- name: S3_LOCAL_(ENDPOINT_URL|ACCESS_KEY_ID|SECRET_ACCESS_KEY|BUCKET_NAME|DEFAULT_REGION)$/{N;d;}' \
             "$1"
         }
         normalise bare.raw.yaml     > bare.yaml
@@ -428,6 +438,8 @@
             -e 's,^([[:space:]]*app\.kubernetes\.io/version:[[:space:]]*).*,\1<VERSION>,' \
             -e '/\.initialized/d' \
             -e '/^[[:space:]]+- name: JUPYTERHUB_(CONF_FILE|CONF_DIR|TMP_DIR|PID_FILE|LOGS_DIR|LOG_FILE|DATA_DIR|VOLUME_DIR)$/{N;d;}' \
+            -e '/^[[:space:]]+- name: POSTGRESQL_SHARED_PRELOAD_LIBRARIES$/{N;s,value:.*,value: <PRELOAD>,;}' \
+            -e '/^[[:space:]]+command:$/{N;/- configurable-http-proxy$/d;}' \
             "$1"
         }
         normalise bare.raw.yaml     > bare.yaml
@@ -509,6 +521,8 @@
             -e 's,^([[:space:]]*image:[[:space:]]*).*,\1<IMAGE>,' \
             -e '/\.initialized/d' \
             -e '/^[[:space:]]+- name: SUPERSET_(HOME_DIR|CONFIG_PATH|LOG_DIR|TMP_DIR)$/{N;d;}' \
+            -e '/^[[:space:]]+- name: POSTGRESQL_SHARED_PRELOAD_LIBRARIES$/{N;s,value:.*,value: <PRELOAD>,;}' \
+            -e '/^[[:space:]]+- name: SUPERSET_LOAD_EXAMPLES$/{N;d;}' \
             "$1"
         }
         normalise bare.raw.yaml     > bare.yaml
@@ -651,6 +665,146 @@
           cat fidelity.diff
           exit 1
         fi
+      '';
+
+      # ----------------------------------------------------------------------
+      # nginx render-fidelity check (net-new, non-Bitnami app).
+      #
+      # Like nextjs, nginx authors BOTH its templates and its values.yaml
+      # defaults, so the bare render already uses firestream-nginx. The
+      # Firestream overlay injects only the nginx image triple (a no-op, already
+      # the chart default) and global.security.allowInsecureImages. There are no
+      # subcharts, no secrets, and no path-env remaps. After normalising the
+      # image line and the config checksum annotation, the sparse overlay must
+      # be a byte-for-byte no-op over the bare chart.
+      #
+      # This check does NOT exercise `upstreams` - by design. `upstreams` is
+      # empty in both values.yaml files, so the check verifies exactly what it
+      # should: that the Firestream overlay adds no unintended drift. Upstream
+      # rendering is covered by evaluating charts.nginx.eval with a populated
+      # upstreams tree.
+      # ----------------------------------------------------------------------
+      checks.nginx-render-fidelity = pkgs.runCommand "nginx-render-fidelity"
+        { nativeBuildInputs = [ pkgs.kubernetes-helm ]; } ''
+        set -euo pipefail
+        export HOME="$TMPDIR"
+
+        helm template nginx ${nginxBundle}/chart                            > bare.raw.yaml
+        helm template nginx ${nginxBundle}/chart -f ${nginxBundle}/values.yaml > withVals.raw.yaml
+
+        normalise() {
+          sed -E \
+            -e 's,^([[:space:]]*checksum/[a-z0-9-]+:[[:space:]]*).*,\1<RANDOM>,' \
+            -e 's,^([[:space:]]*image:[[:space:]]*).*,\1<IMAGE>,' \
+            "$1"
+        }
+        normalise bare.raw.yaml     > bare.yaml
+        normalise withVals.raw.yaml > withVals.yaml
+
+        if diff -u bare.yaml withVals.yaml > fidelity.diff; then
+          echo "nginx render fidelity OK: sparse Firestream values are a no-op over the bare chart"
+          mkdir -p "$out"
+          cp fidelity.diff "$out/" 2>/dev/null || true
+        else
+          echo "NGINX RENDER FIDELITY FAILURE - generated values changed the rendered output:"
+          cat fidelity.diff
+          exit 1
+        fi
+      '';
+
+      # ----------------------------------------------------------------------
+      # cloudflared render-fidelity check (net-new, non-Bitnami app).
+      #
+      # The STRONGEST form of this check in the repo. cloudflared is the only
+      # chart with no Firestream-built container, so its flake-module injects
+      # NOTHING: the containerRef is catalogue-only (componentPath = []) and
+      # `allowInsecureImages` is never set. With no consumer overrides the
+      # generated values.yaml is therefore literally empty, and the two renders
+      # must match WITHOUT normalising the image line - unlike every other
+      # chart here, cloudflared's image is not rewritten by the overlay, so a
+      # diff on `image:` would be a genuine regression rather than expected
+      # substitution.
+      #
+      # There are no secrets, no subcharts, no checksum annotations and no
+      # path-env remaps, so no normalisation is needed at all.
+      # ----------------------------------------------------------------------
+      checks.cloudflared-render-fidelity = pkgs.runCommand "cloudflared-render-fidelity"
+        { nativeBuildInputs = [ pkgs.kubernetes-helm pkgs.jq ]; } ''
+        set -euo pipefail
+        export HOME="$TMPDIR"
+
+        helm template cloudflared ${cloudflaredBundle}/chart > bare.yaml
+        helm template cloudflared ${cloudflaredBundle}/chart \
+          -f ${cloudflaredBundle}/values.yaml > withVals.yaml
+
+        if diff -u bare.yaml withVals.yaml > fidelity.diff; then
+          echo "cloudflared render fidelity OK: sparse Firestream values are a no-op over the bare chart"
+        else
+          echo "CLOUDFLARED RENDER FIDELITY FAILURE - generated values changed the rendered output:"
+          cat fidelity.diff
+          exit 1
+        fi
+
+        # Structural assertions the diff alone cannot make. These encode the
+        # chart's architectural commitments, so a future edit that quietly adds
+        # a Service or a ConfigMap fails the build rather than the cluster.
+        assert_absent() {
+          if grep -qE "^kind: $1$" bare.yaml; then
+            echo "CLOUDFLARED FAILURE: chart rendered a $1, which it must never do ($2)"
+            exit 1
+          fi
+        }
+        assert_absent Service   "the connector only dials OUT to the Cloudflare edge"
+        assert_absent ConfigMap "tunnel ingress rules are managed remotely via the Cloudflare API"
+        assert_absent PersistentVolumeClaim "the connector is stateless"
+        assert_absent Ingress   "TLS and routing terminate at the Cloudflare edge"
+        assert_absent Secret    "the token Secret is created out of band by the deploying layer"
+
+        for want in \
+          "kind: Deployment" \
+          "kind: ServiceAccount" \
+          "replicas: 2" \
+          "name: TUNNEL_TOKEN" \
+          "secretKeyRef" \
+          "key: \"tunnel-token\"" ; do
+          if ! grep -qF "$want" bare.yaml; then
+            echo "CLOUDFLARED FAILURE: rendered output is missing: $want"
+            exit 1
+          fi
+        done
+
+        echo "cloudflared structural assertions OK"
+
+        # ------------------------------------------------------------------
+        # THE PIN-DRIFT GATE.
+        #
+        # cloudflared is the one chart whose image triple is stated TWICE: once
+        # in the chart's own values.yaml (which is what renders, because the
+        # containerRef is catalogue-only -- componentPath = []) and once as
+        # `upstreamImage` in nix/flake-modules/charts/cloudflared.nix (which is
+        # what lands in chart-manifest.json, and therefore what the deploy layer
+        # and any SBOM tooling believe is running).
+        #
+        # Nothing in the module system ties them together -- a comment asked a
+        # human to keep them in sync. Assert it instead, against two BUILD
+        # OUTPUTS of the same bundle, so drift is a red build rather than a
+        # manifest that documents an image nobody is running.
+        manifest_ref="$(jq -r '.images.cloudflared | "\(.registry)/\(.repository):\(.tag)"' \
+          ${cloudflaredBundle}/chart-manifest.json)"
+        if ! grep -qF "image: $manifest_ref" bare.yaml; then
+          echo "CLOUDFLARED PIN DRIFT: chart-manifest.json records"
+          echo "    $manifest_ref"
+          echo "but the chart renders:"
+          grep -E '^[[:space:]]*image:' bare.yaml || echo "    (no image line at all)"
+          echo
+          echo "Fix: make src/charts/firestream/cloudflared/values.yaml and"
+          echo "\`upstreamImage\` in nix/flake-modules/charts/cloudflared.nix agree."
+          exit 1
+        fi
+        echo "cloudflared pin OK: manifest and rendered image both $manifest_ref"
+
+        mkdir -p "$out"
+        cp fidelity.diff "$out/" 2>/dev/null || true
       '';
     };
 }

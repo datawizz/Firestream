@@ -25,6 +25,15 @@
 # forwarded via extraModuleArgs). Empty ⇒ no vendoring, stock image unchanged.
 , vendoredAddons ? [ ]
 
+# Ordered addon layers (options.odoo.addonLayers, forwarded via
+# extraModuleArgs). Listed base -> specific; later entries win. Empty ⇒ no
+# addons.d content and an addons_path byte-identical to the pre-layers literal.
+, addonLayers ? [ ]
+
+# Where {{ODOO_ADDONS_DIR}} sits on addons_path (options.odoo.addonsDirPrecedence).
+# "last" is the historical ordering.
+, addonsDirPrecedence ? "last"
+
 # Externalized core-surface config. Defaults below are EXACTLY today's literals
 # so the legacy flake.nix path (which does not pass these) and evalContainer
 # (which passes the same values from options.nix) yield identical factory args.
@@ -61,6 +70,14 @@
     # Port configuration
     ODOO_PORT_NUMBER = "8069";
     ODOO_LONGPOLLING_PORT_NUMBER = "8072";
+
+    # HTTP worker processes. 0 = threaded mode (one process; websockets are
+    # served on ODOO_PORT_NUMBER and NOTHING BINDS the gevent port). Any value
+    # > 0 puts Odoo in prefork mode, which is the only mode that spawns the
+    # gevent worker and therefore the only mode in which
+    # ODOO_LONGPOLLING_PORT_NUMBER is actually listening. A reverse proxy that
+    # splits /websocket off to the gevent port MUST set this > 0.
+    ODOO_WORKERS = "0";
 
     # Bootstrap configuration
     ODOO_SKIP_BOOTSTRAP = "no";
@@ -143,6 +160,31 @@ let
       version = odooVersion;
       specs = vendoredAddons;
     };
+
+  # Ordered addon layers, one output directory each at
+  # $out/opt/firestream/odoo/addons.d/<NN>-<name>/<module>. Built alongside (not
+  # instead of) the legacy derivation above; the legacy output joins this
+  # builder's collision check as the implicit lowest-precedence pseudo-layer
+  # `legacy-vendor-addons`.
+  addonLayersDrv =
+    import ./addon-layers.nix { inherit pkgs lib; } {
+      version = odooVersion;
+      layers = addonLayers;
+      legacyDrv = if vendoredAddons != [ ] then vendoredAddonsDrv else null;
+    };
+
+  # THE addons_path. Rendered by ./addons-layout.nix — the ONE definition, also
+  # consumed by options.nix (which bakes it as ODOO_ADDONS_PATH) and by
+  # scripts/config.sh (which reads that env var). Prefer the baked env value
+  # when present so an explicit consumer override of ODOO_ADDONS_PATH stays
+  # authoritative for BOTH the template and the environment; fall back to
+  # recomputing for the legacy direct-import path, which passes plain envVars
+  # literals.
+  addonsLayout = import ./addons-layout.nix { inherit lib; };
+  addonsPath = envVars.ODOO_ADDONS_PATH or (addonsLayout.mkAddonsPath {
+    layerDirs = addonsLayout.layerDirNames addonLayers;
+    inherit addonsDirPrecedence;
+  });
 
   # Read external script files
   validateScript = builtins.readFile ./scripts/validate.sh;
@@ -382,12 +424,30 @@ let
     firestream.waitForPortPkg  # Required by init scripts for database readiness checks
   ];
 
+  # Odoo major version as an integer, e.g. "18.0" -> 18. Every version dir under
+  # ./{15,16,17,18}/module.nix is a thin `args: import ../module.nix args`, so
+  # odooVersion is the only version signal this module gets.
+  odooMajor = lib.toInt (lib.versions.major odooVersion);
+
+  # The conf key naming the websocket/longpolling port was renamed in Odoo 16.
+  # Odoo <= 15 reads `longpolling_port`; >= 16 reads `gevent_port`. Both default
+  # to 8072, which is why emitting only `gevent_port` appeared to work on 15 --
+  # the key was ignored and the built-in default happened to match. Now that the
+  # chart injects ODOO_LONGPOLLING_PORT_NUMBER from `containerPorts.gevent`, that
+  # coincidence no longer holds and a non-default port would be silently dropped
+  # on 15.
+  geventPortKey = if odooMajor >= 16 then "gevent_port" else "longpolling_port";
+
   # Odoo config template with {{PLACEHOLDER}} syntax
   odooConfigTemplate = ''
     [options]
-    ; Addons paths. /opt/firestream/odoo/vendor-addons is the baked, read-only directory
-    ; populated at build time from config.odoo.vendoredAddons (empty otherwise).
-    addons_path = /opt/firestream/odoo/addons,/opt/firestream/odoo/odoo/addons,/opt/firestream/odoo/vendor-addons,{{ODOO_ADDONS_DIR}}
+    ; Addons paths. Computed ONCE by ./addons-layout.nix and shared with the
+    ; baked ODOO_ADDONS_PATH env var and scripts/config.sh's fallback generator;
+    ; do not hardcode a copy here. /opt/firestream/odoo/vendor-addons is the
+    ; baked read-only directory populated from config.odoo.vendoredAddons, and
+    ; /opt/firestream/odoo/addons.d/<NN>-<name> are the ordered
+    ; config.odoo.addonLayers directories (both empty otherwise).
+    addons_path = ${addonsPath}
 
     ; Admin password for database management
     admin_passwd = {{ODOO_PASSWORD}}
@@ -407,7 +467,14 @@ let
 
     ; HTTP configuration
     http_port = {{ODOO_PORT_NUMBER}}
-    gevent_port = {{ODOO_LONGPOLLING_PORT_NUMBER}}
+    ${geventPortKey} = {{ODOO_LONGPOLLING_PORT_NUMBER}}
+
+    ; HTTP worker processes. MUST be > 0 for gevent_port above to be bound at
+    ; all: Odoo only spawns the gevent (websocket/longpolling) worker in prefork
+    ; mode. With workers = 0 Odoo runs threaded and serves websockets on
+    ; http_port instead, so a proxy pointing /websocket at gevent_port gets
+    ; connection-refused.
+    workers = {{ODOO_WORKERS}}
 
     ; Performance
     limit_time_cpu = 90
@@ -431,7 +498,14 @@ in firestream.mkPythonContainerModule {
   # as function arguments (defaults equal to the historical literals). The
   # legacy flake.nix path uses the defaults; evalContainer passes the same
   # values from options.nix, yielding identical factory args.
-  inherit paths envVars envVarsWithSecrets;
+  inherit paths envVarsWithSecrets;
+
+  # ODOO_ADDONS_PATH is injected here rather than restated in the envVars
+  # default so that BOTH the options.nix path and the legacy direct-import path
+  # ship it. `//` with the computed value on the left means a caller-supplied
+  # ODOO_ADDONS_PATH still wins (and `addonsPath` above already resolves to that
+  # same caller value, keeping the template in step).
+  envVars = { ODOO_ADDONS_PATH = addonsPath; } // envVars;
 
   # Image naming passthrough.
   inherit imageName imageTag;
@@ -486,6 +560,22 @@ in firestream.mkPythonContainerModule {
       owner = 1001;
       group = 1001;
       description = "Build-time vendored Odoo addons (read-only baseline)";
+    };
+    # PARENT of the ordered addon-layer directories baked from
+    # config.odoo.addonLayers (/opt/firestream/odoo/addons.d/<NN>-<name>). ONE
+    # declaration for the parent, not one per layer: the per-layer dirs are
+    # image content produced by ./addon-layers.nix, and declaring the parent
+    # ephemeral only guarantees it exists so addons_path stays valid when there
+    # are zero layers. Like vendorAddons it is immutable image content, so it is
+    # deliberately NOT in ODOO_DATA_TO_PERSIST and the chart never remaps it.
+    addonLayersDir = {
+      path = "/opt/firestream/odoo/addons.d";
+      type = "data";
+      persistence = "ephemeral";
+      mode = "0755";
+      owner = 1001;
+      group = 1001;
+      description = "Build-time ordered Odoo addon layers (read-only baseline)";
     };
     logs = {
       path = "/opt/firestream/odoo/log";
@@ -588,6 +678,7 @@ in firestream.mkPythonContainerModule {
         -e "s|{{ODOO_DATABASE_USER}}|''${ODOO_DATABASE_USER:-firestream}|g" \
         -e "s|{{ODOO_PORT_NUMBER}}|''${ODOO_PORT_NUMBER:-8069}|g" \
         -e "s|{{ODOO_LONGPOLLING_PORT_NUMBER}}|''${ODOO_LONGPOLLING_PORT_NUMBER:-8072}|g" \
+        -e "s|{{ODOO_WORKERS}}|''${ODOO_WORKERS:-0}|g" \
         -e "s|{{ODOO_LIST_DB}}|''${list_db_val}|g" \
         -e "s|{{ODOO_LOG_LEVEL}}|''${log_level_val}|g" \
         "$template_file" > "$conf_file"
@@ -626,7 +717,22 @@ in firestream.mkPythonContainerModule {
 
   inherit exposedPorts;
   inherit health;
-  volumes = [ "/firestream/odoo/data" "/opt/firestream/odoo/addons" "/bitnami/python" "/docker-entrypoint-init.d" ];
+  # Declare the volume at /firestream/odoo, NOT the /firestream/odoo/data child.
+  # Everything that must survive a container recreate lives under this parent:
+  # the filestore (data/filestore -- ir_attachment.store_fname points into it),
+  # the persistence marker (.app_initialized) and .state. Declaring only the
+  # `data` child left the marker on the container's writable layer, so every
+  # recreate re-ran module install against an already-populated DB, and -- with
+  # a DB on a *named* volume outliving an *anonymous* data volume -- left
+  # ir_attachment rows pointing at files that no longer existed (asset bundles
+  # then 500 and the login form never un-hides).
+  #
+  # The parent also matches the chart's `mountPath: /firestream/odoo` exactly.
+  # A PVC at the parent with an image VOLUME at the child is the shadowing bug
+  # documented in containers/base.nix -- the nested VOLUME masks the PVC subdir.
+  # base.nix drops strict children of a declared volume, so naming the parent
+  # here removes the nested `paths.data` declaration automatically.
+  volumes = [ "/firestream/odoo" "/opt/firestream/odoo/addons" "/bitnami/python" "/docker-entrypoint-init.d" ];
 
   user = {
     name = "odoo";
@@ -640,11 +746,12 @@ in firestream.mkPythonContainerModule {
   requirementsPath = "/bitnami/python/requirements.txt";
   enablePip = true;
 
-  # Extra packages for the container. The vendored-addons derivation is only
-  # appended when specs are present, so an empty list yields a byte-identical
-  # closure to the pre-vendoring image.
+  # Extra packages for the container. Each addons derivation is appended only
+  # when its list is non-empty, so the stock image's closure is byte-identical
+  # to the pre-vendoring / pre-layers image.
   extraDeps = [ odooSource ]
-    ++ lib.optional (vendoredAddons != [ ]) vendoredAddonsDrv;
+    ++ lib.optional (vendoredAddons != [ ]) vendoredAddonsDrv
+    ++ lib.optional (addonLayers != [ ]) addonLayersDrv;
 
   # Development shell extras
   devShellPackages = with pkgs; [ uv docker docker-compose ];
